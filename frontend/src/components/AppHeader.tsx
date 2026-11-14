@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3656a554e6f70cdbc61bd1e3392b8d0e8cdb41d1a9abde99eecd85c7ed4b82e5
+@cypher schema=1 source_sha256=82a08e8bd4f58728aca4ec5e7389f5becbd78b9fdc2d1a266e4bc2bb472fb302
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:IMPORTS]->(guardedLink)
@@ -17,7 +17,6 @@ import {
   Bell,
   Settings,
   Search,
-  LayoutGrid,
   Plus,
   X,
   Sparkles,
@@ -119,7 +118,7 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
+              className="h-9 w-9 grid place-items-center text-ink-mute hover:text-accent border border-line bg-bg-card hover:bg-accent/10 rounded-lg transition-colors shrink-0"
             >
               <Plus size={14} />
             </button>
@@ -139,17 +138,6 @@ export function AppHeader() {
 
           {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, dot, avatar === */}
           <div className="ml-auto flex items-center gap-2">
-            {/* === 右上角应用菜单 / App Matrix 抽屉按钮 (icon-only) === */}
-            <button
-              type="button"
-              onClick={openMatrix}
-              data-testid="app-matrix-trigger"
-              aria-label={t.ariaLabels.openAppMatrix}
-              className="size-9 grid place-items-center border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] text-[var(--cel-cyan,var(--color-primary))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all cel-shadow shrink-0 group"
-            >
-              <LayoutGrid size={14} className="group-hover:scale-110 transition-transform duration-200" />
-            </button>
-
             <ThemeSwitcher />
 
             <button
@@ -157,7 +145,7 @@ export function AppHeader() {
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
               aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-1.5 h-9 px-2 border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] text-[var(--cel-text-primary,var(--color-text))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all text-xs cel-shadow shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1.5 h-9 px-2 border border-line bg-bg-card text-ink hover:bg-accent/10 transition-all text-xs rounded-lg shrink-0 whitespace-nowrap"
             >
               <Search size={13} className="text-[var(--cel-cyan,var(--color-primary))] shrink-0" />
               <kbd className="inline-flex items-center justify-center text-[10px] font-mono px-1.5 border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-gold,var(--color-accent))] font-black">⌘K</kbd>
@@ -167,7 +155,7 @@ export function AppHeader() {
               type="button"
               data-testid="notifications-bell"
               aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative size-9 grid place-items-center text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
+              className="relative size-9 grid place-items-center text-ink hover:text-accent border border-line bg-bg-card hover:bg-accent/10 rounded-lg transition-colors shrink-0"
             >
               <Bell size={15} />
               {notifCount > 0 && (

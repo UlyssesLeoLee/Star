@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9a6e5a3334081ea749aed2b80178b748e7ee5128d1457a3f737573caa4f24742
+@cypher schema=1 source_sha256=d23475ed934ec8a02fa43eb4a1b53aba97a58abb7fecca78fcb4dcb8f1a34d9a
 MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.tsx"})
 @endcypher
 */
@@ -342,7 +342,7 @@ function IssuesPageInner() {
         {selectedWi && (
           <aside
             data-testid="issues-detail-sidebar"
-            className="w-80 shrink-0 border-l-2 border-black bg-[var(--cel-surface-sub,#151c2c)] overflow-y-auto cel-shadow"
+            className="w-80 shrink-0 border-l-2 border-black bg-[var(--cel-surface-sub, var(--color-surface))] overflow-y-auto shadow-soft"
             aria-label={t.ariaLabels.issueDetail}
           >
             <IssuesDetailSidebar
@@ -643,7 +643,7 @@ function IssuesSprintView({
                 <div
                   key={st}
                   data-testid={`issues-sprint-col-${sprint.id}-${st}`}
-                  className="border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] p-2 min-h-[80px] cel-shadow"
+                  className="border-2 border-black bg-[var(--cel-surface-sub, var(--color-surface))] p-2 min-h-[80px] shadow-soft"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <StatusPill value={st} size="xs" />

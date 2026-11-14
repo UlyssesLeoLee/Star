@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=94a17ce21793605df3d47bb004d754d4ab4b128275090c20a8a57c55e1622f79
+@cypher schema=1 source_sha256=101670cce6616e9420ac819fec73c1716b247b058ee19b433ad519b274c7f9ae
 MERGE (self:File {path:"frontend/src/components/agent-view/AgentCanvasView.tsx"})
 MERGE (agentCanvasTypes:File {path:"frontend/src/lib/agent-view/types.ts"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
@@ -627,10 +627,10 @@ export function AgentCanvasView({
     const isMultiSelected = multiSelected.has(a.id);
     const isConnectSource = a.id === connectSourceId;
     const outline = isConnectSource
-      ? "var(--cel-gold,#ffc400)"
+      ? "var(--cel-gold, var(--warn-DEFAULT))"
       : isSelected || isMultiSelected
-        ? "var(--cel-cyan,#00f0ff)"
-        : "var(--cel-ink,#30363d)";
+        ? "var(--cel-cyan, var(--accent-DEFAULT))"
+        : "var(--cel-ink, var(--color-border))";
     const baseTestId = `annotation-${a.id}`;
     const onAnnotationClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -728,18 +728,18 @@ export function AgentCanvasView({
                     width: "100%",
                     height: "100%",
                     fontSize: 14 * viewport.zoom,
-                    color: "var(--cel-text-primary,#e6edf3)",
+                    color: "var(--cel-text-primary, var(--color-text))",
                     lineHeight: 1.3,
                     fontFamily: "system-ui",
                     background: "rgba(0,0,0,0.4)",
-                    border: "1px solid var(--cel-cyan,#00f0ff)",
+                    border: "1px solid var(--cel-cyan, var(--accent-DEFAULT))",
                     outline: "none",
                     padding: 4,
                     resize: "none",
                   }}
                 />
               ) : (
-                <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary,#e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000", whiteSpace: "pre-wrap" }}>
+                <div style={{ fontSize: 14 * viewport.zoom, color: "var(--cel-text-primary, var(--color-text))", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden", textShadow: "0 0 4px #000", whiteSpace: "pre-wrap" }}>
                   {text || (isSelected ? "(双击编辑)" : "")}
                 </div>
               )}
@@ -848,14 +848,14 @@ export function AgentCanvasView({
       {/* 画布工具栏 */}
       <div
         data-testid="agent-canvas-toolbar"
-        className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-[var(--cel-surface-card,#0f1422)] border-2 border-black p-1 cel-shadow"
+        className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black p-1 shadow-soft"
       >
         <button
           onClick={() => setTool("select")}
-          className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${
+          className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${
             tool === "select"
-              ? "bg-[var(--cel-cyan,#00f0ff)] text-black"
-              : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"
+              ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black"
+              : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"
           }`}
           title={t.ariaLabels.canvasSelect}
         >
@@ -863,10 +863,10 @@ export function AgentCanvasView({
         </button>
         <button
           onClick={() => setTool("pan")}
-          className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${
+          className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${
             tool === "pan"
-              ? "bg-[var(--cel-gold,#ffc400)] text-black"
-              : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"
+              ? "bg-[var(--cel-gold, var(--warn-DEFAULT))] text-black"
+              : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"
           }`}
           title={t.ariaLabels.canvasPan}
         >
@@ -875,21 +875,21 @@ export function AgentCanvasView({
         <div className="w-[1.5px] h-5 bg-black mx-0.5" />
         <button
           onClick={() => setViewport((v) => ({ ...v, zoom: Math.min(4, v.zoom * 1.2) }))}
-          className="p-1.5 bg-[var(--cel-surface-sub,#151c2c)] border border-black text-ink-dim hover:text-white transition-colors"
+          className="p-1.5 bg-[var(--cel-surface-sub, var(--color-surface))] border border-line text-ink-dim hover:text-ink transition-colors"
           title={t.ariaLabels.canvasZoomIn}
         >
           <ZoomIn size={13} />
         </button>
         <button
           onClick={() => setViewport((v) => ({ ...v, zoom: Math.max(0.1, v.zoom / 1.2) }))}
-          className="p-1.5 bg-[var(--cel-surface-sub,#151c2c)] border border-black text-ink-dim hover:text-white transition-colors"
+          className="p-1.5 bg-[var(--cel-surface-sub, var(--color-surface))] border border-line text-ink-dim hover:text-ink transition-colors"
           title={t.ariaLabels.canvasZoomOut}
         >
           <ZoomOut size={13} />
         </button>
         <button
           onClick={() => setViewport(canvas.viewport)}
-          className="p-1.5 bg-[var(--cel-surface-sub,#151c2c)] border border-black text-ink-dim hover:text-white transition-colors"
+          className="p-1.5 bg-[var(--cel-surface-sub, var(--color-surface))] border border-line text-ink-dim hover:text-ink transition-colors"
           title={t.ariaLabels.canvasFit}
         >
           <Maximize2 size={13} />
@@ -899,7 +899,7 @@ export function AgentCanvasView({
           <>
             <button
               onClick={() => setTool("sticky")}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "sticky" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "sticky" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
               title="新增便利贴"
               data-testid="agent-canvas-tool-sticky"
             >
@@ -907,7 +907,7 @@ export function AgentCanvasView({
             </button>
             <button
               onClick={() => setTool("text")}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "text" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "text" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
               title="新增文字"
               data-testid="agent-canvas-tool-text"
             >
@@ -915,7 +915,7 @@ export function AgentCanvasView({
             </button>
             <button
               onClick={() => setTool("shape")}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "shape" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "shape" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
               title="新增图形"
               data-testid="agent-canvas-tool-shape"
             >
@@ -923,7 +923,7 @@ export function AgentCanvasView({
             </button>
             <button
               onClick={() => setTool("brush")}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "brush" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "brush" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
               title="自由画笔"
               data-testid="agent-canvas-tool-brush"
             >
@@ -937,7 +937,7 @@ export function AgentCanvasView({
                     <button
                       key={c}
                       onClick={() => setBrushColor(c)}
-                      className={`w-4 h-4 border border-black ${brushColor === c ? "ring-2 ring-[var(--cel-cyan,#00f0ff)]" : ""}`}
+                      className={`w-4 h-4 border border-line ${brushColor === c ? "ring-2 ring-[var(--cel-cyan, var(--accent-DEFAULT))]" : ""}`}
                       style={{ background: c }}
                       aria-label={`brush color ${c}`}
                     />
@@ -948,7 +948,7 @@ export function AgentCanvasView({
                     <button
                       key={s}
                       onClick={() => setBrushSize(s)}
-                      className={`px-1.5 py-0.5 text-[10px] font-mono border border-black ${brushSize === s ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+                      className={`px-1.5 py-0.5 text-[10px] font-mono border border-line ${brushSize === s ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
                       aria-label={`brush size ${s}px`}
                     >
                       {s}
@@ -959,7 +959,7 @@ export function AgentCanvasView({
             )}
             <button
               onClick={() => { setTool("connector"); setConnectSourceId(null); }}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "connector" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "connector" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-ink"}`}
               title="连线 — 选 annotation A → 选 annotation B"
               data-testid="agent-canvas-tool-connector"
             >
@@ -967,7 +967,7 @@ export function AgentCanvasView({
             </button>
             <button
               onClick={() => setTool("eraser")}
-              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black transition-all ${tool === "eraser" ? "bg-[var(--cel-danger,#ff184c)] text-white" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line transition-all ${tool === "eraser" ? "bg-[var(--cel-danger, var(--err-DEFAULT))] text-ink" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-danger, var(--err-DEFAULT))] hover:text-ink"}`}
               title="橡皮擦 — 点 annotation 即删 (per 任务 #6)"
               data-testid="agent-canvas-tool-eraser"
             >
@@ -987,7 +987,7 @@ export function AgentCanvasView({
                   setSelectedAnnotationId(null);
                   setMultiSelected(new Set());
                 }}
-                className="px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-danger,#ff184c)] hover:bg-[#ff184c] hover:text-white transition-all"
+                className="px-2 py-1 text-xs font-mono font-bold flex items-center gap-1 border border-line bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-danger, var(--err-DEFAULT))] hover:bg-err hover:text-ink transition-all"
                 title={`删除选中 (${multiSelected.size + (selectedAnnotationId ? 1 : 0)}) annotation`}
                 data-testid="agent-canvas-tool-delete"
               >
@@ -1000,7 +1000,7 @@ export function AgentCanvasView({
           </>
         )}
         <span
-          className="text-[11px] text-[var(--cel-cyan,#00f0ff)] font-mono font-bold px-2 tabular-nums"
+          className="text-[11px] text-[var(--cel-cyan, var(--accent-DEFAULT))] font-mono font-bold px-2 tabular-nums"
           data-testid="agent-canvas-zoom"
         >
           {Math.round(viewport.zoom * 100)}%
@@ -1089,7 +1089,7 @@ export function AgentCanvasView({
             <rect data-testid="agent-canvas-marquee"
               x={sx} y={sy} width={w} height={h}
               fill="rgba(0, 240, 255, 0.1)"
-              stroke="var(--cel-cyan,#00f0ff)"
+              stroke="var(--cel-cyan, var(--accent-DEFAULT))"
               strokeWidth={1}
               strokeDasharray="4 4"
               pointerEvents="none"
@@ -1126,9 +1126,9 @@ export function AgentCanvasView({
       {/* Canvas overview */}
       <div
         data-testid="agent-canvas-minimap"
-        className="absolute bottom-3 right-3 z-20 w-44 h-32 bg-[var(--cel-surface-card,#0f1422)] border-2 border-black cel-shadow overflow-hidden"
+        className="absolute bottom-3 right-3 z-20 w-44 h-32 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black shadow-soft overflow-hidden"
       >
-        <div className="absolute top-1 left-2 text-[9px] font-mono font-bold text-[var(--cel-cyan,#00f0ff)] uppercase tracking-wider z-10">
+        <div className="absolute top-1 left-2 text-[9px] font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] uppercase tracking-wider z-10">
           OVERVIEW // CANVAS
         </div>
         <svg viewBox={`${bbox.minX} ${bbox.minY} ${bbox.maxX - bbox.minX} ${bbox.maxY - bbox.minY}`} className="w-full h-full bg-[#050811]">
@@ -1196,19 +1196,19 @@ export function AgentCanvasView({
 
       {/* 底部状态条 */}
       <div
-        className="absolute bottom-3 left-3 z-20 text-[11px] text-ink-dim font-mono flex items-center gap-3 bg-[var(--cel-surface-card,#0f1422)] border-2 border-black px-3 py-1 cel-shadow"
+        className="absolute bottom-3 left-3 z-20 text-[11px] text-ink-dim font-mono flex items-center gap-3 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black px-3 py-1 shadow-soft"
         data-testid="agent-canvas-statusbar"
       >
         <span className="flex items-center gap-1">
-          <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] " />
-          zoom <strong className="text-white">{Math.round(viewport.zoom * 100)}%</strong>
+          <span className="size-2 rounded-full bg-[var(--cel-cyan, var(--accent-DEFAULT))] " />
+          zoom <strong className="text-ink">{Math.round(viewport.zoom * 100)}%</strong>
         </span>
         <span className="text-ink-mute">|</span>
-        <span>nodes <strong className="text-white">{canvas.nodes.length}</strong></span>
+        <span>nodes <strong className="text-ink">{canvas.nodes.length}</strong></span>
         <span className="text-ink-mute">|</span>
-        <span>connectors <strong className="text-white">{canvas.connectors.length}</strong></span>
+        <span>connectors <strong className="text-ink">{canvas.connectors.length}</strong></span>
         <span className="text-ink-mute">|</span>
-        <span>selected <strong className="text-[var(--cel-gold,#ffc400)]">{selectedNodeId ?? "—"}</strong></span>
+        <span>selected <strong className="text-[var(--cel-gold, var(--warn-DEFAULT))]">{selectedNodeId ?? "—"}</strong></span>
       </div>
     </div>
   );

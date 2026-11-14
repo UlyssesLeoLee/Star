@@ -653,8 +653,8 @@ export function AnimeCelShaderCanvas({
 
   if (!isClient) {
     return (
-      <div className={`w-full h-full bg-[var(--cel-surface-stage,#090d16)] flex items-center justify-center ${className}`}>
-        <span className="text-xs font-mono font-bold text-[var(--cel-cyan,#00f0ff)] animate-pulse">
+      <div className={`w-full h-full bg-[var(--cel-surface-stage, var(--color-surface))] flex items-center justify-center ${className}`}>
+        <span className="text-xs font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] animate-pulse">
           INITIALIZING_3D_CEL_PIPELINE...
         </span>
       </div>

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1344db609ea7c00e81c471a9fdc9019bfe1f99b63dabb19613563e2cd96e99a4
+@cypher schema=1 source_sha256=db306a0a85ec5ef4f1900671834bb6a60a35a85f382beec7d421b8f176b292d7
 MERGE (self:File {path:"frontend/src/components/agent-workflow/WorkflowBuilder.tsx"})
 MERGE (builder:Function {name:"WorkflowBuilder", language:"typescript", visibility:"public"})
 MERGE (canvas:Function {name:"WorkflowCanvas", language:"typescript", visibility:"private"})
@@ -343,9 +343,9 @@ export function WorkflowBuilder() {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-140px)] min-h-[520px] rounded-lg border border-line bg-[var(--cel-surface-stage,#0b0d10)] overflow-hidden">
+    <div className="flex h-[calc(100vh-140px)] min-h-[520px] rounded-lg border border-line bg-[var(--cel-surface-stage, var(--color-surface))] overflow-hidden">
       {/* ── 左侧节点面板 ── */}
-      <div className="w-64 shrink-0 border-r border-line bg-[var(--cel-surface-card,#0f1422)] flex flex-col">
+      <div className="w-64 shrink-0 border-r border-line bg-[var(--cel-surface-card, var(--color-surface-2))] flex flex-col">
         <div className="p-3 border-b border-line flex items-center justify-between">
           <span className="text-sm font-semibold text-ink">组件面板</span>
           <button
@@ -568,7 +568,7 @@ function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: bo
         width={NODE_WIDTH}
         height={height}
         rx={8}
-        fill="var(--cel-surface-card,#0f1422)"
+        fill="var(--cel-surface-card, var(--color-surface-2))"
         stroke={selected ? "#38bdf8" : "rgba(120,140,160,0.35)"}
         strokeWidth={selected ? 2 : 1}
       />
@@ -594,7 +594,7 @@ function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: bo
         y={node.position.y + 22}
         fontSize={12}
         fontWeight={600}
-        fill="var(--cel-text-primary,#fff)"
+        fill="var(--cel-text-primary, var(--color-text))"
       >
         {node.title.length > 24 ? `${node.title.slice(0, 24)}…` : node.title}
       </text>
@@ -674,7 +674,7 @@ function WorkflowEditorPanel({
 }) {
   const config = node.config;
   return (
-    <div className="w-80 shrink-0 border-l border-line bg-[var(--cel-surface-card,#0f1422)] p-3 overflow-y-auto">
+    <div className="w-80 shrink-0 border-l border-line bg-[var(--cel-surface-card, var(--color-surface-2))] p-3 overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <span className={`flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] ${KIND_TONE[node.kind]}`}>
           {KIND_ICON[node.kind]} {node.title}

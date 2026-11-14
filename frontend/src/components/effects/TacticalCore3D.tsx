@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=690eb0c00b060ddd8ac7d349e3d7b7f086789ce7d8ab4c9cfe161d5f7db59a8a
+MERGE (self:File {path:"frontend/src/components/effects/TacticalCore3D.tsx"})
+MERGE (fx:Symbol {id:"frontend/src/components/effects/TacticalCore3D.tsx::TacticalCore3D",kind:"component"})
+MERGE (self)-[:DEFINES]->(fx)
+@endcypher
+*/
 "use client";
 
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
@@ -433,9 +440,9 @@ export function TacticalCore3D({
     return (
       <div
         style={{ width: size, height: size }}
-        className={`bg-[var(--cel-surface-stage,#090d16)] border border-[var(--cel-ink,#000000)] grid place-items-center ${className}`}
+        className={`bg-[var(--cel-surface-stage, var(--color-surface))] border border-[var(--cel-ink, var(--color-border))] grid place-items-center ${className}`}
       >
-        <span className="size-2 bg-[var(--cel-cyan,#00f0ff)] rotate-45 border border-[var(--cel-ink,#000000)] animate-pulse" />
+        <span className="size-2 bg-[var(--cel-cyan, var(--accent-DEFAULT))] rotate-45 border border-[var(--cel-ink, var(--color-border))] animate-pulse" />
       </div>
     );
   }
@@ -450,7 +457,7 @@ export function TacticalCore3D({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ width: size, height: size }}
-      className={`relative cursor-pointer select-none group border-2 border-[var(--cel-ink,#000000)] bg-[var(--cel-surface-stage,#090d16)] cel-shadow overflow-hidden transition-transform duration-100 hover:scale-105 active:scale-95 ${className}`}
+      className={`relative cursor-pointer select-none group border-2 border-[var(--cel-ink, var(--color-border))] bg-[var(--cel-surface-stage, var(--color-surface))] cel-shadow overflow-hidden transition-transform duration-100 hover:scale-105 active:scale-95 ${className}`}
     >
       {/* 3渲2 背景微网格 */}
       <div className="absolute inset-0 bg-screentone-dense opacity-20 pointer-events-none z-0" />
@@ -478,7 +485,7 @@ export function TacticalCore3D({
       )}
 
       {/* 触碰交互角标 */}
-      <div className="absolute bottom-0 right-0 size-1.5 bg-[var(--cel-cyan,#00f0ff)] pointer-events-none z-20" />
+      <div className="absolute bottom-0 right-0 size-1.5 bg-[var(--cel-cyan, var(--accent-DEFAULT))] pointer-events-none z-20" />
     </div>
   );
 }

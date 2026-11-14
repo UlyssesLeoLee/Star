@@ -17,7 +17,7 @@
 //   (component)-[:CALLS]->(encodeURIComponent),(component)-[:CALLS]->(clsx),(component)-[:CALLS]->(Link),(component)-[:CALLS]->(FolderKanban);
 
 /*
-@cypher schema=1 source_sha256=cfe226dd0239d126757002906b682718ebfbd9133b2e38426978638f53d317ed
+@cypher schema=1 source_sha256=0b045147da0de0ac5950c5098324a2f6a08051ae69de1602ac79f3fd5f342088
 MERGE (self:File {path:"frontend/src/components/worktree-shared/ProjectWorktreeIndexLink.tsx"})
 MERGE (indexLink:Symbol {id:"frontend/src/components/worktree-shared/ProjectWorktreeIndexLink.tsx::ProjectWorktreeIndexLink",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -70,7 +70,7 @@ export function ProjectWorktreeIndexLink({
       >
         <span
           className={clsx(
-            "grid place-items-center shrink-0 rounded-lg border border-[var(--cel-ink)] bg-[var(--cel-cyan,#00f0ff)]/10 text-[var(--cel-cyan,#00f0ff)]",
+            "grid place-items-center shrink-0 rounded-lg border border-[var(--cel-ink)] bg-[var(--cel-cyan, var(--accent-DEFAULT))]/10 text-[var(--cel-cyan, var(--accent-DEFAULT))]",
             collapsed ? "size-9" : "size-8",
           )}
           aria-hidden="true"

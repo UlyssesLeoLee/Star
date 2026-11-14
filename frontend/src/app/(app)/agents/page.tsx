@@ -1,6 +1,6 @@
 "use client";
 
-// @cypher schema=1 source_sha256=ef0dd0e66a0badf1746bc28c2f98704878279d5d95f4b3707835d5304836b8e1
+// @cypher schema=1 source_sha256=778c5083360b35c0da992912e7da709e0c0ca8ee363f59a4e462f4d5b8b50764
 // MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
 // MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
 // MERGE (shader:File {path:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx"})
@@ -61,7 +61,7 @@ export default function AgentsPage() {
       <PageHeader
         title={t.pageTitles['/agents'].title}
         subtitle="Tactical Agent Command // S-Class Runtime & Autonomous Agents (战术机关与自律代理人)"
-        icon={<Bot className="text-[var(--cel-cyan,#00f0ff)]" size={22} />}
+        icon={<Bot className="text-[var(--cel-cyan, var(--accent-DEFAULT))]" size={22} />}
         count={`${active} active`}
       />
 
@@ -91,7 +91,7 @@ export default function AgentsPage() {
               action={
                 <div className="flex items-center gap-2">
                   <span className="anime-hud-tag">DEC-008</span>
-                  <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">5 SESSIONS</span>
+                  <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">5 SESSIONS</span>
                 </div>
               }
             >
@@ -111,14 +111,14 @@ export default function AgentsPage() {
               <tbody>
                 {agents.map((a) => (
                   <tr key={a.id} data-testid={`agent-row-${a.id}`} className="transition-colors">
-                    <td className="font-mono text-xs text-[var(--cel-cyan,#00f0ff)] font-bold">{a.id}</td>
-                    <td className="font-bold text-sm text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-                      <span className="size-2 bg-[var(--cel-crimson,#ff184c)] border border-black rotate-45" />
+                    <td className="font-mono text-xs text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">{a.id}</td>
+                    <td className="font-bold text-sm text-[var(--cel-text-primary, var(--color-text))] flex items-center gap-2">
+                      <span className="size-2 bg-[var(--cel-crimson, var(--err-DEFAULT))] border border-black rotate-45" />
                       {a.name}
                     </td>
                     <td><StatusPill value={a.status} size="xs" /></td>
-                    <td className="text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono">{a.role}</td>
-                    <td className="font-mono text-xs text-[var(--cel-text-secondary,#94a3b8)]">{a.last_active}</td>
+                    <td className="text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] font-mono">{a.role}</td>
+                    <td className="font-mono text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">{a.last_active}</td>
                   </tr>
                 ))}
               </tbody>
@@ -129,7 +129,7 @@ export default function AgentsPage() {
           <div className="card">
             <SectionTitle
               action={
-                <span className="text-xs font-mono text-[var(--cel-gold,#ffc400)] font-bold">
+                <span className="text-xs font-mono text-[var(--cel-gold, var(--warn-DEFAULT))] font-bold">
                   NPR_TACTILE_SPRING
                 </span>
               }
@@ -138,7 +138,7 @@ export default function AgentsPage() {
             </SectionTitle>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub,#151c2c)] cel-shadow">
+              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
                 <CelToggle3D
                   label="AUTONOMOUS SAGA GUARD"
                   sublabel="IDEMPOTENT RECOVERY"
@@ -147,7 +147,7 @@ export default function AgentsPage() {
                 />
               </div>
 
-              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub,#151c2c)] cel-shadow">
+              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
                 <CelToggle3D
                   label="HARD MEMORY LOCK"
                   sublabel="ZERO LEAK VECTOR"
@@ -165,7 +165,7 @@ export default function AgentsPage() {
               />
               <div className="flex items-center gap-2">
                 <CelBeacon3D status="active" size={32} title="Saga Engine Health" />
-                <span className="text-xs font-mono font-bold text-[var(--cel-cyan,#00f0ff)]">SAGA: ONLINE</span>
+                <span className="text-xs font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))]">SAGA: ONLINE</span>
               </div>
             </div>
           </div>
@@ -173,18 +173,18 @@ export default function AgentsPage() {
           {/* Live Activity Feed — Styled with Manga Comms Bubble */}
           <div className="card" data-testid="live-activity-placeholder">
             <SectionTitle>Comms Stream 〔通信ログ・指令ストリーム〕</SectionTitle>
-            <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow text-sm space-y-2.5">
-              <div className="flex items-center justify-between border-b border-black pb-1.5 text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)]">
-                <span className="text-[var(--cel-crimson,#ff184c)] font-bold">// TACTICAL SPEECH STREAM</span>
+            <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage, var(--color-surface))] shadow-soft text-sm space-y-2.5">
+              <div className="flex items-center justify-between border-b border-black pb-1.5 text-xs font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">
+                <span className="text-[var(--cel-crimson, var(--err-DEFAULT))] font-bold">// TACTICAL SPEECH STREAM</span>
                 <span>CH-01 SECURE</span>
               </div>
-              <p className="leading-relaxed text-[var(--cel-text-primary,#ffffff)] font-medium">
-                <strong className="text-[var(--cel-crimson,#ff184c)] mr-1.5">[MAVIS // 統制官]:</strong>
+              <p className="leading-relaxed text-[var(--cel-text-primary, var(--color-text))] font-medium">
+                <strong className="text-[var(--cel-crimson, var(--err-DEFAULT))] mr-1.5">[MAVIS // 統制官]:</strong>
                 「22 DDD 领域状态机与 3渲2 NPR 着色器全节点同步。不变量持有，零脏状态泄漏，所有代理人处于高阶就绪状态！」
               </p>
-              <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-1">
+              <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] pt-1">
                 <span>CONCURRENCY: 4 WORKERS</span>
-                <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">STATUS: OPTIMAL</span>
+                <span className="text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">STATUS: OPTIMAL</span>
               </div>
             </div>
           </div>
@@ -198,29 +198,29 @@ export default function AgentsPage() {
               <div className="flex items-center gap-3">
                 <TacticalCore3D size={42} status="nominal" className="shrink-0" />
                 <div>
-                  <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
+                  <div className="text-[11px] font-black text-[var(--cel-gold, var(--warn-DEFAULT))] uppercase tracking-widest font-mono">
                     AVATAR SPEC // S-CLASS
                   </div>
-                  <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
+                  <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary, var(--color-text))] flex items-center gap-2">
                     AGENT CORE 3D
-                    <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
+                    <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson, var(--err-DEFAULT))] text-black border border-black">
                       神格
                     </span>
                   </h3>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">
+              <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">
                 〔戦術司令機〕
               </span>
             </div>
 
             {/* Real 3D Three.js WebGL NPR Cel Shader Canvas */}
-            <div className="relative w-full h-80 sm:h-96 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black overflow-hidden flex items-center justify-center group cel-shadow">
+            <div className="relative w-full h-80 sm:h-96 bg-[var(--cel-surface-stage, var(--color-surface))] border-2 border-black overflow-hidden flex items-center justify-center group shadow-soft">
               {/* Screentone Backdrop */}
               <div className="absolute inset-0 bg-screentone-dense opacity-20 pointer-events-none" />
 
               {/* Japanese Calligraphy Backdrop */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none font-black text-8xl select-none text-[var(--cel-text-primary,#ffffff)]">
+              <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none font-black text-8xl select-none text-[var(--cel-text-primary, var(--color-text))]">
                 戦術
               </div>
 
@@ -237,36 +237,36 @@ export default function AgentsPage() {
 
               {/* Dynamic HUD Overlays */}
               <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20 pointer-events-none">
-                <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] animate-ping" />
-                <span className="bg-black/85 border border-[var(--cel-cyan,#00f0ff)]/50 text-[var(--cel-cyan,#00f0ff)] px-2.5 py-1 text-[11px] font-mono font-bold">
+                <span className="size-2 rounded-full bg-[var(--cel-cyan, var(--accent-DEFAULT))] animate-ping" />
+                <span className="bg-black/85 border border-[var(--cel-cyan, var(--accent-DEFAULT))]/50 text-[var(--cel-cyan, var(--accent-DEFAULT))] px-2.5 py-1 text-[11px] font-mono font-bold">
                   REALTIME_GLSL_NPR_3D
                 </span>
               </div>
 
               <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
-                <span className="bg-black/85 border border-[var(--cel-gold,#ffc400)]/50 text-[var(--cel-gold,#ffc400)] px-2.5 py-1 text-[11px] font-mono font-bold">
+                <span className="bg-black/85 border border-[var(--cel-gold, var(--warn-DEFAULT))]/50 text-[var(--cel-gold, var(--warn-DEFAULT))] px-2.5 py-1 text-[11px] font-mono font-bold">
                   {celBands}-BAND CEL RAMP
                 </span>
               </div>
 
               <div className="absolute bottom-2.5 left-2.5 right-2.5 flex justify-between items-end z-20 pointer-events-none">
                 <div className="bg-black/90 border border-[#232f47] px-2.5 py-1 text-[10px] font-mono text-slate-200">
-                  INVERTED_HULL: <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">5.0px INK</span>
+                  INVERTED_HULL: <span className="text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">5.0px INK</span>
                 </div>
-                <div className="bg-[var(--cel-crimson,#ff184c)] text-black font-black text-[10px] px-2 py-0.5 border border-black">
+                <div className="bg-[var(--cel-crimson, var(--err-DEFAULT))] text-black font-black text-[10px] px-2 py-0.5 border border-black">
                   LIGHT_TRACKING: ACTIVE
                 </div>
               </div>
             </div>
 
             {/* Live Palette Selector Tuning Bar — 5 Themes Complete Coverage */}
-            <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 space-y-2.5 text-xs">
+            <div className="mt-3 bg-[var(--cel-surface-stage, var(--color-surface))] border-2 border-black p-3 space-y-2.5 text-xs">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
+                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] uppercase font-mono">
                     CEL PALETTE (5大主题流派):
                   </span>
-                  <span className="text-[10px] font-mono text-[var(--cel-gold,#ffc400)] uppercase font-bold">
+                  <span className="text-[10px] font-mono text-[var(--cel-gold, var(--warn-DEFAULT))] uppercase font-bold">
                     {celPalette}
                   </span>
                 </div>
@@ -291,8 +291,8 @@ export default function AgentsPage() {
                       onClick={() => setCelPalette(item.id as CelPalette)}
                       className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border border-black transition-all ${
                         celPalette === item.id
-                          ? "bg-[var(--cel-primary,#8b5cf6)] text-white border-white shadow-sm"
-                          : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"
+                          ? "bg-[var(--cel-primary, var(--color-primary))] text-white border-white shadow-sm"
+                          : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"
                       }`}
                     >
                       {item.label}
@@ -302,14 +302,14 @@ export default function AgentsPage() {
               </div>
 
               <div className="flex items-center justify-between pt-1.5 border-t border-black/40">
-                <span className="text-[11px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">CEL BANDS:</span>
+                <span className="text-[11px] font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">CEL BANDS:</span>
                 <div className="flex gap-1.5">
                   {[2, 3, 4].map((b) => (
                     <button
                       key={b}
                       onClick={() => setCelBands(b)}
                       className={`w-6 h-6 text-[11px] font-mono font-bold border border-black flex items-center justify-center ${
-                        celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)]"
+                        celBands === b ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
                       }`}
                     >
                       {b}

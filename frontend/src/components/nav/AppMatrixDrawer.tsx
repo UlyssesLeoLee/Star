@@ -1,7 +1,7 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=b24b096f1ebb490450cdee91e181cbb509f0b348d30b28308be9081d279f90f8
+@cypher schema=1 source_sha256=c82801401ea5673e2b86442dd9e065ee38164476fcc16378e14e6b2912487700
 MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
 MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
@@ -105,34 +105,34 @@ export function AppMatrixDrawer() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/65 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-bg-soft/65 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
       <div
         data-testid="app-matrix-modal"
-        className="w-full max-w-5xl max-h-[86vh] border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] cel-shadow-lg flex flex-col overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-200 relative"
+        className="w-full max-w-5xl max-h-[86vh] border border-line bg-bg-card text-[var(--cel-text-primary, var(--color-text))] shadow-soft flex flex-col overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-200 relative"
       >
         {/* === Header (3渲2 战术指令台顶部) === */}
-        <div className="px-6 py-4 border-b-2 border-black flex items-center justify-between bg-[var(--cel-surface-card,#0f1422)]">
+        <div className="px-6 py-4 border-b border-line flex items-center justify-between bg-bg-card">
           <div className="flex items-center gap-3.5">
-            <div className="size-10 border-2 border-black bg-gradient-to-br from-[var(--cel-cyan,#00f0ff)] to-[var(--cel-crimson,#ff184c)] grid place-items-center text-black font-black cel-shadow shrink-0">
+            <div className="size-10 border border-line bg-gradient-to-br from-[var(--cel-cyan, var(--accent-DEFAULT))] to-[var(--cel-crimson, var(--err-DEFAULT))] grid place-items-center text-ink font-black shadow-soft shrink-0">
               <Layers size={20} className="stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
+                <h2 className="text-base font-black uppercase tracking-tight text-ink flex items-center gap-2">
                   {t.appMatrix.title}
-                  <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black italic">
+                  <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-[var(--cel-crimson, var(--err-DEFAULT))] text-ink border border-line italic">
                     MODULE_MATRIX
                   </span>
                 </h2>
-                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 border border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-cyan,#00f0ff)]">
+                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 border border-line bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-cyan, var(--accent-DEFAULT))]">
                   {t.appMatrix.capabilities}
                 </span>
               </div>
-              <p className="text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono">
+              <p className="text-xs text-ink-mute font-mono">
                 {t.appMatrix.subtitle}
               </p>
             </div>
@@ -143,7 +143,7 @@ export function AppMatrixDrawer() {
               type="button"
               onClick={resetToDefault}
               title={t.appMatrix.resetDefaultTitle}
-              className="px-3 py-1.5 text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow flex items-center gap-1.5 transition-all active:translate-y-0.5"
+              className="px-3 py-1.5 text-xs font-mono text-ink-mute hover:text-ink border border-line bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft flex items-center gap-1.5 transition-all active:translate-y-0.5"
             >
               <RotateCcw size={12} />
               <span>{t.appMatrix.resetDefault}</span>
@@ -151,7 +151,7 @@ export function AppMatrixDrawer() {
             <button
               type="button"
               onClick={close}
-              className="p-1.5 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-all active:translate-y-0.5"
+              className="p-1.5 text-ink-mute hover:text-ink border border-line bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft transition-all active:translate-y-0.5"
             >
               <X size={18} />
             </button>
@@ -159,9 +159,9 @@ export function AppMatrixDrawer() {
         </div>
 
         {/* === Filter & Search Bar === */}
-        <div className="px-6 py-3.5 border-b-2 border-black bg-[var(--cel-surface-stage,#090d16)] space-y-3">
+        <div className="px-6 py-3.5 border-b border-line bg-bg space-y-3">
           <div className="relative">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--cel-cyan,#00f0ff)]" />
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--cel-cyan, var(--accent-DEFAULT))]" />
             <input
               type="text"
               value={query}
@@ -171,7 +171,7 @@ export function AppMatrixDrawer() {
                 else setView("groups");
               }}
               placeholder={t.appMatrix.searchPlaceholder}
-              className="w-full pl-10 pr-4 py-2 text-xs border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-white placeholder:text-[var(--cel-text-secondary,#94a3b8)] focus:outline-none focus:border-[var(--cel-cyan,#00f0ff)] cel-shadow font-mono"
+              className="w-full pl-10 pr-4 py-2 text-xs border border-line bg-bg-card text-ink placeholder:text-ink-mute focus:outline-none focus:border-[var(--cel-cyan, var(--accent-DEFAULT))] shadow-soft font-mono"
               autoFocus
             />
           </div>
@@ -187,21 +187,21 @@ export function AppMatrixDrawer() {
                   onClick={() => { setSelectedCat(cat.id); setView("all"); }}
                   data-testid={`matrix-cat-${cat.id}`}
                   className={clsx(
-                    "px-3.5 py-1.5 text-xs font-mono font-bold whitespace-nowrap transition-all border-2 border-black flex items-center gap-1.5 cel-shadow",
+                    "px-3.5 py-1.5 text-xs font-mono font-bold whitespace-nowrap transition-all border border-line flex items-center gap-1.5 shadow-soft",
                     isSelected
-                      ? "bg-[var(--cel-cyan,#00f0ff)] text-black"
-                      : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"
+                      ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-ink"
+                      : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-mute hover:text-ink"
                   )}
                 >
                   {cs && (
                     <span
                       data-testid={`matrix-cat-dot-${cat.id}`}
-                      className={clsx("size-1.5 rotate-45 border border-black transition-opacity", isSelected ? "bg-black" : "bg-[var(--cel-cyan,#00f0ff)]")}
+                      className={clsx("size-1.5 rotate-45 border border-line transition-opacity", isSelected ? "bg-bg-soft" : "bg-[var(--cel-cyan, var(--accent-DEFAULT))]")}
                       aria-hidden="true"
                     />
                   )}
                   <span>{cat.label}</span>
-                  <span className={clsx("font-mono text-[9px]", isSelected ? "text-black/80 font-bold" : "opacity-60")}>({cat.tag})</span>
+                  <span className={clsx("font-mono text-[9px]", isSelected ? "text-ink/80 font-bold" : "opacity-60")}>({cat.tag})</span>
                 </button>
               );
             })}
@@ -212,14 +212,14 @@ export function AppMatrixDrawer() {
         {view === "groups" ? (
           <div className="flex-1 overflow-y-auto p-6 space-y-3" data-testid="matrix-groups-view">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[11px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">
+              <p className="text-[11px] font-mono text-ink-mute">
                 6 个模块 · 近似功能已合并为标签 · 点击「+ 添加」将该模块默认标签加入顶栏
               </p>
               <button
                 type="button"
                 onClick={() => setView("all")}
                 data-testid="matrix-view-all"
-                className="text-[11px] font-mono px-2.5 py-1 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-cyan,#00f0ff)] hover:text-white cel-shadow flex items-center gap-1"
+                className="text-[11px] font-mono px-2.5 py-1 border border-line bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-cyan, var(--accent-DEFAULT))] hover:text-ink shadow-soft flex items-center gap-1"
               >
                 全部应用 ({ALL_MODULES.length}) <ArrowRight size={11} />
               </button>
@@ -237,16 +237,16 @@ export function AppMatrixDrawer() {
                   <div
                     key={g.id}
                     data-testid={`matrix-group-${g.id}`}
-                    className="relative border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] hover:bg-[var(--cel-surface-card,#0f1422)] cel-shadow hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#000000] transition-all flex flex-col p-4"
+                    className="relative border border-line bg-[var(--cel-surface-sub, var(--color-surface))] hover:bg-bg-card shadow-soft hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-soft transition-all flex flex-col p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className="size-9 grid place-items-center border-2 border-black bg-black text-[var(--cel-cyan,#00f0ff)] cel-shadow shrink-0">
+                        <span className="size-9 grid place-items-center border border-line bg-bg-soft text-[var(--cel-cyan, var(--accent-DEFAULT))] shadow-soft shrink-0">
                           <Icon size={16} />
                         </span>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-black text-white leading-tight">{g.name}</h3>
-                          <p className="text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)] truncate">{g.blurb}</p>
+                          <h3 className="text-sm font-black text-ink leading-tight">{g.name}</h3>
+                          <p className="text-[10px] font-mono text-ink-mute truncate">{g.blurb}</p>
                         </div>
                       </div>
                       <button
@@ -259,8 +259,8 @@ export function AppMatrixDrawer() {
                         data-testid={`matrix-group-add-${g.id}`}
                         title={added ? "已添加, 点击打开" : "添加该模块到顶栏"}
                         className={clsx(
-                          "shrink-0 size-7 grid place-items-center border-2 border-black cel-shadow transition-all active:translate-y-0.5",
-                          added ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-crimson,#ff184c)] text-black"
+                          "shrink-0 size-7 grid place-items-center border border-line shadow-soft transition-all active:translate-y-0.5",
+                          added ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-ink" : "bg-[var(--cel-crimson, var(--err-DEFAULT))] text-ink"
                         )}
                       >
                         {added ? <Check size={13} /> : <Plus size={13} />}
@@ -274,8 +274,8 @@ export function AppMatrixDrawer() {
                           key={i}
                           data-testid={`matrix-group-tab-${g.id}-${g.tabs[i]}`}
                           className={clsx(
-                            "text-[10px] font-mono px-1.5 py-0.5 border border-black",
-                            i === 0 ? "bg-[var(--cel-cyan,#00f0ff)] text-black font-bold" : "bg-black/40 text-[var(--cel-text-secondary,#94a3b8)]"
+                            "text-[10px] font-mono px-1.5 py-0.5 border border-line",
+                            i === 0 ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-ink font-bold" : "bg-bg-soft/40 text-ink-mute"
                           )}
                         >
                           {name}
@@ -291,18 +291,18 @@ export function AppMatrixDrawer() {
                 href="/settings"
                 onClick={close}
                 data-testid="matrix-group-settings"
-                className="relative border-2 border-dashed border-[var(--cel-text-secondary,#94a3b8)] bg-transparent hover:bg-[var(--cel-surface-sub,#151c2c)] transition-all flex items-center gap-3 p-4"
+                className="relative border-2 border-dashed border-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] bg-transparent hover:bg-[var(--cel-surface-sub, var(--color-surface))] transition-all flex items-center gap-3 p-4"
               >
-                <span className="size-9 grid place-items-center border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-gold,#ffc400)] shrink-0">
+                <span className="size-9 grid place-items-center border border-line bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-gold, var(--warn-DEFAULT))] shrink-0">
                   <Settings size={16} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black text-white">设置</h3>
-                  <p className="text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)] truncate">
+                  <h3 className="text-sm font-black text-ink">设置</h3>
+                  <p className="text-[10px] font-mono text-ink-mute truncate">
                     账户 · 权限 · 租户 · 集成 · API 密钥 ({SETTINGS_DOMAIN_IDS.length} 项 · 右上角用户菜单)
                   </p>
                 </div>
-                <ArrowRight size={13} className="ml-auto text-[var(--cel-text-secondary,#94a3b8)]" />
+                <ArrowRight size={13} className="ml-auto text-ink-mute" />
               </Link>
             </div>
           </div>
@@ -324,22 +324,22 @@ export function AppMatrixDrawer() {
         )}
 
         {/* === Footer === */}
-        <div className="px-6 py-3.5 border-t-2 border-black bg-[var(--cel-surface-card,#0f1422)] flex items-center justify-between text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono">
+        <div className="px-6 py-3.5 border-t border-line bg-bg-card flex items-center justify-between text-xs text-ink-mute font-mono">
           <span className="flex items-center gap-3">
             <span>
               {t.appMatrix.footerPinnedSidebar}{" "}
-              <strong className="text-[var(--cel-cyan,#00f0ff)] font-bold">{sidebarItemIds.length}</strong>
+              <strong className="text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">{sidebarItemIds.length}</strong>
             </span>
-            <span className="text-black font-black">|</span>
+            <span className="text-ink font-black">|</span>
             <span>
               {t.appMatrix.footerPinnedHeader}{" "}
-              <strong className="text-[var(--cel-gold,#ffc400)] font-bold">{headerTabIds.length}</strong>
+              <strong className="text-[var(--cel-gold, var(--warn-DEFAULT))] font-bold">{headerTabIds.length}</strong>
             </span>
           </span>
           <button
             type="button"
             onClick={close}
-            className="px-5 py-1.5 border-2 border-black bg-[var(--cel-crimson,#ff184c)] text-black hover:brightness-110 cel-shadow transition-all text-xs font-black uppercase italic"
+            className="px-5 py-1.5 border border-line bg-[var(--cel-crimson, var(--err-DEFAULT))] text-ink hover:brightness-110 shadow-soft transition-all text-xs font-black uppercase italic"
           >
             {t.appMatrix.done}
           </button>
@@ -378,7 +378,7 @@ function MatrixCard({
   return (
     <div
       data-testid={`matrix-card-${m.id}`}
-      className="group relative border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] hover:bg-[var(--cel-surface-card,#0f1422)] p-4 cel-shadow hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#000000] transition-all flex flex-col justify-between"
+      className="group relative border border-line bg-[var(--cel-surface-sub, var(--color-surface))] hover:bg-bg-card p-4 shadow-soft hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-soft transition-all flex flex-col justify-between"
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-2.5">
@@ -386,34 +386,34 @@ function MatrixCard({
             {/* 战术 icon tile — 墨边黑框 + 3渲2 强调色 */}
             <div
               data-testid={`matrix-card-icon-tile-${m.id}`}
-              className="size-10 grid place-items-center shrink-0 border-2 border-black bg-black text-[var(--cel-cyan,#00f0ff)] cel-shadow transition-all group-hover:scale-105"
+              className="size-10 grid place-items-center shrink-0 border border-line bg-bg-soft text-[var(--cel-cyan, var(--accent-DEFAULT))] shadow-soft transition-all group-hover:scale-105"
               aria-hidden="true"
             >
               <Icon size={20} strokeWidth={2.25} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-white transition-colors group-hover:text-[var(--cel-cyan,#00f0ff)]">
+                <span className="text-xs font-black text-ink transition-colors group-hover:text-[var(--cel-cyan, var(--accent-DEFAULT))]">
                   {mod.label}
                 </span>
-                <span className="font-mono text-[9px] px-1.5 py-0.5 border border-black bg-black text-[var(--cel-gold,#ffc400)] font-bold">
+                <span className="font-mono text-[9px] px-1.5 py-0.5 border border-line bg-bg-soft text-[var(--cel-gold, var(--warn-DEFAULT))] font-bold">
                   {m.code}
                 </span>
               </div>
-              <span className="text-[10px] font-mono inline-flex items-center gap-1 text-[var(--cel-text-secondary,#94a3b8)]">
-                <span className="size-1.5 rotate-45 border border-black bg-[var(--cel-crimson,#ff184c)]" aria-hidden="true" />
+              <span className="text-[10px] font-mono inline-flex items-center gap-1 text-ink-mute">
+                <span className="size-1.5 rotate-45 border border-line bg-[var(--cel-crimson, var(--err-DEFAULT))]" aria-hidden="true" />
                 {mod.categoryLabel}
               </span>
             </div>
           </div>
         </div>
 
-        <p className="text-xs text-[var(--cel-text-secondary,#94a3b8)] line-clamp-2 leading-relaxed mb-4 font-normal">
+        <p className="text-xs text-ink-mute line-clamp-2 leading-relaxed mb-4 font-normal">
           {mod.description}
         </p>
       </div>
 
-      <div className="border-t-2 border-black/60 pt-3 flex items-center justify-between gap-2">
+      <div className="border-t border-line/60 pt-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {/* 钉选到左侧 */}
           <button
@@ -422,12 +422,12 @@ function MatrixCard({
             disabled={indexOwned}
             data-testid={`pin-sidebar-${m.id}`}
             className={clsx(
-              "px-2.5 py-1 text-[10px] font-mono font-bold flex items-center gap-1 transition-all border-2 border-black cel-shadow",
+              "px-2.5 py-1 text-[10px] font-mono font-bold flex items-center gap-1 transition-all border border-line shadow-soft",
               indexOwned
-                ? "bg-black/40 text-[var(--cel-text-secondary,#94a3b8)] cursor-not-allowed opacity-60"
+                ? "bg-bg-soft/40 text-ink-mute cursor-not-allowed opacity-60"
                 : inSidebar
-                  ? "bg-[var(--cel-cyan,#00f0ff)] text-black"
-                  : "bg-black/60 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white hover:border-[var(--cel-cyan,#00f0ff)]"
+                  ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-ink"
+                  : "bg-bg-soft/60 text-ink-mute hover:text-ink hover:border-[var(--cel-cyan, var(--accent-DEFAULT))]"
             )}
             title={indexOwned ? t.appMatrix.indexOwnedHint : inSidebar ? t.appMatrix.unpinFromSidebar : t.appMatrix.pinToSidebar}
           >
@@ -441,10 +441,10 @@ function MatrixCard({
             onClick={onToggleHeader}
             data-testid={`pin-header-${m.id}`}
             className={clsx(
-              "px-2.5 py-1 text-[10px] font-mono font-bold flex items-center gap-1 transition-all border-2 border-black cel-shadow",
+              "px-2.5 py-1 text-[10px] font-mono font-bold flex items-center gap-1 transition-all border border-line shadow-soft",
               inHeader
-                ? "bg-[var(--cel-gold,#ffc400)] text-black"
-                : "bg-black/60 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white hover:border-[var(--cel-gold,#ffc400)]"
+                ? "bg-[var(--cel-gold, var(--warn-DEFAULT))] text-ink"
+                : "bg-bg-soft/60 text-ink-mute hover:text-ink hover:border-[var(--cel-gold, var(--warn-DEFAULT))]"
             )}
             title={inHeader ? t.appMatrix.unpinFromHeader : t.appMatrix.pinToHeader}
           >
@@ -457,7 +457,7 @@ function MatrixCard({
         <Link
           href={m.href}
           onNavigate={onOpen}
-          className="p-1.5 text-[var(--cel-text-secondary,#94a3b8)] hover:text-white border border-black bg-black/60 hover:bg-black transition-colors"
+          className="p-1.5 text-ink-mute hover:text-ink border border-line bg-bg-soft/60 hover:bg-bg-soft transition-colors"
           title={t.appMatrix.openNow}
         >
           <ArrowRight size={14} />

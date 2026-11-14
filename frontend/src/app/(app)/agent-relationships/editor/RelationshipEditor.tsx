@@ -195,7 +195,7 @@ export function RelationshipEditor({
 
   return (
     <div
-      className="relative w-full h-full min-h-[400px] border border-line rounded-md bg-[var(--cel-surface-card,#0f1422)]"
+      className="relative w-full h-full min-h-[400px] border border-line rounded-md bg-[var(--cel-surface-card, var(--color-surface-2))]"
       data-testid="relationship-editor"
     >
       <div className="absolute top-2 left-2 text-[10px] font-mono text-ink-dim z-10">

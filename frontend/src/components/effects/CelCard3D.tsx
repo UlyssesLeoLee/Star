@@ -74,10 +74,10 @@ export function CelCard3D({
 
   const shadowClass =
     elevation === "lg"
-      ? "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),6px_6px_0px_0px_var(--cel-shadow-color,#000000)]"
+      ? "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),6px_6px_0px_0px_var(--cel-shadow-color, var(--color-border))]"
       : elevation === "sm"
-      ? "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),2px_2px_0px_0px_var(--cel-shadow-color,#000000)]"
-      : "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),4px_4px_0px_0px_var(--cel-shadow-color,#000000)]";
+      ? "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),2px_2px_0px_0px_var(--cel-shadow-color, var(--color-border))]"
+      : "shadow-[inset_1px_1px_0_0_var(--cel-bevel-hi),inset_-1px_-1px_0_0_var(--cel-bevel-lo),4px_4px_0px_0px_var(--cel-shadow-color, var(--color-border))]";
 
   return (
     <div
@@ -92,7 +92,7 @@ export function CelCard3D({
       {...rest}
     >
       <div
-        className={`relative border-2 border-[var(--cel-ink,#000000)] bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] ${shadowClass} ${
+        className={`relative border-2 border-[var(--cel-ink, var(--color-border))] bg-[var(--cel-surface-card, var(--color-surface-2))] text-[var(--cel-text-primary, var(--color-text))] ${shadowClass} ${
           chamfer ? "clip-hud-corner" : ""
         } ${className}`}
         style={{

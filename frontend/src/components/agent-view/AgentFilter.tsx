@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a36c17f09f38037c34a17c769649671f2d3233f1c2c61d42761963fa0c32a297
+@cypher schema=1 source_sha256=16779e45b0c35cc16b64c804687ffc9073d34dcaa8967aa73f683ffd38b8548c
 MERGE (self:File {path:"frontend/src/components/agent-view/AgentFilter.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
@@ -65,16 +65,16 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-bold border-2 border-black bg-[var(--cel-surface-card,#0f1422)] cel-shadow hover:border-[var(--cel-cyan,#00f0ff)] transition-all min-w-[200px]"
+        className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono font-bold border-2 border-black bg-[var(--cel-surface-card, var(--color-surface-2))] shadow-soft hover:border-[var(--cel-cyan, var(--accent-DEFAULT))] transition-all min-w-[200px]"
         aria-haspopup="listbox"
         aria-expanded={open}
         data-testid="agent-filter-trigger"
       >
-        <Bot size={13} className="text-[var(--cel-cyan,#00f0ff)] shrink-0" />
+        <Bot size={13} className="text-[var(--cel-cyan, var(--accent-DEFAULT))] shrink-0" />
         <span className="flex-1 text-left truncate">
           {selected ? (
             <>
-              <span className="text-[var(--cel-cyan,#00f0ff)] font-extrabold">{selected.id}</span>
+              <span className="text-[var(--cel-cyan, var(--accent-DEFAULT))] font-extrabold">{selected.id}</span>
               <span className="text-ink-mute ml-2 text-[11px]">· {agentKindDisplayLabel(selected.agent_kind)}</span>
             </>
           ) : (
@@ -84,7 +84,7 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
         {auto && (
           <span
             data-testid="agent-filter-auto-badge"
-            className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-[var(--cel-cyan,#00f0ff)] text-black border border-black"
+            className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black border border-black"
             title="Auto-selected as the most recently active agent"
           >
             auto
@@ -96,10 +96,10 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
       {open && (
         <div
           data-testid="agent-filter-dropdown"
-          className="absolute z-30 top-full mt-1.5 left-0 w-[320px] max-h-[420px] overflow-y-auto bg-[var(--cel-surface-card,#0f1422)] border-2 border-black cel-shadow font-mono"
+          className="absolute z-30 top-full mt-1.5 left-0 w-[320px] max-h-[420px] overflow-y-auto bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black shadow-soft font-mono"
           role="listbox"
         >
-          <div className="sticky top-0 px-3 py-1.5 text-[10px] font-bold text-[var(--cel-gold,#ffc400)] uppercase tracking-wider bg-[var(--cel-surface-card,#0f1422)]/95 backdrop-blur-sm border-b-2 border-black">
+          <div className="sticky top-0 px-3 py-1.5 text-[10px] font-bold text-[var(--cel-gold, var(--warn-DEFAULT))] uppercase tracking-wider bg-[var(--cel-surface-card, var(--color-surface-2))]/95 backdrop-blur-sm border-b-2 border-black">
             {agents.length} agent{agents.length === 1 ? "" : "s"} · active first
           </div>
           {sorted.length === 0 ? (
@@ -119,14 +119,14 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
                     onChange(a.id);
                     setOpen(false);
                   }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b border-black/40 hover:bg-[var(--cel-surface-sub,#151c2c)] transition-colors ${
-                    isSelected ? "bg-[var(--cel-surface-sub,#151c2c)] border-l-4 border-l-[var(--cel-cyan,#00f0ff)]" : ""
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b border-black/40 hover:bg-[var(--cel-surface-sub, var(--color-surface))] transition-colors ${
+                    isSelected ? "bg-[var(--cel-surface-sub, var(--color-surface))] border-l-4 border-l-[var(--cel-cyan, var(--accent-DEFAULT))]" : ""
                   }`}
                 >
                   <StatusDot status={a.status} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className={`font-bold truncate ${isSelected ? "text-[var(--cel-cyan,#00f0ff)]" : "text-white"}`}>
+                      <span className={`font-bold truncate ${isSelected ? "text-[var(--cel-cyan, var(--accent-DEFAULT))]" : "text-white"}`}>
                         {a.id}
                       </span>
                       <span className="text-ink-mute text-[10px]">· {agentKindDisplayLabel(a.agent_kind)}</span>
@@ -137,7 +137,7 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
                   </div>
                   {active && (
                     <span title="active">
-                      <Sparkles size={11} className="text-[var(--cel-gold,#ffc400)] shrink-0" />
+                      <Sparkles size={11} className="text-[var(--cel-gold, var(--warn-DEFAULT))] shrink-0" />
                     </span>
                   )}
                 </button>

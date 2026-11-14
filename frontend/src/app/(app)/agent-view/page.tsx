@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0bdcf540a108f92567f0d76678b968f401646f4ae8cd130d5e5c39e4a3344c9a
+@cypher schema=1 source_sha256=f5b13df75a3bf1db2f1c1243179a12a513505934af1bf9f4fdff206b8c05b108
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
@@ -270,32 +270,32 @@ function AgentViewContent() {
       </div>
 
       {/* Agent workspace views */}
-      <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2.5 flex items-center gap-2.5 cel-shadow" data-testid="view-mode-tabs">
+      <div className="border-b-2 border-black bg-[var(--cel-surface-card, var(--color-surface-2))] px-6 py-2.5 flex items-center gap-2.5 shadow-soft" data-testid="view-mode-tabs">
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "canvas" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
         >
           <LayoutDashboard size={13} /> Canvas
         </button>
         <button
           data-testid="view-mode-relationships"
           onClick={() => handleViewModeChange("relationships")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "relationships" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "relationships" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
         >
           <Network size={13} /> Relationship
         </button>
         <button
           data-testid="view-mode-workflow"
           onClick={() => handleViewModeChange("workflow")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "workflow" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "workflow" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
         >
           <Workflow size={13} /> Workflow 工作流
         </button>
         <button
           data-testid="view-mode-settings"
           onClick={() => handleViewModeChange("settings")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "settings" ? "bg-[var(--cel-text-primary, var(--color-text))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
         >
           <Settings size={13} /> Agent 设置
         </button>
@@ -304,11 +304,11 @@ function AgentViewContent() {
       {/* Content (switch by viewMode) */}
       {viewMode === "canvas" ? (
         <>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--cel-surface-card,#0f1422)] border-b border-black">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--cel-surface-card, var(--color-surface-2))] border-b border-black">
             <button
               onClick={() => setEditMode((v) => !v)}
               data-testid="agent-view-edit-toggle"
-              className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${editMode ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white"}`}
+              className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${editMode ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-white"}`}
               title="开启后可加 sticky / 文本 / 图形 / 画笔 / 连线"
             >
               {editMode ? "✏️ Edit Mode" : "👁 View Mode"}
@@ -326,7 +326,7 @@ function AgentViewContent() {
                   }}
                   disabled={!canUndo(history)}
                   data-testid="agent-view-undo"
-                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canUndo(history) ? "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub,#151c2c)] text-ink-mute"}`}
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canUndo(history) ? "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-mute"}`}
                   title="撤销 (per 任务 #5)"
                 >
                   ↶ Undo
@@ -342,7 +342,7 @@ function AgentViewContent() {
                   }}
                   disabled={!canRedo(history)}
                   data-testid="agent-view-redo"
-                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canRedo(history) ? "bg-[var(--cel-surface-sub,#151c2c)] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub,#151c2c)] text-ink-mute"}`}
+                  className={`px-2 py-1 text-xs font-mono font-bold border border-black transition-all ${canRedo(history) ? "bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-dim hover:text-white" : "opacity-40 cursor-not-allowed bg-[var(--cel-surface-sub, var(--color-surface))] text-ink-mute"}`}
                   title="重做 (per 任务 #5)"
                 >
                   ↷ Redo
@@ -350,7 +350,7 @@ function AgentViewContent() {
               </>
             )}
             {editMode && (
-              <span className="text-[10px] text-[var(--cel-cyan,#00f0ff)] font-mono">
+              <span className="text-[10px] text-[var(--cel-cyan, var(--accent-DEFAULT))] font-mono">
                 编辑模式 — 选中工具后在画布上画/写。Annotations 暂存本地 (per 2026-10-01 OOB)。
               </span>
             )}

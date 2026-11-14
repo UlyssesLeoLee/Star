@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b50e4a56fb59bf174e29cddf9380c9f1c5352ac8d8d9e47f453a66cfa6ab155d
+@cypher schema=1 source_sha256=71192da1334f33f9313804822c2ba1c63d6d291c309802ea6986ab654dce423e
 MERGE (self:File {path:"frontend/src/components/SubNav.tsx"})
 @endcypher
 */
@@ -92,7 +92,7 @@ export function SubNav({
     <aside
       data-testid="subnav"
       aria-label={t.ariaLabels.sectionNav}
-      className="w-[180px] shrink-0 border-r-2 border-black bg-[var(--cel-surface-sub,#151c2c)] h-full sticky top-16 cel-shadow"
+      className="w-[180px] shrink-0 border-r-2 border-black bg-[var(--cel-surface-sub, var(--color-surface))] h-full sticky top-16 shadow-soft"
     >
       {topLabel && (
         <div

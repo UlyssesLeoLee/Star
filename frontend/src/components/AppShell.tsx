@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=edea614afaf9123620fb79af5f110762ef3bd76b7755a4c3eaf059520718cb16
+@cypher schema=1 source_sha256=9c8fe07f8e01348e54ee758db36cc0dbcf86ebfa21b160c04a914185f4985f41
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -34,8 +34,8 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
       {/* 3渲2 Ambient Screentone & Glow Backdrops */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-screentone opacity-15" />
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-[var(--cel-crimson,#ff184c)] rounded-full blur-[160px] opacity-10" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[var(--cel-cyan,#00f0ff)] rounded-full blur-[160px] opacity-10" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-[var(--cel-crimson, var(--err-DEFAULT))] rounded-full blur-[160px] opacity-10" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[var(--cel-cyan, var(--accent-DEFAULT))] rounded-full blur-[160px] opacity-10" />
       </div>
       {/* per 2026-11-12: AppHeader 用 useSearchParams 判定 query-href 高亮,
           必须包 Suspense (Next 16 静态 prerender bailout 规则, 与 Sidebar 同) */}

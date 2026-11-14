@@ -128,7 +128,7 @@ export function RelationshipView({ tenantId }: RelationshipViewProps) {
       className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-3 h-full"
       data-testid="relationship-view"
     >
-      <div className="relative border border-line rounded-md bg-[var(--cel-surface-card,#0f1422)] min-h-[400px]">
+      <div className="relative border border-line rounded-md bg-[var(--cel-surface-card, var(--color-surface-2))] min-h-[400px]">
         <div className="absolute top-2 left-2 right-2 flex items-center justify-between text-[10px] font-mono text-ink-dim z-10">
           <span data-testid="relationship-view-summary">
             {agents.length} agents · {edges.length} edges
