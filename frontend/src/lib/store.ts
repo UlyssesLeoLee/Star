@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=708f64bb37cff0273f32e2803df7c225053792c28c735a34c5fb9aa33e93ba3f
+@cypher schema=1 source_sha256=54aaad0dae8a3fae4e811e6f356b083671040f1f2645f47b60572f1728a3e8d8
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -359,6 +359,8 @@ interface StoreState {
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
   moveCanvasElement: (id: string, x: number, y: number) => void;
+  /** 双击编辑 text/sticky (per WBS-BACKEND-SUPPORT-001 W3.4) */
+  replaceCanvasElementContent: (id: string, contentPatch: Partial<CanvasElement["content"]>) => void;
   deleteCanvasElement: (id: string) => void;
   addCanvasConnector: (connector: CanvasConnector) => void;
   setCanvasViewport: (canvasId: string, x: number, y: number, zoom: number) => void;
@@ -1037,6 +1039,13 @@ const initialState = (set: any, get?: any): StoreState => ({
     set((s: StoreState) => ({
       canvasElements: s.canvasElements.filter((e) => e.id !== id),
       canvasConnectors: s.canvasConnectors.filter((c) => c.from_element_id !== id && c.to_element_id !== id),
+    })),
+  // 双击编辑 text/sticky (per WBS-BACKEND-SUPPORT-001 W3.4)
+  replaceCanvasElementContent: (id, contentPatch) =>
+    set((s: StoreState) => ({
+      canvasElements: s.canvasElements.map((e) => e.id === id
+        ? { ...e, content: { ...e.content, ...contentPatch }, updated_at: new Date().toISOString() }
+        : e),
     })),
   addCanvasConnector: (connector) =>
     set((s: StoreState) => ({ canvasConnectors: [...s.canvasConnectors, connector] })),

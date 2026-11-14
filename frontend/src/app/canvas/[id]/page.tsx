@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2732d153c48a96bc69255ed3df1a953c36c4ed3c3c7ed781b56ac9646dd157e2
+@cypher schema=1 source_sha256=f9367f1918f53d9619522d2242a910b28663adfdf2c6a53d937fa6ac59bdb94a
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -29,6 +29,8 @@ export default function CanvasPage() {
   const canvases = useStore((s) => s.canvases);
   const worktrees = useStore((s) => s.worktrees);
   const workItems = useStore((s) => s.workItems);
+  const storeCanvasElements = useStore((s) => s.canvasElements);
+  const storeCanvasConnectors = useStore((s) => s.canvasConnectors);
   const canvas = canvases.find((c) => c.id === canvasId);
 
   if (!canvas) {
@@ -50,11 +52,33 @@ export default function CanvasPage() {
           <Suspense fallback={null}>
             <CanvasView
               canvas={canvas}
-              elements={[]}
-              connectors={[]}
+              elements={storeCanvasElements}
+              connectors={storeCanvasConnectors}
               readOnly={false}
               groupWorkItems={workItems}
               groupWorktrees={worktrees}
+              // WBS-BACKEND-SUPPORT-001 W3: 本地 store 通道 — 画笔/形状/直线/注释/便签/文本创建
+              onCreateElement={async (input) => {
+                const el = {
+                  id: `el-${globalThis.crypto.randomUUID()}`,
+                  canvas_id: canvas.id,
+                  kind: input.kind,
+                  x: input.x,
+                  y: input.y,
+                  width: input.width,
+                  height: input.height,
+                  rotation: 0,
+                  z_index: input.z_index,
+                  content: input.content,
+                  locked: false,
+                  hidden: false,
+                  created_by: "usr-001",
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                };
+                useStore.getState().addCanvasElement(el);
+                return { id: el.id };
+              }}
             />
           </Suspense>
         );

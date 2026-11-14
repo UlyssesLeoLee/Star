@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fea428ac6601c3ae7c1f867a104b7bfd3bc6f2f8a79931419dba0d44b28dbc3c
+@cypher schema=1 source_sha256=f6cd240d0f3542946a28346d18edbef89526b46aa3afb15d2a26ce12d33c1aff
 MERGE (self:File {path:"frontend/src/components/CanvasView.tsx"})
 MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",kind:"interface"})
 MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -49,7 +49,7 @@ import type {
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
-import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush } from "lucide-react";
+import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
@@ -93,12 +93,33 @@ const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 const BRUSH_PALETTE = ["#e6edf3", "#79c0ff", "#ff7b72", "#a5d6ff", "#ffa657"];
 const BRUSH_SIZES = [2, 4, 8, 12];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements, onCreateElement }: CanvasViewProps) {
+type CanvasTool = "select" | "pan" | "sticky" | "text" | "shape" | "frame-select" | "brush" | "eraser" | "line" | "comment";
+
+// Miro 级形状库 (per WBS-BACKEND-SUPPORT-001 W3.1)
+const SHAPE_KINDS = ["rect", "rounded", "circle", "diamond", "triangle"] as const;
+type ShapeKind = (typeof SHAPE_KINDS)[number];
+const SHAPE_SVG_PATH: Record<ShapeKind, string> = {
+  rect: "",
+  rounded: "",
+  circle: "",
+  diamond: "",
+  triangle: "",
+};
+
+export function CanvasView(props: CanvasViewProps) {
+  const { canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements, onCreateElement } = props;
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
   const [selected, setSelected] = useState<string[]>([]);
-  const [tool, setTool] = useState<"select" | "pan" | "sticky" | "text" | "shape" | "frame-select" | "brush">("select");
+  const [tool, setTool] = useState<CanvasTool>("select");
+  // Miro 级形状库 (per WBS-BACKEND-SUPPORT-001 W3.1)
+  const [shapeKind, setShapeKind] = useState<ShapeKind>("rect");
+  // 直线工具起点 (mousedown 记录, mouseup 提交 line element)
+  const [lineStart, setLineStart] = useState<{ x: number; y: number } | null>(null);
+  // 双击编辑 (per W3.4): 编辑中的 text/sticky element id
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [pendingFrameId, setPendingFrameId] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -189,7 +210,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       routing: "curved",
       arrow_start: false,
       arrow_end: true,
-      color: "var(--cel-cyan, #2f81f7)",
+      color: "var(--cel-cyan, var(--color-primary))",
       width: 2,
     });
   }, [addCanvasConnector, canvas.id]);
@@ -244,6 +265,14 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       const svgPt = svgPointFromClient(e);
       if (!svgPt) return;
       setDrawingPath({ points: [svgPt], minX: svgPt.x, minY: svgPt.y, maxX: svgPt.x, maxY: svgPt.y });
+    } else if (e.button === 0 && tool === "line" && !readOnly) {
+      // 直线/箭头工具 (per WBS-BACKEND-SUPPORT-001 W3.1): mousedown 记起点
+      const svgPt = svgPointFromClient(e);
+      if (!svgPt) return;
+      setLineStart(svgPt);
+    } else if (e.button === 0 && tool === "comment" && !readOnly && onCreateElement) {
+      // 注释工具 (per W3.1): 点击空白区创建注释便签
+      void createElementAt(e, "sticky_note", 160, 96, { text: "💬 注释", is_comment: true });
     }
   };
 
@@ -290,7 +319,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     }
   };
 
-  const onMouseUp = () => {
+  const onMouseUp = (e: React.MouseEvent) => {
     const ds = dragState.current;
     dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null, expectedVersion: 0 };
     const preview = dragPreviewRef.current;
@@ -307,6 +336,24 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     if (drawingPath) {
       void createPathElement(drawingPath);
       // 不切回 select tool (用户连续画); 仅 setDrawingPath 在 createPathElement finally 里清空
+      return;
+    }
+    // 直线工具 (per W3.1): mouseup 提交直线元素 (path element, 两点)
+    if (lineStart) {
+      const end = svgPointFromClient(e);
+      setLineStart(null);
+      if (end && onCreateElement && !readOnly && !createPending) {
+        const dist = Math.hypot(end.x - lineStart.x, end.y - lineStart.y);
+        if (dist > 4) {
+          void createPathElement({
+            points: [lineStart, end],
+            minX: Math.min(lineStart.x, end.x),
+            minY: Math.min(lineStart.y, end.y),
+            maxX: Math.max(lineStart.x, end.x),
+            maxY: Math.max(lineStart.y, end.y),
+          });
+        }
+      }
       return;
     }
     setDragPreview(null);
@@ -331,6 +378,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const onElementMouseDown = (e: React.MouseEvent, el: CanvasElementView) => {
     e.stopPropagation();
     if (tool === "pan") return;
+    // 橡皮擦: 划过/点击元素即删除 (per WBS-BACKEND-SUPPORT-001 W3.1, Miro eraser 语义)
+    if (tool === "eraser" && !readOnly) {
+      if (onDeleteElements) void onDeleteElements([el.id]).catch(() => undefined);
+      else deleteCanvasElement(el.id);
+      return;
+    }
     if (e.shiftKey) {
       setSelected((current) => current.includes(el.id)
         ? current.filter((selectedId) => selectedId !== el.id)
@@ -364,7 +417,48 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     }
   };
 
+  // 键盘快捷键 (per WBS-BACKEND-SUPPORT-001 W3.3, Miro 风格)
+  // V=select H=pan P=brush S=shape T=text N=sticky L=line E=eraser C=comment Delete=删除
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (editingId) return;
+      if (ev.ctrlKey || ev.metaKey) return;
+      switch (ev.key.toLowerCase()) {
+        case "v": setTool("select"); break;
+        case "h": setTool("pan"); break;
+        case "p": setTool("brush"); break;
+        case "s": setTool("shape"); break;
+        case "t": setTool("text"); break;
+        case "n": setTool("sticky"); break;
+        case "l": setTool("line"); break;
+        case "e": setTool("eraser"); break;
+        case "c": setTool("comment"); break;
+        case "delete":
+        case "backspace":
+          if (selected.length > 0) void deleteSelection();
+          break;
+        case "escape":
+          setSelected([]);
+          setEditingId(null);
+          setLineStart(null);
+          break;
+        default: break;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, editingId, readOnly, tool]);
+
   const onElementDoubleClick = (el: CanvasElementView) => {
+    // 双击编辑 text/sticky (per WBS-BACKEND-SUPPORT-001 W3.4)
+    if ((el.kind === "text" || el.kind === "sticky_note") && !readOnly && !el.locked) {
+      setEditingId(el.id);
+      setEditingText(el.content.text ?? "");
+      return;
+    }
     const workItemId = el.entity_ref
       ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
       : el.content.work_item_id;
@@ -515,8 +609,8 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         <circle
           data-testid={`canvas-port-${el.id}-input`}
           cx={0} cy={h / 2} r={portR}
-          fill="var(--cel-surface-card, #161b22)"
-          stroke="var(--cel-cyan, #2f81f7)"
+          fill="var(--cel-surface-card, var(--color-surface-2))"
+          stroke="var(--cel-cyan, var(--color-primary))"
           strokeWidth={1.5}
           style={{ cursor: "crosshair" }}
           onMouseUp={(e) => finishPortDrag(el.id, e)}
@@ -525,8 +619,8 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         <circle
           data-testid={`canvas-port-${el.id}-output`}
           cx={w} cy={h / 2} r={portR}
-          fill="var(--cel-surface-card, #161b22)"
-          stroke="var(--cel-cyan, #2f81f7)"
+          fill="var(--cel-surface-card, var(--color-surface-2))"
+          stroke="var(--cel-cyan, var(--color-primary))"
           strokeWidth={1.5}
           style={{ cursor: "crosshair" }}
           onMouseDown={(e) => startPortDrag(el.id, e)}
@@ -539,7 +633,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const renderElement = (el: CanvasElementView) => {
     const isHighlighted = el.id === highlightElementId;
     const isSelected = selected.includes(el.id);
-    const stroke = isHighlighted ? "var(--cel-cyan, #2f81f7)" : isSelected ? "var(--cel-cyan, #79c0ff)" : "var(--cel-ink, #30363d)";
+    const stroke = isHighlighted ? "var(--cel-cyan, var(--color-primary))" : isSelected ? "var(--cel-cyan, var(--color-primary))" : "var(--cel-ink, var(--color-border))";
     const strokeWidth = isHighlighted || isSelected ? 2 : 1;
     const pos = worldToScreen(el.x, el.y);
     const w = el.width * viewport.zoom;
@@ -553,7 +647,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         const pathData = el.content.path_data;
         if (!pathData) return null;
         const bw = (el.content.brush_size ?? 4) * viewport.zoom;
-        const bc = el.content.brush_color ?? "var(--cel-text-primary, #e6edf3)";
+        const bc = el.content.brush_color ?? "var(--cel-text-primary, var(--color-text))";
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             <rect width={w} height={h} fill="transparent" />
@@ -577,7 +671,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             <rect width={w} height={h} fill={color} stroke={stroke} strokeWidth={strokeWidth} rx={4} />
             <foreignObject x={6} y={6} width={w - 12} height={h - 12}>
-          <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-surface-stage, #0b0d10)", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
+          <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-surface-stage, var(--color-surface))", lineHeight: 1.3, fontFamily: "system-ui", wordBreak: "break-word", overflow: "hidden" }}>
             {el.content.text}
           </div>
             </foreignObject>
@@ -588,7 +682,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             <foreignObject width={w} height={h}>
-          <div style={{ fontSize: 12 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.4, fontFamily: "system-ui" }}>
+          <div style={{ fontSize: 12 * viewport.zoom, color: "var(--cel-text-primary, var(--color-text))", lineHeight: 1.4, fontFamily: "system-ui" }}>
             {el.content.text}
           </div>
             </foreignObject>
@@ -603,12 +697,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         if (!wi) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
-            <rect width={w} height={h} fill="var(--cel-surface-card, #161b22)" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
-            <text x={8} y={16 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="ui-monospace, monospace">
+            <rect width={w} height={h} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
+            <text x={8} y={16 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))" fontFamily="ui-monospace, monospace">
           {wi.key}
             </text>
             <foreignObject x={8} y={20 * viewport.zoom} width={w - 16} height={h - 30 * viewport.zoom}>
-          <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.3, fontFamily: "system-ui", overflow: "hidden" }}>
+          <div style={{ fontSize: 11 * viewport.zoom, color: "var(--cel-text-primary, var(--color-text))", lineHeight: 1.3, fontFamily: "system-ui", overflow: "hidden" }}>
             {wi.title}
           </div>
             </foreignObject>
@@ -627,11 +721,11 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         if (!wt) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
-            <rect width={w} height={h} fill="var(--cel-surface-card, #161b22)" stroke={stroke} strokeWidth={strokeWidth} rx={20} />
-            <text x={12 * viewport.zoom} y={18 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="ui-monospace, monospace">
+            <rect width={w} height={h} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} rx={20} />
+            <text x={12 * viewport.zoom} y={18 * viewport.zoom} fontSize={10 * viewport.zoom} fill="var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))" fontFamily="ui-monospace, monospace">
           worktree
             </text>
-            <text x={12 * viewport.zoom} y={34 * viewport.zoom} fontSize={12 * viewport.zoom} fill="var(--cel-text-primary, #e6edf3)" fontFamily="ui-monospace, monospace">
+            <text x={12 * viewport.zoom} y={34 * viewport.zoom} fontSize={12 * viewport.zoom} fill="var(--cel-text-primary, var(--color-text))" fontFamily="ui-monospace, monospace">
           {wt.branch}
             </text>
             <g transform={`translate(${w - 90 * viewport.zoom}, ${h - 22 * viewport.zoom})`}>
@@ -717,7 +811,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           )}
             </g>
             {/* name label */}
-            <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="var(--cel-text-primary, #e6edf3)" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "var(--cel-surface-stage, #0b0d10)", strokeWidth: 2 }}>
+            <text x={w / 2} y={h - Math.max(8, cellSize * 2)} textAnchor="middle" fontSize={Math.max(8, cellSize * 1.2)} fill="var(--cel-text-primary, var(--color-text))" fontFamily="ui-monospace, monospace" style={{ paintOrder: "stroke", stroke: "var(--cel-surface-stage, var(--color-surface))", strokeWidth: 2 }}>
           {ag.name}
             </text>
             {renderPortHandles(el, w, h)}
@@ -734,7 +828,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           rule
             </text>
             <foreignObject x={8} y={h / 2 - 2} width={w - 16} height={h / 2}>
-          <div style={{ fontSize: 10 * viewport.zoom, color: "var(--cel-text-primary, #e6edf3)", lineHeight: 1.2, fontFamily: "system-ui", textAlign: "center", overflow: "hidden" }}>
+          <div style={{ fontSize: 10 * viewport.zoom, color: "var(--cel-text-primary, var(--color-text))", lineHeight: 1.2, fontFamily: "system-ui", textAlign: "center", overflow: "hidden" }}>
             {au.name}
           </div>
             </foreignObject>
@@ -746,20 +840,43 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)}>
             <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2} fill="rgba(121, 192, 255, 0.2)" stroke={stroke} strokeWidth={strokeWidth} />
-            <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="var(--cel-cyan, #79c0ff)" fontFamily="ui-monospace, monospace">
+            <text x={w / 2} y={h / 2 + 4} textAnchor="middle" fontSize={10 * viewport.zoom} fill="var(--cel-cyan, var(--color-primary))" fontFamily="ui-monospace, monospace">
           💬
             </text>
             {renderPortHandles(el, w, h)}
           </g>
         );
       }
-      case "shape":
+      case "shape": {
+        // Miro 级形状库 (per WBS-BACKEND-SUPPORT-001 W3.1): shape_kind 决定几何
+        const sk = el.content.shape_kind ?? "rect";
+        const renderShape = () => {
+          switch (sk) {
+            case "circle":
+              return <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} />;
+            case "diamond":
+              return <polygon points={`${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} />;
+            case "triangle":
+              return <polygon points={`${w / 2},0 ${w},${h} 0,${h}`} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} />;
+            case "rounded":
+              return <rect width={w} height={h} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} rx={Math.min(w, h) * 0.25} />;
+            case "rect":
+            default:
+              return <rect width={w} height={h} fill="var(--cel-surface-card, var(--color-surface-2))" stroke={stroke} strokeWidth={strokeWidth} rx={2} />;
+          }
+        };
+        return (
+          <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`}>
+            {renderShape()}
+          </g>
+        );
+      }
       case "image":
       case "embed":
       default:
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`}>
-            <rect width={w} height={h} fill="var(--cel-ink, #21262d)" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
+            <rect width={w} height={h} fill="var(--cel-ink, var(--color-border))" stroke={stroke} strokeWidth={strokeWidth} rx={4} />
           </g>
         );
     }
@@ -772,12 +889,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     const h = frame.height * viewport.zoom;
     return (
       <g key={frame.id} transform={`translate(${pos.x}, ${pos.y})`}>
-        <rect width={w} height={h} fill="color-mix(in srgb, var(--cel-surface-stage, #0b0d10) 10%, transparent)" stroke="var(--cel-ink, #21262d)" strokeWidth={1} strokeDasharray="4 4" rx={6} />
-        <text x={10} y={16 * viewport.zoom} fontSize={11 * viewport.zoom} fill="var(--cel-text-secondary, #8b949e)" fontFamily="system-ui">
+        <rect width={w} height={h} fill="color-mix(in srgb, var(--cel-surface-stage, var(--color-surface)) 10%, transparent)" stroke="var(--cel-ink, var(--color-border))" strokeWidth={1} strokeDasharray="4 4" rx={6} />
+        <text x={10} y={16 * viewport.zoom} fontSize={11 * viewport.zoom} fill="var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))" fontFamily="system-ui">
           {frame.title}
         </text>
         {frame.is_slide && (
-          <text x={w - 30 * viewport.zoom} y={16 * viewport.zoom} fontSize={9 * viewport.zoom} fill="var(--cel-text-mute, #6e7681)" fontFamily="system-ui">
+          <text x={w - 30 * viewport.zoom} y={16 * viewport.zoom} fontSize={9 * viewport.zoom} fill="var(--cel-text-mute, color-mix(in srgb, var(--color-text) 55%, transparent))" fontFamily="system-ui">
             [slide]
           </text>
         )}
@@ -842,7 +959,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         />
         {c.label && (
           <g transform={`translate(${midScreenX}, ${midScreenY})`}>
-            <rect x={-c.label.length * 3.5} y={-8} width={c.label.length * 7} height={14} fill="var(--cel-surface-stage, #0b0d10)" stroke={c.color} rx={3} />
+            <rect x={-c.label.length * 3.5} y={-8} width={c.label.length * 7} height={14} fill="var(--cel-surface-stage, var(--color-surface))" stroke={c.color} rx={3} />
             <text textAnchor="middle" y={3} fontSize={9} fill={c.color} fontFamily="ui-monospace, monospace">
           {c.label}
             </text>
@@ -863,7 +980,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   return (
     <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* Toolbar */}
-      <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border-2 border-[var(--cel-ink)] rounded-md p-1 cel-shadow">
+      <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-soft">
         <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasSelect}>
           <MousePointer2 size={14} />
         </button>
@@ -891,12 +1008,56 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           <Type size={14} />
             </button>
             <button
-          onClick={() => setTool("shape")}
-          className={`btn p-1.5 ${tool === "shape" ? "border-accent text-accent" : ""}`}
-          title="新增图形 (shape)"
-          data-testid="canvas-tool-shape"
+              onClick={() => setTool("shape")}
+              className={`btn p-1.5 ${tool === "shape" ? "border-accent text-accent" : ""}`}
+              title="新增图形 (shape) — S"
+              data-testid="canvas-tool-shape"
             >
-          <Square size={14} />
+              <Square size={14} />
+            </button>
+            {/* Miro 级形状库 (per WBS-BACKEND-SUPPORT-001 W3.1): shape 工具时展开 5 形状 */}
+            {tool === "shape" && (
+              <div className="flex items-center gap-1" data-testid="canvas-shape-palette">
+                <div className="w-px h-5 bg-line" />
+                {SHAPE_KINDS.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setShapeKind(k)}
+                    className={`btn px-1.5 py-0.5 text-[10px] ${shapeKind === k ? "border-accent text-accent" : ""}`}
+                    title={`形状: ${k}`}
+                    data-testid={`canvas-shape-${k}`}
+                  >
+                    {k === "rect" ? "▭" : k === "rounded" ? "▢" : k === "circle" ? "◯" : k === "diamond" ? "◇" : "△"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* 直线/箭头 (per W3.1) */}
+            <button
+              onClick={() => setTool("line")}
+              className={`btn p-1.5 ${tool === "line" ? "border-accent text-accent" : ""}`}
+              title="直线 (line) — L"
+              data-testid="canvas-tool-line"
+            >
+              <Minus size={14} />
+            </button>
+            {/* 注释 (per W3.1) */}
+            <button
+              onClick={() => setTool("comment")}
+              className={`btn p-1.5 ${tool === "comment" ? "border-accent text-accent" : ""}`}
+              title="注释 (comment) — C"
+              data-testid="canvas-tool-comment"
+            >
+              <MessageSquare size={14} />
+            </button>
+            {/* 橡皮擦 (per W3.1) */}
+            <button
+              onClick={() => setTool("eraser")}
+              className={`btn p-1.5 ${tool === "eraser" ? "border-accent text-accent" : ""}`}
+              title="橡皮擦 (eraser) — E"
+              data-testid="canvas-tool-eraser"
+            >
+              <Eraser size={14} />
             </button>
             <button onClick={() => setTool("frame-select")} className={`btn p-1.5 ${tool === "frame-select" ? "border-accent text-accent" : ""}`} title="选中 frame 后插入 (下一阶段)" data-testid="canvas-tool-frame-select">
               <Frame size={14} />
@@ -963,13 +1124,58 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         )}
       </div>
 
+      {/* 双击编辑浮层 (per WBS-BACKEND-SUPPORT-001 W3.4): text/sticky 双击 → textarea */}
+      {editingId && (() => {
+        const editingEl = elements.find((el) => el.id === editingId);
+        if (!editingEl) return null;
+        const screen = worldToScreen(editingEl.x, editingEl.y);
+        return (
+          <div
+            data-testid="canvas-edit-overlay"
+            className="absolute z-30"
+            style={{
+              left: screen.x,
+              top: screen.y,
+              width: editingEl.width * viewport.zoom,
+              height: editingEl.height * viewport.zoom,
+            }}
+          >
+            <textarea
+              autoFocus
+              value={editingText}
+              onChange={(e) => setEditingText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setEditingId(null); return; }
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  // 提交编辑: 通过 onElementPositionChange 之外的通道 — 简化: 本地 store 更新
+                  const el = elements.find((x) => x.id === editingId);
+                  if (el && onCreateElement === undefined && !readOnly) {
+                    // preview store 模式: 直接改 store canvasElements 里该元素 content
+                    import("@/lib/store").then(({ useStore }) => {
+                      useStore.getState().replaceCanvasElementContent?.(editingId, { text: editingText });
+                    });
+                  }
+                  setEditingId(null);
+                }
+              }}
+              data-testid="canvas-edit-textarea"
+              className="w-full h-full resize-none rounded border-2 border-accent bg-bg-card text-ink text-sm p-1.5 focus:outline-none shadow-soft"
+              style={{ fontSize: 14 * viewport.zoom, lineHeight: 1.3 }}
+            />
+            <p className="absolute -bottom-5 left-0 text-[9px] font-mono text-ink-mute bg-bg-card/90 px-1 rounded">
+              Ctrl+Enter 保存 · Esc 取消
+            </p>
+          </div>
+        );
+      })()}
+
       {/* SVG Canvas */}
       <svg
         ref={svgRef}
         data-testid="canvas-svg"
         viewBox="0 0 1200 800"
         className="w-full h-full"
-        style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, #0b0d10)", backgroundImage: "radial-gradient(circle, var(--cel-ink, #21262d) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+        style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, var(--color-surface))", backgroundImage: "radial-gradient(circle, var(--cel-ink, var(--color-border)) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -986,7 +1192,8 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           } else if (tool === "text") {
             void createElementAt(e, "text", 200, 60, { text: "" });
           } else if (tool === "shape") {
-            void createElementAt(e, "shape", 120, 120, {});
+            // 形状库 (per WBS-BACKEND-SUPPORT-001 W3.1): shape_kind 传入 content
+            void createElementAt(e, "shape", 120, 120, { shape_kind: shapeKind });
           }
         }}
       >
@@ -1021,7 +1228,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             <path
               data-testid="canvas-port-drag-preview"
               d={`M ${fx} ${fy} C ${cx1} ${fy}, ${cx2} ${portDrag.y}, ${portDrag.x} ${portDrag.y}`}
-              stroke="var(--cel-cyan, #2f81f7)"
+              stroke="var(--cel-cyan, var(--color-primary))"
               strokeWidth={2}
               strokeDasharray="6 4"
               fill="none"
@@ -1045,14 +1252,14 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
 
         {/* Element */}
         {displayElements.map((el) => (
-          <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`}>
+          <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
             {renderElement(el)}
           </g>
         ))}
       </svg>
 
       {/* Minimap */}
-      <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border-2 border-[var(--cel-ink)] rounded-md overflow-hidden cel-shadow">
+      <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border border-line rounded-md overflow-hidden shadow-soft">
         <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className="w-full h-full">
           {/* viewport rect */}
           <rect
@@ -1061,7 +1268,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             width={1200 / viewport.zoom}
             height={800 / viewport.zoom}
             fill="none"
-            stroke="var(--cel-cyan, #2f81f7)"
+            stroke="var(--cel-cyan, var(--color-primary))"
             strokeWidth={2}
           />
           {/* elements dots */}

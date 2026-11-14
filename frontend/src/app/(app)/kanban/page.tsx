@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b5f2dfafa636a1a6b0d1188de8e51dae72491e6d07f06fe4780b37f34a9b4d9d
+@cypher schema=1 source_sha256=7d1c7aa6dd441a561ba8ce5c4759d46d1656957534cf849e00fdd96b38b1d1cc
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -18,7 +18,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -36,6 +36,7 @@ import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import { GanttView } from "@/components/gantt";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { KANBAN_COLUMNS } from "@/mocks/data/kanban";
@@ -212,22 +213,22 @@ export default function KanbanPage() {
           </section>
         )}
 
-        {(activeView === "时间线" || activeView === "日历") && (
-          <section data-testid="kanban-timeline-link" className="bg-bg-card rounded-xl border border-line shadow-soft p-6 text-center">
-            <CalendarDays size={20} className="mx-auto text-accent mb-2" />
-            <h2 className="text-sm font-bold text-ink">
-              {activeView === "时间线" ? "甘特图 / 时间线" : "日历（月 / 周视图）"}
-            </h2>
-            <p className="text-xs text-ink-dim mt-1">
-              完整实现（里程碑拖拽、WorkItem 移动、事件拖动）在项目页时间线 tab。
-            </p>
-            <Link
-              href="/projects?tab=timeline"
-              data-testid="kanban-go-timeline"
-              className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft"
-            >
-              打开项目时间线 <ArrowRight size={12} />
-            </Link>
+        {activeView === "时间线" && (
+          <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-dim">Loading Gantt...</div>}>
+              <GanttView
+                board={board}
+                workItems={workItems}
+                identities={identities}
+              />
+            </Suspense>
+          </section>
+        )}
+        {activeView === "日历" && (
+          <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
+            <div className="flex h-full items-center justify-center text-ink-dim">
+              <p>日历视图 (待实装: W3 Calendar 月/周视图)</p>
+            </div>
           </section>
         )}
       </main>

@@ -2,7 +2,7 @@
 // Star Platform — Shared Type Definitions
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=39c3dd60b0980036a6bf5d1c908856039391fac253295350b8d4d387530d25d1
+@cypher schema=1 source_sha256=a453538e8db444c980863befa99d98f4994811fc379728534ac49eace854296c
 MERGE (self:File {path:"frontend/src/types/ids.ts"})
 MERGE (workItem:Type {id:"frontend/src/types/ids.ts::WorkItem",kind:"interface"})
 MERGE (workItemDoc:Type {id:"frontend/src/types/ids.ts::WorkItemDocument",kind:"interface"})
@@ -813,6 +813,10 @@ export interface CanvasElement {
     brush_size?: number;
     /** Stroke colour (hex or rgba). */
     brush_color?: string;
+    /** Shape sub-kind (per WBS-BACKEND-SUPPORT-001 W3.1 Miro 形状库): rect/rounded/circle/diamond/triangle */
+    shape_kind?: "rect" | "rounded" | "circle" | "diamond" | "triangle";
+    /** Comment sticky marker (per W3.1 注释工具) */
+    is_comment?: boolean;
   };
   locked: boolean;
   hidden: boolean;

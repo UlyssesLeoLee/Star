@@ -1,5 +1,6 @@
 // Gantt module barrel export
 export { GanttChart } from "./GanttChart";
+export { GanttView } from "./GanttView";
 export type { GanttChartProps, ZoomLevel } from "./GanttChart";
 export { GanttBar } from "./GanttBar";
 export type { GanttBarProps, GanttBarItem, GanttBarStatus } from "./GanttBar";
