@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=031b533d443e36259c47ba881a0dbdd1d3dfd1dcc63a46bf517c6ac237c9161d
+@cypher schema=1 source_sha256=c407d1bbbb45758a16cce5d196df3222ddecfc558f4b0bc6b6d17855d45de8b9
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -560,6 +560,10 @@ function WorktreePageInner() {
   if (!worktreeGroupApi) {
     return (
       <main className="mx-auto w-full max-w-4xl space-y-4 p-4" data-testid="worktree-directory-unavailable">
+        {/* per 2026-11-14 树形架构: Branch 功能集 (web 版无宿主走此分支, 同样可达) */}
+        {requestedWorktreeId && requestedBranch && requestedProjectId && (
+          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} />
+        )}
         <header className="border-b border-line pb-3">
           <h1 className="text-xl font-semibold">{t.runDirectory.projectWorktreeIndexTitle}</h1>
           <p className="mt-1 text-xs text-ink-mute">{t.sidebar.projectDirectory}</p>
