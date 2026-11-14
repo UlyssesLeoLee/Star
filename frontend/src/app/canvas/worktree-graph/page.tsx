@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=0cccdcd8573328f3d1d27ead23d36851c09bbf7082c860aa77ca610a5a991e8e
+MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/app/(worktree-canvas)/page.tsx
 //
