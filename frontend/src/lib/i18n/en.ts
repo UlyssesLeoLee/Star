@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ffcfc2e3628d489f01f88280cbd63f43eb43fd1e271e15b6dc97a51261900646
+@cypher schema=1 source_sha256=390430531c5659f470d8eed23243b5180f77cab5f48a7ed6ca0bd8bd4b2bc9a9
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -647,6 +647,11 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  canvasGallery: {
+    title: "Infinite Canvas Hub",
+    subtitle: "Unified entry for three canvas types — Canvas / Worktree Graph / Agent Topology",
+    open: "Open",
   },
   review: {
     title: "Review / Cross Review",

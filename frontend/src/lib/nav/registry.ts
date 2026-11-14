@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d758001769deefc33d85ab93e4a5fc20d52333d8ccb108704db3856023d9d446
+@cypher schema=1 source_sha256=2e77bd6c50676d216c5599697c8218c099a4783d176902698706c55ae76dc11c
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -571,10 +571,10 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "canvas",
     label: "Canvas",
     code: "CNV",
-    href: "/canvas/canvas-001",
+    href: "/canvas",
     category: "work",
     categoryLabel: "Work Management",
-    description: "无限画布 · 帧/端点/连接线 (per DRIFT-α-009: 补 nav registry 入口, seed canvas-001 关联 prj-physis)",
+    description: "无限画布中心 · Canvas / Worktree 图 / Agent 拓扑统一入口 (per 2026-11-14 用户发令整合)",
     icon: Network,
   },
   {

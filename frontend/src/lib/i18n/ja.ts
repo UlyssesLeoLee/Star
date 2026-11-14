@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b00e3ff56813c24b19bad5ccf1ee4f0674678831f7ca4e816790bfd25f753578
+@cypher schema=1 source_sha256=7df5a561f13df2ac9dd8d3f44dd7dbf9c6c0e7fb0b5393fda7a91c11f35a4156
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -648,6 +648,11 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  canvasGallery: {
+    title: "無限キャンバスハブ",
+    subtitle: "3 種類のキャンバス統一入口 — Canvas / Worktree 図 / Agent トポロジー",
+    open: "開く",
   },
   review: {
     title: "Review / 自己・交差レビュー",

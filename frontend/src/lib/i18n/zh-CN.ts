@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d9cf27b036e2bd9615b96e5296a341dda75dab0d19f4f60072e55a54d80f65d5
+@cypher schema=1 source_sha256=60a3af8a083d5d1e6eefd9bf643aa7d9c4bc87a1254335e63b7c162fd7a04dde
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -662,6 +662,11 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  canvasGallery: {
+    title: "无限画布中心",
+    subtitle: "三类画布统一入口 — Canvas 画布 / Worktree 图 / Agent 拓扑",
+    open: "打开",
   },
   review: {
     title: "Review / 自审交叉审核",

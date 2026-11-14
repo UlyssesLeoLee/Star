@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=cc2705969c78f5a5d71ca5560cb9c3f5fa48ef2bd300604184cd42a29c1f53bb
+@cypher schema=1 source_sha256=8b541c4c21644f0685e4ed7004967c84cd814d55240be6f7246b0bfedd6d93e0
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -566,6 +566,11 @@ export interface Dictionary {
     fiveW1H: string;                // "5W1H"
   };
 
+  canvasGallery: {
+    title: string;                  // "无限画布中心"
+    subtitle: string;               // "三类画布统一入口 (per 2026-11-14 用户发令整合)"
+    open: string;                   // "打开"
+  };
   review: {
     title: string;                  // "Review / 自审交叉审核"
     subtitle: string;               // "ReviewRecord 列表 · 按状态分组 (per requirements §27.4)"
