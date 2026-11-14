@@ -2269,3 +2269,9 @@ pub mod ai_session_inline {
 // (per SRS-PI-BORROW-001 §4 FR-30). 跟 application crate 的 SteeringSinkBridge
 // 集成.
 pub mod queue;
+
+// W12 第一阶段 (WBS 7.13): capability profile 固定 (name/version/digest,
+// digest 不匹配 fail closed) + 插件生命周期状态机 (安装/升级/卸载/drain,
+// 热卸载 = 先停新准入再 drain)。纯逻辑 + 测试, 插件不加载进主进程。
+pub mod capability_profile;
+pub mod plugin_lifecycle;
