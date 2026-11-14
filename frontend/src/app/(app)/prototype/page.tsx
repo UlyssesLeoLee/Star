@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c13df99de068c255f7693a69bace80c4fac393fd197e33460ab43b4477d775f6
+@cypher schema=1 source_sha256=42602cf8fab1e64fb0c1182f5f174c5e792ba95136c80f8d4f466981c3751851
 MERGE (self:File {path:"frontend/src/app/(app)/prototype/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/prototype/page.tsx::PrototypePage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -57,11 +57,11 @@ export default function PrototypePage() {
   const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-bg">
       <div className="flex-1 flex min-h-0">
         {/* ============ 左: 生成类型 + 引用 ============ */}
-        <aside data-testid="prototype-gen-panel" className="w-64 shrink-0 border-r border-gray-200 bg-white overflow-y-auto p-3">
-          <h2 className="text-xs font-bold text-gray-900 mb-2">要生成什么</h2>
+        <aside data-testid="prototype-gen-panel" className="w-64 shrink-0 border-r border-line bg-bg-card overflow-y-auto p-3">
+          <h2 className="text-xs font-bold text-ink mb-2">要生成什么</h2>
           <ul className="grid grid-cols-2 gap-1.5">
             {GEN_TYPES.map((t) => (
               <li key={t.id}>
@@ -71,31 +71,31 @@ export default function PrototypePage() {
                   data-testid={`prototype-gen-${t.id}`}
                   className={clsx(
                     "w-full text-left px-2.5 py-2 rounded-lg border transition-colors",
-                    genType === t.id ? "border-indigo-500 bg-indigo-50" : "border-gray-200 hover:border-gray-300",
+                    genType === t.id ? "border-accent bg-accent/10" : "border-line hover:border-line",
                   )}
                 >
-                  <span className={clsx("flex items-center gap-1.5 text-xs font-semibold", genType === t.id ? "text-indigo-700" : "text-gray-700")}>
+                  <span className={clsx("flex items-center gap-1.5 text-xs font-semibold", genType === t.id ? "text-accent" : "text-ink-dim")}>
                     <t.icon size={12} /> {t.label}
                   </span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5">{t.sub}</span>
+                  <span className="block text-[10px] text-ink-mute mt-0.5">{t.sub}</span>
                 </button>
               </li>
             ))}
           </ul>
 
           <div className="mt-4">
-            <h3 className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">引用上下文</h3>
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-1.5">引用上下文</h3>
             <ul className="space-y-1">
-              <li className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs">
-                <Paperclip size={11} className="text-gray-400" />
-                <span className="font-mono text-gray-700 flex-1 truncate">T-142 relation-api.md</span>
+              <li className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-line text-xs">
+                <Paperclip size={11} className="text-ink-mute" />
+                <span className="font-mono text-ink-dim flex-1 truncate">T-142 relation-api.md</span>
               </li>
-              <li className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs">
-                <Paperclip size={11} className="text-gray-400" />
-                <span className="font-mono text-gray-700 flex-1 truncate">ipa-s03-005 画面設計</span>
+              <li className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-line text-xs">
+                <Paperclip size={11} className="text-ink-mute" />
+                <span className="font-mono text-ink-dim flex-1 truncate">ipa-s03-005 画面設計</span>
               </li>
             </ul>
-            <button type="button" className="mt-1.5 w-full text-xs py-1.5 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-indigo-400 flex items-center justify-center gap-1">
+            <button type="button" className="mt-1.5 w-full text-xs py-1.5 rounded-lg border border-dashed border-line text-ink-dim hover:border-accent/60 flex items-center justify-center gap-1">
               + 文件 / 截图 / 任务卡
             </button>
           </div>
@@ -108,17 +108,17 @@ export default function PrototypePage() {
               data-testid="prototype-prompt"
               rows={4}
               defaultValue="做一个手机端的关系查询界面，能切换出边、入边、环路径"
-              className="w-full rounded-xl border border-gray-200 bg-white p-3.5 text-sm text-gray-800 focus:border-indigo-500 focus:outline-none shadow-sm"
+              className="w-full rounded-xl border border-line bg-bg-card p-3.5 text-sm text-ink focus:border-accent focus:outline-none shadow-soft"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-dim">
               已生成 3 个页签的可点击原型，数据来自示例。可以把数据来源切到当前 Branch 的接口。
             </p>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 flex-1">描述你要的原型</span>
-              <button type="button" data-testid="prototype-generate" className="text-xs px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-semibold">
+              <span className="text-xs text-ink-dim flex-1">描述你要的原型</span>
+              <button type="button" data-testid="prototype-generate" className="text-xs px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft font-semibold">
                 生成
               </button>
-              <button type="button" className="text-xs px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+              <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60">
                 从模板
               </button>
             </div>
@@ -127,20 +127,20 @@ export default function PrototypePage() {
             <div data-testid="prototype-pipeline" className="flex items-center gap-1.5 text-xs flex-wrap">
               {PIPELINE.map((step, i) => (
                 <span key={step} className="flex items-center gap-1.5">
-                  <span className={clsx("px-2.5 py-1.5 rounded-lg border", i <= 3 ? "bg-indigo-600 text-white border-indigo-600 font-semibold" : "bg-white border-gray-200 text-gray-600")}>
+                  <span className={clsx("px-2.5 py-1.5 rounded-lg border", i <= 3 ? "bg-accent text-white border-accent font-semibold" : "bg-bg-card border-line text-ink-dim")}>
                     {step}
                   </span>
-                  {i < PIPELINE.length - 1 && <span className="text-gray-300">→</span>}
+                  {i < PIPELINE.length - 1 && <span className="text-ink-mute">→</span>}
                 </span>
               ))}
               <span className="ml-2 flex items-center gap-2">
-                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold">
+                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-accent text-white font-semibold">
                   <Play size={12} /> 交互预览
                 </button>
-                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700">
+                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim">
                   <Download size={12} /> 导出
                 </button>
-                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700">
+                <button type="button" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim">
                   <Share2 size={12} /> 分享
                 </button>
               </span>
@@ -149,12 +149,12 @@ export default function PrototypePage() {
         </main>
 
         {/* ============ 右: 交互预览 ============ */}
-        <aside data-testid="prototype-preview" className="w-80 shrink-0 border-l border-gray-200 bg-white overflow-y-auto p-3">
-          <h2 className="text-xs font-bold text-gray-900 mb-2">UI · 关系查询（手机）</h2>
-          <div data-testid="prototype-preview-ui" className={clsx("mx-auto rounded-xl border-2 border-gray-300 bg-gray-50 overflow-hidden", device === "mobile" ? "w-[200px]" : "w-full")}>
-            <div className="bg-white border-b border-gray-200 px-3 py-2 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-800">关系查询</span>
-              <span className="text-[9px] text-gray-400">A → B</span>
+        <aside data-testid="prototype-preview" className="w-80 shrink-0 border-l border-line bg-bg-card overflow-y-auto p-3">
+          <h2 className="text-xs font-bold text-ink mb-2">UI · 关系查询（手机）</h2>
+          <div data-testid="prototype-preview-ui" className={clsx("mx-auto rounded-xl border-2 border-line bg-bg overflow-hidden", device === "mobile" ? "w-[200px]" : "w-full")}>
+            <div className="bg-bg-card border-b border-line px-3 py-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-ink">关系查询</span>
+              <span className="text-[9px] text-ink-mute">A → B</span>
             </div>
             <div className="p-2.5 space-y-1.5">
               {[
@@ -162,10 +162,10 @@ export default function PrototypePage() {
                 { tab: "入边", rows: ["C → A 依赖"] },
                 { tab: "环路径", rows: ["查询环路径"] },
               ].map((g) => (
-                <div key={g.tab} className="rounded-lg bg-white border border-gray-200 p-2">
-                  <div className="text-[10px] font-semibold text-indigo-700">{g.tab}</div>
+                <div key={g.tab} className="rounded-lg bg-bg-card border border-line p-2">
+                  <div className="text-[10px] font-semibold text-accent">{g.tab}</div>
                   {g.rows.map((r) => (
-                    <div key={r} className="text-[10px] font-mono text-gray-600 mt-0.5">{r}</div>
+                    <div key={r} className="text-[10px] font-mono text-ink-dim mt-0.5">{r}</div>
                   ))}
                 </div>
               ))}
@@ -173,57 +173,57 @@ export default function PrototypePage() {
           </div>
 
           <div className="mt-3 space-y-2 text-xs">
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">2D · 节点关系</div>
-              <div className="mt-1.5 flex items-center justify-center gap-3 font-mono text-[11px] text-gray-600">
-                <span className="size-7 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center">A</span>
-                <span className="text-gray-300">—</span>
-                <span className="size-7 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center">B</span>
-                <span className="text-gray-300">—</span>
-                <span className="size-7 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center">C</span>
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">2D · 节点关系</div>
+              <div className="mt-1.5 flex items-center justify-center gap-3 font-mono text-[11px] text-ink-dim">
+                <span className="size-7 rounded-full bg-accent/15 text-accent grid place-items-center">A</span>
+                <span className="text-ink-mute">—</span>
+                <span className="size-7 rounded-full bg-accent/15 text-accent grid place-items-center">B</span>
+                <span className="text-ink-mute">—</span>
+                <span className="size-7 rounded-full bg-accent/15 text-accent grid place-items-center">C</span>
               </div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">3D · 机房 → 机柜 → 服务</div>
-              <div className="mt-1 text-[11px] text-gray-500">机柜 A2 · canvas-realtime ×3</div>
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">3D · 机房 → 机柜 → 服务</div>
+              <div className="mt-1 text-[11px] text-ink-dim">机柜 A2 · canvas-realtime ×3</div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">4D · 事件随时间传播</div>
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">4D · 事件随时间传播</div>
               <div className="mt-1.5 flex items-center gap-1 font-mono text-[10px]">
                 {["postgres", "api", "realtime", "告警"].map((n, i) => (
                   <span key={n} className="flex items-center gap-1">
-                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{n}</span>
-                    {i < 3 && <span className="text-gray-300">→</span>}
+                    <span className="px-1.5 py-0.5 rounded bg-bg-soft text-ink-dim">{n}</span>
+                    {i < 3 && <span className="text-ink-mute">→</span>}
                   </span>
                 ))}
               </div>
-              <div className="mt-1 text-[10px] text-emerald-600">t = 0 · 正常</div>
+              <div className="mt-1 text-[10px] text-ok">t = 0 · 正常</div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">5D · 反事实对照</div>
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">5D · 反事实对照</div>
               <div className="mt-1 space-y-0.5 text-[11px] font-mono">
-                <div className="text-gray-600">屏蔽「队列」模块</div>
-                <div className="text-emerald-600">正常 P95 42 ms</div>
-                <div className="text-rose-600">反事实 P95 118 ms</div>
+                <div className="text-ink-dim">屏蔽「队列」模块</div>
+                <div className="text-ok">正常 P95 42 ms</div>
+                <div className="text-err">反事实 P95 118 ms</div>
               </div>
-              <div className="mt-1 text-[10px] text-gray-400">按显式规则推演，不是一般意义的因果推断</div>
+              <div className="mt-1 text-[10px] text-ink-mute">按显式规则推演，不是一般意义的因果推断</div>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">1D · 结构化说明</div>
-              <ol className="mt-1 space-y-0.5 text-[11px] text-gray-600 list-decimal list-inside">
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">1D · 结构化说明</div>
+              <ol className="mt-1 space-y-0.5 text-[11px] text-ink-dim list-decimal list-inside">
                 <li>输入起点节点</li>
                 <li>选择方向与深度</li>
                 <li>查看环路径并跳到任务卡</li>
               </ol>
             </div>
 
-            <div className="rounded-lg border border-gray-200 p-2.5">
-              <div className="font-semibold text-gray-800">动效 · 合并成功提示</div>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-600">
+            <div className="rounded-lg border border-line p-2.5">
+              <div className="font-semibold text-ink">动效 · 合并成功提示</div>
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-ok">
                 <Check size={12} /> 已合并到 dev
               </div>
             </div>
@@ -232,57 +232,57 @@ export default function PrototypePage() {
       </div>
 
       {/* ============ 底栏 ============ */}
-      <footer data-testid="prototype-footer" className="border-t border-gray-200 bg-white px-3 py-2 flex items-center gap-2 text-xs flex-wrap">
-        <span className="flex items-center gap-1 text-gray-500">
+      <footer data-testid="prototype-footer" className="border-t border-line bg-bg-card px-3 py-2 flex items-center gap-2 text-xs flex-wrap">
+        <span className="flex items-center gap-1 text-ink-dim">
           <Minus size={12} /> 80% <Plus size={12} />
         </span>
-        <span className="flex items-center gap-1 text-gray-500"><Settings2 size={12} /> 适配</span>
-        <span className="flex items-center gap-1 text-gray-500"><Layers size={12} /> 图层</span>
-        <span className="flex items-center gap-1 text-gray-500">评论</span>
+        <span className="flex items-center gap-1 text-ink-dim"><Settings2 size={12} /> 适配</span>
+        <span className="flex items-center gap-1 text-ink-dim"><Layers size={12} /> 图层</span>
+        <span className="flex items-center gap-1 text-ink-dim">评论</span>
 
-        <span className="mx-1 w-px h-4 bg-gray-200" />
+        <span className="mx-1 w-px h-4 bg-bg-soft" />
 
-        <span className="flex items-center gap-1 text-gray-500"><Palette size={12} /> UI 界面 / 原型</span>
-        <span className="flex items-center gap-1 text-gray-500"><Palette size={12} /> 主色</span>
+        <span className="flex items-center gap-1 text-ink-dim"><Palette size={12} /> UI 界面 / 原型</span>
+        <span className="flex items-center gap-1 text-ink-dim"><Palette size={12} /> 主色</span>
 
-        <span className="mx-1 w-px h-4 bg-gray-200" />
+        <span className="mx-1 w-px h-4 bg-bg-soft" />
 
         <span className="flex items-center gap-1.5">
-          <span className="text-gray-500">设备</span>
-          <button type="button" onClick={() => setDevice("mobile")} className={clsx("flex items-center gap-1 px-2 py-0.5 rounded border", device === "mobile" ? "border-indigo-500 text-indigo-700" : "border-gray-200 text-gray-500")}>
+          <span className="text-ink-dim">设备</span>
+          <button type="button" onClick={() => setDevice("mobile")} className={clsx("flex items-center gap-1 px-2 py-0.5 rounded border", device === "mobile" ? "border-accent text-accent" : "border-line text-ink-dim")}>
             <Smartphone size={11} /> 手机 390 × 844
           </button>
-          <button type="button" onClick={() => setDevice("desktop")} className={clsx("flex items-center gap-1 px-2 py-0.5 rounded border", device === "desktop" ? "border-indigo-500 text-indigo-700" : "border-gray-200 text-gray-500")}>
+          <button type="button" onClick={() => setDevice("desktop")} className={clsx("flex items-center gap-1 px-2 py-0.5 rounded border", device === "desktop" ? "border-accent text-accent" : "border-line text-ink-dim")}>
             <Monitor size={11} /> 桌面 1440 × 900
           </button>
         </span>
 
-        <span className="mx-1 w-px h-4 bg-gray-200" />
+        <span className="mx-1 w-px h-4 bg-bg-soft" />
 
         <span className="flex items-center gap-1.5">
-          <span className="text-gray-500">数据来源</span>
-          <span className="px-2 py-0.5 rounded border border-indigo-300 bg-indigo-50 text-indigo-700">示例数据（原型用）</span>
-          <span className="px-2 py-0.5 rounded border border-gray-200 text-gray-500 flex items-center gap-1"><GitBranch size={11} /> 当前 Branch 的接口</span>
+          <span className="text-ink-dim">数据来源</span>
+          <span className="px-2 py-0.5 rounded border border-accent/50 bg-accent/10 text-accent">示例数据（原型用）</span>
+          <span className="px-2 py-0.5 rounded border border-line text-ink-dim flex items-center gap-1"><GitBranch size={11} /> 当前 Branch 的接口</span>
         </span>
 
-        <span className="mx-1 w-px h-4 bg-gray-200" />
+        <span className="mx-1 w-px h-4 bg-bg-soft" />
 
         <span className="flex items-center gap-1.5">
-          <span className="text-gray-500">版本</span>
-          <span className="text-gray-700 font-semibold">刚刚 生成 v3</span>
-          <span className="text-gray-400">5 分钟前 改为手机尺寸</span>
-          <span className="text-gray-400">10 分钟前 首次生成</span>
+          <span className="text-ink-dim">版本</span>
+          <span className="text-ink-dim font-semibold">刚刚 生成 v3</span>
+          <span className="text-ink-mute">5 分钟前 改为手机尺寸</span>
+          <span className="text-ink-mute">10 分钟前 首次生成</span>
         </span>
 
         <div className="flex-1" />
 
-        <a href="/kanban?view=%E6%8C%89%E6%96%87%E4%BB%B6%E5%BC%80%E5%8D%A1" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+        <a href="/kanban?view=%E6%8C%89%E6%96%87%E4%BB%B6%E5%BC%80%E5%8D%A1" className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim hover:border-accent/60">
           附加到任务卡 T-142
         </a>
-        <a href="/canvas/canvas-001" data-testid="prototype-to-canvas" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+        <a href="/canvas/canvas-001" data-testid="prototype-to-canvas" className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim hover:border-accent/60">
           放进画布白板
         </a>
-        <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+        <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim hover:border-accent/60">
           导出 HTML / 视频
         </button>
       </footer>

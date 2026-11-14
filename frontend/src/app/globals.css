@@ -1,5 +1,7 @@
 @import "../styles/theme.css";
 @import "@xterm/xterm/css/xterm.css";
+/* Tailwind v4: JS config (colors bg/ink/accent/ok...) 必须显式 @config 加载, 否则 token 工具类 (bg-bg-card/text-ink...) 不生成 */
+@config "../../tailwind.config.ts";
 @import "tailwindcss";
 
 /* Star 日漫科技美学双主题 v2.0 (Shōnen Studio Light + Neo-Tokyo Dark) */

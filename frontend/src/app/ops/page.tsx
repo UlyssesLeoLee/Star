@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=15716ff60cb6e8e8078c8bb702fef29c007ca0669765ee55e551398a17f7d353
+@cypher schema=1 source_sha256=c077c58e86720270352e15eba25fc03f07558e6d6817aefc0bb542f1a6f1654b
 MERGE (self:File {path:"frontend/src/app/ops/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/ops/page.tsx::OpsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -36,13 +36,13 @@ interface AppRow {
 }
 
 const APPS: AppRow[] = [
-  { app: "star-api-rest", kind: "服务 · REST API", current: "0.4.2", upgrade: "0.4.3", contract: "v3 兼容", health: "健康", healthTone: "bg-emerald-100 text-emerald-700" },
-  { app: "star-bff", kind: "服务 · 前端网关", current: "0.2.0", upgrade: null, contract: "v3 兼容", health: "健康", healthTone: "bg-emerald-100 text-emerald-700" },
-  { app: "canvas-engine", kind: "服务 · 画布平台", current: "0.3.1", upgrade: "0.3.2", contract: "v2 兼容", health: "健康", healthTone: "bg-emerald-100 text-emerald-700" },
-  { app: "domain-canvas", kind: "服务 · 画布业务域", current: "0.3.0", upgrade: "0.4.0", contract: "需迁移", health: "健康", healthTone: "bg-emerald-100 text-emerald-700" },
-  { app: "canvas-realtime", kind: "服务 · 实时协作", current: "0.2.4", upgrade: "0.2.5", contract: "v1 兼容", health: "降级", healthTone: "bg-amber-100 text-amber-700" },
-  { app: "web", kind: "前端 · Vercel 独立发布", current: "2026.11.14", upgrade: null, contract: "—", health: "健康", healthTone: "bg-emerald-100 text-emerald-700" },
-  { app: "star-desktop", kind: "桌面 · 独立发布链", current: "0.9.0", upgrade: "0.9.1", contract: "—", health: "—", healthTone: "bg-gray-100 text-gray-500" },
+  { app: "star-api-rest", kind: "服务 · REST API", current: "0.4.2", upgrade: "0.4.3", contract: "v3 兼容", health: "健康", healthTone: "bg-ok/10 text-ok" },
+  { app: "star-bff", kind: "服务 · 前端网关", current: "0.2.0", upgrade: null, contract: "v3 兼容", health: "健康", healthTone: "bg-ok/10 text-ok" },
+  { app: "canvas-engine", kind: "服务 · 画布平台", current: "0.3.1", upgrade: "0.3.2", contract: "v2 兼容", health: "健康", healthTone: "bg-ok/10 text-ok" },
+  { app: "domain-canvas", kind: "服务 · 画布业务域", current: "0.3.0", upgrade: "0.4.0", contract: "需迁移", health: "健康", healthTone: "bg-ok/10 text-ok" },
+  { app: "canvas-realtime", kind: "服务 · 实时协作", current: "0.2.4", upgrade: "0.2.5", contract: "v1 兼容", health: "降级", healthTone: "bg-warn/10 text-warn" },
+  { app: "web", kind: "前端 · Vercel 独立发布", current: "2026.11.14", upgrade: null, contract: "—", health: "健康", healthTone: "bg-ok/10 text-ok" },
+  { app: "star-desktop", kind: "桌面 · 独立发布链", current: "0.9.0", upgrade: "0.9.1", contract: "—", health: "—", healthTone: "bg-bg-soft text-ink-dim" },
 ];
 
 const CHECKS = [
@@ -57,15 +57,15 @@ function AppClusterPanel() {
   return (
     <div data-testid="ops-app-cluster" className="space-y-4">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-bold text-gray-900">原子化 App</h2>
-        <span className="text-[11px] text-gray-500">每个 App 独立构建、独立晋级、独立回滚</span>
+        <h2 className="text-sm font-bold text-ink">原子化 App</h2>
+        <span className="text-[11px] text-ink-dim">每个 App 独立构建、独立晋级、独立回滚</span>
       </div>
 
       {/* App 表 */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-bg-card rounded-xl border border-line shadow-soft overflow-hidden">
         <table data-testid="ops-app-table" className="w-full text-xs">
           <thead>
-            <tr className="text-left text-gray-400 border-b border-gray-200 bg-gray-50">
+            <tr className="text-left text-ink-mute border-b border-line bg-bg">
               <th className="py-2.5 px-3 font-medium">App</th>
               <th className="py-2.5 px-3 font-medium">当前版本</th>
               <th className="py-2.5 px-3 font-medium">可升级到</th>
@@ -76,21 +76,21 @@ function AppClusterPanel() {
           </thead>
           <tbody>
             {APPS.map((row) => (
-              <tr key={row.app} data-testid={`ops-app-${row.app}`} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr key={row.app} data-testid={`ops-app-${row.app}`} className="border-b border-line/60 hover:bg-bg-soft/60">
                 <td className="py-2.5 px-3">
-                  <div className="font-mono font-semibold text-gray-800">{row.app}</div>
-                  <div className="text-[10px] text-gray-400">{row.kind}</div>
+                  <div className="font-mono font-semibold text-ink">{row.app}</div>
+                  <div className="text-[10px] text-ink-mute">{row.kind}</div>
                 </td>
-                <td className="py-2.5 px-3 font-mono text-gray-700">{row.current}</td>
-                <td className="py-2.5 px-3 font-mono text-indigo-700">{row.upgrade ?? "—"}</td>
-                <td className="py-2.5 px-3 text-gray-600">{row.contract}</td>
+                <td className="py-2.5 px-3 font-mono text-ink-dim">{row.current}</td>
+                <td className="py-2.5 px-3 font-mono text-accent">{row.upgrade ?? "—"}</td>
+                <td className="py-2.5 px-3 text-ink-dim">{row.contract}</td>
                 <td className="py-2.5 px-3">
                   <span className={clsx("text-[10px] px-1.5 py-0.5 rounded font-semibold", row.healthTone)}>{row.health}</span>
                 </td>
                 <td className="py-2.5 px-3">
                   <span className="flex items-center gap-2">
-                    <button type="button" className="text-indigo-700 hover:underline">单独更新</button>
-                    <button type="button" className="text-gray-500 hover:underline">回滚</button>
+                    <button type="button" className="text-accent hover:underline">单独更新</button>
+                    <button type="button" className="text-ink-dim hover:underline">回滚</button>
                   </span>
                 </td>
               </tr>
@@ -100,49 +100,49 @@ function AppClusterPanel() {
       </div>
 
       {/* domain-canvas 兼容性检查 */}
-      <section data-testid="ops-release-check" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <h3 className="text-sm font-bold text-gray-900">domain-canvas 0.3.0 → 0.4.0</h3>
-        <p className="text-xs text-gray-500 mt-0.5">兼容性检查（晋级前必过）</p>
+      <section data-testid="ops-release-check" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+        <h3 className="text-sm font-bold text-ink">domain-canvas 0.3.0 → 0.4.0</h3>
+        <p className="text-xs text-ink-dim mt-0.5">兼容性检查（晋级前必过）</p>
         <ul className="mt-3 space-y-1.5">
           {CHECKS.map((c, i) => (
             <li key={i} className="flex items-start gap-2 text-xs">
               {c.ok ? (
-                <Check size={13} className="text-emerald-600 mt-0.5 shrink-0" />
+                <Check size={13} className="text-ok mt-0.5 shrink-0" />
               ) : (
-                <AlertTriangle size={13} className="text-amber-600 mt-0.5 shrink-0" />
+                <AlertTriangle size={13} className="text-warn mt-0.5 shrink-0" />
               )}
-              <span className={c.ok ? "text-gray-700" : "text-amber-800"}>{c.text}</span>
+              <span className={c.ok ? "text-ink-dim" : "text-warn"}>{c.text}</span>
             </li>
           ))}
         </ul>
 
         <div className="mt-4 flex items-center gap-2 text-xs">
-          <span className="text-gray-500">晋级路径</span>
-          <span className="px-2 py-1 rounded border border-gray-200 bg-gray-50 font-mono">dev</span>
-          <span className="text-gray-300">→</span>
-          <span className="px-2 py-1 rounded border border-gray-200 bg-gray-50 font-mono">staging</span>
-          <span className="text-gray-300">→</span>
-          <span className="px-2 py-1 rounded border border-indigo-300 bg-indigo-50 font-mono text-indigo-700">prod（需审批）</span>
+          <span className="text-ink-dim">晋级路径</span>
+          <span className="px-2 py-1 rounded border border-line bg-bg font-mono">dev</span>
+          <span className="text-ink-mute">→</span>
+          <span className="px-2 py-1 rounded border border-line bg-bg font-mono">staging</span>
+          <span className="text-ink-mute">→</span>
+          <span className="px-2 py-1 rounded border border-accent/50 bg-accent/10 font-mono text-accent">prod（需审批）</span>
         </div>
 
         <div className="mt-2 flex items-center gap-2 text-xs">
-          <span className="text-gray-500">渐进发布</span>
+          <span className="text-ink-dim">渐进发布</span>
           {["10%", "30%", "60%", "100%"].map((p, i) => (
-            <span key={p} className={clsx("px-2 py-1 rounded border font-mono", i === 0 ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-semibold" : "border-gray-200 bg-gray-50 text-gray-500")}>
+            <span key={p} className={clsx("px-2 py-1 rounded border font-mono", i === 0 ? "border-accent/60 bg-accent/10 text-accent font-semibold" : "border-line bg-bg text-ink-dim")}>
               {p}
             </span>
           ))}
-          <span className="text-[11px] text-gray-500 ml-2">每一步跑分析门禁（错误率、P95 延迟、事件积压），失败自动回滚，只影响这一个 App</span>
+          <span className="text-[11px] text-ink-dim ml-2">每一步跑分析门禁（错误率、P95 延迟、事件积压），失败自动回滚，只影响这一个 App</span>
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <button type="button" data-testid="ops-release-go" className="text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+          <button type="button" data-testid="ops-release-go" className="text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft">
             先发布扩展迁移，再更新
           </button>
-          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60">
             暂停
           </button>
-          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:border-indigo-400">
+          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60">
             查看发布记录
           </button>
         </div>
@@ -153,7 +153,7 @@ function AppClusterPanel() {
 
 function StubPanel({ label }: { label: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 text-xs text-gray-500">
+    <div className="bg-bg-card rounded-xl border border-line p-6 text-xs text-ink-dim">
       {label} 面板待接入（P2 功能缺口，per 缺标比错标）
     </div>
   );
@@ -163,16 +163,16 @@ export default function OpsPage() {
   const [activeTab, setActiveTab] = useState<(typeof OPS_TABS)[number]>("App 集群");
 
   return (
-    <div data-testid="ops-page" className="flex flex-col h-full bg-gray-50">
+    <div data-testid="ops-page" className="flex flex-col h-full bg-bg">
       {/* 头部 */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <header className="bg-bg-card border-b border-line px-4 py-3 flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="size-8 rounded-lg bg-indigo-100 grid place-items-center text-indigo-700">
+          <div className="size-8 rounded-lg bg-accent/15 grid place-items-center text-accent">
             <ShieldAlert size={15} />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-gray-900">运维控制台</h1>
-            <p className="text-[10px] text-gray-400">仅管理员</p>
+            <h1 className="text-sm font-bold text-ink">运维控制台</h1>
+            <p className="text-[10px] text-ink-mute">仅管理员</p>
           </div>
         </div>
 
@@ -185,7 +185,7 @@ export default function OpsPage() {
               data-testid={`ops-tab-${tab}`}
               className={clsx(
                 "px-3 py-1.5 text-sm rounded-t-lg border-b-2 transition-colors",
-                activeTab === tab ? "border-indigo-600 text-indigo-700 font-semibold" : "border-transparent text-gray-500 hover:text-gray-900",
+                activeTab === tab ? "border-accent text-accent font-semibold" : "border-transparent text-ink-dim hover:text-ink",
               )}
             >
               {tab}
@@ -195,11 +195,11 @@ export default function OpsPage() {
 
         <div className="flex-1" />
 
-        <button type="button" data-testid="ops-env" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700">
+        <button type="button" data-testid="ops-env" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim">
           环境 <span className="font-mono font-semibold">staging</span> <ChevronDown size={12} />
         </button>
-        <span className="size-7 rounded-full bg-gray-200 text-gray-600 font-bold grid place-items-center text-[10px]">L</span>
-        <span className="text-xs text-gray-500">lidian727@gmail.com</span>
+        <span className="size-7 rounded-full bg-bg-soft text-ink-dim font-bold grid place-items-center text-[10px]">L</span>
+        <span className="text-xs text-ink-dim">lidian727@gmail.com</span>
       </header>
 
       {/* 内容 */}
@@ -207,8 +207,8 @@ export default function OpsPage() {
         {activeTab === "App 集群" && (
           <div className="space-y-4">
             <AppClusterPanel />
-            <section data-testid="ops-cluster-tab" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <h2 className="text-sm font-bold text-gray-900 mb-2">集群更新（F-01 实装）</h2>
+            <section data-testid="ops-cluster-tab" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+              <h2 className="text-sm font-bold text-ink mb-2">集群更新（F-01 实装）</h2>
               <ClusterTab />
             </section>
           </div>

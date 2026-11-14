@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e2097d7d7b512c6f97ea78b586e81fbf2c0170e16757148b4de751dfd602ae95
+@cypher schema=1 source_sha256=16468e525781b4e6c8c591619b6c75ed8f25fd16ec8e5a616086dfc91ade68da
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -101,10 +101,10 @@ function McpPanel() {
   const [source, setSource] = useState<"official" | "custom">("official");
   return (
     <div data-testid="settings-panel-mcp">
-      <h2 className="text-base font-bold text-gray-900">MCP 服务器</h2>
-      <p className="text-xs text-gray-500 mt-1">官方目录一键安装，或自定义接入任意 MCP 服务器（原 /integration）</p>
+      <h2 className="text-base font-bold text-ink">MCP 服务器</h2>
+      <p className="text-xs text-ink-dim mt-1">官方目录一键安装，或自定义接入任意 MCP 服务器（原 /integration）</p>
 
-      <div className="mt-3 flex gap-1 border-b border-gray-200">
+      <div className="mt-3 flex gap-1 border-b border-line">
         {(["official", "custom"] as const).map((s) => (
           <button
             key={s}
@@ -112,7 +112,7 @@ function McpPanel() {
             onClick={() => setSource(s)}
             className={clsx(
               "px-3 py-2 text-sm border-b-2 -mb-px",
-              source === s ? "border-indigo-600 text-indigo-700 font-semibold" : "border-transparent text-gray-500",
+              source === s ? "border-accent text-accent font-semibold" : "border-transparent text-ink-dim",
             )}
           >
             {s === "official" ? "官方目录" : "自定义"}
@@ -122,25 +122,25 @@ function McpPanel() {
 
       <ul className="mt-3 grid gap-2">
         {MCP_SERVERS.map((srv) => (
-          <li key={srv.name} data-testid={`settings-mcp-${srv.name}`} className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-gray-200 bg-white">
-            <div className="size-9 rounded-lg bg-indigo-100 grid place-items-center text-indigo-700 shrink-0">
+          <li key={srv.name} data-testid={`settings-mcp-${srv.name}`} className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-line bg-bg-card">
+            <div className="size-9 rounded-lg bg-accent/15 grid place-items-center text-accent shrink-0">
               <Server size={15} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-gray-900">{srv.name}</span>
-                <span className="text-[10px] text-gray-400">{srv.kind}</span>
+                <span className="text-sm font-semibold text-ink">{srv.name}</span>
+                <span className="text-[10px] text-ink-mute">{srv.kind}</span>
                 {srv.connected && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold flex items-center gap-0.5">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-ok/10 text-ok font-semibold flex items-center gap-0.5">
                     <Check size={10} /> 已连接
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-gray-500 mt-0.5">
+              <div className="text-[11px] text-ink-dim mt-0.5">
                 {srv.verified} · <span className="font-mono">{srv.auth}</span>
               </div>
             </div>
-            <button type="button" className={clsx("text-xs px-2.5 py-1.5 rounded-lg", srv.connected ? "border border-gray-300 text-gray-600" : "bg-indigo-600 text-white hover:bg-indigo-700")}>
+            <button type="button" className={clsx("text-xs px-2.5 py-1.5 rounded-lg", srv.connected ? "border border-line text-ink-dim" : "bg-accent text-white hover:bg-accent-soft")}>
               {srv.connected ? "管理" : "安装"}
             </button>
           </li>
@@ -152,17 +152,17 @@ function McpPanel() {
 
 function StubPanel({ id, label, realHref }: { id: string; label: string; realHref?: string }) {
   return (
-    <div data-testid={`settings-panel-${id}`} className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-      <h2 className="text-sm font-bold text-gray-900">{label}</h2>
+    <div data-testid={`settings-panel-${id}`} className="bg-bg-card rounded-xl border border-line p-6 text-center">
+      <h2 className="text-sm font-bold text-ink">{label}</h2>
       {realHref ? (
         <>
-          <p className="text-xs text-gray-500 mt-1">该面板的完整实现在子路由 {realHref}</p>
-          <a href={realHref} data-testid={`settings-panel-${id}-go`} className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+          <p className="text-xs text-ink-dim mt-1">该面板的完整实现在子路由 {realHref}</p>
+          <a href={realHref} data-testid={`settings-panel-${id}-go`} className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft">
             前往 {realHref}
           </a>
         </>
       ) : (
-        <p className="text-xs text-gray-500 mt-1">该面板待接入（P2 功能缺口，per 缺标比错标）</p>
+        <p className="text-xs text-ink-dim mt-1">该面板待接入（P2 功能缺口，per 缺标比错标）</p>
       )}
     </div>
   );
@@ -202,12 +202,12 @@ function SettingsInner() {
   const activeId = resolved.id;
 
   return (
-    <div data-testid="settings-page" className="flex h-full bg-gray-50">
+    <div data-testid="settings-page" className="flex h-full bg-bg">
       {/* 左导航 */}
-      <aside data-testid="settings-nav" className="w-64 shrink-0 border-r border-gray-200 bg-white overflow-y-auto p-3 space-y-4">
+      <aside data-testid="settings-nav" className="w-64 shrink-0 border-r border-line bg-bg-card overflow-y-auto p-3 space-y-4">
         {NAV_GROUPS.map((g) => (
           <div key={g.group}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5 px-1">{g.group}</div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-1.5 px-1">{g.group}</div>
             <ul className="space-y-0.5">
               {g.items.map((item) => (
                 <li key={item.id}>
@@ -216,10 +216,10 @@ function SettingsInner() {
                     data-testid={`settings-nav-${item.id}`}
                     className={clsx(
                       "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors",
-                      activeId === item.id ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-gray-600 hover:bg-gray-50",
+                      activeId === item.id ? "bg-accent/10 text-accent font-semibold" : "text-ink-dim hover:bg-bg-soft/60",
                     )}
                   >
-                    <span className="text-gray-400">{item.icon}</span>
+                    <span className="text-ink-mute">{item.icon}</span>
                     {item.label}
                   </a>
                 </li>
@@ -232,15 +232,15 @@ function SettingsInner() {
       {/* 主区 */}
       <main className="flex-1 min-w-0 overflow-y-auto p-5">
         <div className="max-w-3xl space-y-4">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="font-semibold text-gray-700">设置</span>
+          <div className="flex items-center gap-2 text-xs text-ink-mute">
+            <span className="font-semibold text-ink-dim">设置</span>
             <span>›</span>
             <span>{resolved.label}</span>
             <div className="flex-1" />
-            <button type="button" data-testid="settings-dev-mode-toggle" className="flex items-center gap-1 text-gray-500 hover:text-indigo-700">
+            <button type="button" data-testid="settings-dev-mode-toggle" className="flex items-center gap-1 text-ink-dim hover:text-accent">
               <Code2 size={12} /> 开发者模式
             </button>
-            <button type="button" className="flex items-center gap-1 text-gray-500 hover:text-indigo-700">
+            <button type="button" className="flex items-center gap-1 text-ink-dim hover:text-accent">
               <Search size={12} /> 搜索设置
             </button>
           </div>

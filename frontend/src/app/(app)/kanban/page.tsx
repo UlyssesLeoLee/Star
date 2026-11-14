@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=63b21840b7dd5b24c7c5ce2ad7cd87bb3533cc0d02911c251ad9709b9cc7d169
+@cypher schema=1 source_sha256=b5f2dfafa636a1a6b0d1188de8e51dae72491e6d07f06fe4780b37f34a9b4d9d
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -88,32 +88,32 @@ export default function KanbanPage() {
     : KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full bg-bg">
       {/* ============ 主区 ============ */}
       <main className="flex-1 min-w-0 overflow-y-auto p-4 space-y-4">
         {/* 面包屑: Project → LANE → Worktree → Branch */}
-        <nav data-testid="kanban-breadcrumb" className="flex items-center gap-1.5 text-xs text-gray-600 flex-wrap">
-          <button type="button" className="flex items-center gap-1 hover:text-gray-900">
+        <nav data-testid="kanban-breadcrumb" className="flex items-center gap-1.5 text-xs text-ink-dim flex-wrap">
+          <button type="button" className="flex items-center gap-1 hover:text-ink">
             <span className="font-medium">{project?.name ?? "Physis / GVPE"}</span> <ChevronDown size={12} />
           </button>
-          <span className="text-gray-300">▸</span>
-          <button type="button" className="flex items-center gap-1 hover:text-gray-900">
+          <span className="text-ink-mute">▸</span>
+          <button type="button" className="flex items-center gap-1 hover:text-ink">
             LANE · auth-refactor <ChevronDown size={12} />
           </button>
-          <span className="text-gray-300">▸</span>
-          <button type="button" className="flex items-center gap-1 hover:text-gray-900">
+          <span className="text-ink-mute">▸</span>
+          <button type="button" className="flex items-center gap-1 hover:text-ink">
             wt-relation-bfs <ChevronDown size={12} />
           </button>
-          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white font-mono hover:border-gray-400">
+          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-bg-card font-mono hover:border-line">
             <GitBranch size={11} /> feat/relation-bfs
           </button>
-          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white font-mono hover:border-gray-400">
+          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-bg-card font-mono hover:border-line">
             <GitBranch size={11} /> fix/bfs-cycle
           </button>
         </nav>
 
         {/* 视图 tabs (?view= 深链) */}
-        <div data-testid="kanban-view-tabs" className="flex items-center gap-1 border-b border-gray-200">
+        <div data-testid="kanban-view-tabs" className="flex items-center gap-1 border-b border-line">
           {VIEW_TABS.map((tab) => (
             <button
               key={tab}
@@ -123,8 +123,8 @@ export default function KanbanPage() {
               className={clsx(
                 "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
                 activeView === tab
-                  ? "border-blue-700 text-blue-700 font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-900",
+                  ? "border-accent text-accent font-semibold"
+                  : "border-transparent text-ink-dim hover:text-ink",
               )}
             >
               {tab}
@@ -133,26 +133,26 @@ export default function KanbanPage() {
         </div>
 
         {/* 生命周期条 (真实 board.columns) */}
-        <div data-testid="kanban-lifecycle" className="flex items-center gap-2 text-[11px] text-gray-500 flex-wrap">
+        <div data-testid="kanban-lifecycle" className="flex items-center gap-2 text-[11px] text-ink-dim flex-wrap">
           {lifecycleCols.map((stage, i) => (
             <span key={stage.id} className="flex items-center gap-2">
-              <span className={clsx("px-2 py-0.5 rounded-full border", i === 1 ? "bg-blue-50 border-blue-300 text-blue-700 font-semibold" : "border-gray-200 bg-white")}>
+              <span className={clsx("px-2 py-0.5 rounded-full border", i === 1 ? "bg-accent/10 border-accent/50 text-accent font-semibold" : "border-line bg-bg-card")}>
                 {stage.label}
               </span>
-              {i < lifecycleCols.length - 1 && <span className="text-gray-300">→</span>}
+              {i < lifecycleCols.length - 1 && <span className="text-ink-mute">→</span>}
             </span>
           ))}
         </div>
 
         {/* ============ 视图内容 = 原有真实功能 ============ */}
         {activeView === "Sprint" && (
-          <section data-testid="kanban-sprint-view" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <section data-testid="kanban-sprint-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
             <SprintBoardView />
           </section>
         )}
 
         {activeView === "任务看板" && (
-          <section data-testid="kanban-board-view" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <section data-testid="kanban-board-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
             <KanbanBoard
               board={board}
               workItems={workItems}
@@ -164,7 +164,7 @@ export default function KanbanPage() {
         )}
 
         {activeView === "IPA 流程图" && (
-          <section data-testid="kanban-ipa-view" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <section data-testid="kanban-ipa-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
             <IpaSkillWorkflowBoard
               projectId={projectId}
               tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
@@ -175,24 +175,24 @@ export default function KanbanPage() {
         )}
 
         {activeView === "按文件开卡" && (
-          <section data-testid="kanban-file-cards" className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <section data-testid="kanban-file-cards" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-900">文件即任务 · .nema 侧车</h2>
-              <Link href="/nema" className="text-xs text-indigo-700 hover:underline flex items-center gap-1">
+              <h2 className="text-sm font-bold text-ink">文件即任务 · .nema 侧车</h2>
+              <Link href="/nema" className="text-xs text-accent hover:underline flex items-center gap-1">
                 协同页管理 <ArrowRight size={11} />
               </Link>
             </div>
             {nemaTasks.length === 0 ? (
-              <p className="text-xs text-gray-500">暂无 .nema 任务 — 在 /nema 关联共享文件后会自动生成侧车文件，可在此直接开卡。</p>
+              <p className="text-xs text-ink-dim">暂无 .nema 任务 — 在 /nema 关联共享文件后会自动生成侧车文件，可在此直接开卡。</p>
             ) : (
               <ul className="space-y-1.5">
                 {nemaTasks.map((task) => (
-                  <li key={task.id} data-testid={`kanban-nema-${task.id}`} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 text-xs">
-                    <FileCode2 size={13} className="text-indigo-600 shrink-0" />
-                    <span className="font-mono text-gray-700 flex-1 truncate">{task.filePath}</span>
-                    <span className="text-[10px] text-gray-400">{task.editors.length} 人</span>
+                  <li key={task.id} data-testid={`kanban-nema-${task.id}`} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-line text-xs">
+                    <FileCode2 size={13} className="text-accent shrink-0" />
+                    <span className="font-mono text-ink-dim flex-1 truncate">{task.filePath}</span>
+                    <span className="text-[10px] text-ink-mute">{task.editors.length} 人</span>
                     {task.workItemId ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">已开卡 {task.workItemId}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-ok/10 text-ok">已开卡 {task.workItemId}</span>
                     ) : (
                       <button
                         type="button"
@@ -200,7 +200,7 @@ export default function KanbanPage() {
                           const wid = openNemaAsStarTask(task.id);
                           if (wid) router.push(`/work-item/${wid}`);
                         }}
-                        className="text-[11px] px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1"
+                        className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft flex items-center gap-1"
                       >
                         <FileText size={11} /> 打开为任务
                       </button>
@@ -213,18 +213,18 @@ export default function KanbanPage() {
         )}
 
         {(activeView === "时间线" || activeView === "日历") && (
-          <section data-testid="kanban-timeline-link" className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-center">
-            <CalendarDays size={20} className="mx-auto text-indigo-600 mb-2" />
-            <h2 className="text-sm font-bold text-gray-900">
+          <section data-testid="kanban-timeline-link" className="bg-bg-card rounded-xl border border-line shadow-soft p-6 text-center">
+            <CalendarDays size={20} className="mx-auto text-accent mb-2" />
+            <h2 className="text-sm font-bold text-ink">
               {activeView === "时间线" ? "甘特图 / 时间线" : "日历（月 / 周视图）"}
             </h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-ink-dim mt-1">
               完整实现（里程碑拖拽、WorkItem 移动、事件拖动）在项目页时间线 tab。
             </p>
             <Link
               href="/projects?tab=timeline"
               data-testid="kanban-go-timeline"
-              className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              className="inline-flex items-center gap-1.5 mt-3 text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft"
             >
               打开项目时间线 <ArrowRight size={12} />
             </Link>
@@ -233,41 +233,41 @@ export default function KanbanPage() {
       </main>
 
       {/* ============ 右侧 rail ============ */}
-      <aside data-testid="kanban-right-rail" className="w-72 shrink-0 border-l border-gray-200 bg-white flex flex-col">
-        <div className="px-3 py-2.5 border-b border-gray-200 flex items-center gap-2 text-xs font-semibold text-gray-700">
-          <GitCommitHorizontal size={13} className="text-emerald-600" />
-          Worktree 状态 · <span className="text-emerald-600 font-mono">干净</span>
+      <aside data-testid="kanban-right-rail" className="w-72 shrink-0 border-l border-line bg-bg-card flex flex-col">
+        <div className="px-3 py-2.5 border-b border-line flex items-center gap-2 text-xs font-semibold text-ink-dim">
+          <GitCommitHorizontal size={13} className="text-ok" />
+          Worktree 状态 · <span className="text-ok font-mono">干净</span>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-            <MessageSquare size={13} className="text-blue-600" /> 聊天
+          <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim">
+            <MessageSquare size={13} className="text-accent" /> 聊天
           </div>
-          <div data-testid="kanban-chat-panel" className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-            <p className="text-xs text-gray-800 leading-relaxed">详细设计还有哪些流程没建卡？</p>
-            <p className="text-xs text-gray-600 leading-relaxed">
+          <div data-testid="kanban-chat-panel" className="rounded-lg border border-line bg-bg p-3 space-y-2">
+            <p className="text-xs text-ink leading-relaxed">详细设计还有哪些流程没建卡？</p>
+            <p className="text-xs text-ink-dim leading-relaxed">
               P4 共 20 个流程，已建卡 3 个。建议先建 <span className="font-mono">ロジック設計</span> 和{" "}
               <span className="font-mono">DB詳細設計</span>，要我放进 Backlog 吗？
             </p>
-            <button type="button" data-testid="kanban-chat-ask" className="text-[11px] px-2 py-1 rounded border border-gray-300 bg-white hover:border-blue-400 text-gray-600">
+            <button type="button" data-testid="kanban-chat-ask" className="text-[11px] px-2 py-1 rounded border border-line bg-bg-card hover:border-accent/60 text-ink-dim">
               问问这个 Branch 的进展
             </button>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-            <Users size={13} className="text-gray-500" /> Team
+          <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim">
+            <Users size={13} className="text-ink-dim" /> Team
           </div>
           <div className="flex -space-x-1.5">
             {identities.slice(0, 4).map((who, i) => (
               <span
                 key={who.id ?? i}
                 title={who.display_name}
-                className="size-7 rounded-full border-2 border-white bg-indigo-100 text-indigo-700 text-[10px] font-bold grid place-items-center"
+                className="size-7 rounded-full border-2 border-white bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
               >
                 {who.display_name?.slice(0, 1) ?? "?"}
               </span>
             ))}
-            <span className="size-7 rounded-full border-2 border-white bg-gray-100 text-gray-500 text-[9px] font-bold grid place-items-center">
+            <span className="size-7 rounded-full border-2 border-white bg-bg-soft text-ink-dim text-[9px] font-bold grid place-items-center">
               {identities.length} 在线
             </span>
           </div>
