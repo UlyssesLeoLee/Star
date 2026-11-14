@@ -103,18 +103,18 @@
 | 7.9 | W8 事件传输与 owner settlement | Ulysses |  |  |  |  |  | 进行中 |
 | 7.9.1 | W8 PostgreSQL 验收（grants / RLS / 并发 / 重放 / 持久回执） | Ulysses |  |  | 2026-11-09 |  | 100 | 已完成 |
 | 7.9.2 | 9F4J 原生事件授权错误分类与 BI 接收适配器接线 | Ulysses |  |  | 2026-11-09 |  | 100 | 已完成 |
-| 7.9.3 | mTLS 与服务身份供应、commit-before-ACK 恢复矩阵 |  |  |  |  |  | 0 | 未开始 |
+| 7.9.3 | mTLS 与服务身份供应、commit-before-ACK 恢复矩阵 (e2e 4 TLS 用例 + PG 撤销 opt-in; 恢复矩阵留 P3) | Ulysses |  |  | 2026-11-14 |  | 70 | 进行中 |
 | 7.10 | W9 Schedule / Loop Worker | Ulysses |  |  |  |  |  | 进行中 |
 | 7.11 | W10 BI / Benchmark 产品闭环 | Ulysses |  |  |  |  |  | 进行中 |
 | 7.12 | W11 Multipass / K3s Infrastructure Manager | Ulysses |  |  |  |  |  | 进行中 |
-| 7.13 | W12 Agent 扩展能力与插件热插拔 |  |  |  |  |  | 0 | 未开始 |
+| 7.13 | W12 Agent 扩展能力与插件热插拔 (第一阶段: capability profile 固定 + 插件生命周期状态机; 235 tests) | Ulysses |  |  | 2026-11-14 |  | 50 | 进行中 |
 | 7.14 | W13 跨 App 导航与交互 | Ulysses |  |  |  |  |  | 进行中 |
 | 7.15 | W14 Rust 桌面内存与并行验收 | Ulysses |  |  |  |  |  | 进行中 |
 | 7.16 | W15 商业发布与系统验收 |  |  |  |  |  | 0 | 未开始 |
 | 7.17 | W16 低消耗实时协作、草稿与冲突闭环 | Ulysses |  |  |  |  |  | 进行中 |
 | 7.17.1 | W16-A 设备撤销 HTTP 的 PostgreSQL 验收 | Ulysses |  |  | 2026-10-31 |  | 100 | 已完成 |
 | 7.17.2 | W16-C 载荷安全 envelope core | Ulysses |  |  |  |  |  | 进行中 |
-| 7.17.3 | 持久 Outbox owner 契约、跨实例恢复与资源 / p99 验证 |  |  |  |  |  | 0 | 未开始 |
+| 7.17.3 | 持久 Outbox owner 契约核心 (Identity Outbox → Collaboration Inbox: 幂等/游标/gap fail-closed/有界重放/退避-drain; 31 tests; 跨实例恢复与 p99 验证留后续) | Ulysses |  |  | 2026-11-14 |  | 70 | 进行中 |
 | 7.17.4 | W16-D 草稿与冲突闭环 |  |  |  |  |  | 0 | 未开始 |
 | 8 | 前端与桌面实装 | Ulysses |  |  |  |  |  | 进行中 |
 | 8.1 | 应用壳、导航、多语言与主题 | Ulysses |  |  | 2026-11-13 |  | 100 | 已完成 |

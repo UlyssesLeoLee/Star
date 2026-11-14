@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=3a493edb236184b5f7089d3230c50d6cf58d0ba818fc8f0aa406422b27baec55
 MERGE (self:File {path:"crates/star-api-rest/src/device_outbox/identity_owner.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/device_outbox/identity_owner.rs::module",kind:"module"})
 MERGE (port:Type {id:"crates/star-api-rest/src/device_outbox/identity_owner.rs::DeviceRevocationOwnerStore",kind:"trait"})

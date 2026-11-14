@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=9aca76fe4baa5639f7f77d307cfa54697f70501bc26b645a6afd67034667b3a2
 MERGE (self:File {path:"crates/star-api-rest/src/device_outbox/auth_policy.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/device_outbox/auth_policy.rs::module",kind:"module"})
 MERGE (decision:Type {id:"crates/star-api-rest/src/device_outbox/auth_policy.rs::DeviceAuthorizationDecision",kind:"enum"})
