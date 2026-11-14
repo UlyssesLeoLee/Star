@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8a949a4904895fd01d62b6b7ae20c2699c959ef40deac0a25115e238e989fafa
+@cypher schema=1 source_sha256=6028b1d2c1864c5f15955f5d76c4c55c0c2797c62d7ee9de1f91c5973e197cde
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
@@ -19,7 +19,7 @@ MERGE (self)-[:IMPORTS]->(registry)
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { ALL_MODULES, MODULE_MAP, type ModuleDefinition } from "./registry";
+import { ALL_MODULES, MODULE_MAP, NAV_GROUPS, type ModuleDefinition } from "./registry";
 
 /**
  * Sidebar 折叠状态 (per 2026-09-03 12:36 JST 拍板)
@@ -79,10 +79,11 @@ export interface NavState {
   resetToDefault: () => void;
 }
 
-export const DEFAULT_SIDEBAR_ITEMS = ["inbox", "issues", "projects", "agents", "advanced-settings"];
-// per WBS §23.32-A (2026-11-13 用户发令): kanban/timeline/backlog 归入"其他入口"折叠区;
-// worktree 模块集中在 Project Worktree Index (/worktree), 不允许进入 pinned/sidebar
-export const DEFAULT_PINNED_VIEWS = ["kanban", "timeline", "backlog"];
+// per 2026-11-14 实测对照设计书: 5 组 (NAV_GROUPS) 已全量承载模块,
+// 默认不再预填 sidebar/pinned (设计书 §1.2 无"其他入口"预填区; 仅用户主动钉选才显示)
+export const DEFAULT_SIDEBAR_ITEMS: string[] = [];
+// per 2026-11-14: 视图组已承载 kanban/timeline/backlog/canvas/refactor/search, 默认不预填
+export const DEFAULT_PINNED_VIEWS: string[] = [];
 export const DEFAULT_HEADER_TABS = ["inbox", "issues", "projects", "agents", "analytics"];
 
 /** 由 Project Worktree Index 承载的模块 id — 不允许出现在 sidebar/pinned/其他入口 */
@@ -107,24 +108,15 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
     ? persisted.pinnedViewIds
     : DEFAULT_PINNED_VIEWS;
 
-  // per WBS §23.32-A: worktree 模块由 Project Worktree Index 承载,
-  // 从 sidebar/pinned 双区清理; kanban/timeline/backlog 补齐到 pinned (去重)
-  const cleanedSidebar = storedSidebarItems.filter(
-    (id) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)
-  );
-  const cleanedPinned = storedPinnedViews.filter(
-    (id) => !(WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)
-  );
-  const mergedPinned = [...cleanedPinned];
-  for (const id of DEFAULT_PINNED_VIEWS) {
-    if (!mergedPinned.includes(id)) mergedPinned.push(id);
-  }
+  // per 2026-11-14 实测对照设计书: NAV_GROUPS 5 组已全量承载模块,
+  // 旧版预填的 sidebar/pinned 一次性清理 (组内已显示, 不再重复渲染)
+  const mappedIds = new Set<string>(Object.values(NAV_GROUPS).flat());
+  const cleanedSidebar = storedSidebarItems.filter((id) => !mappedIds.has(id));
+  const cleanedPinned = storedPinnedViews.filter((id) => !mappedIds.has(id));
 
   return {
-    sidebarItemIds: cleanedSidebar.includes("advanced-settings")
-      ? cleanedSidebar
-      : [...cleanedSidebar, "advanced-settings"],
-    pinnedViewIds: mergedPinned,
+    sidebarItemIds: cleanedSidebar,
+    pinnedViewIds: cleanedPinned,
     headerTabIds: Array.isArray(persisted?.headerTabIds)
       ? persisted.headerTabIds
       : DEFAULT_HEADER_TABS,

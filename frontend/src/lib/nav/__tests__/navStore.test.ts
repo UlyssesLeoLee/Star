@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7cdc24142a24a5b4cf18a590899b64be9b09ceb3d887eaf7e9e869bc495acbed
+@cypher schema=1 source_sha256=f4ec1897d57dae7866e87634cc85801db354c90545c4fa00f5863a7f80816619
 MERGE (self:File {path:"frontend/src/lib/nav/__tests__/navStore.test.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (suite:Symbol {id:"frontend/src/lib/nav/__tests__/navStore.test.ts::navStore customization",kind:"suite"})
@@ -17,14 +17,12 @@ describe("navStore customization", () => {
     useNavStore.getState().closeMatrix();
   });
 
-  it("initializes with default core items in sidebar and header", () => {
+  // per 2026-11-14 设计书对齐: 5 组全量承载, sidebar/pinned 默认空
+  it("initializes with empty sidebar defaults (5 组全量承载) and header tabs", () => {
     const { sidebarItemIds, headerTabIds } = useNavStore.getState();
     expect(sidebarItemIds).toEqual(DEFAULT_SIDEBAR_ITEMS);
+    expect(sidebarItemIds).toEqual([]);
     expect(headerTabIds).toEqual(DEFAULT_HEADER_TABS);
-    expect(sidebarItemIds).toContain("inbox");
-    expect(sidebarItemIds).toContain("issues");
-    expect(sidebarItemIds).toContain("projects");
-    expect(sidebarItemIds).toContain("agents");
   });
 
   it("adds and removes items from sidebar dynamically", () => {
@@ -181,18 +179,12 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
 
     await useNavStore.persist.rehydrate();
 
-    expect(useNavStore.getState().sidebarItemIds).toEqual([
-      "inbox",
-      "projects",
-      "advanced-settings",
-    ]);
+    // per 2026-11-14: 已映射模块在 migrate 时清理 (组内已显示, 不重复钉选)
+    expect(useNavStore.getState().sidebarItemIds).toEqual([]);
     expect(useNavStore.getState().sidebarFold).toBe("collapsed");
     expect(useNavStore.getState().sidebarScope).toBe("project");
     expect(useNavStore.getState().selectedProjectId).toBe("proj-migration-test");
 
-    useNavStore.getState().removeSidebarItem("advanced-settings");
-    await useNavStore.persist.rehydrate();
-    expect(useNavStore.getState().sidebarItemIds).toEqual(["inbox", "projects"]);
   });
 
   // per WBS §23.32-A: worktree 由 Project Worktree Index 承载 — migrate 时从
@@ -216,15 +208,10 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
     await useNavStore.persist.rehydrate();
 
     const s = useNavStore.getState();
-    expect(s.sidebarItemIds).not.toContain("worktree");
-    expect(s.sidebarItemIds).toContain("inbox");
-    expect(s.sidebarItemIds).toContain("advanced-settings");
-    expect(s.pinnedViewIds).not.toContain("worktree");
-    // 用户已有的 webhooks 保留, 且 kanban/timeline/backlog 补齐
-    expect(s.pinnedViewIds).toContain("webhooks");
-    expect(s.pinnedViewIds).toContain("kanban");
-    expect(s.pinnedViewIds).toContain("timeline");
-    expect(s.pinnedViewIds).toContain("backlog");
+    // per 2026-11-14: 已映射模块 (inbox/worktree/kanban/... 均入 5 组) 在 migrate 时清理,
+    // 用户钉选里未映射的自定义项 (webhooks 在 admin-integration 组 → 也清理) → 全空
+    expect(s.sidebarItemIds).toEqual([]);
+    expect(s.pinnedViewIds).toEqual([]);
   });
 
   // per WBS §23.32-A: worktree 禁止写回 sidebar/pinned — 走 add 入口也拦

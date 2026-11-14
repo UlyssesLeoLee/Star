@@ -19,7 +19,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import AdvancedSettingsLayout from "../layout";
 import { DEFAULT_SIDEBAR_ITEMS } from "@/lib/nav/navStore";
-import { ALL_MODULES } from "@/lib/nav/registry";
+import { ALL_MODULES, NAV_GROUPS } from "@/lib/nav/registry";
 import { I18nProvider } from "@/lib/i18n";
 
 describe("Advanced Settings navigation", () => {
@@ -28,7 +28,9 @@ describe("Advanced Settings navigation", () => {
 
     const advancedSettings = ALL_MODULES.find((module) => module.id === "advanced-settings");
     expect(advancedSettings?.href).toBe("/settings/advanced/hooks");
-    expect(DEFAULT_SIDEBAR_ITEMS).toContain("advanced-settings");
+    // per 2026-11-14: 默认钉选清空 (5 组全量承载), advanced-settings 在 admin-dev 组内
+    expect(DEFAULT_SIDEBAR_ITEMS).toEqual([]);
+    expect(NAV_GROUPS["admin-dev"]).toContain("advanced-settings");
     expect(ALL_MODULES.some((module) => module.id === "hooks")).toBe(false);
 
     const nav = screen.getByRole("navigation", { name: "高级设置导航" });
