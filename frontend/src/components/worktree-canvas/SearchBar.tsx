@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/SearchBar.tsx
-// DSL search bar (per spec §20 + IMPL-PLAN §4.14.7).
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -34,3 +31,8 @@ function Inner() {
 }
 export const SearchBar = memo(Inner);
 export default SearchBar;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/SearchBar.tsx
+// DSL search bar (per spec §20 + IMPL-PLAN §4.14.7).

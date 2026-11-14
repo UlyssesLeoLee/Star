@@ -1,16 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorFiles.tsx
-// Inspector Tab 7/11: Files.
-//
-// ULYS-211: 接入 DiffAnnotator (per FR-ORCA-035 "用户对 AI 生成的 diff
-// 可在任意行 drop comment")。
-//
-// 缺标 (per 守门 #11, 2026-09-23):
-//   1. 后端没有"取某 worktree 变更 diff"的接口, diff 正文用
-//      src/mocks/data/annotations.ts 的演示 hunk;
-//   2. worktree → agent_run 的映射未落 (WorktreeNodeData 无 agent_run_id
-//      字段), 故先挂 DEMO_AGENT_RUN_ID。
-//   两处都只需换数据源, DiffAnnotator 与 annotationsApi 不用改。
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -45,3 +32,18 @@ function Inner() {
 }
 export const InspectorFiles = memo(Inner);
 export default InspectorFiles;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorFiles.tsx
+// Inspector Tab 7/11: Files.
+//
+// ULYS-211: 接入 DiffAnnotator (per FR-ORCA-035 "用户对 AI 生成的 diff
+// 可在任意行 drop comment")。
+//
+// 缺标 (per 守门 #11, 2026-09-23):
+//   1. 后端没有"取某 worktree 变更 diff"的接口, diff 正文用
+//      src/mocks/data/annotations.ts 的演示 hunk;
+//   2. worktree → agent_run 的映射未落 (WorktreeNodeData 无 agent_run_id
+//      字段), 故先挂 DEMO_AGENT_RUN_ID。
+//   两处都只需换数据源, DiffAnnotator 与 annotationsApi 不用改。

@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorAgent.tsx
-// Inspector Tab 4/11: Agent.
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -24,3 +21,8 @@ function Inner() {
 }
 export const InspectorAgent = memo(Inner);
 export default InspectorAgent;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorAgent.tsx
+// Inspector Tab 4/11: Agent.

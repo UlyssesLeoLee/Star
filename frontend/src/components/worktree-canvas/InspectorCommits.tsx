@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorCommits.tsx
-// Inspector Tab 8/11: Commits.
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -21,3 +18,8 @@ function Inner() {
 }
 export const InspectorCommits = memo(Inner);
 export default InspectorCommits;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorCommits.tsx
+// Inspector Tab 8/11: Commits.

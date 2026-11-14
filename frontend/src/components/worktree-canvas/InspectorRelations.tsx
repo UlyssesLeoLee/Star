@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorRelations.tsx
-// Inspector Tab 9/11: Relations.
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -25,3 +22,8 @@ function Inner() {
 }
 export const InspectorRelations = memo(Inner);
 export default InspectorRelations;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorRelations.tsx
+// Inspector Tab 9/11: Relations.

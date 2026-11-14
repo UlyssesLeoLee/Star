@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorOverview.tsx
-// Inspector Tab 1/11: Overview (per spec §4.3 + DD §21).
-
 "use client";
 
 import { memo } from "react";
@@ -37,3 +33,8 @@ function InspectorOverviewInner() {
 
 export const InspectorOverview = memo(InspectorOverviewInner);
 export default InspectorOverview;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorOverview.tsx
+// Inspector Tab 1/11: Overview (per spec §4.3 + DD §21).

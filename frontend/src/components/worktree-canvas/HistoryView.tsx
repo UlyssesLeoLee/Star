@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/HistoryView.tsx
-//
-// HISTORY VIEW — 显示已 merged Worktree 和历史关系 (per SRS §19 Merged Worktree 处理).
-
 "use client";
 
 import { memo } from "react";
@@ -54,3 +49,9 @@ function HistoryViewInner() {
 
 export const HistoryView = memo(HistoryViewInner);
 export default HistoryView;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/HistoryView.tsx
+//
+// HISTORY VIEW — 显示已 merged Worktree 和历史关系 (per SRS §19 Merged Worktree 处理).

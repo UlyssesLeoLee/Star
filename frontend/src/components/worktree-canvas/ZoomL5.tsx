@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL5.tsx
-// L5 — Symbol 级 (per SRS §6 最近距离, AST-level).
-
 "use client";
 
 import { memo } from "react";
@@ -25,3 +21,8 @@ function ZoomL5Inner() {
 
 export const ZoomL5 = memo(ZoomL5Inner);
 export default ZoomL5;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL5.tsx
+// L5 — Symbol 级 (per SRS §6 最近距离, AST-level).

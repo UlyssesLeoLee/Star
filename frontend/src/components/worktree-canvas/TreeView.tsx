@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/TreeView.tsx
-//
-// TREE View — 以 Main → Worktree 派生为核心 (per SRS §18 + DD §12 Tree Backbone).
-//
-// 守门合规: 'use client' 边界 (per 守门 #19 v19 SSR + 客户端组件边界).
-
 "use client";
 
 import { memo, useMemo } from "react";
@@ -83,3 +76,11 @@ function TreeViewInner() {
 
 export const TreeView = memo(TreeViewInner);
 export default TreeView;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/TreeView.tsx
+//
+// TREE View — 以 Main → Worktree 派生为核心 (per SRS §18 + DD §12 Tree Backbone).
+//
+// 守门合规: 'use client' 边界 (per 守门 #19 v19 SSR + 客户端组件边界).

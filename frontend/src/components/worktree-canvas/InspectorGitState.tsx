@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorGitState.tsx
-// Inspector Tab 2/11: GitState (per spec §4.3).
-
 "use client";
 
 import { memo } from "react";
@@ -37,3 +33,8 @@ function InspectorGitStateInner() {
 
 export const InspectorGitState = memo(InspectorGitStateInner);
 export default InspectorGitState;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorGitState.tsx
+// Inspector Tab 2/11: GitState (per spec §4.3).

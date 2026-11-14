@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL0.tsx
-//
-// L0 — Project 级 (per SRS §6, 远距离只显示 Repo + 计数).
-// 守门 INV-WC-06 (Semantic Zoom 6 级).
-
 "use client";
 
 import { memo } from "react";
@@ -42,3 +36,10 @@ function ZoomL0Inner() {
 
 export const ZoomL0 = memo(ZoomL0Inner);
 export default ZoomL0;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL0.tsx
+//
+// L0 — Project 级 (per SRS §6, 远距离只显示 Repo + 计数).
+// 守门 INV-WC-06 (Semantic Zoom 6 级).

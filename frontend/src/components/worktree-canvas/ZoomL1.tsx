@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL1.tsx
-// L1 — Repository / Main / Worktree (per SRS §6 中距离).
-
 "use client";
 
 import { memo } from "react";
@@ -42,3 +38,8 @@ function ZoomL1Inner() {
 
 export const ZoomL1 = memo(ZoomL1Inner);
 export default ZoomL1;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL1.tsx
+// L1 — Repository / Main / Worktree (per SRS §6 中距离).

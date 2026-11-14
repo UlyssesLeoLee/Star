@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/WorktreeCard.tsx
-// Default Worktree Node card (per DD §10 12 字段 + INV-WC-05/07).
 "use client";
 import { memo } from "react";
 import type { WorktreeNodeData } from "./types";
@@ -43,3 +40,8 @@ function Inner({ wt, selected, onClick }: Props) {
 }
 export const WorktreeCard = memo(Inner);
 export default WorktreeCard;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/WorktreeCard.tsx
+// Default Worktree Node card (per DD §10 12 字段 + INV-WC-05/07).

@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorHistory.tsx
-// Inspector Tab 10/11: History.
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -26,3 +23,8 @@ function Inner() {
 }
 export const InspectorHistory = memo(Inner);
 export default InspectorHistory;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorHistory.tsx
+// Inspector Tab 10/11: History.

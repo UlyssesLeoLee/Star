@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/DependencyView.tsx
-//
-// DEPENDENCY VIEW — 突出 DEPENDS_ON / BLOCKS Edge (per SRS §18 + DD §8).
-
 "use client";
 
 import { memo } from "react";
@@ -84,3 +79,9 @@ function DependencyViewInner() {
 
 export const DependencyView = memo(DependencyViewInner);
 export default DependencyView;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/DependencyView.tsx
+//
+// DEPENDENCY VIEW — 突出 DEPENDS_ON / BLOCKS Edge (per SRS §18 + DD §8).

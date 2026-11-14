@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/RiskBadge.tsx
-// Risk count badge (per DD §13).
 "use client";
 import { memo } from "react";
 
@@ -21,3 +18,8 @@ function Inner({ count }: Props) {
 }
 export const RiskBadge = memo(Inner);
 export default RiskBadge;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/RiskBadge.tsx
+// Risk count badge (per DD §13).

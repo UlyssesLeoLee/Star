@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/RiskView.tsx
-//
-// RISK VIEW — 正常节点弱化, 高风险节点强调 (per SRS §18 R7 Exception-first).
-
 "use client";
 
 import { memo } from "react";
@@ -100,3 +95,9 @@ function RiskViewInner() {
 
 export const RiskView = memo(RiskViewInner);
 export default RiskView;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/RiskView.tsx
+//
+// RISK VIEW — 正常节点弱化, 高风险节点强调 (per SRS §18 R7 Exception-first).

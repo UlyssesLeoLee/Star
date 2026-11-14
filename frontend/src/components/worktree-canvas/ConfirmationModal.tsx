@@ -4,7 +4,6 @@ import * as React from "react";
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/components/worktree-canvas/ConfirmationModal.tsx
 // Destructive action confirm modal (per INV-WC-09 + DD §20.2).
-"use client";
 import { ACTION_DANGER, type WorktreeAction } from "./types";
 
 interface Props {

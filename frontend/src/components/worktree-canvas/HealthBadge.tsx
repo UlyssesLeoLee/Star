@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/HealthBadge.tsx
-// Health score badge (per DD §12 0-100).
 "use client";
 import { memo } from "react";
 
@@ -23,3 +20,8 @@ function Inner({ score }: Props) {
 }
 export const HealthBadge = memo(Inner);
 export default HealthBadge;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/HealthBadge.tsx
+// Health score badge (per DD §12 0-100).

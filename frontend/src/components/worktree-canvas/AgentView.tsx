@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/AgentView.tsx
-//
-// AGENT VIEW — 以 Agent → Task → Worktree 为核心 (per SRS §18).
-
 "use client";
 
 import { memo } from "react";
@@ -72,3 +67,9 @@ function AgentViewInner() {
 
 export const AgentView = memo(AgentViewInner);
 export default AgentView;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/AgentView.tsx
+//
+// AGENT VIEW — 以 Agent → Task → Worktree 为核心 (per SRS §18).

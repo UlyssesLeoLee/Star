@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorTask.tsx
-// Inspector Tab 3/11: Task.
-
 "use client";
 
 import { memo } from "react";
@@ -29,3 +25,8 @@ function InspectorTaskInner() {
 
 export const InspectorTask = memo(InspectorTaskInner);
 export default InspectorTask;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorTask.tsx
+// Inspector Tab 3/11: Task.

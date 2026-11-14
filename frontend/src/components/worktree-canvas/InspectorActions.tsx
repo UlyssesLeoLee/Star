@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorActions.tsx
-// Inspector Tab 11/11: Actions (per spec §4.4 18 Action matrix).
 "use client";
 import { memo, useState } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -62,3 +59,8 @@ function Inner() {
 }
 export const InspectorActions = memo(Inner);
 export default InspectorActions;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorActions.tsx
+// Inspector Tab 11/11: Actions (per spec §4.4 18 Action matrix).

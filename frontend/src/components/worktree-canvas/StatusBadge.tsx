@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/StatusBadge.tsx
-// 7 Human State 状态 badge (per SRS §九).
 "use client";
 import { memo } from "react";
 import type { WorktreeHumanState } from "./types";
@@ -30,3 +27,8 @@ function Inner({ state }: Props) {
 }
 export const StatusBadge = memo(Inner);
 export default StatusBadge;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/StatusBadge.tsx
+// 7 Human State 状态 badge (per SRS §九).

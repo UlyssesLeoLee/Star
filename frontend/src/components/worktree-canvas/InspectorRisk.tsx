@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/InspectorRisk.tsx
-// Inspector Tab 5/11: Risk.
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -33,3 +30,8 @@ function Inner() {
 }
 export const InspectorRisk = memo(Inner);
 export default InspectorRisk;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/InspectorRisk.tsx
+// Inspector Tab 5/11: Risk.

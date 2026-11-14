@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/AIDialog.tsx
-// AI NL query dialog (per FR-EXPLAIN-001..004 + spec §20).
 "use client";
 import { memo, useState } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -58,3 +55,8 @@ function Inner() {
 }
 export const AIDialog = memo(Inner);
 export default AIDialog;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/AIDialog.tsx
+// AI NL query dialog (per FR-EXPLAIN-001..004 + spec §20).

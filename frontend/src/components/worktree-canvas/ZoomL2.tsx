@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL2.tsx
-// L2 — Task / Agent (per SRS §6 中距离更深一级).
-
 "use client";
 
 import { memo } from "react";
@@ -46,3 +42,8 @@ function ZoomL2Inner() {
 
 export const ZoomL2 = memo(ZoomL2Inner);
 export default ZoomL2;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL2.tsx
+// L2 — Task / Agent (per SRS §6 中距离更深一级).

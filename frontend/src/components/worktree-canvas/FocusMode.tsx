@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/FocusMode.tsx
-// Focus Mode toggle (per SRS §十七 + DD §17).
 "use client";
 import { memo } from "react";
 import { useWorktreeCanvasStore } from "@/stores/worktreeCanvasStore";
@@ -31,3 +28,8 @@ function Inner() {
 }
 export const FocusMode = memo(Inner);
 export default FocusMode;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/FocusMode.tsx
+// Focus Mode toggle (per SRS §十七 + DD §17).

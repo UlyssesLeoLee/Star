@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL4.tsx
-// L4 — File 级 (per SRS §6 近距离更深一级).
-
 "use client";
 
 import { memo } from "react";
@@ -33,3 +29,8 @@ function ZoomL4Inner() {
 
 export const ZoomL4 = memo(ZoomL4Inner);
 export default ZoomL4;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL4.tsx
+// L4 — File 级 (per SRS §6 近距离更深一级).

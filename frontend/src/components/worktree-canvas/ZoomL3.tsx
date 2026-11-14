@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
-// frontend/src/components/worktree-canvas/ZoomL3.tsx
-// L3 — Commit 级 (per SRS §6 近距离).
-
 "use client";
 
 import { memo } from "react";
@@ -41,3 +37,8 @@ function ZoomL3Inner() {
 
 export const ZoomL3 = memo(ZoomL3Inner);
 export default ZoomL3;
+
+
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// frontend/src/components/worktree-canvas/ZoomL3.tsx
+// L3 — Commit 级 (per SRS §6 近距离).
