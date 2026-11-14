@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=499496ffd9e50b32760f3e20d82d71ff552e1c8d4d526b585050c4e093bccc1d
+@cypher schema=1 source_sha256=031b533d443e36259c47ba881a0dbdd1d3dfd1dcc63a46bf517c6ac237c9161d
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -98,6 +98,7 @@ import dynamic from "next/dynamic";
 import { ProjectWorktreeLifecycleControls } from "./ProjectWorktreeLifecycleControls";
 import { AuthorizedProjectSelector, type AuthorizedProjectDirectoryState } from "./AuthorizedProjectSelector";
 import { GitBindingPanel } from "./GitBindingPanel";
+import { BranchWorkspace } from "@/components/run/BranchWorkspace";
 import { findWorktreeGitBinding, useGitBindings } from "@/lib/group/gitBindingStore";
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
@@ -381,6 +382,8 @@ function WorktreePageInner() {
   const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
   const [hasMounted, setHasMounted] = useState(false);
   const requestedProjectId = searchParams.get("project_id");
+  const requestedWorktreeId = searchParams.get("worktree_id");
+  const requestedBranch = searchParams.get("branch");
   const persistedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? null;
   const [authorizedProjectDirectory, setAuthorizedProjectDirectory] = useState<AuthorizedProjectDirectoryState>({
     mode: "loading", projects: [], next_cursor: null, loading_more: false,
@@ -585,6 +588,12 @@ function WorktreePageInner() {
 
   return (
     <div className="max-w-7xl">
+      {/* per 2026-11-14 树形架构: Branch 功能集 (目录树 Branch 节点点入) */}
+      {requestedWorktreeId && requestedBranch && requestedProjectId && (
+        <div className="mb-4">
+          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} />
+        </div>
+      )}
       <PageHeader
         title={t.pageTitles['/worktree'].title}
         subtitle="项目级 Worktree 管理 — 先选择 Project，再集中管理每个 Agent Worktree 的归属、执行绑定、生命周期与健康信号。"

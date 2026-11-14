@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=60a3af8a083d5d1e6eefd9bf643aa7d9c4bc87a1254335e63b7c162fd7a04dde
+@cypher schema=1 source_sha256=c16fa3519feb4f642ba25d22b79c429bdab22dad95a350979cdd797e6e507024
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -662,6 +662,12 @@ export const zhCN: Dictionary = {
     openBoundTask: "已绑定 Star 任务 →",
     openAsStarTask: "打开为 Star 任务",
     fiveW1H: "5W1H",
+  },
+  branchWorkspace: {
+    title: "Branch 工作区",
+    subtitle: "该 Branch 的功能集 (Tenant → Project → LANE → Worktree → Branch)",
+    tabs: { tasks: "任务卡", agents: "Agent 会话", validation: "Validation", nema: "Nema 文件", canvas: "Canvas" },
+    empty: { tasks: "该 Branch 暂无任务卡", agents: "该 Branch 暂无 Agent 会话", validation: "该 Branch 暂无 Validation 用例", nema: "该 Branch 暂无 .nema 文件", canvas: "该 Branch 暂无关联画布" },
   },
   canvasGallery: {
     title: "无限画布中心",

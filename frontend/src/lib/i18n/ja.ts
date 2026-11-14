@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7df5a561f13df2ac9dd8d3f44dd7dbf9c6c0e7fb0b5393fda7a91c11f35a4156
+@cypher schema=1 source_sha256=ed6e23212812f817f762066acaa8aac4012f89531b3ff86d9e8eb7ad3c9b116c
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -648,6 +648,12 @@ export const ja: Dictionary = {
     openBoundTask: "バインド済み Star タスク →",
     openAsStarTask: "Star タスクとして開く",
     fiveW1H: "5W1H",
+  },
+  branchWorkspace: {
+    title: "Branch ワークスペース",
+    subtitle: "この Branch の機能セット (Tenant → Project → LANE → Worktree → Branch)",
+    tabs: { tasks: "タスクカード", agents: "Agent セッション", validation: "Validation", nema: "Nema ファイル", canvas: "Canvas" },
+    empty: { tasks: "この Branch にタスクカードなし", agents: "この Branch に Agent セッションなし", validation: "この Branch に Validation ケースなし", nema: "この Branch に .nema ファイルなし", canvas: "この Branch に関連キャンバスなし" },
   },
   canvasGallery: {
     title: "無限キャンバスハブ",

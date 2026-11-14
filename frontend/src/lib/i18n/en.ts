@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=390430531c5659f470d8eed23243b5180f77cab5f48a7ed6ca0bd8bd4b2bc9a9
+@cypher schema=1 source_sha256=e8754987a1e37e670a55bba3a05fff192a831228fcab0ebaf0c80d09c1c92673
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -647,6 +647,12 @@ export const en: Dictionary = {
     openBoundTask: "Bound Star task →",
     openAsStarTask: "Open as Star task",
     fiveW1H: "5W1H",
+  },
+  branchWorkspace: {
+    title: "Branch Workspace",
+    subtitle: "Feature set of this branch (Tenant → Project → LANE → Worktree → Branch)",
+    tabs: { tasks: "Task Cards", agents: "Agent Sessions", validation: "Validation", nema: "Nema Files", canvas: "Canvas" },
+    empty: { tasks: "No task cards on this branch", agents: "No agent sessions on this branch", validation: "No validation cases on this branch", nema: "No .nema files on this branch", canvas: "No linked canvas on this branch" },
   },
   canvasGallery: {
     title: "Infinite Canvas Hub",
