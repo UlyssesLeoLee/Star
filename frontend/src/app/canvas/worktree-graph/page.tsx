@@ -1,8 +1,10 @@
 /*
-@cypher schema=1 source_sha256=f7a2b5944f22b05a5cee42f76645e9ca7df36949fee043407832fc26f256a756
+@cypher schema=1 source_sha256=535be0b56bd6d48de04962fa0122174662d6d05e4960f117b190c23a11eeab70
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
+MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:CALLS]->(groupApiHook)
 @endcypher
 */
 "use client";
@@ -10,14 +12,21 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 // /canvas/worktree-graph — Worktree 图 (per 2026-11-14: 占位 → 实装)
 // 5 视图: 树 / 依赖 / 风险 / Agent / 历史 + 缩放, 数据源 store
+// 2026-11-15 (per TASK-ulys-canvas-ctx):
+//   - 5 视图状态区分: 有数据渲染列表 / 空数据空态 (wtg-empty-<view>) /
+//     宿主未接入提示 (wtg-disconnected-<view>), 二选一渲染
+//   - 去固定示例: 树视图 Project/LANE 改为 store.projects[0] / store.lanes[0]
 // =====================================================================
 
 import { useState } from "react";
-import { Network, GitBranch, AlertTriangle, Bot, History } from "lucide-react";
+import { Network, GitBranch, AlertTriangle, Bot, History, PlugZap } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
+import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 
 const GRAPH_VIEWS = ["树", "依赖", "风险", "Agent", "历史"] as const;
+/** wtg-view-*/wtg-empty-*/wtg-disconnected-* 的视图 id (与既有 testid 对齐) */
+type GraphViewId = "tree" | "deps" | "risk" | "agent" | "history";
 
 export default function WorktreeGraphPage() {
   const [activeView, setActiveView] = useState<typeof GRAPH_VIEWS[number]>("树");
@@ -25,25 +34,69 @@ export default function WorktreeGraphPage() {
   const worktrees = useStore((s) => s.worktrees);
   const workItems = useStore((s) => s.workItems);
   const agentSessions = useStore((s) => s.agentSessions);
+  const projects = useStore((s) => s.projects);
+  const lanes = useStore((s) => s.lanes);
+
+  // 宿主接入信号 (per TASK-ulys-canvas-ctx): Group API 会话存在 = 宿主已接入;
+  // 网页预览模式 (无宿主会话) 为 null → 视图渲染「未接入」提示,
+  // 不展示无授权的固定示例数据.
+  const groupApi = useWorktreeGroupApi();
+  const hostConnected = groupApi !== null;
 
   // 图布局: worktree 为列 hub, 下挂任务; agent 列在右侧
   const cols = Math.min(4, Math.max(1, worktrees.length));
   const colW = 220;
 
+  // 未接入空态 (per TASK-ulys-canvas-ctx: 现有 fallback 文案基础上统一)
+  const renderDisconnected = (view: GraphViewId, label: string) => (
+    <div
+      data-testid={`wtg-disconnected-${view}`}
+      className="flex min-h-48 flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <PlugZap size={20} className="text-ink-mute" />
+      <p className="text-xs font-semibold text-ink-dim">宿主未接入 — {label}数据通道不可用</p>
+      <p className="max-w-md text-[10px] leading-relaxed text-ink-mute">
+        Worktree 关系图依赖宿主 Group API 数据通道; 当前会话未装配或无权读取
+        (网页预览模式)。请通过宿主会话打开。
+      </p>
+    </div>
+  );
+
+  // 空数据空态 (per TASK-ulys-canvas-ctx)
+  const renderEmpty = (view: GraphViewId, text: string) => (
+    <div
+      data-testid={`wtg-empty-${view}`}
+      className="flex min-h-48 flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <div className="rounded-lg border border-dashed border-line bg-bg-soft/40 px-4 py-3">
+        <p className="text-xs text-ink-mute">空数据 — {text}</p>
+      </div>
+    </div>
+  );
+
   const renderView = () => {
     switch (activeView) {
       case "树": {
         // 树视图: Project → LANE → Worktree → Branch 层级
+        // (去固定示例: 动态取 store.projects[0] / store.lanes[0])
+        const project = projects[0];
+        const lane = lanes[0];
+        if (!hostConnected || !project || !lane) {
+          return renderDisconnected("tree", "Project/LANE 树");
+        }
+        if (worktrees.length === 0) {
+          return renderEmpty("tree", "当前 Project/LANE 下暂无 Worktree");
+        }
         return (
           <div data-testid="wtg-view-tree" className="min-w-[640px] p-6">
             <div className="flex items-start gap-4">
               <div className="rounded-lg border-2 border-accent/60 bg-accent/10 px-4 py-3 text-sm font-bold text-accent" data-testid="wtg-root">
-                Project · Physis / GVPE
+                Project · {project.name}
               </div>
               <div className="w-6 border-t-2 border-line mt-5" />
               <div className="flex-1">
                 <div className="rounded-lg border border-warn/50 bg-warn/10 px-3 py-2 text-xs font-semibold text-warn inline-block">
-                  LANE · auth-refactor
+                  LANE · {lane.name}
                 </div>
                 <div className="mt-3 space-y-2">
                   {worktrees.slice(0, 6).map((wt) => (
@@ -70,6 +123,10 @@ export default function WorktreeGraphPage() {
       }
       case "依赖": {
         // 依赖视图: 任务按 worktree 分组 + 依赖关系线 (worktree→任务)
+        if (!hostConnected) return renderDisconnected("deps", "依赖");
+        if (worktrees.length === 0 || workItems.length === 0) {
+          return renderEmpty("deps", "无任务");
+        }
         return (
           <div data-testid="wtg-view-deps" className="p-6" style={{ width: cols * colW + 120 }}>
             <div className="flex items-start gap-8">
@@ -104,33 +161,33 @@ export default function WorktreeGraphPage() {
       case "风险": {
         // 风险视图: 阻塞/冲突任务 + 高优先级
         const risky = workItems.filter((w) => w.status === "blocked" || w.priority === "p0" || w.priority === "p1");
+        if (!hostConnected) return renderDisconnected("risk", "风险");
+        if (risky.length === 0) return renderEmpty("risk", "无阻塞/高优先风险任务");
         return (
           <div data-testid="wtg-view-risk" className="p-6 space-y-2 max-w-xl">
             <div className="flex items-center gap-2 text-xs text-ink-dim mb-2">
               <AlertTriangle size={13} className="text-err" /> 风险项 ({risky.length})
             </div>
-            {risky.length === 0 ? (
-              <p className="text-xs text-ink-mute">无阻塞/高优先风险任务</p>
-            ) : (
-              risky.map((wi) => (
-                <a
-                  key={wi.id}
-                  href={`/work-item/${wi.id}`}
-                  className="flex items-center gap-2 rounded-lg border border-err/40 bg-err/5 px-3 py-2 hover:border-err/70"
-                  data-testid={`wtg-risk-${wi.id}`}
-                >
-                  <AlertTriangle size={12} className="text-err shrink-0" />
-                  <span className="font-mono text-[11px] text-err font-bold">{wi.key}</span>
-                  <span className="flex-1 truncate text-xs text-ink">{wi.title}</span>
-                  <span className="text-[10px] font-mono text-ink-mute">{wi.status} · {wi.priority}</span>
-                </a>
-              ))
-            )}
+            {risky.map((wi) => (
+              <a
+                key={wi.id}
+                href={`/work-item/${wi.id}`}
+                className="flex items-center gap-2 rounded-lg border border-err/40 bg-err/5 px-3 py-2 hover:border-err/70"
+                data-testid={`wtg-risk-${wi.id}`}
+              >
+                <AlertTriangle size={12} className="text-err shrink-0" />
+                <span className="font-mono text-[11px] text-err font-bold">{wi.key}</span>
+                <span className="flex-1 truncate text-xs text-ink">{wi.title}</span>
+                <span className="text-[10px] font-mono text-ink-mute">{wi.status} · {wi.priority}</span>
+              </a>
+            ))}
           </div>
         );
       }
       case "Agent": {
         // Agent 视图: agent 会话 ↔ worktree 关联
+        if (!hostConnected) return renderDisconnected("agent", "Agent 会话");
+        if (agentSessions.length === 0) return renderEmpty("agent", "无 Agent 会话");
         return (
           <div data-testid="wtg-view-agent" className="p-6">
             <div className="space-y-2 max-w-xl">
@@ -151,7 +208,6 @@ export default function WorktreeGraphPage() {
                   </div>
                 );
               })}
-              {agentSessions.length === 0 && <p className="text-xs text-ink-mute">无 Agent 会话</p>}
             </div>
           </div>
         );
@@ -159,6 +215,8 @@ export default function WorktreeGraphPage() {
       case "历史": {
         // 历史视图: 最近更新任务 (按 updated_at 排序)
         const recent = [...workItems].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 10);
+        if (!hostConnected) return renderDisconnected("history", "历史");
+        if (recent.length === 0) return renderEmpty("history", "无历史");
         return (
           <div data-testid="wtg-view-history" className="p-6 space-y-1.5 max-w-xl">
             <div className="flex items-center gap-2 text-xs text-ink-dim mb-2">
@@ -171,7 +229,6 @@ export default function WorktreeGraphPage() {
                 <span className="text-[9px] font-mono text-ink-mute">{(wi.updated_at ?? "").slice(0, 16)}</span>
               </div>
             ))}
-            {recent.length === 0 && <p className="text-xs text-ink-mute">无历史</p>}
           </div>
         );
       }
