@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=95886f782cde62e5c9d024c07b6ba4183653eb9dd6de2c9f1ca8b449610026db
+@cypher schema=1 source_sha256=deb7bbb76a616cca19ad536e42f87bf20e8e19d7cb316a24903435789cc9c772
 MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
@@ -52,6 +52,7 @@ import { clsx } from "clsx";
 import {
   X, Trash2, Plus, Flag, Hash, Tag, FileText, User, Bot, Users,
   GitBranch, AlertTriangle, Save, ChevronDown, ListTodo, Workflow,
+  Terminal,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
@@ -309,7 +310,7 @@ export function WorkItemDetailDrawer({
   const drawerContent = (
     <div
       data-testid="work-item-drawer-root"
-      className="fixed inset-0 z-50 flex justify-end"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3"
       role="dialog"
       aria-modal="true"
     >
@@ -320,10 +321,10 @@ export function WorkItemDetailDrawer({
         data-testid="work-item-drawer-backdrop"
         aria-hidden
       />
-      {/* 抽屉本体: 右侧滑入 */}
+      {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
       <div
         data-testid="work-item-drawer-panel"
-        className="relative h-full bg-bg-card border-l-2 border-[var(--cel-ink)] shadow-[-8px_0px_0px_0px_var(--cel-ink),0_25px_50px_-12px_rgba(0,0,0,0.4)] flex flex-col animate-in slide-in-from-right duration-200"
+        className="relative h-[86vh] max-h-[720px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
         style={{ width: DRAWER_W, maxWidth: "92vw" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -941,6 +942,43 @@ export function WorkItemDetailDrawer({
             )}
           </div>
         </div>
+
+        {/* === CLI 面板 (per 2026-11-15 用户发令: 任务卡子窗口带 CLI) === */}
+        {!isNew && (
+          <div
+            data-testid="work-item-cli-panel"
+            className="shrink-0 border-t-2 border-[var(--cel-ink)] bg-[#0b0d10] flex flex-col"
+          >
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/10">
+              <Terminal size={11} className="text-[#79c0ff]" />
+              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#8b949e]">CLI</span>
+              <span className="text-[8px] font-mono text-[#8b949e]">
+                {currentWi?.worktree_id ? `worktree ${currentWi.worktree_id}` : "—"}
+              </span>
+              <span className="ml-auto rounded border border-[#d29922]/40 bg-[#d29922]/10 px-1 py-0.5 text-[8px] text-[#d29922]">
+                会话未接入 — 宿主 CLI 接入后启用
+              </span>
+            </div>
+            <div className="max-h-24 overflow-y-auto px-3 py-1.5 font-mono text-[9px] leading-relaxed text-[#8b949e]">
+              <p>$ star task show {currentWi?.key ?? "—"}</p>
+              <p className="text-[#79c0ff]">任务 {currentWi?.key ?? "—"} · {currentWi?.title ?? ""} · {currentWi?.status ?? ""}</p>
+              <p>$ </p>
+            </div>
+            <div className="flex items-center gap-1 border-t border-white/10 px-2 py-1.5">
+              <input
+                type="text"
+                disabled
+                placeholder="CLI 会话未接入 — 输入命令不可用"
+                aria-label="CLI 命令输入"
+                data-testid="work-item-cli-input"
+                className="h-6 flex-1 rounded bg-white/5 px-2 font-mono text-[10px] text-[#c9d1d9] placeholder:text-[#484f58] border border-white/10 cursor-not-allowed"
+              />
+              <button type="button" disabled className="rounded border border-white/10 px-2 py-1 text-[9px] font-mono text-[#484f58]">
+                Run
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
