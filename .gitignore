@@ -164,3 +164,6 @@ coverage-*/
 
 .vercel
 .env*
+0
+.coverage
+server.err
