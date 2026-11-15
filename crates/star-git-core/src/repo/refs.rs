@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=011484cdd682d4eca65c01940c2d994ba7f2f2b9cfd69759524f50fb0d56a564
+MERGE (self:File {path:"crates/star-git-core/src/repo/refs.rs"})
+MERGE (read_head:Symbol {id:"crates/star-git-core/src/repo/refs.rs::read_head",kind:"function"})
+MERGE (read_ref:Symbol {id:"crates/star-git-core/src/repo/refs.rs::read_ref",kind:"function"})
+MERGE (write_ref:Symbol {id:"crates/star-git-core/src/repo/refs.rs::write_ref",kind:"function"})
+MERGE (self)-[:DEFINES]->(read_head)
+MERGE (self)-[:DEFINES]->(read_ref)
+MERGE (self)-[:DEFINES]->(write_ref)
+@endcypher
+*/
 //! Ref read/write helpers for a bare repo.
 //! 移植自 GitGit D:\GitGit\src\repo\refs.rs @ 69770e6 (2026-11-14, AGPL-3.0 —
 //! 仅移植保留, Star 侧不做代码并入)
