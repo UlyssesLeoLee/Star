@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ca77642bc0956b24ca34f1e852b4c22e04e0cda80b63370b10a8ad7cc00fb817
+@cypher schema=1 source_sha256=d0ace1ffc6615b2023c547640594432b93e6f92820863c29bd8e8b3bab93cf64
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -68,8 +68,10 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
         >
           {children}
         </main>
-        <RightChatRail />
       </div>
+      {/* 全局右侧聊天栏: 与 AppHeader 同级 (per 2026-11-15 用户发令: 顶端在前不被遮蔽 —
+          fixed z-40 > header z-30; 之前挂在 z-10 容器内被 header 盖住) */}
+      <RightChatRail />
     </div>
   );
 }

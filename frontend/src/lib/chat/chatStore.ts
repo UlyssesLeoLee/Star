@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4892b7f5a36115646539ed66943f71e52935a5bab998e41eac9ce64f6e18572d
+@cypher schema=1 source_sha256=3330be574671ab20f90e68e6b60f6dc6cc51f28ce1a6a48cd7a77c9ad87580b5
 MERGE (self:File {path:"frontend/src/lib/chat/chatStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
 MERGE (self)-[:DEFINES]->(store)
@@ -75,6 +75,22 @@ export interface GlobalSession {
  */
 export type ChatScope = "WORKTREE" | "GLOBAL";
 
+/** 聊天 agent 设置 (per 2026-11-15: 主流 agent 功能 — 模型/effort/思考模式/自动模式) */
+export type ChatEffort = "low" | "medium" | "high";
+export interface ChatAgentSettings {
+  model: string;
+  effort: ChatEffort;
+  thinkingMode: boolean;
+  autoMode: boolean;
+}
+export const DEFAULT_AGENT_SETTINGS: ChatAgentSettings = {
+  model: "deepseek-v4-pro",
+  effort: "medium",
+  thinkingMode: false,
+  autoMode: true,
+};
+export const CHAT_MODELS = ["deepseek-v4-pro", "MiniMax-M3", "gpt-4o", "claude-sonnet-4"] as const;
+
 interface ChatState {
   topics: ChatTopic[];
   globalSessions: GlobalSession[];
@@ -83,6 +99,8 @@ interface ChatState {
   chatScope: ChatScope;
   /** GLOBAL 范围的授权目标 worktree id; 未选 = null (persist, 提交时重新校验) */
   globalAuthTargetId: string | null;
+  /** 聊天 agent 设置 (persist) */
+  agentSettings: ChatAgentSettings;
 
   /** 点击任务卡 → 打开/创建该任务卡的聊天话题 (幂等) */
   openTopicForTask: (workItemId: string, taskTitle: string) => string;
@@ -101,6 +119,7 @@ interface ChatState {
   setChatScope: (scope: ChatScope) => void;
   /** 设置 GLOBAL 范围授权目标 worktree (null = 清除) */
   setGlobalAuthTarget: (worktreeId: string | null) => void;
+  setAgentSettings: (patch: Partial<ChatAgentSettings>) => void;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -126,6 +145,7 @@ export const useChatStore = create<ChatState>()(
       activeTopicId: null,
       chatScope: "WORKTREE",
       globalAuthTargetId: null,
+      agentSettings: DEFAULT_AGENT_SETTINGS,
 
       openTopicForTask: (workItemId, taskTitle) => {
         const existing = get().topics.find(
@@ -263,6 +283,9 @@ export const useChatStore = create<ChatState>()(
       setChatScope: (scope) => set({ chatScope: scope }),
 
       setGlobalAuthTarget: (worktreeId) => set({ globalAuthTargetId: worktreeId }),
+
+      setAgentSettings: (patch) =>
+        set((s) => ({ agentSettings: { ...s.agentSettings, ...patch } })),
     }),
     {
       name: "star-chat-store:v1",
@@ -278,6 +301,7 @@ export const useChatStore = create<ChatState>()(
         activeTopicId: s.activeTopicId,
         chatScope: s.chatScope,
         globalAuthTargetId: s.globalAuthTargetId,
+        agentSettings: s.agentSettings,
       }),
     },
   ),

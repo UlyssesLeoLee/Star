@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5e43c781adbf9ce45ae402ca18cae1de453a8b40c8933579e35bcfb7d680324f
+@cypher schema=1 source_sha256=5ab21916a30683eca7549dad46104fbeb447689b87b681af76623b5a23f27ccb
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { clsx } from "clsx";
 import { SideChatPanel } from "./SideChatPanel";
-import { useChatStore } from "@/lib/chat/chatStore";
+import { useChatStore, CHAT_MODELS, type ChatEffort } from "@/lib/chat/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
 export function RightChatRail() {
@@ -61,6 +61,9 @@ export function RightChatRail() {
       document.documentElement.style.removeProperty("--chat-rail-w");
     };
   }, [open]);
+
+  const agentSettings = useChatStore((s) => s.agentSettings);
+  const setAgentSettings = useChatStore((s) => s.setAgentSettings);
 
   const totalMessages = topics.reduce((acc, t) => acc + t.messages.length, 0);
 
@@ -117,6 +120,61 @@ export function RightChatRail() {
           </button>
         )}
       </div>
+
+      {/* Agent 设置行 (per 2026-11-15: 主流 agent 功能 — 模型/effort/思考模式/自动模式) */}
+      {open && (
+        <div
+          className="shrink-0 border-b border-line bg-bg-card px-2 py-1.5 space-y-1"
+          data-testid="chat-rail-agent-settings"
+        >
+          <div className="flex items-center gap-1">
+            <label className="w-10 shrink-0 text-[9px] font-mono uppercase tracking-wider text-ink-mute">模型</label>
+            <select
+              value={agentSettings.model}
+              onChange={(e) => setAgentSettings({ model: e.target.value })}
+              data-testid="chat-rail-model"
+              className="h-6 flex-1 min-w-0 rounded border border-line bg-bg-soft px-1.5 text-[10px] text-ink focus:border-accent focus:outline-none"
+            >
+              {CHAT_MODELS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="w-10 shrink-0 text-[9px] font-mono uppercase tracking-wider text-ink-mute">Effort</label>
+            <select
+              value={agentSettings.effort}
+              onChange={(e) => setAgentSettings({ effort: e.target.value as ChatEffort })}
+              data-testid="chat-rail-effort"
+              className="h-6 flex-1 min-w-0 rounded border border-line bg-bg-soft px-1.5 text-[10px] text-ink focus:border-accent focus:outline-none"
+            >
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAgentSettings({ thinkingMode: !agentSettings.thinkingMode })}
+              aria-pressed={agentSettings.thinkingMode}
+              data-testid="chat-rail-thinking"
+              className={`flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${agentSettings.thinkingMode ? "border-accent bg-accent/15 text-accent" : "border-line text-ink-mute hover:text-ink"}`}
+            >
+              思考模式 {agentSettings.thinkingMode ? "ON" : "OFF"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAgentSettings({ autoMode: !agentSettings.autoMode })}
+              aria-pressed={agentSettings.autoMode}
+              data-testid="chat-rail-automode"
+              className={`flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${agentSettings.autoMode ? "border-accent bg-accent/15 text-accent" : "border-line text-ink-mute hover:text-ink"}`}
+            >
+              自动模式 {agentSettings.autoMode ? "ON" : "OFF"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 范围切换器 (per 2026-11-15 任务: 展开面板顶部, 清楚展示当前范围) */}
       {open && (
