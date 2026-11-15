@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a99d87a698dc462b83a2dfe80f5530ee0bd3c7bc860bf4a74544b28185d52c36
+@cypher schema=1 source_sha256=94cc23dca3a5263fd1a89d11a09f1d82e22e54083bcada0590c2ce0897849c15
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
 MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
 MERGE (resolveTaskCliUiState:Function {name:"resolveTaskCliUiState", language:"typescript", visibility:"public"})

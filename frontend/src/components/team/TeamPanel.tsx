@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=e0c7f97f442c694467943db3214d6375f55b394c942e7a4b62b25245492ec5ea
 MERGE (self:File {path:"frontend/src/components/team/TeamPanel.tsx"})
 @endcypher
 */

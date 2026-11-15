@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e0720cb6a11648cb3036f011115d8aada099271e09f19311b7909b85a494f78f
+@cypher schema=1 source_sha256=5abb09209c34bfaaa47b5f9b1ecc03f98d040c5e269b86f953ea1921f08b436b
 MERGE (self:File {path:"frontend/src/components/chat/SideChatPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
 MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
