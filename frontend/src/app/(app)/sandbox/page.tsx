@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=50ad467bc3d40c96f3c93bd702a5b80e9b29ad97f567b0a7b13e633d48e5a6f1
+@cypher schema=1 source_sha256=b1d27b6c00eb8e5449e24d12b9219c2f1e6c1256444e532033a124d3dfb9faa6
 MERGE (self:File {path:"frontend/src/app/(app)/sandbox/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/sandbox/page.tsx::SandboxPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -13,7 +13,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Boxes,
@@ -84,6 +84,27 @@ const OP_TASKS = [
 ];
 
 export default function SandboxPage() {
+  // 后端门面数据 (per WBS-BACKEND-SUPPORT-001 W2: sandtree/argo API)
+  const [backendInfo, setBackendInfo] = useState<{
+    argoCli?: string[];
+    observationLevels?: string[];
+  } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.allSettled([
+      fetch("/api/v1/argo/nodes").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/v1/sandtree/resources").then((r) => (r.ok ? r.json() : null)),
+    ]).then(([argo, st]) => {
+      if (!alive) return;
+      const argoData = argo.status === "fulfilled" ? argo.value : null;
+      const stData = st.status === "fulfilled" ? st.value : null;
+      setBackendInfo({
+        argoCli: argoData?.data?.supported_cli,
+        observationLevels: stData?.data?.observation_levels,
+      });
+    }).catch(() => { /* 后端不可达: 保留本地 mock */ });
+    return () => { alive = false; };
+  }, []);
   const [activeTab, setActiveTab] = useState<(typeof SANDBOX_TABS)[number]>("Worktree");
 
   return (
@@ -129,6 +150,11 @@ export default function SandboxPage() {
           ))}
 
           <p data-testid="sandbox-observation-note" className="text-[11px] text-ink-dim leading-relaxed bg-bg rounded-lg p-2.5 border border-line">
+            {backendInfo?.observationLevels && (
+              <span data-testid="sandbox-obs-levels" className="block mb-1 text-accent font-mono">
+                观测四级: {backendInfo.observationLevels.join(" → ")} (sandtree-core)
+              </span>
+            )}
             观测方式：原生 → 执行 → 探针 → 元数据。每个值都标出来源、可信度和新鲜度；离线的主机仍列出，不当作空。
           </p>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-// @cypher schema=1 source_sha256=778c5083360b35c0da992912e7da709e0c0ca8ee363f59a4e462f4d5b8b50764
+// @cypher schema=1 source_sha256=5ca344de6a64e7cd97bac26beedc3b91a0066cb26293a970187324144c1bd5f3
 // MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
 // MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
 // MERGE (shader:File {path:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx"})
@@ -37,6 +37,18 @@ import {
 import { CelCard3D } from "@/components/effects/CelCard3D";
 
 export default function AgentsPage() {
+  // 后端门面: Argo 支持的 CLI (per WBS W2)
+  const [supportedCli, setSupportedCli] = useState<string[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/v1/argo/nodes")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j?.data?.supported_cli) setSupportedCli(j.data.supported_cli);
+      })
+      .catch(() => { /* 后端不可达: 保留本地 mock */ });
+    return () => { alive = false; };
+  }, []);
   const { t } = useTranslation();
   const [agents, setAgents] = useState<ReadonlyArray<AgentRow>>(MOCK_AGENTS_FALLBACK);
   const [celPalette, setCelPalette] = useState<CelPalette>("crimson");
@@ -58,6 +70,14 @@ export default function AgentsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6" data-testid="agents-page">
+      {supportedCli && (
+        <div data-testid="agents-cli-badge" className="mb-3 flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
+          <span className="text-ink-mute">Argo CLI 支持:</span>
+          {supportedCli.map((c) => (
+            <span key={c} className="px-1.5 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent">{c}</span>
+          ))}
+        </div>
+      )}
       <PageHeader
         title={t.pageTitles['/agents'].title}
         subtitle="Tactical Agent Command // S-Class Runtime & Autonomous Agents (战术机关与自律代理人)"

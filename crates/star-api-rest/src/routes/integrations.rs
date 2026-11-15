@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=0bc41450729188217711ddee2da7debd8ce4b904c254b5b3bd14ca5ac8ead3df
 MERGE (self:File {path:"crates/star-api-rest/src/routes/integrations.rs"})
 MERGE (collab:Symbol {id:"crates/ide-collab-core/src/lib.rs::CollaborationHub",kind:"struct"})
 MERGE (git:Symbol {id:"crates/star-git-core/src/lib.rs::ConflictSet",kind:"struct"})
