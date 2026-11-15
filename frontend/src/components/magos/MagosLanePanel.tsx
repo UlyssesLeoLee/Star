@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c433e39b2df790593e589318c350d7d12575bc300514335086c533802c2a2221
+@cypher schema=1 source_sha256=d65be1355cdecb6063a4b393fee334abe1a3e9412b8a0c6e668ada2fc9ae4ded
 MERGE (self:File {path:"frontend/src/components/magos/MagosLanePanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/magos/MagosLanePanel.tsx::MagosLanePanel",kind:"component"})
 MERGE (self)-[:DEFINES]->(panel)
@@ -44,6 +44,25 @@ export function MagosLanePanel({ repo = "D:\\Star" }: { repo?: string }) {
   const [claims, setClaims] = useState<MagosClaim[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState<{ plan: unknown; protect: unknown } | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+
+  // Plan 审批流 (per 2026-11-14: MAGOS 深度集成 — 只读组合 plan+protect-show)
+  const requestReview = () => {
+    setReviewing(true);
+    fetch("/api/magos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ repo }),
+    })
+      .then((r) => r.json())
+      .then((d: { ok: boolean; review?: { plan: unknown; protect: unknown } }) => {
+        if (d.ok && d.review) setReview(d.review);
+        else setError("审批流读取失败 (MAGOS 只读代理)");
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setReviewing(false));
+  };
 
   const load = () => {
     setLoading(true);
@@ -70,6 +89,15 @@ export function MagosLanePanel({ repo = "D:\\Star" }: { repo?: string }) {
         </h2>
         <button
           type="button"
+          onClick={() => void requestReview()}
+          data-testid="magos-review"
+          disabled={reviewing}
+          className="mr-1 px-2 py-1 rounded-md border border-info/40 text-[10px] font-semibold text-info hover:bg-info/10 disabled:opacity-50"
+        >
+          {reviewing ? "读取中…" : "Plan 审批"}
+        </button>
+        <button
+          type="button"
           onClick={() => void load()}
           data-testid="magos-refresh"
           className="p-1.5 rounded-md text-ink-mute hover:text-accent hover:bg-bg-soft"
@@ -78,6 +106,17 @@ export function MagosLanePanel({ repo = "D:\\Star" }: { repo?: string }) {
           <RefreshCw size={13} className={clsx(loading && "animate-spin")} />
         </button>
       </div>
+
+      {review && (
+        <div data-testid="magos-review-panel" className="rounded-lg border border-info/40 bg-info/5 p-2.5 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-info">
+            <Shield size={11} /> Plan 审批预览 (只读 · 通过后由外部流程执行)
+          </div>
+          <pre className="max-h-32 overflow-auto rounded bg-bg p-2 text-[9px] font-mono text-ink-dim whitespace-pre-wrap">
+            {JSON.stringify(review, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-xs text-ink-mute">读取车道登记中…</p>

@@ -15,6 +15,8 @@
 
 pub mod error;
 pub mod repo;
+#[cfg(feature = "sync")]
+pub mod remote_sync;
 pub mod subprocess;
 
 pub use error::{Result, StarGitError};

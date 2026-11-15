@@ -31,6 +31,10 @@ pub enum StarGitError {
     #[error("git error: {0}")]
     Http(String),
 
+    /// 远端/同步层错误 (与 GitGit 对齐, remote_sync 模块用)
+    #[error("remote error: {0}")]
+    Remote(String),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }

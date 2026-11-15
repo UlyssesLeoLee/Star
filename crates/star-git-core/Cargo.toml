@@ -6,6 +6,14 @@ license = "MIT OR Apache-2.0"
 description = "Git conflict region engine ported from UlyssesLeoLee/GitGit (author dual-licensed)"
 
 [dependencies]
+tokio = { version = "1.40", features = ["process"], optional = true }
 thiserror = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
+
+[features]
+default = []
+sync = ["dep:tokio"]
+
+[dev-dependencies]
+tokio = { version = "1.40", features = ["rt", "macros"] }
