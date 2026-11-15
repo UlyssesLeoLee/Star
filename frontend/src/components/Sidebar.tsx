@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=acaba5fdb286226b6bfaa3c8df0a8730a76285aa51d49c5bfd863ad335407ce9
+@cypher schema=1 source_sha256=07d0a4ed45e65d0c2d4bb742dc81a2873cf4a2253861b39fac9c1024c7dc020f
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -35,7 +35,7 @@ import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 // =====================================================================
 // Sidebar — Project-first navigation.
-// Project → Engineering Run → Worktree → Branch is the primary hierarchy.
+// Project → Lane → Worktree → Branch is the primary hierarchy (per 2026-11-15 Lane 统一命名).
 // Existing pages remain reachable in a secondary, collapsible section.
 // =====================================================================
 

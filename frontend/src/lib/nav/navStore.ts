@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=af3d734f287745f7f6be1d1355dd7d46fd80886f1dbc314e23e87ee787983e0b
+@cypher schema=1 source_sha256=65eecc4f922c8d0a702d006c042cdb460a601f4dd6cbb000c60d3162cde195c3
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})
@@ -53,6 +53,10 @@ export interface NavState {
   sidebarScope: SidebarScope;
   // 当前选中项目 ID (从 ProjectsClient 提升, 跨 page 共享, 持久化)
   selectedProjectId: string;
+  /** Lane 选择 (per 2026-11-15: Project → Lane → Worktree → Branch 导航上下文) */
+  selectedLaneId: string;
+  selectedWorktreeId: string;
+  selectedBranch: string;
 
   // Actions
   openMatrix: () => void;
@@ -75,6 +79,8 @@ export interface NavState {
   setSidebarFold: (state: SidebarFoldState) => void;
   setSidebarScope: (scope: SidebarScope) => void;
   setSelectedProjectId: (id: string) => void;
+  /** Lane/Worktree/Branch 上下文一键设置 (per 2026-11-15) */
+  setLaneContext: (laneId: string, worktreeId: string, branch: string) => void;
 
   resetToDefault: () => void;
 }
@@ -98,6 +104,9 @@ type PersistedNavState = Pick<
   | "sidebarFold"
   | "sidebarScope"
   | "selectedProjectId"
+  | "selectedLaneId"
+  | "selectedWorktreeId"
+  | "selectedBranch"
 >;
 
 function migratePersistedNavState(persistedState: unknown): PersistedNavState {
@@ -134,6 +143,12 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
     sidebarScope: persisted?.sidebarScope === "project" ? "project" : "main",
     selectedProjectId:
       typeof persisted?.selectedProjectId === "string" ? persisted.selectedProjectId : "",
+    selectedLaneId:
+      typeof persisted?.selectedLaneId === "string" ? persisted.selectedLaneId : "",
+    selectedWorktreeId:
+      typeof persisted?.selectedWorktreeId === "string" ? persisted.selectedWorktreeId : "",
+    selectedBranch:
+      typeof persisted?.selectedBranch === "string" ? persisted.selectedBranch : "",
   };
 }
 
@@ -147,6 +162,9 @@ export const useNavStore = create<NavState>()(
       sidebarFold: "expanded",
       sidebarScope: "main",
       selectedProjectId: "",
+      selectedLaneId: "",
+      selectedWorktreeId: "",
+      selectedBranch: "",
 
       openMatrix: () => set({ isMatrixOpen: true }),
       closeMatrix: () => set({ isMatrixOpen: false }),
@@ -217,6 +235,8 @@ export const useNavStore = create<NavState>()(
       setSidebarScope: (scope) => set({ sidebarScope: scope }),
       // selectedProjectId setter (per 2026-09-03 12:36 JST 从 ProjectsClient 提升)
       setSelectedProjectId: (id) => set({ selectedProjectId: id }),
+      setLaneContext: (laneId, worktreeId, branch) =>
+        set({ selectedLaneId: laneId, selectedWorktreeId: worktreeId, selectedBranch: branch }),
 
       resetToDefault: () => {
         set({
@@ -245,6 +265,9 @@ export const useNavStore = create<NavState>()(
         sidebarFold: s.sidebarFold,
         sidebarScope: s.sidebarScope,
         selectedProjectId: s.selectedProjectId,
+        selectedLaneId: s.selectedLaneId,
+        selectedWorktreeId: s.selectedWorktreeId,
+        selectedBranch: s.selectedBranch,
       }),
     }
   )

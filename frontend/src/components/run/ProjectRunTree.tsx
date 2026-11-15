@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6bd49c329d446defd84ea4c9bac8a587c60c02c8a78ef482f6f4e432d95b45a7
+@cypher schema=1 source_sha256=8ea60ba37be4c5c0e532b24d8bc5562ef33bb79f9b89d05e934994d4d79f5b15
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -115,6 +115,10 @@ function FallbackProjectRunTree() {
   const selectedProjectId = useNavStore((s) => s.selectedProjectId);
   const setSelectedProjectId = useNavStore((s) => s.setSelectedProjectId);
   const setSidebarScope = useNavStore((s) => s.setSidebarScope);
+  const selectedLaneId = useNavStore((s) => s.selectedLaneId);
+  const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+  const setLaneContext = useNavStore((s) => s.setLaneContext);
+  const lanes = useStore((s) => s.lanes);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const [expandedWorktrees, setExpandedWorktrees] = useState<Record<string, boolean>>({});
 
@@ -131,6 +135,15 @@ function FallbackProjectRunTree() {
   function selectProject(projectId: string) {
     setSelectedProjectId(projectId);
     setSidebarScope("project");
+  }
+
+  /** Lane 点选 (per 2026-11-15: Lane 是管理层级, 可单独选中; Worktree/Branch 随 Lane 清空) */
+  function selectLane(laneId: string) {
+    setLaneContext(laneId, "", "");
+  }
+  /** Worktree 点选: Lane + Worktree + Branch 一键进入统一授权上下文 */
+  function selectWorktree(laneId: string, worktreeId: string, branch: string) {
+    setLaneContext(laneId, worktreeId, branch);
   }
   const toggleProject = (id: string) =>
     setExpandedProjects((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -164,49 +177,58 @@ function FallbackProjectRunTree() {
             </div>
             {expanded && (
               <ul className="ml-3 border-l border-line/60 pl-1">
-                <li className="flex items-center gap-1 py-0.5 pl-3 text-[10px] text-ink-mute" aria-level={2}>
-                  <Layers size={11} className="shrink-0" />
-                  <span className="truncate">{t.runDirectory.fallbackLane}</span>
-                </li>
-                {laneWorktrees.map((wt) => {
-                  const wtExpanded = Boolean(expandedWorktrees[wt.id]);
+                {lanes.filter((l) => l.project_id === project.id).map((lane) => {
+                  const laneSel = selectedLaneId === lane.id;
+                  const laneWts = laneWorktrees.filter(
+                    (wt) => wt.lane_id === lane.id || (wt.lane_id === undefined && lane.id === "lane-001"),
+                  );
                   return (
-                    <li key={wt.id} className="ml-2">
-                      <div className="flex items-center gap-1">
-                        <button type="button" aria-expanded={wtExpanded} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
-                          onClick={() => toggleWorktree(wt.id)}>
-                          {wtExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                        </button>
-                        <Link role="treeitem" aria-level={3} aria-expanded={wtExpanded}
-                          href={`/worktree?project_id=${encodeURIComponent(project.id)}`} prefetch={false}
-                          onNavigate={() => selectProject(project.id)}
-                          className="flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10">
-                          <Monitor size={12} className="shrink-0" />
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs">{wt.name}</span>
-                            <span className="block truncate text-[9px] text-ink-mute">{t.runDirectory.localWorktree} · {wt.status}</span>
-                          </span>
-                        </Link>
-                      </div>
-                      {wtExpanded && (
-                        <Link
-                          role="treeitem"
-                          aria-level={4}
-                          data-testid={`branch-entry-${wt.id}`}
-                          href={`/worktree?project_id=${encodeURIComponent(project.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
-                          prefetch={false}
-                          onNavigate={() => selectProject(project.id)}
-                          title={wt.branch}
-                          className="ml-7 flex items-center gap-1 py-0.5 text-[10px] text-ink-mute hover:bg-accent/10 hover:text-accent"
-                        >
-                          <GitBranch size={11} className="shrink-0" />
-                          <span className="truncate">{wt.branch}</span>
-                        </Link>
-                      )}
+                    <li key={lane.id} aria-level={2}>
+                      <button
+                        type="button"
+                        role="treeitem"
+                        aria-selected={laneSel}
+                        onClick={() => selectLane(lane.id)}
+                        data-testid={`project-run-lane-${lane.id}`}
+                        className={`flex w-full items-center gap-1 rounded py-0.5 pl-3 pr-1 text-left hover:bg-accent/10 ${laneSel ? "bg-accent/15 text-accent" : "text-ink-mute"}`}
+                      >
+                        <Layers size={11} className="shrink-0" />
+                        <span className="truncate text-[10px]">{lane.name}</span>
+                        {!lane.git_remote_url && (
+                          <span title="未绑定远端" className="ml-auto shrink-0 rounded border border-warn/40 bg-warn/10 px-1 text-[8px] text-warn">未绑定</span>
+                        )}
+                      </button>
+                      {laneWts.map((wt) => (
+                        <li key={wt.id} className="ml-2">
+                          <div className="flex items-center gap-1">
+                            <button type="button" aria-expanded={Boolean(expandedWorktrees[wt.id])} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
+                              onClick={() => toggleWorktree(wt.id)}>
+                              {expandedWorktrees[wt.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            </button>
+                            <Link role="treeitem" aria-level={3} aria-selected={selectedWorktreeId === wt.id}
+                              href={`/worktree?project_id=${encodeURIComponent(project.id)}&lane_id=${encodeURIComponent(lane.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                              prefetch={false}
+                              onNavigate={() => selectWorktree(lane.id, wt.id, wt.branch)}
+                              className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selectedWorktreeId === wt.id ? "bg-accent/15 text-accent" : ""}`}>
+                              <GitBranch size={11} className="shrink-0" />
+                              <span className="min-w-0">
+                                <span className="block truncate text-[11px]">{wt.name}</span>
+                                <span className="block truncate text-[9px] text-ink-mute">Worktree · {wt.branch}</span>
+                              </span>
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
                     </li>
                   );
                 })}
-              </ul>
+                {lanes.filter((l) => l.project_id === project.id).length === 0 && (
+                  <li className="flex items-center gap-1 py-0.5 pl-3 text-[10px] text-ink-mute" aria-level={2}>
+                    <Layers size={11} className="shrink-0" />
+                    <span className="truncate">{t.runDirectory.fallbackLane}</span>
+                  </li>
+                )}
+</ul>
             )}
           </li>
         );
@@ -223,6 +245,10 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   const selectedProjectId = useNavStore((state) => state.selectedProjectId);
   const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
   const setSidebarScope = useNavStore((state) => state.setSidebarScope);
+  const selectedLaneId = useNavStore((state) => state.selectedLaneId);
+  const selectedWorktreeId = useNavStore((state) => state.selectedWorktreeId);
+  const setLaneContext = useNavStore((state) => state.setLaneContext);
+  const lanes = useStore((s) => s.lanes);
   const model = useMemo(() => new RunDirectoryTree(client), [client]);
   const rows = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
@@ -244,6 +270,15 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   function selectProject(projectId: string) {
     setSelectedProjectId(projectId);
     setSidebarScope("project");
+  }
+
+  /** Lane 点选 (per 2026-11-15: Lane 是管理层级, 可单独选中; Worktree/Branch 随 Lane 清空) */
+  function selectLane(laneId: string) {
+    setLaneContext(laneId, "", "");
+  }
+  /** Worktree 点选: Lane + Worktree + Branch 一键进入统一授权上下文 */
+  function selectWorktree(laneId: string, worktreeId: string, branch: string) {
+    setLaneContext(laneId, worktreeId, branch);
   }
   function moveTreeFocus(event: KeyboardEvent<HTMLDivElement>) {
     const target = (event.target as HTMLElement).closest<HTMLElement>("[data-directory-index]");

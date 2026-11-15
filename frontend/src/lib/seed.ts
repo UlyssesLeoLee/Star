@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ce870bf371e858cedabd8feb1f0efb4e9e210f1337a4c908a449a8cdaf8650f7
+@cypher schema=1 source_sha256=0a85e5356ef31188906eb92f2ad301f4b219a69613b1c5d2aa577caa74cc0860
 MERGE (self:File {path:"frontend/src/lib/seed.ts"})
 MERGE (integrations:Symbol {id:"frontend/src/lib/seed.ts::integrations",kind:"constant"})
 MERGE (canvases:Symbol {id:"frontend/src/lib/seed.ts::canvases",kind:"constant"})
@@ -23,6 +23,7 @@ import type {
   PullRequest, Notification, SearchHit, SavedSearch, Integration, PresenceCursor,
   Whiteboard, Canvas, CanvasElement, CanvasConnector, Sprint, Milestone,
   BurndownPoint, Board, Relation, AuditEvent, AutomationRule,
+  Lane,
 } from "@/types/ids";
 
 const now = () => new Date().toISOString();
@@ -191,19 +192,28 @@ export const changeSets: ChangeSet[] = [];
 // =====================================================================
 // worktrees (12)
 // =====================================================================
+// =====================================================================
+// lanes (per 2026-11-15: Lane 管理层级 — 本地可建/授权/列出, 远端可选)
+// =====================================================================
+export const lanes: Lane[] = [
+  { id: "lane-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "core-runtime", git_remote_url: "https://github.com/UlyssesLeoLee/Star.git", git_provider: "github", default_branch: "dev", created_at: ago(60 * 24 * 100) },
+  { id: "lane-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "physis-3d", created_at: ago(60 * 24 * 80) },
+  { id: "lane-003", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "dashboard", created_at: ago(60 * 24 * 55) },
+];
+
 export const worktrees: Worktree[] = [
-  { id: "wt-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-worktree-sm",  branch: "feat/worktree-sm",     base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-001", pr_id: "pr-001", lock_version: 3, last_event_at: ago(60 * 30), created_at: ago(60 * 36) },
-  { id: "wt-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-agent-14sm",   branch: "feat/agent-14-sm",     base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-002", pr_id: "pr-002", lock_version: 5, last_event_at: ago(60 * 24), created_at: ago(60 * 30) },
-  { id: "wt-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-automation",   branch: "feat/automation-v2",   base_branch: "main", status: "review_requested",local_runtime_id: "lr-002", agent_session_id: "ag-003", pr_id: "pr-003", lock_version: 7, last_event_at: ago(60 * 1),  created_at: ago(60 * 14) },
-  { id: "wt-004", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-changeset-5sm",branch: "feat/changeset-5sm",  base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-004", pr_id: "pr-004", lock_version: 4, last_event_at: ago(60 * 35), created_at: ago(60 * 40) },
-  { id: "wt-005", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-relation-bfs", branch: "feat/relation-bfs",    base_branch: "main", status: "active",          local_runtime_id: "lr-002", agent_session_id: "ag-005",                      lock_version: 1, last_event_at: ago(60 * 0.5), created_at: ago(60 * 4) },
+  { id: "wt-001", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-worktree-sm",  branch: "feat/worktree-sm",     base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-001", pr_id: "pr-001", lock_version: 3, last_event_at: ago(60 * 30), created_at: ago(60 * 36) },
+  { id: "wt-002", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-agent-14sm",   branch: "feat/agent-14-sm",     base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-002", pr_id: "pr-002", lock_version: 5, last_event_at: ago(60 * 24), created_at: ago(60 * 30) },
+  { id: "wt-003", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-automation",   branch: "feat/automation-v2",   base_branch: "main", status: "review_requested",local_runtime_id: "lr-002", agent_session_id: "ag-003", pr_id: "pr-003", lock_version: 7, last_event_at: ago(60 * 1),  created_at: ago(60 * 14) },
+  { id: "wt-004", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-changeset-5sm",branch: "feat/changeset-5sm",  base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-004", pr_id: "pr-004", lock_version: 4, last_event_at: ago(60 * 35), created_at: ago(60 * 40) },
+  { id: "wt-005", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-002", name: "wt-relation-bfs", branch: "feat/relation-bfs",    base_branch: "main", status: "active",          local_runtime_id: "lr-002", agent_session_id: "ag-005",                      lock_version: 1, last_event_at: ago(60 * 0.5), created_at: ago(60 * 4) },
   { id: "wt-006", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "wt-realtime-wi",  branch: "feat/realtime-workitem", base_branch: "main", status: "ci_running",    local_runtime_id: "lr-003", agent_session_id: "ag-006", pr_id: "pr-006", lock_version: 2, last_event_at: ago(60 * 0.2), created_at: ago(60 * 8) },
   { id: "wt-007", tenant_id: TENANT_ID, project_id: "prj-stargate", name: "wt-presence",     branch: "feat/presence-cursor", base_branch: "main", status: "dirty",          local_runtime_id: "lr-003", agent_session_id: "ag-007",                       lock_version: 0, last_event_at: ago(60 * 0.1), created_at: ago(60 * 2) },
   { id: "wt-008", tenant_id: TENANT_ID, project_id: "prj-mobile", name: "wt-ios-switch",    branch: "feat/ios-worktree-switch", base_branch: "main", status: "active",    local_runtime_id: "lr-004", agent_session_id: "ag-008",                       lock_version: 1, last_event_at: ago(60 * 0.4), created_at: ago(60 * 6) },
-  { id: "wt-009", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-feedback-fb",   branch: "fix/feedback-reopen",  base_branch: "main", status: "abandoned",       local_runtime_id: "lr-002", agent_session_id: "ag-009", pr_id: "pr-009", lock_version: 0, last_event_at: ago(60 * 20), created_at: ago(60 * 24) },
-  { id: "wt-010", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-context-cache", branch: "perf/context-p0",      base_branch: "main", status: "reverted",        local_runtime_id: "lr-002", agent_session_id: "ag-010", pr_id: "pr-010", lock_version: 2, last_event_at: ago(60 * 16), created_at: ago(60 * 18) },
-  { id: "wt-011", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-validation-7",  branch: "feat/validation-7",    base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-011", pr_id: "pr-011", lock_version: 3, last_event_at: ago(60 * 22), created_at: ago(60 * 26) },
-  { id: "wt-012", tenant_id: TENANT_ID, project_id: PROJECT_ID, name: "wt-permission-rb", branch: "feat/perm-rules",      base_branch: "main", status: "review_requested",local_runtime_id: "lr-002", agent_session_id: "ag-012", pr_id: "pr-012", lock_version: 4, last_event_at: ago(60 * 0.3), created_at: ago(60 * 14) },
+  { id: "wt-009", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-feedback-fb",   branch: "fix/feedback-reopen",  base_branch: "main", status: "abandoned",       local_runtime_id: "lr-002", agent_session_id: "ag-009", pr_id: "pr-009", lock_version: 0, last_event_at: ago(60 * 20), created_at: ago(60 * 24) },
+  { id: "wt-010", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-context-cache", branch: "perf/context-p0",      base_branch: "main", status: "reverted",        local_runtime_id: "lr-002", agent_session_id: "ag-010", pr_id: "pr-010", lock_version: 2, last_event_at: ago(60 * 16), created_at: ago(60 * 18) },
+  { id: "wt-011", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-validation-7",  branch: "feat/validation-7",    base_branch: "main", status: "merged",          local_runtime_id: "lr-001", agent_session_id: "ag-011", pr_id: "pr-011", lock_version: 3, last_event_at: ago(60 * 22), created_at: ago(60 * 26) },
+  { id: "wt-012", tenant_id: TENANT_ID, project_id: PROJECT_ID, lane_id: "lane-001", name: "wt-permission-rb", branch: "feat/perm-rules",      base_branch: "main", status: "review_requested",local_runtime_id: "lr-002", agent_session_id: "ag-012", pr_id: "pr-012", lock_version: 4, last_event_at: ago(60 * 0.3), created_at: ago(60 * 14) },
 ];
 
 // =====================================================================

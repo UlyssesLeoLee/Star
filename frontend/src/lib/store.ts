@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2278a3d04bf1594da86e555797bd47ace1893df5f4288307fa411ebe5281c549
+@cypher schema=1 source_sha256=022cee31b91da9ef0972860bf07a3d674ae6c3cf5a5f32df5bdb3a6e76c4364b
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -167,6 +167,7 @@ interface StoreState {
   milestones: typeof seed.milestones;
   burndownSeries: typeof seed.burndownSeries;
   board: typeof seed.board;
+  lanes: typeof seed.lanes;
   relations: typeof seed.relations;
   auditEvents: typeof seed.auditEvents;
   automationRules: typeof seed.automationRules;
@@ -421,6 +422,7 @@ const initialState = (set: any, get?: any): StoreState => ({
   milestones: seed.milestones,
   burndownSeries: seed.burndownSeries,
   board: seed.board,
+  lanes: seed.lanes,
   relations: seed.relations,
   auditEvents: seed.auditEvents,
   automationRules: seed.automationRules,

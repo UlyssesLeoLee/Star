@@ -2,7 +2,7 @@
 // Star Platform — Shared Type Definitions
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=a453538e8db444c980863befa99d98f4994811fc379728534ac49eace854296c
+@cypher schema=1 source_sha256=3632be88af9a11edb541f7bf302bc1ebd8e6eebdb0fb45225bcf0461f9308156
 MERGE (self:File {path:"frontend/src/types/ids.ts"})
 MERGE (workItem:Type {id:"frontend/src/types/ids.ts::WorkItem",kind:"interface"})
 MERGE (workItemDoc:Type {id:"frontend/src/types/ids.ts::WorkItemDocument",kind:"interface"})
@@ -430,6 +430,23 @@ export interface ChangeSet {
 }
 
 // =====================================================================
+// 10. lane ★ Lane 管理层级 (per 2026-11-15 用户发令: Project → Lane → Worktree → Branch)
+//   Lane 是当前产品使用的管理层级 (对外不再用 Engineering Run)
+//   无远端身份时依然可创建/授权/列出/管理; 远端关联是可选元数据
+// =====================================================================
+export interface Lane {
+  id: Uuid;
+  tenant_id: Uuid;
+  project_id: Uuid;
+  name: string;
+  /** 远端可选元数据 (缺失 = 无绑定, UI 显式展示"未绑定") */
+  git_remote_url?: string;
+  git_provider?: "github" | "gitlab" | "gitee";
+  default_branch?: string;
+  created_at: Iso8601;
+}
+
+// =====================================================================
 // 10. worktree  ★ 17 状态机(§7.1)
 // =====================================================================
 export type WorktreeStatus =
@@ -446,6 +463,8 @@ export interface Worktree {
   id: Uuid;
   tenant_id: Uuid;
   project_id: Uuid;
+  /** Lane 管理的本地 checkout (per 2026-11-15; 可选 = 历史数据未归类) */
+  lane_id?: Uuid;
   name: string;
   branch: string;
   base_branch: string;

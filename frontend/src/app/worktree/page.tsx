@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=38416908b6b67820c16e958240b7cf0e5c812044e2f08e600bc3838c2c19bfb4
+@cypher schema=1 source_sha256=72914abbe75cf86b8cb21de66d66982e8b3e2cf1d19d905dd44ff0d328561b63
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -381,6 +381,10 @@ function WorktreePageInner() {
   const { repositories, pullRequests } = useStore();
   const selectedProjectId = useNavStore((state) => state.selectedProjectId);
   const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
+  const selectedLaneId = useNavStore((state) => state.selectedLaneId);
+  const selectedWorktreeId = useNavStore((state) => state.selectedWorktreeId);
+  const selectedBranch = useNavStore((state) => state.selectedBranch);
+  const setLaneContext = useNavStore((state) => state.setLaneContext);
   const [hasMounted, setHasMounted] = useState(false);
   const requestedProjectId = searchParams.get("project_id");
   const requestedWorktreeId = searchParams.get("worktree_id");
@@ -517,7 +521,15 @@ function WorktreePageInner() {
       query.set("project_id", selectedProject.id);
       router.replace(`/worktree?${query.toString()}`, { scroll: false });
     }
-  }, [hasMounted, requestedProjectId, router, searchParams, selectedProject, selectedProjectId, setSelectedProjectId]);
+
+    // Lane 上下文同步 (per 2026-11-15: Project → Lane → Worktree → Branch 统一授权上下文)
+    const laneId = searchParams.get("lane_id") ?? "";
+    const worktreeId = searchParams.get("worktree_id") ?? "";
+    const branch = searchParams.get("branch") ?? "";
+    if (laneId !== selectedLaneId || worktreeId !== selectedWorktreeId || branch !== selectedBranch) {
+      setLaneContext(laneId, worktreeId, branch);
+    }
+  }, [hasMounted, requestedProjectId, router, searchParams, selectedProject, selectedProjectId, setSelectedProjectId, selectedLaneId, selectedWorktreeId, selectedBranch, setLaneContext]);
 
   const currentProjectIndex = selectedProject && indexStateApi.current === worktreeGroupApi && indexState?.project_id === selectedProject.id
     ? indexState
