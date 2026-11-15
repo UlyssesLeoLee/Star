@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7089d70f399ff1e092a40eab85b794fff4bd61aa9509d4d61b0bdf0c3b6afe16
+@cypher schema=1 source_sha256=dfd7ee48ac22a8f4478989dcf90fdb19842aa25599b32274d5a863284f06893e
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -23,6 +23,8 @@ MERGE (self)-[:IMPORTS]->(agentViewPage)
 //   非无限画布类 (IPA/低代码流程) 移出为单独页面 (/analytics, /workflow)
 // 2026-11-15 (per TASK-ulys-canvas-ctx): Canvas 作为 Lane 应用入口,
 //   通过 ?worktree=<id> 深链携带当前 Worktree 上下文, 顶部渲染上下文条.
+// 2026-11-15 (per TASK-ulys-canvas-fine): 关系图 tab RelationshipView
+//   tenantId 去固定值, 接 store.projects[0].tenant_id.
 // =====================================================================
 
 import { Suspense, useEffect, useState } from "react";
@@ -53,7 +55,15 @@ export default function CanvasDetailPage() {
   const canvasConnectors = useStore((s) => s.canvasConnectors);
   const workItems = useStore((s) => s.workItems);
   const worktrees = useStore((s) => s.worktrees);
+  const projects = useStore((s) => s.projects);
   const canvas = canvases[0];
+
+  // 关系图 tenant 动态化 (per TASK-ulys-canvas-fine):
+  //   RelationshipView.tenantId 语义 = RLS 13 類 tenant id (非 project id,
+  //   per RelationshipViewProps: "Optional tenant id (RLS 13 類)");
+  //   接 store.projects[0].tenant_id (Project.tenant_id 13 類必带 per REQ-SEC-001)。
+  //   无 project 时为 undefined → RelationshipView 按未过滤加载 (同 AgentViewTab)。
+  const relationTenantId = projects[0]?.tenant_id;
 
   // ===================================================================
   // Worktree 上下文 (per TASK-ulys-canvas-ctx):
@@ -133,7 +143,7 @@ export default function CanvasDetailPage() {
                 <Network size={12} /> Worktree 图 · 5 视图
               </a>
             </div>
-            <RelationshipView tenantId="tn-001" />
+            <RelationshipView tenantId={relationTenantId} />
           </div>
         );
       default:

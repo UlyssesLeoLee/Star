@@ -1,10 +1,12 @@
 /*
-@cypher schema=1 source_sha256=566c79cb5d55df20b0c16e0d5175a22a4e9a7a89397781724ee7ed861c14e9d4
+@cypher schema=1 source_sha256=63b1b9de655b2695870ce39f29767d746a9bd03586014257db4e27bc78add3b0
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
 MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
+MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:CALLS]->(groupApiHook)
+MERGE (self)-[:CALLS]->(sessionStateHook)
 @endcypher
 */
 "use client";
@@ -16,16 +18,19 @@ MERGE (self)-[:CALLS]->(groupApiHook)
 //   - 5 视图状态区分: 有数据渲染列表 / 空数据空态 (wtg-empty-<view>) /
 //     宿主未接入提示 (wtg-disconnected-<view>), 二选一渲染
 //   - 去固定示例: 树视图 Project/LANE 改为 store.projects[0] / store.lanes[0]
+// 2026-11-15 (per TASK-ulys-canvas-fine):
+//   - 状态细分至四态: 未授权 (wtg-unauthorized-<view>) / 未接入 (wtg-disconnected-<view>) /
+//     空数据 (wtg-empty-<view>) / 有数据 (wtg-view-<view>)
 // =====================================================================
 
 import { useState } from "react";
-import { Network, GitBranch, AlertTriangle, Bot, History, PlugZap } from "lucide-react";
+import { Network, GitBranch, AlertTriangle, Bot, History, PlugZap, ShieldAlert } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
-import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
+import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 
 const GRAPH_VIEWS = ["树", "依赖", "风险", "Agent", "历史"] as const;
-/** wtg-view-* / wtg-empty-* / wtg-disconnected-* 的视图 id (与既有 testid 对齐) */
+/** wtg-view-* / wtg-empty-* / wtg-disconnected-* / wtg-unauthorized-* 的视图 id (与既有 testid 对齐) */
 type GraphViewId = "tree" | "deps" | "risk" | "agent" | "history";
 
 export default function WorktreeGraphPage() {
@@ -43,6 +48,17 @@ export default function WorktreeGraphPage() {
   const groupApi = useWorktreeGroupApi();
   const hostConnected = groupApi !== null;
 
+  // 未授权判定位 (per TASK-ulys-canvas-fine):
+  //   useWorktreeGroupApi() 返回形状为 WorktreeGroupApiClient | null, 不含 error/401 信号;
+  //   401 信号来自同模块 useWorktreeGroupSessionState(): status === "invalidated" —
+  //   WorktreeGroupApiClient.invalidateAuthorization 仅在 HTTP 401 / 缺 token 时置位
+  //   (见 lib/group/worktreeGroupApi.ts), 经 WorktreeGroupApiProvider 的
+  //   onAuthorizationError → setInvalidatedSession 冒泡为会话状态。
+  //   401 时 provider 会同时把 GroupApiContext 置 null (client === null),
+  //   故 unauthorized 判定必须排在 disconnected 判定之前。
+  const groupSession = useWorktreeGroupSessionState();
+  const unauthorized = groupSession.status === "invalidated";
+
   // 图布局: worktree 为列 hub, 下挂任务; agent 列在右侧
   const cols = Math.min(4, Math.max(1, worktrees.length));
   const colW = 220;
@@ -58,6 +74,21 @@ export default function WorktreeGraphPage() {
       <p className="max-w-md text-[10px] leading-relaxed text-ink-mute">
         Worktree 关系图依赖宿主 Group API 数据通道; 当前会话未装配或无权读取
         (网页预览模式)。请通过宿主会话打开。
+      </p>
+    </div>
+  );
+
+  // 未授权空态 (per TASK-ulys-canvas-fine): 宿主已装配但 Group API 会话失效 (401)。
+  const renderUnauthorized = (view: GraphViewId, label: string) => (
+    <div
+      data-testid={`wtg-unauthorized-${view}`}
+      className="flex min-h-48 flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <ShieldAlert size={20} className="text-err" />
+      <p className="text-xs font-semibold text-ink-dim">未授权 — {label}数据读取被拒绝</p>
+      <p className="max-w-md text-[10px] leading-relaxed text-ink-mute">
+        Group API 返回 401 / 会话已失效, 当前宿主会话无权读取该视图数据。
+        请在宿主会话中重新授权后刷新。
       </p>
     </div>
   );
@@ -81,6 +112,7 @@ export default function WorktreeGraphPage() {
         // (去固定示例: 动态取 store.projects[0] / store.lanes[0])
         const project = projects[0];
         const lane = lanes[0];
+        if (unauthorized) return renderUnauthorized("tree", "Project/LANE 树");
         if (!hostConnected || !project || !lane) {
           return renderDisconnected("tree", "Project/LANE 树");
         }
@@ -123,6 +155,7 @@ export default function WorktreeGraphPage() {
       }
       case "依赖": {
         // 依赖视图: 任务按 worktree 分组 + 依赖关系线 (worktree→任务)
+        if (unauthorized) return renderUnauthorized("deps", "依赖");
         if (!hostConnected) return renderDisconnected("deps", "依赖");
         if (worktrees.length === 0 || workItems.length === 0) {
           return renderEmpty("deps", "无任务");
@@ -161,6 +194,7 @@ export default function WorktreeGraphPage() {
       case "风险": {
         // 风险视图: 阻塞/冲突任务 + 高优先级
         const risky = workItems.filter((w) => w.status === "blocked" || w.priority === "p0" || w.priority === "p1");
+        if (unauthorized) return renderUnauthorized("risk", "风险");
         if (!hostConnected) return renderDisconnected("risk", "风险");
         if (risky.length === 0) return renderEmpty("risk", "无阻塞/高优先风险任务");
         return (
@@ -186,6 +220,7 @@ export default function WorktreeGraphPage() {
       }
       case "Agent": {
         // Agent 视图: agent 会话 ↔ worktree 关联
+        if (unauthorized) return renderUnauthorized("agent", "Agent 会话");
         if (!hostConnected) return renderDisconnected("agent", "Agent 会话");
         if (agentSessions.length === 0) return renderEmpty("agent", "无 Agent 会话");
         return (
@@ -215,6 +250,7 @@ export default function WorktreeGraphPage() {
       case "历史": {
         // 历史视图: 最近更新任务 (按 updated_at 排序)
         const recent = [...workItems].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 10);
+        if (unauthorized) return renderUnauthorized("history", "历史");
         if (!hostConnected) return renderDisconnected("history", "历史");
         if (recent.length === 0) return renderEmpty("history", "无历史");
         return (
