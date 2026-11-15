@@ -32,7 +32,10 @@ impl PhysisWorld {
         let mut world = DynamicsWorld::new();
         world.set_gravity(Vec3::new(gravity[0], gravity[1], gravity[2]));
         world.set_stepper(TimeStepper::SemiImplicitEuler);
-        Self { world, handles: Vec::new() }
+        Self {
+            world,
+            handles: Vec::new(),
+        }
     }
 
     /// 生成动态球体 (radius 用于 profile)
@@ -55,7 +58,13 @@ impl PhysisWorld {
             _padding: [0],
         };
         let inertia_diag = [radius * radius * 0.4 * mass; 3];
-        match self.world.spawn_dynamic(Vec3::new(x, y, z), Quat::IDENTITY, mass, inertia_diag, profile) {
+        match self.world.spawn_dynamic(
+            Vec3::new(x, y, z),
+            Quat::IDENTITY,
+            mass,
+            inertia_diag,
+            profile,
+        ) {
             Ok(h) => {
                 self.handles.push(h);
                 self.handles.len() - 1
@@ -71,7 +80,9 @@ impl PhysisWorld {
 
     /// 读取第 idx 个刚体位置 [x,y,z] (不存在返回 [0,0,0])
     pub fn position(&self, idx: usize) -> Vec<f32> {
-        let Some(h) = self.handles.get(idx) else { return vec![0.0, 0.0, 0.0]; };
+        let Some(h) = self.handles.get(idx) else {
+            return vec![0.0, 0.0, 0.0];
+        };
         match self.world.body(*h) {
             Ok(b) => {
                 let p = b.position;
@@ -83,12 +94,18 @@ impl PhysisWorld {
 
     /// 施加外力 (鼠标吸引子): 向 target 施加力
     pub fn attract(&mut self, idx: usize, tx: f32, ty: f32, tz: f32, k: f32) {
-        let Some(h) = self.handles.get(idx) else { return; };
-        let Ok(b) = self.world.body(*h) else { return; };
+        let Some(h) = self.handles.get(idx) else {
+            return;
+        };
+        let Ok(b) = self.world.body(*h) else {
+            return;
+        };
         let p = b.position;
         let mut dir = Vec3::new(tx - p.x, ty - p.y, tz - p.z);
         let len = dir.length();
-        if len < 0.001 { return; }
+        if len < 0.001 {
+            return;
+        }
         dir = dir * (1.0 / len);
         let force = dir * k * len.min(8.0);
         if let Ok(body) = self.world.body_mut(*h) {
@@ -124,7 +141,9 @@ mod tests {
         let idx = w.spawn(0.0, 10.0, 0.0, 1.0, 1.0);
         assert!(idx < usize::MAX);
         assert_eq!(w.len(), 1);
-        for _ in 0..60 { w.step(1.0 / 60.0); }
+        for _ in 0..60 {
+            w.step(1.0 / 60.0);
+        }
         let p = w.position(idx);
         // 重力下落: y < 10
         assert!(p[1] < 10.0, "body should fall: {:?}", p);
@@ -135,7 +154,9 @@ mod tests {
         let mut w = PhysisWorld::new(vec![0.0, 0.0, 0.0]);
         let idx = w.spawn(0.0, 0.0, 0.0, 1.0, 1.0);
         w.attract(idx, 5.0, 0.0, 0.0, 2.0);
-        for _ in 0..30 { w.step(1.0 / 60.0); }
+        for _ in 0..30 {
+            w.step(1.0 / 60.0);
+        }
         let p = w.position(idx);
         assert!(p[0] > 0.0, "body should move toward attractor: {:?}", p);
     }

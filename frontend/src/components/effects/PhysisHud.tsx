@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=145235b1c11944844f23cbeccf4e09b8f8cf41a4d8dc2045db59b01f11253a18
+@cypher schema=1 source_sha256=6854142f898225363b746201a3d2bc5eac10ac14c42cf7ffffa6d1a364886af7
 MERGE (self:File {path:"frontend/src/components/effects/PhysisHud.tsx"})
 MERGE (hud:Symbol {id:"frontend/src/components/effects/PhysisHud.tsx::PhysisHud",kind:"component"})
 MERGE (self)-[:DEFINES]->(hud)
@@ -16,9 +16,13 @@ MERGE (self)-[:DEFINES]->(hud)
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { useStore } from "@/lib/store";
 
 export function PhysisHud() {
   const { resolvedTheme } = useTheme();
+  const worktrees = useStore((s) => s.worktrees);
+  const workItems = useStore((s) => s.workItems);
+  const agentSessions = useStore((s) => s.agentSessions);
   const [combo, setCombo] = useState(0);
   const [bursts, setBursts] = useState(0);
   const [pulse, setPulse] = useState(false);
@@ -50,8 +54,8 @@ export function PhysisHud() {
         <div className="flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1.5">
             <span className={`size-1.5 rounded-full bg-ok ${pulse ? "animate-ping" : ""}`} />
-            <span className="text-ink-dim">PARTICLES</span>
-            <span className="text-accent font-bold">90</span>
+            <span className="text-ink-dim">NODES</span>
+            <span className="text-accent font-bold">{Math.min(8, worktrees.length) + Math.min(18, workItems.length) + Math.min(6, agentSessions.length)}</span>
           </span>
           <span className="text-line">|</span>
           <span className="flex items-center gap-1.5">
@@ -65,7 +69,7 @@ export function PhysisHud() {
           </span>
         </div>
         <div className="mt-1.5 text-[9px] text-ink-mute">
-          GVPE · WASM · three.js — 点击任意处触发冲击波
+          GVPE · WASM · node-edge 图 — worktree/task/agent 实体节点 · 点击触发冲击波
         </div>
       </div>
     </div>

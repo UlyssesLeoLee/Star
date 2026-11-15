@@ -88,6 +88,18 @@ pub fn build_router() -> Router {
         .route("/work-items", post(routes::work_items::create))
         .route("/work-items/{id}", patch(routes::work_items::update))
         .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
+        // 4 内核 crate 门面 (per WBS-BACKEND-SUPPORT-001 W2: ide-collab-core/star-git-core/argo-core/sandtree-core)
+        .route("/collab/session", get(routes::integrations::collab_session))
+        .route(
+            "/collab/annotations",
+            get(routes::integrations::collab_annotations),
+        )
+        .route("/git/conflicts", get(routes::integrations::git_conflicts))
+        .route("/argo/nodes", get(routes::integrations::argo_nodes))
+        .route(
+            "/sandtree/resources",
+            get(routes::integrations::sandtree_resources),
+        )
         .route("/worktrees", post(routes::worktrees::create))
         .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
         // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──
@@ -231,6 +243,18 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .route("/work-items", post(routes::work_items::create))
                 .route("/work-items/{id}", patch(routes::work_items::update))
                 .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
+                // 4 内核 crate 门面 (per WBS-BACKEND-SUPPORT-001 W2: ide-collab-core/star-git-core/argo-core/sandtree-core)
+                .route("/collab/session", get(routes::integrations::collab_session))
+                .route(
+                    "/collab/annotations",
+                    get(routes::integrations::collab_annotations),
+                )
+                .route("/git/conflicts", get(routes::integrations::git_conflicts))
+                .route("/argo/nodes", get(routes::integrations::argo_nodes))
+                .route(
+                    "/sandtree/resources",
+                    get(routes::integrations::sandtree_resources),
+                )
                 .route("/worktrees", post(routes::worktrees::create))
                 .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
                 // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──

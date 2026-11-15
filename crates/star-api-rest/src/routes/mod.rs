@@ -24,6 +24,7 @@ pub mod ex_05;
 pub mod ex_06;
 pub mod ex_07;
 pub mod ex_08;
+pub mod integrations;
 pub mod merge_requests;
 pub mod pipelines;
 pub mod reviews;

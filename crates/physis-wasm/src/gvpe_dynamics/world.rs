@@ -144,9 +144,20 @@ impl DynamicsWorld {
         inertia_diag: [f32; 3],
         profile: PhysicsProfile,
     ) -> DynamicsResult<BodyHandle> {
-        let state = RigidBodyState::dynamic(position, rotation, Vec3::ZERO, Vec3::ZERO, mass, inertia_diag);
+        let state = RigidBodyState::dynamic(
+            position,
+            rotation,
+            Vec3::ZERO,
+            Vec3::ZERO,
+            mass,
+            inertia_diag,
+        );
         let island = self.alloc_island();
-        let entry = BodyEntry { state, profile, island };
+        let entry = BodyEntry {
+            state,
+            profile,
+            island,
+        };
         let SlabHandle { index, generation } = self.bodies.allocate(entry);
         let body = BodyHandle::from_raw(index, generation);
         self.islands[island.0 as usize].push(body);
@@ -159,7 +170,11 @@ impl DynamicsWorld {
         let profile = PhysicsProfile::default_static();
         // static body 阻尼无意义但保留（force 累加 no-op 已阻断）
         let island = self.alloc_island();
-        let entry = BodyEntry { state, profile, island };
+        let entry = BodyEntry {
+            state,
+            profile,
+            island,
+        };
         let SlabHandle { index, generation } = self.bodies.allocate(entry);
         let body = BodyHandle::from_raw(index, generation);
         self.islands[island.0 as usize].push(body);

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=74006c3c2020d437c31ac8fbf26e95aa9b1f1a34e67234620478583fc8daf6db
+@cypher schema=1 source_sha256=11c0c39fdfa656c7bdb6209ee93567cea441d1f35957e1a264fe52065c321bdb
 MERGE (self:File {path:"frontend/src/components/effects/PhysisBackdrop.tsx"})
 MERGE (backdrop:Symbol {id:"frontend/src/components/effects/PhysisBackdrop.tsx::PhysisBackdrop",kind:"component"})
 MERGE (wasm:Symbol {id:"frontend/src/lib/physis/physis_wasm.js::PhysisWorld",kind:"wasm"})
@@ -10,18 +10,19 @@ MERGE (self)-[:IMPORTS]->(wasm)
 "use client";
 
 // =====================================================================
-// PhysisBackdrop — 全 3D 物理主题背景层 (游戏化动态版)
-// per 2026-11-14: 全 3D 主题应有游戏化动态化整体设计
-//   - 多形状粒子 (盒/二十面体/环面/八面体) + 自旋 + emissive 发光
-//   - 真实物理: 重力/阻尼/底部反弹 (Physis GVPE WASM)
-//   - 鼠标 = 光晕点光源 + 吸引子 (粒子追随光标)
-//   - 点击任意处 → 冲击波 (斥力场推开粒子)
-//   - 自定义事件 "physis-burst" (聊天发消息/任务完成 → 粒子爆发庆祝)
+// PhysisBackdrop — 3D 主题 node-edge 图背景 (per 2026-11-14 用户发令:
+//   3D 主题整体重新设计, node-edge 方式呈现, 参考 GOS 项目做法)
+//   GOS 图原生世界观: 一切皆节点(node)与边(edge)
+//   - 节点 = Star 真实实体 (worktree/task/agent), 发光球体 + 呼吸
+//   - 边   = 实体关系 (worktree→task, agent→worktree), 发光连线
+//   - 物理 = Physis GVPE WASM 驱动节点运动 (力导向图感)
+//   - 交互 = 鼠标吸引子 + 点击冲击波 + physis-burst 事件
 // =====================================================================
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useTheme } from "next-themes";
+import { useStore } from "@/lib/store";
 
 interface PhysisWorldWasm {
   new (gravity: number[]): {
@@ -33,13 +34,16 @@ interface PhysisWorldWasm {
   };
 }
 
-const COUNT = 90;
-// 主题粒子色板 (游戏化霓虹)
-const PALETTE = [0x7c8cff, 0x9c6bff, 0x5ad2ff, 0x8b5cf6, 0x63e6be, 0xffb86b, 0xff5c7a];
+// 节点角色 → 颜色 (GOS 风格: 节点类型色)
+const ROLE_COLOR = { worktree: 0x5ad2ff, task: 0x9c6bff, agent: 0x63e6be } as const;
 
 export function PhysisBackdrop() {
   const { resolvedTheme } = useTheme();
   const mountRef = useRef<HTMLDivElement>(null);
+  // 实体数据 (节点来源, 每次主题激活时读一次)
+  const worktrees = useStore((s) => s.worktrees);
+  const workItems = useStore((s) => s.workItems);
+  const agentSessions = useStore((s) => s.agentSessions);
 
   useEffect(() => {
     if (resolvedTheme !== "physis") return;
@@ -52,10 +56,58 @@ export function PhysisBackdrop() {
     const shocks: { x: number; y: number; age: number }[] = [];
     let mouseWorld = { x: 0, y: 0 };
 
+    // --- 构建 node-edge 图 (GOS 图原生: 真实实体 + 关系) ---
+    type Node = {
+      id: string;
+      role: keyof typeof ROLE_COLOR;
+      label: string;
+      seed: [number, number, number];
+    };
+    const nodes: Node[] = [];
+    const edges: [number, number][] = [];
+
+    // worktree 节点 (hub)
+    const wtIndex = new Map<string, number>();
+    worktrees.slice(0, 8).forEach((wt, i) => {
+      wtIndex.set(wt.id, nodes.length);
+      nodes.push({
+        id: wt.id,
+        role: "worktree",
+        label: wt.name,
+        seed: [Math.cos((i / 8) * Math.PI * 2) * 6, 2 + Math.sin(i * 1.7) * 2, Math.sin((i / 8) * Math.PI * 2) * 4],
+      });
+    });
+    // task 节点 + worktree→task 边
+    workItems.slice(0, 18).forEach((wi, i) => {
+      const idx = nodes.length;
+      nodes.push({
+        id: wi.id,
+        role: "task",
+        label: wi.key,
+        seed: [(Math.random() - 0.5) * 16, 1 + Math.random() * 6, (Math.random() - 0.5) * 8],
+      });
+      if (wi.worktree_id) {
+        const wt = wtIndex.get(wi.worktree_id);
+        if (wt !== undefined && edges.length < 60) edges.push([wt, idx]);
+      }
+    });
+    // agent 节点 + agent→worktree 边
+    agentSessions.slice(0, 6).forEach((ag, i) => {
+      const idx = nodes.length;
+      nodes.push({
+        id: ag.id,
+        role: "agent",
+        label: `ag-${ag.id.slice(0, 6)}`,
+        seed: [Math.cos((i / 6) * Math.PI * 2) * 9, 4 + Math.sin(i * 2.3) * 3, -2],
+      });
+      const wt = wtIndex.get(ag.worktree_id ?? "");
+      if (wt !== undefined && edges.length < 60) edges.push([idx, wt]);
+    });
+
     // --- three.js 场景 ---
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
-    camera.position.set(0, 0, 14);
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 120);
+    camera.position.set(0, 0, 18);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -64,54 +116,56 @@ export function PhysisBackdrop() {
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
 
-    // 光晕点光源 (跟随鼠标) + 基础光
     const cursorLight = new THREE.PointLight(0x8b5cf6, 0, 30);
     cursorLight.position.set(0, 0, 5);
     scene.add(cursorLight);
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+    scene.add(new THREE.AmbientLight(0x8899ff, 0.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
     dir.position.set(5, 8, 6);
     scene.add(dir);
-    scene.add(new THREE.AmbientLight(0x8899ff, 0.45));
 
-    // --- 多形状粒子 ---
-    const geos = [
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.IcosahedronGeometry(0.62, 0),
-      new THREE.TorusGeometry(0.42, 0.16, 10, 20),
-      new THREE.OctahedronGeometry(0.66, 0),
-    ];
-    const bodies: { mesh: THREE.Mesh; spin: [number, number] }[] = [];
-
-    for (let i = 0; i < COUNT; i++) {
-      const color = PALETTE[i % PALETTE.length];
+    // --- 节点 mesh (发光球体, 角色色) ---
+    const nodeMeshes: THREE.Mesh[] = [];
+    const nodeMats: THREE.MeshStandardMaterial[] = [];
+    const nodeSeeds = nodes.map((n) => n.seed);
+    nodes.forEach((n, i) => {
+      const color = ROLE_COLOR[n.role];
       const mat = new THREE.MeshStandardMaterial({
         color,
         emissive: color,
-        emissiveIntensity: 0.25 + Math.random() * 0.3,
-        roughness: 0.3,
-        metalness: 0.25,
-        transparent: true,
-        opacity: 0.9,
+        emissiveIntensity: 0.5,
+        roughness: 0.25,
+        metalness: 0.3,
       });
-      const mesh = new THREE.Mesh(geos[i % geos.length], mat);
-      const s = 0.25 + Math.random() * 0.8;
-      mesh.scale.setScalar(s);
-      mesh.position.set((Math.random() - 0.5) * 22, 5 + Math.random() * 10, (Math.random() - 0.5) * 9);
+      const size = n.role === "worktree" ? 0.55 : n.role === "agent" ? 0.4 : 0.3;
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 16, 12), mat);
+      mesh.position.set(n.seed[0], n.seed[1], n.seed[2]);
       scene.add(mesh);
-      bodies.push({
-        mesh,
-        spin: [(Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.2],
-      });
-    }
+      nodeMeshes.push(mesh);
+      nodeMats.push(mat);
+    });
+
+    // --- 边 (THREE.Line, 随节点实时重算) ---
+    const edgeGeos = edges.map(() => new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(), new THREE.Vector3(),
+    ]));
+    const edgeLines = edgeGeos.map((g) => {
+      const line = new THREE.Line(
+        g,
+        new THREE.LineBasicMaterial({ color: 0x7c8cff, transparent: true, opacity: 0.35 }),
+      );
+      scene.add(line);
+      return line;
+    });
 
     // --- Physis WASM ---
     (async () => {
       try {
         const mod = await import("@/lib/physis/physis_wasm.js");
         const World = mod.PhysisWorld as unknown as PhysisWorldWasm;
-        const w = new World([0, -3.0, 0]);
-        bodies.forEach((b) => {
-          w.spawn(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 0.5, 1.0);
+        const w = new World([0, -1.6, 0]);
+        nodeMeshes.forEach((m) => {
+          w.spawn(m.position.x, m.position.y, m.position.z, 0.5, 1.0);
         });
         world = w;
 
@@ -123,39 +177,44 @@ export function PhysisBackdrop() {
           const dt = Math.min((now - last) / 1000, 0.05);
           last = now;
 
-          // 物理 2 子步
           w.step(dt / 2);
           w.step(dt / 2);
 
-          // 同步粒子 + 冲击波 + 底部反弹
-          for (let i = 0; i < bodies.length; i++) {
+          // 同步节点 + 冲击波 + 底部回推
+          for (let i = 0; i < nodeMeshes.length; i++) {
             const p = w.position(i);
-            const { mesh, spin } = bodies[i];
+            const mesh = nodeMeshes[i];
             mesh.position.set(p[0], p[1], p[2]);
-            mesh.rotation.x += dt * spin[0];
-            mesh.rotation.y += dt * spin[1];
+            // 呼吸发光
+            nodeMats[i].emissiveIntensity = 0.4 + Math.sin(now * 0.003 + i) * 0.25;
 
-            if (p[1] < -6.5) w.attract(i, p[0], 6.0, p[2], 1.2);
-
-            // 冲击波斥力 (老化衰减)
+            if (p[1] < -7) w.attract(i, p[0], 7.0, p[2], 1.0);
             for (const s of shocks) {
               const dx = p[0] - s.x;
               const dy = p[1] - s.y;
               const d2 = dx * dx + dy * dy;
               if (d2 < 64) {
                 const d = Math.sqrt(d2) + 0.1;
-                const f = (1 - s.age / 0.8) * (28 / d);
+                const f = (1 - s.age / 0.8) * (30 / d);
                 w.attract(i, p[0] + dx * f * 2, p[1] + dy * f * 2, p[2], 0.08);
               }
             }
           }
-          // 冲击波老化
           for (const s of shocks) s.age += dt;
           while (shocks.length > 0 && shocks[0].age > 0.8) shocks.shift();
 
-          // 光晕光源跟随鼠标 (发光强度脉动)
+          // 边端点跟随节点 (GOS edge 实时重连)
+          for (let e = 0; e < edges.length; e++) {
+            const [a, b] = edges[e];
+            const pos = edgeGeos[e].attributes.position as THREE.BufferAttribute;
+            pos.setXYZ(0, nodeMeshes[a].position.x, nodeMeshes[a].position.y, nodeMeshes[a].position.z);
+            pos.setXYZ(1, nodeMeshes[b].position.x, nodeMeshes[b].position.y, nodeMeshes[b].position.z);
+            pos.needsUpdate = true;
+            edgeGeos[e].computeBoundingSphere();
+          }
+
           cursorLight.position.set(mouseWorld.x, mouseWorld.y, 5);
-          cursorLight.intensity = 1.4 + Math.sin(now * 0.004) * 0.5;
+          cursorLight.intensity = 1.2 + Math.sin(now * 0.004) * 0.4;
 
           renderer.render(scene, camera);
         };
@@ -166,35 +225,28 @@ export function PhysisBackdrop() {
       }
     })();
 
-    // 屏幕 → 世界坐标
     const screenToWorld = (e: PointerEvent) => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       return {
-        x: ((e.clientX / w) * 2 - 1) * 11,
-        y: -((e.clientY / h) * 2 - 1) * 8,
+        x: ((e.clientX / w) * 2 - 1) * 12,
+        y: -((e.clientY / h) * 2 - 1) * 8.5,
       };
     };
-
-    // 鼠标 = 吸引子 + 光晕
     const onPointerMove = (e: PointerEvent) => {
       if (!world) return;
       const t = screenToWorld(e);
       mouseWorld = t;
-      for (let i = 0; i < COUNT; i += 3) {
-        world.attract(i, t.x, t.y, 0, 0.12);
+      for (let i = 0; i < nodeMeshes.length; i += 4) {
+        world.attract(i, t.x, t.y, 0, 0.1);
       }
     };
-
-    // 点击 → 冲击波
     const onPointerDown = (e: PointerEvent) => {
       if (!world) return;
       const t = screenToWorld(e);
       shocks.push({ x: t.x, y: t.y, age: 0 });
       if (shocks.length > 4) shocks.shift();
     };
-
-    // 粒子爆发 (window.dispatchEvent(new CustomEvent("physis-burst")))
     const onBurst = (e: Event) => {
       if (!world) return;
       const d = (e as CustomEvent<{ x?: number; y?: number }>).detail ?? {};
@@ -230,11 +282,11 @@ export function PhysisBackdrop() {
         const mat = m.material as THREE.Material | undefined;
         if (mat) mat.dispose();
       });
-      geos.forEach((g) => g.dispose());
+      edgeGeos.forEach((g) => g.dispose());
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
-  }, [resolvedTheme]);
+  }, [resolvedTheme, worktrees, workItems, agentSessions]);
 
   if (resolvedTheme !== "physis") return null;
 

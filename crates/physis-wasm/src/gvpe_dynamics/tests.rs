@@ -43,7 +43,11 @@ fn t01_free_fall_matches_g() {
     }
     let s = world.body(h).unwrap();
     // v_y = g * t = 9.81 * 1 = 9.81（向下为负）
-    assert!((s.lin_vel.y - (-9.81)).abs() < 0.05, "v_y = {}", s.lin_vel.y);
+    assert!(
+        (s.lin_vel.y - (-9.81)).abs() < 0.05,
+        "v_y = {}",
+        s.lin_vel.y
+    );
     // y = y0 + 0.5 * a * t^2 = 10 - 0.5 * 9.81 ≈ 5.095
     assert!((s.position.y - 5.095).abs() < 0.1, "y = {}", s.position.y);
 }
@@ -51,7 +55,9 @@ fn t01_free_fall_matches_g() {
 #[test]
 fn t02_static_body_does_not_move() {
     let mut world = DynamicsWorld::new();
-    let h = world.spawn_fixed(Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY).unwrap();
+    let h = world
+        .spawn_fixed(Vec3::new(0.0, 0.0, 0.0), Quat::IDENTITY)
+        .unwrap();
     for _ in 0..10 {
         world.step(0.1).unwrap();
     }
@@ -125,13 +131,7 @@ fn t05_damping_decays_velocity_to_zero() {
     p.damping_linear = 1.0;
     p.damping_angular = 1.0;
     let h = world
-        .spawn_dynamic(
-            Vec3::ZERO,
-            Quat::IDENTITY,
-            1.0,
-            [1.0, 1.0, 1.0],
-            p,
-        )
+        .spawn_dynamic(Vec3::ZERO, Quat::IDENTITY, 1.0, [1.0, 1.0, 1.0], p)
         .unwrap();
     {
         let s = world.body_mut(h).unwrap();
@@ -222,22 +222,10 @@ fn t08_stepper_dispatch_changes_behavior() {
     let mut w2 = DynamicsWorld::new();
     let p = dyn_profile();
     let h1 = w1
-        .spawn_dynamic(
-            Vec3::ZERO,
-            Quat::IDENTITY,
-            1.0,
-            [1.0, 1.0, 1.0],
-            p,
-        )
+        .spawn_dynamic(Vec3::ZERO, Quat::IDENTITY, 1.0, [1.0, 1.0, 1.0], p)
         .unwrap();
     let h2 = w2
-        .spawn_dynamic(
-            Vec3::ZERO,
-            Quat::IDENTITY,
-            1.0,
-            [1.0, 1.0, 1.0],
-            p,
-        )
+        .spawn_dynamic(Vec3::ZERO, Quat::IDENTITY, 1.0, [1.0, 1.0, 1.0], p)
         .unwrap();
     // 单步大 dt = 0.5 + 恒定力 (1, 0, 0)
     {

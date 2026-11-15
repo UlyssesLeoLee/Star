@@ -21,6 +21,11 @@ name = "star_api_rest"
 path = "src/lib.rs"
 
 [dependencies]
+# 4 内核 crate 门面 (per WBS-BACKEND-SUPPORT-001 W2, 2026-11-14 移植)
+ide-collab-core = { path = "../ide-collab-core" }
+star-git-core = { path = "../star-git-core" }
+argo-core = { path = "../argo-core" }
+sandtree-core = { path = "../sandtree-core" }
 # workspace 基础
 serde = { workspace = true }
 serde_json = { workspace = true }

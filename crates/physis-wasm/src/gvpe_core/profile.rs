@@ -247,7 +247,10 @@ impl PhysicsProfile {
 
     /// NaN 检测辅助：若 `v` 是 `NaN` 返回 `ProfileInconsistent`。
     #[inline]
-    fn check_not_nan(v: f32, field: &'static str) -> Result<(), crate::gvpe_core::error::CoreError> {
+    fn check_not_nan(
+        v: f32,
+        field: &'static str,
+    ) -> Result<(), crate::gvpe_core::error::CoreError> {
         use crate::gvpe_core::error::CoreError;
         if v.is_nan() {
             Err(CoreError::ProfileInconsistent { field, value: v })
@@ -258,7 +261,10 @@ impl PhysicsProfile {
 
     /// 范围检查辅助：`v ∈ [0, 1]`。
     #[inline]
-    fn check_unit_range(v: f32, field: &'static str) -> Result<(), crate::gvpe_core::error::CoreError> {
+    fn check_unit_range(
+        v: f32,
+        field: &'static str,
+    ) -> Result<(), crate::gvpe_core::error::CoreError> {
         use crate::gvpe_core::error::CoreError;
         if (0.0..=1.0).contains(&v) {
             Ok(())

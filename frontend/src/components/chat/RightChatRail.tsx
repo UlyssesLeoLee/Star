@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6995789fcd228e2199fe12379132138a3f231103c25378da13e00b67edb15540
+@cypher schema=1 source_sha256=1ee4962525346ea0e3f2344d4fd3eb92660824a7386b83c73ee222de016c8d63
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -68,11 +68,11 @@ export function RightChatRail() {
         open ? "w-80" : "w-14",
       )}
     >
-      {/* 边条 / 头部 */}
-      <div className="shrink-0 border-b border-line flex items-center justify-between px-2 py-2">
+      {/* 顶部 header 行: 占满上方空间 (per 2026-11-14 用户发令) */}
+      <div className="shrink-0 border-b border-line flex items-center justify-between px-3 py-2.5 bg-bg-card">
         {open ? (
           <>
-            <span className="text-xs font-semibold text-ink flex items-center gap-1.5">
+            <span className="text-xs font-bold text-ink flex items-center gap-1.5">
               <MessageSquare size={13} className="text-accent" /> 聊天
             </span>
             <button
@@ -80,6 +80,7 @@ export function RightChatRail() {
               onClick={toggle}
               data-testid="chat-rail-collapse"
               aria-label="折叠聊天栏"
+              title="折叠聊天栏"
               className="p-1 rounded hover:bg-bg-soft text-ink-mute hover:text-accent"
             >
               <PanelRightClose size={14} />
@@ -92,8 +93,11 @@ export function RightChatRail() {
             data-testid="chat-rail-expand"
             aria-label="展开聊天栏"
             title="展开聊天栏"
-            className="flex flex-col items-center gap-1 w-full py-2 rounded-lg text-ink-mute hover:text-accent hover:bg-accent/10 transition-colors"
+            className="flex flex-col items-center gap-2 w-full py-2.5 rounded-lg text-ink-mute hover:text-accent hover:bg-accent/10 transition-colors"
           >
+            {/* 折叠/展开按钮在上 (用户一眼识别) */}
+            <PanelRightOpen size={14} />
+            {/* 聊天图标在下 (带未读徽标) */}
             <span className="relative">
               <MessageSquare size={16} />
               {totalMessages > 0 && (
@@ -105,7 +109,6 @@ export function RightChatRail() {
                 </span>
               )}
             </span>
-            <PanelRightOpen size={11} />
           </button>
         )}
       </div>
