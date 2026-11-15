@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8585b723edc6ed2771b46034914e673a38885c6299ab44d15ffc4275e61d6679
+@cypher schema=1 source_sha256=a3397972dd843e7c71aae76d74f5d35fcafe930e77f6332b1cca558ff660fc8e
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -18,7 +18,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown,
@@ -31,6 +31,7 @@ import {
   ArrowRight,
   FileCode2,
   PenTool,
+  Plus,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
@@ -62,6 +63,43 @@ const isViewTab = (v: string | null): v is ViewTab =>
 
 export default function KanbanPage() {
   const router = useRouter();
+  // 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup)
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftIpaFlow, setDraftIpaFlow] = useState("");
+  const [draftWorkflow, setDraftWorkflow] = useState("");
+  const ipaFlows = useMemo(
+    () => ["ipa-s05-002 ソースコード作成", "ipa-s06-ut-005 単体試験実施"],
+    [],
+  );
+  const workflows = useStore((s) => s.workflows);
+  const addWorkItem = useStore((s) => s.addWorkItem);
+
+  const handleCreateTaskCard = async () => {
+    const title = draftTitle.trim();
+    if (!title) return;
+    try {
+      addWorkItem({
+        tenant_id: "tn-001",
+        project_id: "prj-physis",
+        title,
+        kind: "task",
+        status: "todo",
+        priority: "p2",
+        reporter_id: "usr-002",
+        story_points: 2,
+        sprint_id: "sp-12",
+        labels: draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : [],
+        workflow_id: draftWorkflow || undefined,
+      });
+      setDraftTitle("");
+      setDraftIpaFlow("");
+      setDraftWorkflow("");
+      setActiveView("IPA 流程图");
+    } catch {
+      /* 创建失败静默 (store 本地) */
+    }
+  };
+
   const [activeView, setActiveView] = useState<ViewTab>("Sprint");
 
   // 深链 ?view= (client-only 解析; 不用 useSearchParams — dev 下与页面级
@@ -135,6 +173,54 @@ export default function KanbanPage() {
               {tab}
             </button>
           ))}
+        </div>
+
+        {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
+        <div data-testid="kanban-create-bar" className="flex items-center gap-2 flex-wrap rounded-xl border border-line bg-bg-card p-2.5">
+          <input
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleCreateTaskCard();
+            }}
+            placeholder="新任务卡标题"
+            aria-label="新任务卡标题"
+            data-testid="kanban-create-title"
+            className="h-8 flex-1 min-w-[180px] rounded-lg border border-line bg-bg-soft px-2.5 text-xs focus:border-accent focus:outline-none"
+          />
+          <select
+            value={draftIpaFlow}
+            onChange={(e) => setDraftIpaFlow(e.target.value)}
+            aria-label="IPA 流程"
+            data-testid="kanban-create-ipa"
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+          >
+            <option value="">IPA：不关联 IPA</option>
+            {ipaFlows.map((f) => (
+              <option key={f} value={f}>IPA：{f}</option>
+            ))}
+          </select>
+          <select
+            value={draftWorkflow}
+            onChange={(e) => setDraftWorkflow(e.target.value)}
+            aria-label="工作流"
+            data-testid="kanban-create-workflow"
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+          >
+            <option value="">不关联工作流</option>
+            {workflows.map((wf) => (
+              <option key={wf.id} value={wf.id}>{wf.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void handleCreateTaskCard()}
+            disabled={!draftTitle.trim()}
+            data-testid="kanban-create-submit"
+            className="h-8 px-3.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-soft disabled:opacity-50 flex items-center gap-1"
+          >
+            <Plus size={13} /> 创建任务卡
+          </button>
         </div>
 
         {/* 生命周期条 (真实 board.columns) */}
