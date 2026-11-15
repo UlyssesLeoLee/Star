@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1ee4962525346ea0e3f2344d4fd3eb92660824a7386b83c73ee222de016c8d63
+@cypher schema=1 source_sha256=1da3969ac23e854814b5682435359c666767144f896ca1a9ea0ee3f3445a6057
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -25,6 +25,8 @@ import { useChatStore } from "@/lib/chat/chatStore";
 
 export function RightChatRail() {
   const topics = useChatStore((s) => s.topics);
+  const chatScope = useChatStore((s) => s.chatScope);
+  const setChatScope = useChatStore((s) => s.setChatScope);
   const [open, setOpen] = useState(false);
 
   // 持久化展开状态
@@ -112,6 +114,50 @@ export function RightChatRail() {
           </button>
         )}
       </div>
+
+      {/* 范围切换器 (per 2026-11-15 任务: 展开面板顶部, 清楚展示当前范围) */}
+      {open && (
+        <div
+          className="shrink-0 border-b border-line bg-bg-card px-2 py-1.5"
+          data-testid="chat-rail-scope-bar"
+        >
+          <div className="flex items-center gap-0.5 rounded-lg bg-bg-soft p-0.5" role="group" aria-label="聊天范围">
+            <button
+              type="button"
+              onClick={() => setChatScope("WORKTREE")}
+              data-testid="chat-rail-scope-worktree"
+              aria-pressed={chatScope === "WORKTREE"}
+              className={clsx(
+                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors",
+                chatScope === "WORKTREE"
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-ink-dim hover:text-ink",
+              )}
+            >
+              WORKTREE
+            </button>
+            <button
+              type="button"
+              onClick={() => setChatScope("GLOBAL")}
+              data-testid="chat-rail-scope-global"
+              aria-pressed={chatScope === "GLOBAL"}
+              className={clsx(
+                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors",
+                chatScope === "GLOBAL"
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-ink-dim hover:text-ink",
+              )}
+            >
+              GLOBAL
+            </button>
+          </div>
+          <p className="mt-1 px-0.5 text-[9px] leading-relaxed text-ink-mute" data-testid="chat-rail-scope-label">
+            {chatScope === "WORKTREE"
+              ? "当前范围: WORKTREE · 本 Worktree 对话"
+              : "当前范围: GLOBAL · 需选择授权目标后才可发送"}
+          </p>
+        </div>
+      )}
 
       {/* 聊天面板 */}
       {open && (

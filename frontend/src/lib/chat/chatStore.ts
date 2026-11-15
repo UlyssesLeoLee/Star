@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=27d91d3d76aa805e5319ebf42ee05767a7a578872849e26b8570e58d37239a4e
+@cypher schema=1 source_sha256=132bf8c2d3ffbdfc450b9e7ce8e7668d64d2c5dab6b567dde15717f3cb9d8804
 MERGE (self:File {path:"frontend/src/lib/chat/chatStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
 MERGE (self)-[:DEFINES]->(store)
@@ -43,10 +43,21 @@ export interface GlobalSession {
   createdAt: string;
 }
 
+/**
+ * 底栏聊天范围 (per 2026-11-15 任务: 底栏聊天保留范围选择)
+ *   - WORKTREE: 当前 Worktree 对话
+ *   - GLOBAL:   全局范围 — 必须先选择授权目标, 提交时重新校验权限
+ */
+export type ChatScope = "WORKTREE" | "GLOBAL";
+
 interface ChatState {
   topics: ChatTopic[];
   globalSessions: GlobalSession[];
   activeTopicId: string | null;
+  /** 底栏聊天当前范围 (persist) */
+  chatScope: ChatScope;
+  /** GLOBAL 范围的授权目标 worktree id; 未选 = null (persist, 提交时重新校验) */
+  globalAuthTargetId: string | null;
 
   /** 点击任务卡 → 打开/创建该任务卡的聊天话题 (幂等) */
   openTopicForTask: (workItemId: string, taskTitle: string) => string;
@@ -59,6 +70,10 @@ interface ChatState {
   /** 在同一个聊天页(同一 ref)开新话题 */
   createTopic: (scope: "task" | "global", refId: string, title: string) => string;
   setActiveTopic: (topicId: string | null) => void;
+  /** 切换底栏聊天范围 (WORKTREE / GLOBAL) */
+  setChatScope: (scope: ChatScope) => void;
+  /** 设置 GLOBAL 范围授权目标 worktree (null = 清除) */
+  setGlobalAuthTarget: (worktreeId: string | null) => void;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -82,6 +97,8 @@ export const useChatStore = create<ChatState>()(
       topics: [],
       globalSessions: seedGlobalSessions(),
       activeTopicId: null,
+      chatScope: "WORKTREE",
+      globalAuthTargetId: null,
 
       openTopicForTask: (workItemId, taskTitle) => {
         const existing = get().topics.find(
@@ -163,6 +180,10 @@ export const useChatStore = create<ChatState>()(
       },
 
       setActiveTopic: (topicId) => set({ activeTopicId: topicId }),
+
+      setChatScope: (scope) => set({ chatScope: scope }),
+
+      setGlobalAuthTarget: (worktreeId) => set({ globalAuthTargetId: worktreeId }),
     }),
     {
       name: "star-chat-store:v1",
@@ -176,6 +197,8 @@ export const useChatStore = create<ChatState>()(
         topics: s.topics,
         globalSessions: s.globalSessions,
         activeTopicId: s.activeTopicId,
+        chatScope: s.chatScope,
+        globalAuthTargetId: s.globalAuthTargetId,
       }),
     },
   ),
