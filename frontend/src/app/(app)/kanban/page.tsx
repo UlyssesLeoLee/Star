@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fa5b91be5b26ff6cdc6b2d2907f1d3dc1f04f8758133a52cdf7b74e68ed01bb8
+@cypher schema=1 source_sha256=4b3748bfad27012bd5c751ab93d01dc009b4afb4686e77d8959752d61a328a1f
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -206,6 +206,12 @@ export default function KanbanPage() {
             </span>
             {identities.length} 在线
           </span>
+        </div>
+
+        {/* 数据来源标识 (per 2026-11-15 Phase 3.2: 预览/seed 数据不得冒充正式管理视图) */}
+        <div data-testid="kanban-data-source" className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn">
+          <span className="size-1.5 rounded-full bg-warn" />
+          预览数据模式 — 当前看板展示本地 seed 数据, 非授权服务端任务事实。宿主会话接入后自动切换为授权投影。
         </div>
 
         {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
