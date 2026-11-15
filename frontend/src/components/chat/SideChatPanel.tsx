@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8a5ef2fe266a8abac9b546b0509af5cebb76bdaac286915e5dc2b11bc9147842
+@cypher schema=1 source_sha256=e0720cb6a11648cb3036f011115d8aada099271e09f19311b7909b85a494f78f
 MERGE (self:File {path:"frontend/src/components/chat/SideChatPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
 MERGE (chatStore:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useChatStore } from "@/lib/chat/chatStore";
+import { useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/lib/i18n";
 
@@ -100,9 +101,17 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [activeTopic?.messages.length, activeTopicId]);
 
+  // 聊天后端接入状态 (宿主 Group API 会话; 未接入 = 不写入本地消息冒充真实记录)
+  const groupSession = useWorktreeGroupSessionState();
+  const backendConnected = groupSession.status === "ready";
+
   const send = () => {
     const text = draft.trim();
     if (!text) return;
+    if (!backendConnected) {
+      setScopeError("聊天后端尚未接入 — 只读模式, 消息不会写入 (接入后启用发送)。");
+      return;
+    }
     // GLOBAL 范围: 提交前重新校验授权目标 (无真实后端, 校验=目标已选且非空且仍存在)。
     // 校验失败 → 提示并保留草稿, 不写入任何消息。
     if (chatScope === "GLOBAL") {
@@ -468,7 +477,7 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
               <button
                 type="button"
                 onClick={send}
-                disabled={!draft.trim() || !authTargetValid}
+                disabled={!draft.trim() || !authTargetValid || !backendConnected}
                 data-testid="chat-send"
                 title={chatScope === "GLOBAL" && !authTargetValid ? t.chatScope["error.noTarget"] : undefined}
                 className="flex items-center gap-1 text-[11px] px-2.5 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:opacity-50 shrink-0"

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=dfd7ee48ac22a8f4478989dcf90fdb19842aa25599b32274d5a863284f06893e
+@cypher schema=1 source_sha256=28f7041e3bb87a8b4aa9a74fd25530cba9ed81b5fbe9fee1229ef6c2118701b4
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -166,8 +166,17 @@ export default function CanvasDetailPage() {
             <span className="rounded border border-line bg-bg-soft px-1.5 py-0.5 font-mono text-[9px] text-ink-dim">
               {ctxWorktree.status}
             </span>
-            <span className="ml-auto font-mono text-[9px] text-ink-mute">
-              Worktree 上下文 · {ctxWorktree.id}
+            <span className="ml-auto flex items-center gap-2">
+              <span
+                data-testid="canvas-worktree-data-scope"
+                title="画布元素按 canvas_id 加载; 按 Worktree 隔离的画布投影接入后, 此处切换为授权数据"
+                className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
+              >
+                数据未按 Worktree 隔离 (画布投影待接入)
+              </span>
+              <span className="font-mono text-[9px] text-ink-mute">
+                Worktree 上下文 · {ctxWorktree.id}
+              </span>
             </span>
           </>
         ) : worktreeCtxId ? (
