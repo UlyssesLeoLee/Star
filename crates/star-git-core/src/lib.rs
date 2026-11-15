@@ -14,9 +14,9 @@
 #![allow(missing_docs, unreachable_pub)]
 
 pub mod error;
-pub mod repo;
 #[cfg(feature = "sync")]
 pub mod remote_sync;
+pub mod repo;
 pub mod subprocess;
 
 pub use error::{Result, StarGitError};

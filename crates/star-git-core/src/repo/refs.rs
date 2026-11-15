@@ -21,7 +21,7 @@ MERGE (self)-[:DEFINES]->(write_ref)
 
 use std::path::Path;
 
-use crate::error::{StarGitError, Result};
+use crate::error::{Result, StarGitError};
 
 /// Read the symbolic target of `HEAD` in a bare repo (e.g. `refs/heads/main`).
 #[allow(dead_code)]

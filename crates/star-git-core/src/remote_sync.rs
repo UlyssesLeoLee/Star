@@ -19,7 +19,7 @@ use std::process::Stdio;
 
 use tokio::process::Command;
 
-use crate::error::{StarGitError, Result};
+use crate::error::{Result, StarGitError};
 
 /// Outcome of one sync attempt against one ref.
 #[derive(Debug, Clone, PartialEq, Eq)]
