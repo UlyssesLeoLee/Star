@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c02c33a7ed9714d574338d2107d37b392d6fcae4e69af32eeff85ece62461be2
+@cypher schema=1 source_sha256=8585b723edc6ed2771b46034914e673a38885c6299ab44d15ffc4275e61d6679
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -30,6 +30,7 @@ import {
   CalendarDays,
   ArrowRight,
   FileCode2,
+  PenTool,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
@@ -239,44 +240,56 @@ export default function KanbanPage() {
         )}
       </main>
 
-      {/* ============ 右侧 rail ============ */}
+      {/* ============ 右侧 rail (per 2026-11-14: 内容改子页面, 聊天由全局右侧聊天栏接管) ============ */}
       <aside data-testid="kanban-right-rail" className="w-72 shrink-0 border-l border-line bg-bg-card flex flex-col">
         <div className="px-3 py-2.5 border-b border-line flex items-center gap-2 text-xs font-semibold text-ink-dim">
           <GitCommitHorizontal size={13} className="text-ok" />
-          Worktree 状态 · <span className="text-ok font-mono">干净</span>
+          Branch 上下文
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim">
-            <MessageSquare size={13} className="text-accent" /> 聊天
-          </div>
-          <div data-testid="kanban-chat-panel" className="rounded-lg border border-line bg-bg p-3 space-y-2">
-            <p className="text-xs text-ink leading-relaxed">详细设计还有哪些流程没建卡？</p>
-            <p className="text-xs text-ink-dim leading-relaxed">
-              P4 共 20 个流程，已建卡 3 个。建议先建 <span className="font-mono">ロジック設計</span> 和{" "}
-              <span className="font-mono">DB詳細設計</span>，要我放进 Backlog 吗？
-            </p>
-            <button type="button" data-testid="kanban-chat-ask" className="text-[11px] px-2 py-1 rounded border border-line bg-bg-card hover:border-accent/60 text-ink-dim">
-              问问这个 Branch 的进展
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim">
-            <Users size={13} className="text-ink-dim" /> Team
-          </div>
-          <div className="flex -space-x-1.5">
-            {identities.slice(0, 4).map((who, i) => (
-              <span
-                key={who.id ?? i}
-                title={who.display_name}
-                className="size-7 rounded-full border-2 border-white bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
-              >
-                {who.display_name?.slice(0, 1) ?? "?"}
-              </span>
-            ))}
-            <span className="size-7 rounded-full border-2 border-white bg-bg-soft text-ink-dim text-[9px] font-bold grid place-items-center">
-              {identities.length} 在线
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <a
+            href="/worktree"
+            data-testid="kanban-rail-worktree-link"
+            className="flex items-center gap-2 rounded-lg border border-line bg-bg p-2.5 hover:border-accent/50 transition-colors"
+          >
+            <GitBranch size={13} className="text-ok shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-ink">Worktree 状态</span>
+              <span className="block text-[10px] font-mono text-ink-mute">feat/relation-bfs · 干净 →</span>
             </span>
+          </a>
+
+          <a
+            href="/canvas/canvas-001"
+            data-testid="kanban-rail-canvas-link"
+            className="flex items-center gap-2 rounded-lg border border-line bg-bg p-2.5 hover:border-accent/50 transition-colors"
+          >
+            <PenTool size={13} className="text-accent shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-ink">画布</span>
+              <span className="block text-[10px] font-mono text-ink-mute">关系图 / Agent 画布 / 流程 →</span>
+            </span>
+          </a>
+
+          <div className="pt-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim mb-1.5">
+              <Users size={13} className="text-ink-dim" /> Team
+            </div>
+            <div className="flex -space-x-1.5">
+              {identities.slice(0, 4).map((who, i) => (
+                <span
+                  key={who.id ?? i}
+                  title={who.display_name}
+                  className="size-7 rounded-full border-2 border-line bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
+                >
+                  {who.display_name?.slice(0, 1) ?? "?"}
+                </span>
+              ))}
+              <span className="size-7 rounded-full border-2 border-line bg-bg-soft text-ink-dim text-[9px] font-bold grid place-items-center">
+                {identities.length} 在线
+              </span>
+            </div>
           </div>
         </div>
       </aside>

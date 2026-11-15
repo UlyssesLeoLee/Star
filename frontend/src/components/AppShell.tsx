@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9c8fe07f8e01348e54ee758db36cc0dbcf86ebfa21b160c04a914185f4985f41
+@cypher schema=1 source_sha256=42e05793d5bc65c47305cd58f924792b6b9131cecabac6d402337e3606e22c0e
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -18,6 +18,7 @@ MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 // =====================================================================
 import { ReactNode, Suspense } from "react";
 import { AppHeader } from "./AppHeader";
+import { RightChatRail } from "./chat/RightChatRail";
 
 export interface AppShellProps {
   children: ReactNode;
@@ -46,19 +47,23 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
         SubNav slot — U2 接管, 会在路由为 /projects /agents /analytics 时
         自动渲染 180px sticky 左侧导航 (per §4). 当前 U1 不实现, 留 comment 占位.
       */}
-      <main
-        data-testid="app-main"
-        style={fullBleed ? { height: "calc(100vh - 64px)" } : { minHeight: "calc(100vh - 64px)" }}
-        className={
-          fullBleed
-            ? "relative z-10 overflow-hidden w-full"
-            : wide
-              ? "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto w-full"
-              : "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
-        }
-      >
-        {children}
-      </main>
+      {/* 主区 + 全局右侧可折叠聊天栏 (per 2026-11-14: 所有界面通用) */}
+      <div className="relative z-10 flex" style={{ height: "calc(100vh - 64px)" }}>
+        <main
+          data-testid="app-main"
+          style={fullBleed ? { minHeight: "calc(100vh - 64px)" } : { minHeight: "calc(100vh - 64px)" }}
+          className={
+            fullBleed
+              ? "overflow-hidden w-full"
+              : wide
+                ? "px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-y-auto w-full"
+                : "px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-y-auto max-w-[1440px] mx-auto w-full"
+          }
+        >
+          {children}
+        </main>
+        <RightChatRail />
+      </div>
     </div>
   );
 }
