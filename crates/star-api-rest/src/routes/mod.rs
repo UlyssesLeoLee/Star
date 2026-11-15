@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=36407e46a20969629a384b97030b7ccddb939936b1ba8276ed4758576fb8989f
+MERGE (self:File {path:"crates/star-api-rest/src/routes/mod.rs"})
+MERGE (integrations:File {path:"crates/star-api-rest/src/routes/integrations.rs"})
+MERGE (self)-[:DECLARES]->(integrations)
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! 27 业务路由 (per Phase I 全部完成, per WBS §14.12.1 + 独立 WBS §1.1) + 8 §14.9 Star-EI 路由 (per brief v0.53)
 //!
