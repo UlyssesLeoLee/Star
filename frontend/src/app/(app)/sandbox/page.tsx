@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b1d27b6c00eb8e5449e24d12b9219c2f1e6c1256444e532033a124d3dfb9faa6
+@cypher schema=1 source_sha256=5da05aee701207cbd3ebd1182495ef42a8572bdf01c5151f608b26a2d1d73f05
 MERGE (self:File {path:"frontend/src/app/(app)/sandbox/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/sandbox/page.tsx::SandboxPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -106,6 +106,20 @@ export default function SandboxPage() {
     return () => { alive = false; };
   }, []);
   const [activeTab, setActiveTab] = useState<(typeof SANDBOX_TABS)[number]>("Worktree");
+  // 接入实体机表单 (per 2026-11-15: 2c mockup FR-SB-003, 后端未接入 → 本地登记 + 状态说明)
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachForm, setAttachForm] = useState({ host: "", os: "", via: "SSH" });
+  const [attachDone, setAttachDone] = useState(false);
+  const [attachedHosts, setAttachedHosts] = useState<{ host: string; os: string; via: string; state: string }[]>([]);
+
+  const submitAttach = () => {
+    if (!attachForm.host.trim()) return;
+    setAttachedHosts((prev) => [...prev, { ...attachForm, host: attachForm.host.trim(), state: "验证中" }]);
+    setAttachForm({ host: "", os: "", via: "SSH" });
+    setAttachOpen(false);
+    setAttachDone(true);
+    setTimeout(() => setAttachDone(false), 4000);
+  };
 
   return (
     <div className="flex h-full bg-bg">
@@ -115,12 +129,27 @@ export default function SandboxPage() {
           <button type="button" data-testid="sandbox-new" className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-soft">
             <Plus size={12} /> 新建沙盒
           </button>
-          <button type="button" className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim hover:border-accent/60">
+          <button type="button" data-testid="sandbox-attach-bm" onClick={() => setAttachOpen(true)} className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-ink-dim hover:border-accent/60">
             接入实体机
           </button>
         </div>
 
         <div className="px-3 py-3 space-y-4">
+          {attachedHosts.length > 0 && (
+            <div data-testid="sandbox-attached-list">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-1.5">已接入实体机</div>
+              {attachedHosts.map((h, i) => (
+                <div key={h.host + i} className="rounded-lg border border-line bg-bg-soft/50 px-2.5 py-2 text-xs mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="size-1.5 rounded-full bg-warn" />
+                    <span className="font-mono font-semibold text-ink flex-1 truncate">{h.host}</span>
+                    <span className="text-[9px] text-warn">{h.state}</span>
+                  </div>
+                  <div className="text-[10px] text-ink-mute mt-0.5">{h.os || "系统待探测"} · {h.via}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {RESOURCES.map((group) => (
             <div key={group.group}>
               <div className="text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-1.5">
@@ -159,6 +188,66 @@ export default function SandboxPage() {
           </p>
         </div>
       </aside>
+
+      {/* 接入实体机对话框 (per 2c mockup) */}
+      {attachOpen && (
+        <div data-testid="sandbox-attach-dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setAttachOpen(false)}>
+          <div className="w-96 rounded-xl border border-line bg-bg-card p-4 shadow-soft" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-3 text-sm font-bold text-ink">接入实体机</h3>
+            <div className="space-y-2.5">
+              <label className="block">
+                <span className="mb-1 block text-[10px] text-ink-mute">主机地址</span>
+                <input
+                  value={attachForm.host}
+                  onChange={(e) => setAttachForm((f) => ({ ...f, host: e.target.value }))}
+                  placeholder="192.168.x.x 或主机名"
+                  data-testid="sandbox-attach-host"
+                  className="h-9 w-full rounded-lg border border-line bg-bg-soft px-2.5 text-xs focus:border-accent focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] text-ink-mute">系统类型</span>
+                <select
+                  value={attachForm.os}
+                  onChange={(e) => setAttachForm((f) => ({ ...f, os: e.target.value }))}
+                  data-testid="sandbox-attach-os"
+                  className="h-9 w-full rounded-lg border border-line bg-bg-soft px-2.5 text-xs"
+                >
+                  <option value="">待探测</option>
+                  <option value="Windows 11">Windows 11</option>
+                  <option value="Ubuntu 24.04">Ubuntu 24.04</option>
+                  <option value="macOS">macOS</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] text-ink-mute">接入方式</span>
+                <select
+                  value={attachForm.via}
+                  onChange={(e) => setAttachForm((f) => ({ ...f, via: e.target.value }))}
+                  data-testid="sandbox-attach-via"
+                  className="h-9 w-full rounded-lg border border-line bg-bg-soft px-2.5 text-xs"
+                >
+                  <option value="SSH">SSH</option>
+                  <option value="WinRM">WinRM</option>
+                  <option value="Agent">Agent (Worker)</option>
+                </select>
+              </label>
+              <p className="rounded border border-warn/40 bg-warn/10 px-2 py-1.5 text-[10px] text-warn">
+                凭据与探测由宿主后端执行 — 当前登记本地记录, 后端接入后走真实验证。
+              </p>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setAttachOpen(false)} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-dim">取消</button>
+              <button type="button" onClick={submitAttach} disabled={!attachForm.host.trim()} data-testid="sandbox-attach-submit" className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">接入</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {attachDone && (
+        <div data-testid="sandbox-attach-done" className="fixed top-20 right-4 z-50 rounded-lg border border-ok/50 bg-ok/10 px-3 py-2 text-xs text-ok">
+          已登记接入请求 — 验证中 (宿主后端接入后完成探测)
+        </div>
+      )}
 
       {/* ============ 主区 ============ */}
       <main className="flex-1 min-w-0 overflow-y-auto p-4 space-y-4">
