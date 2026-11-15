@@ -42,3 +42,4 @@ MERGE (self:File {path:"docs/requirements/SRS-PROTOTYPE-001.md"})
 | 日期 | 版本 | 内容 | commit |
 |---|---|---|---|
 | 2026-11-15 | v1.0 | 建档: mockup 设计提炼 + FR + 实现状态 (全量审计) | c0f149f2 |
+| 2026-11-15 | v1.1 | 状态回写核对 | 本提交 |

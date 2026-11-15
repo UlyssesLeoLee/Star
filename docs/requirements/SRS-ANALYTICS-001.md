@@ -27,7 +27,7 @@ MERGE (self:File {path:"docs/requirements/SRS-ANALYTICS-001.md"})
 |---|---|---|
 | FR-AN-001 | 4 指标卡 | ✅ |
 | FR-AN-002 | IPA 阶段进度 | ✅ |
-| FR-AN-003 | 未接入标识 | ✅ |
+| FR-AN-003 | 未接入标识 | ❌ 运维 tab 为静态指标卡, 无「未接入」标注 |
 | FR-AN-004 | 操作日志表 | ✅ |
 
 ## §3 实现状态与文件映射
@@ -41,3 +41,4 @@ MERGE (self:File {path:"docs/requirements/SRS-ANALYTICS-001.md"})
 | 日期 | 版本 | 内容 | commit |
 |---|---|---|---|
 | 2026-11-15 | v1.0 | 建档: mockup 设计提炼 + FR + 实现状态 (全量审计) | c0f149f2 |
+| 2026-11-15 | v1.1 | 状态回写核对 | 本提交 |
