@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=72914abbe75cf86b8cb21de66d66982e8b3e2cf1d19d905dd44ff0d328561b63
+@cypher schema=1 source_sha256=a4d4c5a3698dd553409aafef0e8917f88dfe437727eda79b86c5080c612b318b
 CYPHER STRUCTURE MANIFEST
 MERGE (self:File {path:"frontend/src/app/worktree/page.tsx"});
 CREATE
@@ -15,6 +15,8 @@ CREATE
   (localRuntimes:Variable {name:"localRuntimes", type:"variable", language:"typescript"}),
   (project:Variable {name:"selectedProject", type:"variable", language:"typescript"}),
   (requestedProjectId:Variable {name:"requestedProjectId", type:"variable", language:"typescript"}),
+  (requestedLaneId:Variable {name:"requestedLaneId", type:"variable", language:"typescript"}),
+  (branchWorkspace:Function {name:"BranchWorkspace", type:"function", language:"tsx", visibility:"public", complexity:"complex"}),
   (persistedProject:Variable {name:"persistedProject", type:"variable", language:"typescript"}),
   (router:Variable {name:"router", type:"variable", language:"typescript"}),
   (searchParams:Variable {name:"searchParams", type:"variable", language:"typescript"}),
@@ -38,6 +40,7 @@ CREATE
   (self)-[:CONTAINS]->(authorizedSelector),
   (page)-[:CALLS]->(lifecycleControls),
   (page)-[:CALLS]->(authorizedSelector),
+  (page)-[:CALLS]->(branchWorkspace),
   (self)-[:CONTAINS]->(row),
   (self)-[:CONTAINS]->(apps),
   (self)-[:CONTAINS]->(editor),
@@ -48,6 +51,7 @@ CREATE
   (page)-[:USES]->(localRuntimes),
   (page)-[:USES]->(project),
   (page)-[:USES]->(requestedProjectId),
+  (page)-[:USES]->(requestedLaneId),
   (page)-[:USES]->(persistedProject),
   (page)-[:USES]->(router),
   (page)-[:USES]->(searchParams),
@@ -389,6 +393,7 @@ function WorktreePageInner() {
   const requestedProjectId = searchParams.get("project_id");
   const requestedWorktreeId = searchParams.get("worktree_id");
   const requestedBranch = searchParams.get("branch");
+  const requestedLaneId = searchParams.get("lane_id");
   const persistedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? null;
   const [authorizedProjectDirectory, setAuthorizedProjectDirectory] = useState<AuthorizedProjectDirectoryState>({
     mode: "loading", projects: [], next_cursor: null, loading_more: false,
@@ -575,7 +580,7 @@ function WorktreePageInner() {
       <main className="mx-auto w-full max-w-4xl space-y-4 p-4" data-testid="worktree-directory-unavailable">
         {/* per 2026-11-14 树形架构: Branch 功能集 (web 版无宿主走此分支, 同样可达) */}
         {requestedWorktreeId && requestedBranch && requestedProjectId && (
-          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} />
+          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} laneId={requestedLaneId ?? undefined} />
         )}
         <header className="border-b border-line pb-3">
           <h1 className="text-xl font-semibold">{t.runDirectory.projectWorktreeIndexTitle}</h1>
@@ -610,12 +615,12 @@ function WorktreePageInner() {
       {/* per 2026-11-14 树形架构: Branch 功能集 (目录树 Branch 节点点入) */}
       {requestedWorktreeId && requestedBranch && requestedProjectId && (
         <div className="mb-4">
-          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} />
+          <BranchWorkspace worktreeId={requestedWorktreeId} branch={requestedBranch} projectId={requestedProjectId} laneId={requestedLaneId ?? undefined} />
         </div>
       )}
       <PageHeader
-        title={t.pageTitles['/worktree'].title}
-        subtitle="项目级 Worktree 管理 — 先选择 Project，再集中管理每个 Agent Worktree 的归属、执行绑定、生命周期与健康信号。"
+        title="Worktree 汇总与管理入口"
+        subtitle="跨 Lane / Worktree / Branch 的汇总与管理入口 — 先选择 Project，再集中查看每个 Agent Worktree 的归属、执行绑定、生命周期与健康信号；Lane 与 Branch 上下文随链接参数就绪时优先展示。"
         icon={<GitBranch className="text-accent" size={20} />}
         track="B"
         count={displayedWorktreeCount}
