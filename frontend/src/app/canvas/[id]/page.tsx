@@ -1,12 +1,14 @@
 /*
-@cypher schema=1 source_sha256=d5a60069c1b396b12babd40ae03cba5b8c870c1bec3e6c587b68e5c87362b391
+@cypher schema=1 source_sha256=3f36ddb35020a59546104dc4108e0535f6a9bffa11650a71d964356492b8aefe
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
-MERGE (agentCanvas:Symbol {id:"frontend/src/components/agent-view/AgentCanvasView.tsx::AgentCanvasView",kind:"component"})
+MERGE (relationshipView:Symbol {id:"frontend/src/app/(app)/agent-relationships/view/RelationshipView.tsx::RelationshipView",kind:"component"})
+MERGE (agentViewPage:Symbol {id:"frontend/src/app/(app)/agent-view/page.tsx::AgentViewPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(canvasView)
-MERGE (self)-[:IMPORTS]->(agentCanvas)
+MERGE (self)-[:IMPORTS]->(relationshipView)
+MERGE (self)-[:IMPORTS]->(agentViewPage)
 @endcypher
 */
 "use client";
@@ -19,10 +21,12 @@ MERGE (self)-[:IMPORTS]->(agentCanvas)
 //     2. Agent 画布 (AgentCanvasView 拓扑)
 //     3. 关系图 (RelationshipView)
 //   非无限画布类 (IPA/低代码流程) 移出为单独页面 (/analytics, /workflow)
+// 2026-11-15 (per TASK-ulys-canvas-ctx): Canvas 作为 Lane 应用入口,
+//   通过 ?worktree=<id> 深链携带当前 Worktree 上下文, 顶部渲染上下文条.
 // =====================================================================
 
-import { Suspense, useState } from "react";
-import { Network } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { GitBranch, Network } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CanvasView } from "@/components/CanvasView";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
@@ -38,6 +42,22 @@ export default function CanvasDetailPage() {
   const workItems = useStore((s) => s.workItems);
   const worktrees = useStore((s) => s.worktrees);
   const canvas = canvases[0];
+
+  // ===================================================================
+  // Worktree 上下文 (per TASK-ulys-canvas-ctx):
+  //   ?worktree=<id> 深链 → 顶部上下文条. client-only 解析
+  //   (不用 useSearchParams — dev 下与页面级 Suspense 组合会产生
+  //   双份 DOM 渲染, 同 kanban ?view= 模式), 数据源 useStore worktrees.
+  // ===================================================================
+  const [worktreeCtxId, setWorktreeCtxId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wt = new URLSearchParams(window.location.search).get("worktree");
+    setWorktreeCtxId(wt);
+  }, []);
+  const ctxWorktree = worktreeCtxId
+    ? worktrees.find((w) => w.id === worktreeCtxId)
+    : undefined;
 
   const renderCanvasContent = () => {
     switch (activeTab) {
@@ -111,6 +131,41 @@ export default function CanvasDetailPage() {
 
   return (
     <div className="flex h-full flex-col bg-bg" data-testid="canvas-detail-page">
+      {/* Worktree 上下文条 (per TASK-ulys-canvas-ctx: ?worktree=<id> 深链) */}
+      <div
+        className="flex items-center gap-2 border-b border-line bg-bg-card px-3 py-1.5"
+        data-testid="canvas-worktree-context"
+      >
+        <GitBranch size={13} className="shrink-0 text-accent" />
+        {ctxWorktree ? (
+          <>
+            <span className="text-xs font-semibold text-ink">{ctxWorktree.name}</span>
+            <span className="font-mono text-[10px] text-ink-mute">{ctxWorktree.branch}</span>
+            <span className="rounded border border-line bg-bg-soft px-1.5 py-0.5 font-mono text-[9px] text-ink-dim">
+              {ctxWorktree.status}
+            </span>
+            <span className="ml-auto font-mono text-[9px] text-ink-mute">
+              Worktree 上下文 · {ctxWorktree.id}
+            </span>
+          </>
+        ) : worktreeCtxId ? (
+          <span
+            className="text-xs text-warn"
+            data-testid="canvas-worktree-context-missing"
+          >
+            Worktree 上下文未找到 / 未授权读取: {worktreeCtxId}
+          </span>
+        ) : (
+          <span
+            className="text-xs text-ink-mute"
+            data-testid="canvas-worktree-context-unspecified"
+          >
+            未指定 Worktree 上下文 — 通过 ?worktree=&lt;id&gt; 深链携带当前 Worktree
+            (关系图按此上下文授权读取)
+          </span>
+        )}
+      </div>
+
       {/* 无限画布标签切换 (无三选一, 直接呈现) */}
       <div className="flex items-center gap-1 border-b border-line bg-bg-card px-3" data-testid="canvas-merged-tabs">
         {CANVAS_SUB_TABS.map((tab) => (
