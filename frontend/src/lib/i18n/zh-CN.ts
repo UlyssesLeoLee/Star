@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c5dd78b4139059a538456ac0ed648524c522c9cb92391a7d5e7ea1e296d670a3
+@cypher schema=1 source_sha256=bca6bb2cbccb37c08f73c19fb2f612f06cab94d723227d70f24045eb7fa5326e
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -691,8 +691,16 @@ export const zhCN: Dictionary = {
   branchWorkspace: {
     title: "Branch 工作区",
     subtitle: "该 Branch 的功能集 (Tenant → Project → LANE → Worktree → Branch)",
-    tabs: { tasks: "任务卡", agents: "Agent 会话", validation: "Validation", nema: "Nema 文件", canvas: "Canvas" },
-    empty: { tasks: "该 Branch 暂无任务卡", agents: "该 Branch 暂无 Agent 会话", validation: "该 Branch 暂无 Validation 用例", nema: "该 Branch 暂无 .nema 文件", canvas: "该 Branch 暂无关联画布" },
+    tabs: { tasks: "任务卡", agents: "Agent 会话", validation: "Validation", nema: "Nema 文件", canvas: "Canvas",
+    "backlog-sprint": "Backlog / Sprint",
+    "workflow": "工作流",
+    "bi": "BI / 基准",
+    "plugins": "插件",
+  },
+    empty: { tasks: "该 Branch 暂无任务卡", agents: "该 Branch 暂无 Agent 会话", validation: "该 Branch 暂无 Validation 用例", nema: "该 Branch 暂无 .nema 文件", canvas: "该 Branch 暂无关联画布",
+    workflow: "没有已定义的工作流",
+    plugins: "暂无集成",
+  },
   },
   canvasGallery: {
     title: "无限画布中心",

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5c0af6ee61bc1adc169634dacd85d21b27e39a159a37dd3ebf975e0343877d76
+@cypher schema=1 source_sha256=f88f3288331bb20d4f1422e2790c34ab5d058602bd3dd3843ff1d181a0703237
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -677,8 +677,16 @@ export const ja: Dictionary = {
   branchWorkspace: {
     title: "Branch ワークスペース",
     subtitle: "この Branch の機能セット (Tenant → Project → LANE → Worktree → Branch)",
-    tabs: { tasks: "タスクカード", agents: "Agent セッション", validation: "Validation", nema: "Nema ファイル", canvas: "Canvas" },
-    empty: { tasks: "この Branch にタスクカードなし", agents: "この Branch に Agent セッションなし", validation: "この Branch に Validation ケースなし", nema: "この Branch に .nema ファイルなし", canvas: "この Branch に関連キャンバスなし" },
+    tabs: { tasks: "タスクカード", agents: "Agent セッション", validation: "Validation", nema: "Nema ファイル", canvas: "Canvas",
+    "backlog-sprint": "バックログ / スプリント",
+    "workflow": "ワークフロー",
+    "bi": "BI / ベンチマーク",
+    "plugins": "プラグイン",
+  },
+    empty: { tasks: "この Branch にタスクカードなし", agents: "この Branch に Agent セッションなし", validation: "この Branch に Validation ケースなし", nema: "この Branch に .nema ファイルなし", canvas: "この Branch に関連キャンバスなし",
+    workflow: "ワークフロー定義なし",
+    plugins: "統合なし",
+  },
   },
   canvasGallery: {
     title: "無限キャンバスハブ",

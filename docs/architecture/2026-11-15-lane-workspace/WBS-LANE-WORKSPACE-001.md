@@ -34,8 +34,8 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 - [x] 1.5 选择 Worktree 后统一授权上下文: 面包屑/中央应用/任务详情/CLI checkout 焦点同一上下文; 绑定信息缺失显式显示"未绑定"状态
 
 ### Phase 2 — 工作空间布局整合 (P0/P1)
-- [ ] 2.1 BranchWorkspace tabs → Lane 级中央应用: Backlog/Sprint、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins
-- [ ] 2.2 Group Workspace 左侧双页签: 导航树 / AI 更新 (Branch 任务按工作流状态分组; 底部状态筛选同步两页签)
+- [x] 2.1 BranchWorkspace tabs → Lane 级中央应用: Backlog/Sprint、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins
+- [x] 2.2 Group Workspace 左侧双页签: 导航树 / AI 更新 (Branch 任务按工作流状态分组; 底部状态筛选同步两页签)
 - [ ] 2.3 任务卡统一为可关闭子窗口 (Drawer 保留 /work-item 子页面择一, 全站一致)
 - [ ] 2.4 Project Worktree Index 保留为汇总入口 (不冒充生产管理)
 - [ ] 2.5 深链/前进后退/关闭任务窗/切换 Worktree 验证

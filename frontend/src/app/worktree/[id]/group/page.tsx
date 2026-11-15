@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=388f6cdb4b1d784e2feda43c67d700dac183ed7764527acc9b1c72e5eb775653
+@cypher schema=1 source_sha256=a99d87a698dc462b83a2dfe80f5530ee0bd3c7bc860bf4a74544b28185d52c36
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
 MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
 MERGE (resolveTaskCliUiState:Function {name:"resolveTaskCliUiState", language:"typescript", visibility:"public"})
@@ -704,6 +704,8 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     setRightPanelOpen(window.matchMedia("(min-width: 1536px)").matches);
   }, []);
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>("all");
+  // 短搜索 (per 2026-11-15: 单行顶栏 + 短搜索)
+  const [quickSearch, setQuickSearch] = useState("");
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [worktreeDetailsOpen, setWorktreeDetailsOpen] = useState(false);
   const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
@@ -989,6 +991,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const groupProjection = useWorktreeGroupProjection(worktreeId, currentApp === "canvas", projectionRefreshKey, requestedCanvasId);
   const storeWorktree = worktrees.find((item) => item.id === worktreeId);
   const worktree = groupProjection.mode === "live" ? groupProjection.worktree : storeWorktree;
+
+  // Lane 上下文 (per 2026-11-15: 导航树显示真实 Lane; 无 lane_id 归类时取项目首个 lane)
+  const lanes = useStore((s) => s.lanes);
+  const activeLane =
+    lanes.find((l) => l.id === (worktree as { lane_id?: string } | undefined)?.lane_id) ??
+    lanes.find((l) => worktree && l.project_id === worktree.project_id) ?? null;
   const chatTargetOptions: ScopedChatTarget[] = groupProjection.mode === "live" ? chatTargets : [];
   useEffect(() => {
     if (scope !== "GLOBAL" || groupProjection.mode !== "live" || !groupApi) return;
@@ -2630,7 +2638,10 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 <div className="flex items-center gap-2 rounded px-2 py-1.5 text-[11px] font-medium text-ink-dim" role="treeitem" aria-expanded="true">
                   <ChevronRight size={12} className="rotate-90 text-ink-mute" />
                   <span className="size-2 rounded-full border border-warning/70" />
-                  <span className="min-w-0 flex-1 truncate">LANE · 绑定待接入</span>
+                  <span className="min-w-0 flex-1 truncate">LANE · {activeLane?.name ?? "未归类"}</span>
+                  {activeLane && !activeLane.git_remote_url && (
+                    <span title="未绑定远端" className="shrink-0 rounded border border-warn/40 bg-warn/10 px-1 text-[8px] text-warn">未绑定</span>
+                  )}
                 </div>
                 <div className="ml-2 border-l border-line pl-2">
                   <div className="flex items-center gap-2 rounded bg-accent/10 px-2 py-1.5 text-[11px] font-medium text-accent" role="treeitem" aria-expanded="true">
@@ -2702,6 +2713,15 @@ export default function GroupWorkspacePage({ params }: PageProps) {
 
         <div className="flex min-h-0 min-w-0 flex-col">
           <nav aria-label="LANE 应用" className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-bg-card/70 px-3 scrollbar-none" data-testid="group-app-navigation">
+            <input
+              type="search"
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+              placeholder="搜索任务 / 应用…"
+              aria-label="短搜索"
+              data-testid="group-quick-search"
+              className="mr-1 h-7 w-40 shrink-0 rounded-md border border-line bg-bg-soft px-2 text-[11px] text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none"
+            />
             {visibleGroupApps.map((app) => {
               const Icon = app.icon;
               const active = currentApp === app.id;

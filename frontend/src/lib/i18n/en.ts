@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=88e415f96fc61a68867eb8f01c46577058b34446f84b6f4bef2556927f22e89b
+@cypher schema=1 source_sha256=c8cbde0ee23eaebe68d5a2d904e560d1f9e4b3e70302d8f81e49bad684008d00
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -676,8 +676,16 @@ export const en: Dictionary = {
   branchWorkspace: {
     title: "Branch Workspace",
     subtitle: "Feature set of this branch (Tenant → Project → LANE → Worktree → Branch)",
-    tabs: { tasks: "Task Cards", agents: "Agent Sessions", validation: "Validation", nema: "Nema Files", canvas: "Canvas" },
-    empty: { tasks: "No task cards on this branch", agents: "No agent sessions on this branch", validation: "No validation cases on this branch", nema: "No .nema files on this branch", canvas: "No linked canvas on this branch" },
+    tabs: { tasks: "Task Cards", agents: "Agent Sessions", validation: "Validation", nema: "Nema Files", canvas: "Canvas",
+    "backlog-sprint": "Backlog / Sprint",
+    "workflow": "Workflow",
+    "bi": "BI / Benchmark",
+    "plugins": "Plugins",
+  },
+    empty: { tasks: "No task cards on this branch", agents: "No agent sessions on this branch", validation: "No validation cases on this branch", nema: "No .nema files on this branch", canvas: "No linked canvas on this branch",
+    workflow: "No workflows defined",
+    plugins: "No integrations",
+  },
   },
   canvasGallery: {
     title: "Infinite Canvas Hub",

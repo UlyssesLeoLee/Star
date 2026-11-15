@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=62418c93cc33d187119f90223e990b8a779dc77eefd0f1f180972e7d0635d653
+@cypher schema=1 source_sha256=41846e946a26bb5020ca04b0ad5a644246e80bef3828f32c80e0f355d110f73b
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -594,8 +594,8 @@ export interface Dictionary {
   branchWorkspace: {
     title: string;                  // "Branch 工作区"
     subtitle: string;               // "该 Branch 的功能集 (per Tenant → Project → LANE → Worktree → Branch 树形架构)"
-    tabs: { tasks: string; agents: string; validation: string; nema: string; canvas: string; };
-    empty: { tasks: string; agents: string; validation: string; nema: string; canvas: string; };
+    tabs: { tasks: string; agents: string; validation: string; nema: string; canvas: string; "backlog-sprint": string; workflow: string; bi: string; plugins: string; }
+    empty: { tasks: string; agents: string; validation: string; nema: string; canvas: string; workflow: string; plugins: string; }
   };
   canvasGallery: {
     title: string;                  // "无限画布中心"
