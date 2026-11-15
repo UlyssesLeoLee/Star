@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4b3748bfad27012bd5c751ab93d01dc009b4afb4686e77d8959752d61a328a1f
+@cypher schema=1 source_sha256=d291871b9d4bb69c2e5d46e38bea400f0e327e789f5dc75136a0eab065c743dd
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -66,8 +66,11 @@ export default function KanbanPage() {
   const router = useRouter();
   // 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup)
   const [draftTitle, setDraftTitle] = useState("");
-  const [draftIpaFlow, setDraftIpaFlow] = useState("");
+  // per 1b mockup 默认值: IPA 默认第一个流程, 工作流默认标准研发, 估点默认 3 点
+  const [draftIpaFlow, setDraftIpaFlow] = useState("ipa-s05-002 ソースコード作成");
   const [draftWorkflow, setDraftWorkflow] = useState("");
+  const [draftFile, setDraftFile] = useState("");
+  const [draftPoints, setDraftPoints] = useState("3");
   const ipaFlows = useMemo(
     () => ["ipa-s05-002 ソースコード作成", "ipa-s06-ut-005 単体試験実施"],
     [],
@@ -87,14 +90,20 @@ export default function KanbanPage() {
         status: "todo",
         priority: "p2",
         reporter_id: "usr-002",
-        story_points: 2,
+        story_points: Number(draftPoints) || 3,
         sprint_id: "sp-12",
-        labels: draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : [],
+        labels: [
+          ...(draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : []),
+          ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
+        ],
         workflow_id: draftWorkflow || undefined,
+        description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
       });
       setDraftTitle("");
-      setDraftIpaFlow("");
+      setDraftIpaFlow("ipa-s05-002 ソースコード作成");
       setDraftWorkflow("");
+      setDraftFile("");
+      setDraftPoints("3");
       setActiveView("IPA 流程图");
     } catch {
       /* 创建失败静默 (store 本地) */
@@ -248,7 +257,31 @@ export default function KanbanPage() {
           >
             <option value="">不关联工作流</option>
             {workflows.map((wf) => (
-              <option key={wf.id} value={wf.id}>{wf.name}</option>
+              <option key={wf.id} value={wf.id}>工作流：{wf.name}</option>
+            ))}
+          </select>
+          <select
+            value={draftFile}
+            onChange={(e) => setDraftFile(e.target.value)}
+            aria-label="关联文件"
+            data-testid="kanban-create-file"
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+          >
+            <option value="">文件：无</option>
+            {nemaTasks.slice(0, 6).map((nt) => (
+              <option key={nt.id} value={nt.filePath.split("/").pop() ?? nt.filePath}>文件：{nt.filePath.split("/").pop() ?? nt.filePath}</option>
+            ))}
+            <option value="branch">从 Branch 选择…</option>
+          </select>
+          <select
+            value={draftPoints}
+            onChange={(e) => setDraftPoints(e.target.value)}
+            aria-label="估点"
+            data-testid="kanban-create-points"
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+          >
+            {["1", "3", "5", "8"].map((p) => (
+              <option key={p} value={p}>{p} 点</option>
             ))}
           </select>
           <button
@@ -256,9 +289,10 @@ export default function KanbanPage() {
             onClick={() => void handleCreateTaskCard()}
             disabled={!draftTitle.trim()}
             data-testid="kanban-create-submit"
-            className="h-8 px-3.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-soft disabled:opacity-50 flex items-center gap-1"
+            className="h-8 px-4 rounded-lg text-white text-xs font-semibold hover:bg-accent-soft disabled:opacity-50 flex items-center gap-1"
+            style={{ backgroundColor: "var(--accent-DEFAULT, #1D4ED8)" }}
           >
-            <Plus size={13} /> 创建任务卡
+            开卡
           </button>
         </div>
 
