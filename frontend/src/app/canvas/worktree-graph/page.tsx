@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=535be0b56bd6d48de04962fa0122174662d6d05e4960f117b190c23a11eeab70
+@cypher schema=1 source_sha256=566c79cb5d55df20b0c16e0d5175a22a4e9a7a89397781724ee7ed861c14e9d4
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
 MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
@@ -25,7 +25,7 @@ import { useStore } from "@/lib/store";
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 
 const GRAPH_VIEWS = ["树", "依赖", "风险", "Agent", "历史"] as const;
-/** wtg-view-*/wtg-empty-*/wtg-disconnected-* 的视图 id (与既有 testid 对齐) */
+/** wtg-view-* / wtg-empty-* / wtg-disconnected-* 的视图 id (与既有 testid 对齐) */
 type GraphViewId = "tree" | "deps" | "risk" | "agent" | "history";
 
 export default function WorktreeGraphPage() {

@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=41846e946a26bb5020ca04b0ad5a644246e80bef3828f32c80e0f355d110f73b
+@cypher schema=1 source_sha256=cb652920e445ed5ffc513b1c9476bc34a130c9542feb2eaf44dd827c9f155ca9
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -597,6 +597,20 @@ export interface Dictionary {
     tabs: { tasks: string; agents: string; validation: string; nema: string; canvas: string; "backlog-sprint": string; workflow: string; bi: string; plugins: string; }
     empty: { tasks: string; agents: string; validation: string; nema: string; canvas: string; workflow: string; plugins: string; }
   };
+  chatScope: {
+    worktree: string;
+    global: string;
+    "label.worktree": string;
+    "label.global": string;
+    authTarget: string;
+    "authTarget.placeholder": string;
+    "authTarget.none": string;
+    "authTarget.hint": string;
+    "error.noTarget": string;
+    "error.staleTarget": string;
+    backendNotConnected: string;
+  };
+
   canvasGallery: {
     title: string;                  // "无限画布中心"
     subtitle: string;               // "三类画布统一入口 (per 2026-11-14 用户发令整合)"

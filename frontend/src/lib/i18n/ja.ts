@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f88f3288331bb20d4f1422e2790c34ab5d058602bd3dd3843ff1d181a0703237
+@cypher schema=1 source_sha256=741f06c840daafcdc377357263ed66bce012aa9b0bfd49fb734c2536a22ff542
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -687,6 +687,19 @@ export const ja: Dictionary = {
     workflow: "ワークフロー定義なし",
     plugins: "統合なし",
   },
+  },
+  chatScope: {
+    worktree: "WORKTREE",
+    global: "GLOBAL",
+    "label.worktree": "現在のスコープ: WORKTREE · この Worktree の会話",
+    "label.global": "現在のスコープ: GLOBAL · 承認対象を選択してから送信",
+    authTarget: "承認対象",
+    "authTarget.placeholder": "承認対象 Worktree を選択…",
+    "authTarget.none": "未選択",
+    "authTarget.hint": "ローカル選択は権限を付与しない",
+    "error.noTarget": "先に承認対象を選択",
+    "error.staleTarget": "承認対象が無効になりました",
+    backendNotConnected: "未接続",
   },
   canvasGallery: {
     title: "無限キャンバスハブ",

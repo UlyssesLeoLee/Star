@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bca6bb2cbccb37c08f73c19fb2f612f06cab94d723227d70f24045eb7fa5326e
+@cypher schema=1 source_sha256=742b81b5b208d220762ba2527a58f12028115a4c310b55898e6c636b8deabe4f
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -701,6 +701,19 @@ export const zhCN: Dictionary = {
     workflow: "没有已定义的工作流",
     plugins: "暂无集成",
   },
+  },
+  chatScope: {
+    worktree: "WORKTREE",
+    global: "GLOBAL",
+    "label.worktree": "当前范围: WORKTREE · 本 Worktree 对话",
+    "label.global": "当前范围: GLOBAL · 需选择授权目标后才可发送",
+    authTarget: "授权目标",
+    "authTarget.placeholder": "选择授权 Worktree…",
+    "authTarget.none": "未选择",
+    "authTarget.hint": "本地选择不授予权限…",
+    "error.noTarget": "需先选择授权目标",
+    "error.staleTarget": "授权目标已失效",
+    backendNotConnected: "未接入",
   },
   canvasGallery: {
     title: "无限画布中心",

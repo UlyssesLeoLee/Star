@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c8cbde0ee23eaebe68d5a2d904e560d1f9e4b3e70302d8f81e49bad684008d00
+@cypher schema=1 source_sha256=312bbd1ec4d0c9e756def73541d15268aaf1c3a8a300b3d4ccac6701bbdbb244
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -686,6 +686,19 @@ export const en: Dictionary = {
     workflow: "No workflows defined",
     plugins: "No integrations",
   },
+  },
+  chatScope: {
+    worktree: "WORKTREE",
+    global: "GLOBAL",
+    "label.worktree": "Scope: WORKTREE · this worktree conversation",
+    "label.global": "Scope: GLOBAL · select an authorized target to send",
+    authTarget: "Authorized target",
+    "authTarget.placeholder": "Select authorized worktree…",
+    "authTarget.none": "None selected",
+    "authTarget.hint": "Local selection grants no permission",
+    "error.noTarget": "Select an authorized target first",
+    "error.staleTarget": "Authorized target no longer valid",
+    backendNotConnected: "Not connected",
   },
   canvasGallery: {
     title: "Infinite Canvas Hub",
