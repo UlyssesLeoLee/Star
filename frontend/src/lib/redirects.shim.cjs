@@ -44,12 +44,13 @@ const LEGACY_REDIRECTS = [
   { source: "/work-item", destination: "/sprint?view=list", permanent: false },
 
   // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
-  { source: "/agent", destination: "/agent-view", permanent: false },
-  { source: "/agents", destination: "/agent-view", permanent: false },
-  { source: "/validation", destination: "/agent-view?tab=validation", permanent: false },
-  { source: "/automation", destination: "/agent-view?tab=automation", permanent: false },
-  { source: "/development", destination: "/agent-view?tab=development", permanent: false },
-  { source: "/local-runtime", destination: "/agent-view?tab=runtime", permanent: false },
+  { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/agent-view", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/validation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/automation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/development", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/local-runtime", destination: "/canvas/canvas-001?tab=agent", permanent: false },
 
   // ── /inbox sink ─────────────────────────────────────────────────────
   { source: "/notification", destination: "/inbox", permanent: false },

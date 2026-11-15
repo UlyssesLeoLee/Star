@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3f36ddb35020a59546104dc4108e0535f6a9bffa11650a71d964356492b8aefe
+@cypher schema=1 source_sha256=7089d70f399ff1e092a40eab85b794fff4bd61aa9509d4d61b0bdf0c3b6afe16
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -36,6 +36,18 @@ const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图"] as const;
 
 export default function CanvasDetailPage() {
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("画布");
+
+  // ?tab= 深链 (per 2026-11-15 Agent 中心并入: /agent-view → ?tab=agent)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const map: Record<string, typeof CANVAS_SUB_TABS[number]> = {
+      board: "画布",
+      agent: "Agent 画布",
+      relation: "关系图",
+    };
+    if (tab && map[tab]) setActiveTab(map[tab]);
+  }, []);
   const canvases = useStore((s) => s.canvases);
   const canvasElements = useStore((s) => s.canvasElements);
   const canvasConnectors = useStore((s) => s.canvasConnectors);

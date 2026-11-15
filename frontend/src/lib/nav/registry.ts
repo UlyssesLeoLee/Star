@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=53f3f3808d7f5dfd9df01ba8dc6ba3c306987e33ca621b7bc050d8a63874e603
+@cypher schema=1 source_sha256=de035e9f20d7cd1229d1ebc914ff607a2391c2bd34c69b4f196fb19ad204b643
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -212,7 +212,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     // Per 2026-09-02 16:13 JST 域分色: Agents 是智能 agent 编排, 归 agent 域
     category: "agent",
     categoryLabel: "Core Workspace",
-    description: "智能 Agent 运行状态、编排、会话与执行日志",
+    description: "Agent 中心已并入画布 — 无限画布集中在 Canvas 的 Agent 画布标签 (per 2026-11-15)",
     icon: Bot,
     isCore: true,
   },
@@ -321,7 +321,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "validation",
     label: "Validation Test",
     code: "VAL",
-    href: "/agent-view?tab=validation",
+    href: "/canvas/canvas-001?tab=agent",
     category: "agent",
     categoryLabel: "Worktree / Agent",
     description: "自动化用例验证与断言测试套件",
@@ -353,7 +353,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "agent-view",
     label: "Agent View",
     code: "AV",
-    href: "/agent-view",
+    href: "/canvas/canvas-001?tab=agent",
     category: "agent",
     categoryLabel: "Worktree / Agent",
     description: "无限画布 · 当前工作 agent 关联 worktree / work-items 拓扑图",
@@ -385,7 +385,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "development",
     label: "Development Hub",
     code: "DEV",
-    href: "/agent-view?tab=development",
+    href: "/canvas/canvas-001?tab=agent",
     category: "work",
     categoryLabel: "Work Management",
     description: "变更集 ChangeSet 与分支代码协同",

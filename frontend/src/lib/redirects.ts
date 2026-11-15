@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=596d7e6f975e123a33cf0ed782ff5cfe5a240f874c6311469706a78b584f026c
+@cypher schema=1 source_sha256=b257c91e02ba67986d003c07471e458dad96857c9e4cc02084294474020ae463
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -91,27 +91,29 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     permanent: false,
   },
 
-  // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
-  { source: "/agent", destination: "/agent-view", permanent: false },
-  { source: "/agents", destination: "/agent-view", permanent: false },
+  // ── Agent 中心 sink (per 2026-11-15 用户拍板: Agent 中心所有无限画布并入 Canvas —
+  //     /agent-view 独立页关闭, 全部 307 → canvas Agent 画布标签 ?tab=agent) ──
+  { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  { source: "/agent-view", destination: "/canvas/canvas-001?tab=agent", permanent: false },
   {
     source: "/validation",
-    destination: "/agent-view?tab=validation",
+    destination: "/canvas/canvas-001?tab=agent",
     permanent: false,
   },
   {
     source: "/automation",
-    destination: "/agent-view?tab=automation",
+    destination: "/canvas/canvas-001?tab=agent",
     permanent: false,
   },
   {
     source: "/development",
-    destination: "/agent-view?tab=development",
+    destination: "/canvas/canvas-001?tab=agent",
     permanent: false,
   },
   {
     source: "/local-runtime",
-    destination: "/agent-view?tab=runtime",
+    destination: "/canvas/canvas-001?tab=agent",
     permanent: false,
   },
 

@@ -50,10 +50,10 @@ const findRedirect = (source: string) => {
 };
 
 describe("redirects: legacy 22 routes → 6 panels", () => {
-  it("contains 26 entries (9 projects-sink + 2 issues/sprint-sink + 6 agent-view-sink + 6 inbox-sink + 4 settings-sink)", () => {
+  it("contains 27 entries (9 projects-sink + 2 issues/sprint-sink + 7 agent-sink + 6 inbox-sink + 4 settings-sink)", () => {
     // /worktree is not redirected because it is the Project Worktree Index route.
-    // Total: 9 project routes + 2 sprint routes + 6 agent routes + 6 inbox routes + 4 settings routes.
-    expect(LEGACY_REDIRECTS.length).toBe(26);
+    // Total: 9 project routes + 2 sprint routes + 7 agent routes + 6 inbox routes + 4 settings routes.
+    expect(LEGACY_REDIRECTS.length).toBe(27);
   });
 
   it("/workspace → /projects (case 1)", () => {
@@ -133,7 +133,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
       "/sprint",
       "/projects",
       "/agents",
-      "/agent-view", // per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect
+      // per 2026-11-15: Agent 中心并入 Canvas — /agent-view 等全部 → /canvas/canvas-001?tab=agent
       "/settings",
       "/canvas", // per 2026-11-14: workflow/context/relation/collaboration 并入 canvas 标签
     ];
@@ -159,7 +159,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     }
   });
 
-  it("all 26 entries use 307 (permanent: false) for client-friendly nav", () => {
+  it("all 27 entries use 307 (permanent: false) for client-friendly nav", () => {
     for (const r of LEGACY_REDIRECTS) {
       expect(r.permanent, `${r.source} should not be permanent`).toBe(false);
     }
