@@ -41,7 +41,7 @@ axum = { workspace = true }
 prometheus = "0.13"
 
 # Config (per FR-1.1, YAML 配置文件)
-serde_yaml = "0.9"
+serde_yaml_ng = "0.9"
 
 # session 池并发容器 (per DD §2.1 Orchestrator.sessions)
 dashmap = "6"
