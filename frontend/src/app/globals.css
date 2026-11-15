@@ -1598,8 +1598,35 @@ body.physis {
   background-attachment: fixed;
 }
 
-/* physis 主题: 卡片/面板 3D 深度感 */
+/* physis 主题: 卡片/面板 3D 深度感 (游戏化) */
 html.physis .card,
 html.physis [class*="bg-bg-card"] {
   backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 24px rgba(11, 14, 28, 0.6),
+    0 0 0 1px rgba(124, 140, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+}
+
+/* physis 主题: 卡片悬浮 3D 抬升 + 光边 */
+html.physis .card:hover,
+html.physis [class*="bg-bg-card"]:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 14px 34px rgba(11, 14, 28, 0.7),
+    0 0 0 1px rgba(124, 140, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* physis 主题: 按钮按压弹跳 (游戏手感) */
+html.physis button:active,
+html.physis a:active {
+  transform: scale(0.96);
+  transition: transform 0.08s ease-out;
+}
+
+/* physis 主题: 激活 tab 发光下划线 */
+html.physis [class*="border-accent"][class*="border-b-2"] {
+  box-shadow: 0 2px 12px rgba(124, 140, 255, 0.55);
 }

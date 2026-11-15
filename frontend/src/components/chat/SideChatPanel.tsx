@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fba858afaa67fa12c4a776defe4e33a54c5d22451625c53c2db3209bf859fe8b
+@cypher schema=1 source_sha256=efdc055adcfe384dcf3147036d1c5574e399a8ef54a641a7552d9ca67034594f
 MERGE (self:File {path:"frontend/src/components/chat/SideChatPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
 MERGE (chatStore:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
@@ -81,6 +81,10 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
   const send = () => {
     const text = draft.trim();
     if (!text) return;
+    // Physis 主题联动: 发消息触发粒子爆发 (per 2026-11-14 游戏化设计)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("physis-burst"));
+    }
     if (newTopicMode) {
       if (activeTopic) {
         const id = createTopic(activeTopic.scope, activeTopic.refId, newTopicTitle.trim() || text.slice(0, 24));

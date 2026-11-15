@@ -88,9 +88,9 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r?.destination).toBe("/projects?tab=timeline");
   });
 
-  it("/workflow → /canvas/canvas-001 (per 2026-11-14: workflow 内容并入 canvas 低代码流程标签)", () => {
+  it("/workflow → /projects?tab=timeline (per 2026-11-14 二轮: workflow 恢复独立页, 非无限画布类不进 canvas)", () => {
     const r = findRedirect("/workflow");
-    expect(r?.destination).toBe("/canvas/canvas-001");
+    expect(r?.destination).toBe("/projects?tab=timeline");
   });
 
   it("/workspace/:id → /projects/:id (case 7, path-param variant)", () => {

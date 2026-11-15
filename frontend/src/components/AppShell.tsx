@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=82cb1ef30951c3dd8ac2eab63695e9a0e85ce15f0596a980a5801dba035ffbae
+@cypher schema=1 source_sha256=337ef632b37af63a1aa1abbc1b4aecfb35e32ee955d1408827baf8f7e6ff7bdc
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -20,6 +20,7 @@ import { ReactNode, Suspense } from "react";
 import { AppHeader } from "./AppHeader";
 import { RightChatRail } from "./chat/RightChatRail";
 import { PhysisBackdrop } from "./effects/PhysisBackdrop";
+import { PhysisHud } from "./effects/PhysisHud";
 
 export interface AppShellProps {
   children: ReactNode;
@@ -33,8 +34,9 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
       data-testid="app-shell"
       className="min-h-screen bg-bg bg-[var(--cel-bg)] text-ink text-[var(--cel-text-primary)] transition-colors duration-200 relative"
     >
-      {/* Physis 3D 物理背景层 (仅 physis 主题挂载) */}
+      {/* Physis 3D 物理背景层 + 游戏化 HUD (仅 physis 主题挂载) */}
       <PhysisBackdrop />
+      <PhysisHud />
       {/* 3渲2 Ambient Screentone & Glow Backdrops */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-screentone opacity-15" />
