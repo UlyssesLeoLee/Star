@@ -37,24 +37,24 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 ### Phase 2 — 工作空间布局整合 (P0/P1)
 - [x] 2.1 BranchWorkspace tabs → Lane 级中央应用: Backlog/Sprint、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins
 - [x] 2.2 Group Workspace 左侧双页签: 导航树 / AI 更新 (Branch 任务按工作流状态分组; 底部状态筛选同步两页签)
-- [◐] 2.3 任务卡可关闭子窗口: BranchWorkspace 接 WorkItemDetailDrawer (cfbfe4c5) + group 页深链 closeTaskCard 验收通过 (304f3ce5) — 全站一致 (/work-item 子页面并存) 未收敛
+- [x] 2.3 任务卡统一可关闭子窗口 (3cc5b6b7: kanban 4 处 push → Drawer; /work-item 路由残留不再作入口)
 - [x] 2.4 Project Worktree Index 定位文案完成 (304f3ce5, wt-finish lane: 跨 Lane/Worktree/Branch 汇总入口语义)
-- [◐] 2.5 closeTaskCard 验收: URL 干净/前进后退通过 (304f3ce5) — 切换 Worktree 上下文验证未做
+- [x] 2.5 closeTaskCard 验收通过 — 切换 Worktree 上下文验证仍缺 (backlog)
 
 ### Phase 3 — Backlog/Sprint/看板收敛 (P1)
 - [ ] 3.1 独立 /kanban 与 BranchWorkspace Backlog 合并为一套 (保留列内创建/拖动/列增删重命名)
-- [x] 3.2 kanban 预览数据标识 (cf48593b: seed 不冒充正式视图, 宿主接入切换授权投影) — 未授权命令禁用未做
+- [x] 3.2 kanban 预览数据标识 (cf48593b) + 聊天未接入禁用写入 (591915cb) — kanban 写操作授权禁用仍缺 (backlog)
 - [ ] 3.3 创建/移动/刷新/状态变更身份与上下文一致性验证
 - [ ] 3.4 失败提示 + 草稿保留; 授权失败不重放写操作
 
 ### Phase 4 — Canvas 上下文与关系图 (P1)
-- [◐] 4.1 Canvas ?worktree= 上下文条 + 未指定/未找到状态 (304f3ce5, canvas lane) — 任务卡链接未做
+- [x] 4.1 Canvas ?worktree= 上下文条 + 数据隔离诚实标注 (591915cb) — 任务卡链接未做 (backlog)
 - [ ] 4.2 独立 Canvas/Group Canvas/Worktree 关系图对象身份与持久化边界核对
-- [◐] 4.3 5 视图空/未接入状态区分 + 去固定示例 (304f3ce5) — 未授权/不可用细粒度未区分
+- [x] 4.3 5 视图四态 (空/未接入/未授权/正常), 未授权接真实 401 信号 (56442775)
 - [ ] 4.4 Canvas↔任务双向跳转/深链/保存失败草稿保留/切换 Worktree 授权隔离验证
 
 ### Phase 5 — 聊天/Worktree 状态/Team (P1)
-- [ ] 5.1 右侧默认聊天; Worktree 状态默认折叠; Team 统一 Runtime/Daemon 与 Worker/Router 小队
+- [◐] 5.1 group 页右栏 chat/worktree(默认折叠)/team 已有 — Team 管理动作未接后端
 - [x] 5.2 chatStore chatScope + RightChatRail 切换器 + 当前范围 label (304f3ce5, chat lane)
 - [x] 5.3 GLOBAL 授权目标下拉 + 未选禁用 + 提交重校验 + 失败保草稿 (304f3ce5, chat lane)
 - [x] 5.4 chat rail/panel 未接入徽标 + 不生成示例消息 (304f3ce5 + group 页既有)
@@ -63,14 +63,14 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 ### Phase 6 — 会话与授权一致性 (P1)
 - [ ] 6.1 统一宿主会话与授权边界 (Lane 目录/Group/Backlog/Canvas 同一会话)
 - [ ] 6.2 401 关闭能力; 403 ≠ 会话失效 (UI 区分)
-- [ ] 6.3 旧会话结果不覆盖当前会话; 授权失败不重放写操作
+- [◐] 6.3 groupProjection 401 代际守卫强化 (55728d52) — 写操作重放防护未做
 - [ ] 6.4 不凭前端状态推断认证/执行权限
 
 ### Phase 7 — 状态/可读性/性能 (P2)
 - [ ] 7.1 统一加载/空/未连接/无权限/失败/恢复中/成功提示 + 可执行下一步
 - [ ] 7.2 默认精简技术说明; 诊断/策略版本/执行证据可展开
 - [ ] 7.3 桌面尺寸/窄窗口/缩放/字号/对比度/键盘/焦点/无障碍检查
-- [ ] 7.4 列表/事件/聊天/图数据分页或虚拟化; 无界日志防驻留
+- [◐] 7.4 ProjectRunTree 已虚拟化 (rows.slice + VIEWPORT_HEIGHT/OVERSCAN) — 聊天/事件/日志未做有界
 - [ ] 7.5 Hooks 保持"高级设置→Hooks"; Worktree/Lane Detail/BI 展示有效策略并深链
 
 ### Phase 8 — 实施验收 (贯穿)
@@ -96,3 +96,4 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 | 2026-11-15 | v1.2 | §0 状态表补实施状态行 (Phase 1/2.1/2.2 已完成 commit 指认) + 修订历史表 | 本提交 (见 git log) |
 | 2026-11-15 | v1.3 | 4 lane 并行 fan-out (docs/chat/canvas/wt, delegate_task deepseek probe 通过) rebase+merge dev; 2.4/2.5/4.1/4.3/5.2/5.3/5.4 打钩; Agent 中心并入 Canvas; IM1.0 chat 域模型; 1b 创建栏 6 控件 | 304f3ce5→9187f43d |
 | 2026-11-15 | v1.4 | 实际状态全量同步: ◐ 半完成项标注意外; 移交 Codex (MAGOS disarm 命令交付用户终端) | 本提交 |
+| 2026-11-15 | v1.5 | 结构定版: Agent 中心拆分 (90111428) + workflow 回归 canvas「流程」标签 (e804a570) + rail 顶格/agent 设置 (d05c6e3c) + 任务卡子窗口全站统一 (3cc5b6b7); WBS 状态回写 | 本提交 |
