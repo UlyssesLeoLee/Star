@@ -32,6 +32,7 @@ import {
 import { clsx } from "clsx";
 import { useChatStore } from "@/lib/chat/chatStore";
 import { useStore } from "@/lib/store";
+import { useTranslation } from "@/lib/i18n";
 
 type ChatTab = "task" | "global";
 
@@ -44,6 +45,7 @@ export interface SideChatPanelProps {
 }
 
 export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPanelProps) {
+  const { t } = useTranslation();
   const topics = useChatStore((s) => s.topics);
   const globalSessions = useChatStore((s) => s.globalSessions);
   const activeTopicId = useChatStore((s) => s.activeTopicId);
@@ -105,11 +107,11 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
     // 校验失败 → 提示并保留草稿, 不写入任何消息。
     if (chatScope === "GLOBAL") {
       if (globalAuthTargetId == null || globalAuthTargetId.trim() === "") {
-        setScopeError("GLOBAL 范围需先选择授权目标。");
+        setScopeError(t.chatScope["error.noTarget"]);
         return;
       }
       if (!worktrees.some((w) => w.id === globalAuthTargetId)) {
-        setScopeError("授权目标已失效 (Worktree 不存在或已移除)，请重新选择。");
+        setScopeError(t.chatScope["error.staleTarget"]);
         return;
       }
     }
@@ -283,7 +285,7 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                 title="聊天后端尚未接入，消息仅本地暂存"
                 className="shrink-0 rounded border border-warn/30 px-1.5 py-0.5 text-[8px] text-warn"
               >
-                未接入
+                {t.chatScope.backendNotConnected}
               </span>
             </div>
             {!compact && activeTopic && (
@@ -382,10 +384,10 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                     htmlFor="chat-auth-target"
                     className="text-[10px] font-semibold uppercase tracking-wider text-ink-mute"
                   >
-                    授权目标
+                    {t.chatScope.authTarget}
                   </label>
                   <span className="text-[9px] text-ink-mute">
-                    {authTarget ? `${authTarget.name} · ${authTarget.id}` : "未选择"}
+                    {authTarget ? `${authTarget.name} · ${authTarget.id}` : t.chatScope["authTarget.none"]}
                   </span>
                 </div>
                 <select
@@ -398,7 +400,7 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                   data-testid="chat-scope-auth-target"
                   className="w-full rounded-lg border border-line bg-bg-soft px-2 py-1.5 text-xs focus:border-accent focus:outline-none"
                 >
-                  <option value="">选择授权 Worktree…</option>
+                  <option value="">{t.chatScope["authTarget.placeholder"]}</option>
                   {worktrees.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name} · {w.id}
@@ -406,7 +408,7 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                   ))}
                 </select>
                 <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">
-                  仅显示当前账号可见的 Worktree；本地选择不授予权限，提交时服务端将重新逐个校验授权。
+                  {t.chatScope["authTarget.hint"]}
                 </p>
               </div>
             )}
@@ -468,7 +470,7 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                 onClick={send}
                 disabled={!draft.trim() || !authTargetValid}
                 data-testid="chat-send"
-                title={chatScope === "GLOBAL" && !authTargetValid ? "请先选择授权目标" : undefined}
+                title={chatScope === "GLOBAL" && !authTargetValid ? t.chatScope["error.noTarget"] : undefined}
                 className="flex items-center gap-1 text-[11px] px-2.5 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:opacity-50 shrink-0"
               >
                 <Send size={11} /> 发

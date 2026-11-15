@@ -22,8 +22,10 @@ import { MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { clsx } from "clsx";
 import { SideChatPanel } from "./SideChatPanel";
 import { useChatStore } from "@/lib/chat/chatStore";
+import { useTranslation } from "@/lib/i18n";
 
 export function RightChatRail() {
+  const { t } = useTranslation();
   const topics = useChatStore((s) => s.topics);
   const chatScope = useChatStore((s) => s.chatScope);
   const setChatScope = useChatStore((s) => s.setChatScope);
@@ -135,7 +137,7 @@ export function RightChatRail() {
                   : "text-ink-dim hover:text-ink",
               )}
             >
-              WORKTREE
+              {t.chatScope.worktree}
             </button>
             <button
               type="button"
@@ -149,13 +151,13 @@ export function RightChatRail() {
                   : "text-ink-dim hover:text-ink",
               )}
             >
-              GLOBAL
+              {t.chatScope.global}
             </button>
           </div>
           <p className="mt-1 px-0.5 text-[9px] leading-relaxed text-ink-mute" data-testid="chat-rail-scope-label">
             {chatScope === "WORKTREE"
-              ? "当前范围: WORKTREE · 本 Worktree 对话"
-              : "当前范围: GLOBAL · 需选择授权目标后才可发送"}
+              ? t.chatScope["label.worktree"]
+              : t.chatScope["label.global"]}
           </p>
         </div>
       )}
