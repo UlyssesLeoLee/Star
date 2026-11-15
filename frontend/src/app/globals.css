@@ -1569,5 +1569,37 @@ html.cel .btn-primary:active,
   box-shadow: 1.5px 1.5px 0 #1e293b;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Physis 3D 物理主题 (per 2026-11-14: 全 3D 主题)
+   深紫蓝空间 + three.js 物理背景层 (PhysisBackdrop)
+   ══════════════════════════════════════════════════════════════════ */
+html.physis,
+html.physis body,
+.physis body,
+body.physis {
+  --color-surface: #0b0e1c;
+  --color-surface-2: #12163a;
+  --color-surface-elevated: #1a1f4d;
+  --color-border: #2b3163;
+  --color-text: #e2e8ff;
+  --color-primary: #7c8cff;
+  --color-primary-glow: rgba(124, 140, 255, 0.45);
+  --color-secondary: #9c6bff;
+  --accent-DEFAULT: #7c8cff;
+  --ok-DEFAULT: #5ad2ff;
+  --warn-DEFAULT: #ffb86b;
+  --err-DEFAULT: #ff5c7a;
+  background-color: var(--color-surface, #0b0e1c);
+  color: var(--color-text, #e2e8ff);
+  /* 深空渐变 + 微星光 (3D 背景层在其上渲染粒子) */
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(124, 140, 255, 0.18), transparent 55%),
+    radial-gradient(ellipse at 80% 110%, rgba(156, 107, 255, 0.15), transparent 55%);
+  background-attachment: fixed;
+}
 
-
+/* physis 主题: 卡片/面板 3D 深度感 */
+html.physis .card,
+html.physis [class*="bg-bg-card"] {
+  backdrop-filter: blur(10px);
+}

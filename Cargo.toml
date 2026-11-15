@@ -69,6 +69,7 @@ members = [
   "crates/ide-collab-core",
   "crates/star-git-core",
   "crates/sandtree-core",
+  "crates/physis-wasm",
   "crates/argo-core",
     # WBS 6.2 (2026-11-14) 新增 crates/star-agent-runtime (STAR Agent Runtime 双模式骨架, per SRS-STAR-AGENT-RUNTIME-001 / ADR-0044)
     "crates/star-agent-runtime",

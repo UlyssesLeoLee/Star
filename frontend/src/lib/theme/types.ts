@@ -7,7 +7,7 @@
  * - 预留扩展: HighContrast / Solarized 等
  * - 第三方 / 租户自定义主题可追加 variant
  */
-export type ThemeId = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel" | "high-contrast" | "solarized";
+export type ThemeId = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel" | "physis" | "high-contrast" | "solarized";
 
 /**
  * 主题作用域 (三层解析: Personal > Tenant > Global)
@@ -264,6 +264,15 @@ export const THEMES: ThemeDefinition[] = [
     displayName: "日式赛璐璐",
     isDark: false,
     colors: STAR_CEL_PALETTE,
+    spacings: STAR_SPACING,
+    radii: CEL_RADII,
+    version: 1,
+  },
+  {
+    id: "physis",
+    displayName: "Physis 3D 物理",
+    isDark: true,
+    colors: STAR_CEL_PALETTE, // 基色复用 cel (CSS 层覆盖 3D 深紫蓝)
     spacings: STAR_SPACING,
     radii: CEL_RADII,
     version: 1,
