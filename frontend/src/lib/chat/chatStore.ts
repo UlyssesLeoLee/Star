@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=132bf8c2d3ffbdfc450b9e7ce8e7668d64d2c5dab6b567dde15717f3cb9d8804
+@cypher schema=1 source_sha256=4892b7f5a36115646539ed66943f71e52935a5bab998e41eac9ce64f6e18572d
 MERGE (self:File {path:"frontend/src/lib/chat/chatStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
 MERGE (self)-[:DEFINES]->(store)
@@ -18,12 +18,33 @@ MERGE (self)-[:DEFINES]->(store)
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+/** IM1.0 对齐 (per 2026-11-15 用户发令: chat 组件用 IM1.0 改造)
+ *  MessageState: sent/delivered/read (IM1.0 im-core message::MessageState 子集)
+ */
+export type ChatMessageState = "sent" | "delivered" | "read";
+
 export interface ChatMessage {
   id: string;
   author: string;        // "Ulysses" | "Agent A1" | ...
   authorKind: "human" | "agent" | "system";
   text: string;
   at: string;            // ISO time
+  /** IM1.0 对齐: 会话内序号 (sequence, 单调递增, 稳定排序) */
+  sequence: number;
+  /** IM1.0 对齐: 引用回复 (reply_to → 被引用消息 id) */
+  replyTo?: string;
+  /** IM1.0 对齐: 消息状态 (sent→delivered→read) */
+  state: ChatMessageState;
+  editedAt?: string;     // IM1.0 edited_at
+}
+
+/** IM1.0 对齐: ConversationKind 子集 — task=Channel, global=Group, 系统=System */
+export type ChatTopicKind = "channel" | "group" | "system";
+
+export interface ChatTopicMember {
+  userId: string;
+  role: "owner" | "admin" | "member";  // IM1.0 MemberRole
+  joinedAt: string;
 }
 
 export interface ChatTopic {
@@ -32,6 +53,10 @@ export interface ChatTopic {
   /** task scope: workItemId (e.g. T-142); global scope: sessionId */
   refId: string;
   title: string;
+  /** IM1.0 对齐: 会话类型 (task=channel, global=group) */
+  kind: ChatTopicKind;
+  /** IM1.0 对齐: 会话成员与角色 */
+  members: ChatTopicMember[];
   messages: ChatMessage[];
   createdAt: string;
 }
@@ -66,7 +91,9 @@ interface ChatState {
   /** 创建全局会话 (顶层或子会话) */
   createSession: (title: string, parentId?: string | null) => string;
   /** 回复当前话题; 或开新话题 */
-  reply: (topicId: string, author: string, authorKind: ChatMessage["authorKind"], text: string) => void;
+  reply: (topicId: string, author: string, authorKind: ChatMessage["authorKind"], text: string, replyTo?: string) => void;
+  /** IM1.0 对齐: 标记话题内消息已读 (delivered→read) */
+  markTopicRead: (topicId: string) => void;
   /** 在同一个聊天页(同一 ref)开新话题 */
   createTopic: (scope: "task" | "global", refId: string, title: string) => string;
   setActiveTopic: (topicId: string | null) => void;
@@ -114,6 +141,11 @@ export const useChatStore = create<ChatState>()(
           scope: "task",
           refId: workItemId,
           title: taskTitle || workItemId,
+          kind: "channel",
+          members: [
+            { userId: "usr-arch", role: "owner", joinedAt: nowIso() },
+            { userId: "usr-002", role: "member", joinedAt: nowIso() },
+          ],
           messages: [
             {
               id: uid("msg"),
@@ -121,6 +153,8 @@ export const useChatStore = create<ChatState>()(
               authorKind: "system",
               text: `已打开任务卡 ${workItemId} 的聊天。话题按条回复，也可在底部开新话题。`,
               at: nowIso(),
+              sequence: 1,
+              state: "read",
             },
           ],
           createdAt: nowIso(),
@@ -142,6 +176,8 @@ export const useChatStore = create<ChatState>()(
           scope: "global",
           refId: sessionId,
           title: session?.title ?? sessionId,
+          kind: "group",
+          members: [{ userId: "usr-arch", role: "owner", joinedAt: nowIso() }],
           messages: [],
           createdAt: nowIso(),
         };
@@ -156,13 +192,27 @@ export const useChatStore = create<ChatState>()(
         return id;
       },
 
-      reply: (topicId, author, authorKind, text) => {
-        const msg: ChatMessage = { id: uid("msg"), author, authorKind, text, at: nowIso() };
-        set((s) => ({
-          topics: s.topics.map((t) =>
-            t.id === topicId ? { ...t, messages: [...t.messages, msg] } : t,
-          ),
-        }));
+      reply: (topicId, author, authorKind, text, replyTo) => {
+        set((s) => {
+          const topic = s.topics.find((t) => t.id === topicId);
+          if (!topic) return s;
+          const seq = (topic.messages.reduce((m, x) => Math.max(m, x.sequence), 0) + 1) || 1;
+          const msg: ChatMessage = {
+            id: uid("msg"),
+            author,
+            authorKind,
+            text,
+            at: nowIso(),
+            sequence: seq,
+            replyTo,
+            state: "sent",
+          };
+          return {
+            topics: s.topics.map((t) =>
+              t.id === topicId ? { ...t, messages: [...t.messages, msg] } : t,
+            ),
+          };
+        });
       },
 
       createTopic: (scope, refId, title) => {
@@ -172,6 +222,8 @@ export const useChatStore = create<ChatState>()(
           scope,
           refId,
           title: title || (scope === "task" ? refId : "新话题"),
+          kind: scope === "task" ? "channel" : "group",
+          members: [{ userId: "usr-arch", role: "owner", joinedAt: nowIso() }],
           messages: [],
           createdAt: nowIso(),
         };
@@ -179,7 +231,34 @@ export const useChatStore = create<ChatState>()(
         return id;
       },
 
-      setActiveTopic: (topicId) => set({ activeTopicId: topicId }),
+      setActiveTopic: (topicId) =>
+        set((s) => ({
+          activeTopicId: topicId,
+          topics: s.topics.map((t) =>
+            t.id === topicId
+              ? {
+                  ...t,
+                  messages: t.messages.map((m) =>
+                    m.authorKind !== "human" && m.state !== "read" ? { ...m, state: "read" as const } : m,
+                  ),
+                }
+              : t,
+          ),
+        })),
+
+      markTopicRead: (topicId) =>
+        set((s) => ({
+          topics: s.topics.map((t) =>
+            t.id === topicId
+              ? {
+                  ...t,
+                  messages: t.messages.map((m) =>
+                    m.authorKind !== "human" && m.state !== "read" ? { ...m, state: "read" as const } : m,
+                  ),
+                }
+              : t,
+          ),
+        })),
 
       setChatScope: (scope) => set({ chatScope: scope }),
 

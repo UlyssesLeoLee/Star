@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=79c16cdfa9753a974522b09a9c417ba296225b42f42e4c5316af895518cdb0fa
+@cypher schema=1 source_sha256=8a5ef2fe266a8abac9b546b0509af5cebb76bdaac286915e5dc2b11bc9147842
 MERGE (self:File {path:"frontend/src/components/chat/SideChatPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
 MERGE (chatStore:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
@@ -54,6 +54,8 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
   const openTopicForSession = useChatStore((s) => s.openTopicForSession);
   const createSession = useChatStore((s) => s.createSession);
   const reply = useChatStore((s) => s.reply);
+  // IM1.0 对齐: 引用回复 (reply_to) — 点击消息"引用"后回复它
+  const [replyingTo, setReplyingTo] = useState<{ id: string; preview: string } | null>(null);
   const createTopic = useChatStore((s) => s.createTopic);
   const setActiveTopic = useChatStore((s) => s.setActiveTopic);
   // GLOBAL 授权目标候选 = 当前账号可见的 worktree 列表 (本地 seed; 真实授权由服务端校验)
@@ -124,7 +126,8 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
         setNewTopicTitle("");
       }
     } else if (activeTopic) {
-      reply(activeTopic.id, "Ulysses", "human", text);
+      reply(activeTopic.id, "Ulysses", "human", text, replyingTo?.id);
+      setReplyingTo(null);
     }
     setDraft("");
   };
@@ -328,8 +331,34 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                             : "bg-bg-soft border-line/60 text-ink-dim text-[10px]",
                       )}
                     >
+                      {m.replyTo && (() => {
+                        const parent = activeTopic.messages.find((x) => x.id === m.replyTo);
+                        return parent ? (
+                          <div className="mb-1 rounded border-l-2 border-accent/60 bg-accent/10 px-1.5 py-0.5 text-[9px] text-ink-mute" data-testid={`chat-msg-quote-${m.id}`}>
+                            <span className="font-mono text-accent">{parent.author}: </span>
+                            {parent.text.slice(0, 40)}
+                            {parent.text.length > 40 ? "…" : ""}
+                          </div>
+                        ) : null;
+                      })()}
                       {m.text}
+                      {m.authorKind === "human" && (
+                        <span className="ml-1.5 text-[8px] opacity-70" data-testid={`chat-msg-state-${m.id}`}>
+                          {m.state === "read" ? "已读" : m.state === "delivered" ? "送达" : "发送"}
+                        </span>
+                      )}
                     </div>
+                    {m.authorKind !== "system" && (
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo({ id: m.id, preview: m.text.slice(0, 40) })}
+                        data-testid={`chat-msg-reply-btn-${m.id}`}
+                        title="引用回复"
+                        className="mt-0.5 text-[9px] text-ink-mute hover:text-accent"
+                      >
+                        引用
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -338,6 +367,13 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
 
           {/* 底部聊天栏 */}
           <footer data-testid="chat-input-bar" className="border-t border-line bg-bg-card p-2.5">
+            {replyingTo && (
+              <div className="mb-1.5 flex items-center gap-2 rounded border border-accent/40 bg-accent/10 px-2 py-1 text-[10px]" data-testid="chat-replying-banner">
+                <span className="text-accent">引用:</span>
+                <span className="flex-1 truncate text-ink-dim">{replyingTo.preview}</span>
+                <button type="button" onClick={() => setReplyingTo(null)} className="text-ink-mute hover:text-err">✕</button>
+              </div>
+            )}
             {/* GLOBAL 范围: 授权目标选择 (per 2026-11-15 任务: 未选目标禁用发送, 提交时重新校验) */}
             {chatScope === "GLOBAL" && (
               <div className="mb-2" data-testid="chat-scope-auth">
