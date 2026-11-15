@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=16477096ca343be917ff597a9944c5bccd3524df348d4050ef98878af3bb7cdf
+@cypher schema=1 source_sha256=2fdcb51f80b0e5fcf741ed2087b07b9e9cdce91510e94a381d901a6fc3591bf0
 MERGE (self:File {path:"frontend/src/app/(app)/analytics/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/analytics/page.tsx::AnalyticsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -32,11 +32,13 @@ import { Chart12SlaCompliance } from "@/components/charts/Chart12SlaCompliance";
 import { Chart13CreatedVsResolved } from "@/components/charts/Chart13CreatedVsResolved";
 import { Chart14IssueTypeDist } from "@/components/charts/Chart14IssueTypeDist";
 import { Chart15PriorityDist } from "@/components/charts/Chart15PriorityDist";
+import { GanttView } from "@/components/gantt/GanttView";
+import { Suspense } from "react";
 
 const ANALYTICS_TABS = [
   "概览", "燃尽图", "燃起图", "速度", "Sprint 报告", "累计流图", "控制图",
   "周期时间", "吞吐量", "预测", "时间跟踪", "解决时间", "SLA 合规",
-  "创建vs解决", "问题分布", "优先级分布", "运维", "审计日志",
+  "创建vs解决", "问题分布", "优先级分布", "甘特图", "运维", "审计日志",
 ] as const;
 type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
 
@@ -56,6 +58,8 @@ export default function AnalyticsPage() {
   const workItems = useStore((s) => s.workItems);
   const agents = useStore((s) => s.agentSessions);
   const sprints = useStore((s) => s.sprints);
+  const board = useStore((s) => s.board);
+  const identities = useStore((s) => s.identities);
 
   const charts = useMemo(() => buildAnalyticsData(sprints, workItems), [sprints, workItems]);
 
@@ -207,7 +211,18 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {activeTab !== "概览" && activeTab !== "运维" && activeTab !== "审计日志" && (
+        {activeTab === "甘特图" && (
+          <div className="max-w-7xl mx-auto" data-testid="analytics-chart-甘特图">
+            <ChartFrame title="甘特图" description="冲刺 / 里程碑排期与任务时间轴" chartId="C16_GANTT">
+              {preview}
+              <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-dim">Loading Gantt...</div>}>
+                <GanttView board={board} workItems={workItems} identities={identities} />
+              </Suspense>
+            </ChartFrame>
+          </div>
+        )}
+
+        {activeTab !== "概览" && activeTab !== "运维" && activeTab !== "审计日志" && activeTab !== "甘特图" && (
           <div className="max-w-7xl mx-auto" data-testid={`analytics-chart-${activeTab}`}>
             {renderChart(activeTab)}
           </div>

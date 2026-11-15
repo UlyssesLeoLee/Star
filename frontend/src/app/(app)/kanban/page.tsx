@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9e7d48317272244455b1dc36d68f0ca4838cede20fbc59cb22e8f84b541b9fb5
+@cypher schema=1 source_sha256=035c8680148ae8cb8fbd23302558d7f97a73fca7cb2bd0859e149feb7e8f93a1
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -403,14 +403,17 @@ export default function KanbanPage() {
         )}
 
         {activeView === "时间线" && (
-          <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
-            <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-dim">Loading Gantt...</div>}>
-              <GanttView
-                board={board}
-                workItems={workItems}
-                identities={identities}
-              />
-            </Suspense>
+          <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <p className="text-xs font-semibold text-ink">甘特图已合并进分析界面</p>
+              <p className="text-[11px] text-ink-dim">
+                排期甘特图现在
+                <a href="/analytics" className="mx-1 font-semibold text-accent underline underline-offset-2" data-testid="kanban-gantt-open-analytics">
+                  分析界面「甘特图」标签
+                </a>
+                打开 (per 2026-11-15)
+              </p>
+            </div>
           </section>
         )}
         {activeView === "日历" && (
