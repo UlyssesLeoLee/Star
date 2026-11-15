@@ -26,11 +26,11 @@ MERGE (self:File {path:"docs/requirements/SRS-OPS-CONSOLE-001.md"})
 
 | FR | 描述 | 状态 |
 |---|---|---|
-| FR-OP-001 | 集群与节点 | ✅ |
+| FR-OP-001 | 集群与节点 | ◐ 集群更新端到端已接 (ClusterTab), 节点列表未实现 |
 | FR-OP-002 | 原子化 App 表 + 回滚 | ✅ |
 | FR-OP-003 | 兼容性检查 | ✅ |
 | FR-OP-004 | 晋级/渐进发布 | ✅ |
-| FR-OP-005 | 告警 | ✅ |
+| FR-OP-005 | 告警 | ❌ 无告警列表, 仅 MetricsTab 查询错误横幅 |
 
 ## §3 实现状态与文件映射
 
@@ -44,3 +44,4 @@ MERGE (self:File {path:"docs/requirements/SRS-OPS-CONSOLE-001.md"})
 | 日期 | 版本 | 内容 | commit |
 |---|---|---|---|
 | 2026-11-15 | v1.0 | 建档: mockup 设计提炼 + FR + 实现状态 (全量审计) | c0f149f2 |
+| 2026-11-15 | v1.1 | 状态回写核对 | 本提交 |
