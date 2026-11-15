@@ -44,9 +44,10 @@
 
 | # | 子任务 | 依赖 | 状态 |
 |---|---|---|---|
-| **W2.1** | star-api-rest 编译 + 启动 (8081, DATABASE_URL + JWT_PUBLIC_KEY_PEM per star-local-run skill) | — | 🟡 |
-| **W2.2** | next rewrites proxy 验证 (/api/v1/health 200, 401 语义正确) | W2.1 | 🟡 |
-| **W2.3** | 前端 auth 优雅降级走查 (NETWORK_UNREACHABLE 路径) | W2.2 | 🟡 |
+| **W2.1** | star-api-rest 编译 + 启动 (8081, DATABASE_URL + JWT_PUBLIC_KEY_PEM per star-local-run skill) | — | ✅ |
+| **W2.2** | next rewrites proxy 验证 (/api/v1/health 200, 401 语义正确) | W2.1 | ✅ |
+| **W2.3** | 前端 auth 优雅降级走查 (NETWORK_UNREACHABLE 路径) | W2.2 | ✅ |
+| **W2 验证** | 4 内核 crate 门面端点实装: /api/v1/collab/session + /collab/annotations (ide-collab-core)、/git/conflicts (star-git-core 真实 merge-file)、/argo/nodes (argo-core)、/sandtree/resources (sandtree-core) — lib.rs 注册 + integrations.rs 处理 (4e1565d1); **234 单元测试绿; PG 集成测试 2 失败为基线** (需隔离 PostgreSQL 的 #[ignore] 验收, 不阻塞主链路) | W2.1–2.3 | ✅ |
 
 ## §3 W3 — 画布 Miro 级工具集 (用户发令: 画笔等达到 Miro 标准)
 

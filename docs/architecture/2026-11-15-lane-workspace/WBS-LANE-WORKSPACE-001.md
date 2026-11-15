@@ -23,6 +23,7 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 | 聊天 | RightChatRail 全局折叠栏(默认展开=聊天); SideChatPanel task/global 双 scope | 底栏需 WORKTREE/GLOBAL 范围选择 + 当前范围标识 |
 | 会话/授权 | AuthorizedProjectSelector + AuthorizedProjectDirectoryState 存在; 401/403 区分未验证 | 需按需求六核对 |
 | mock 数据 | seed.ts deterministic mock (产品约束: preview/live 双模式, 本地 DB 基本为空) | 正式视图需标识数据来源; 未授权操作禁用 |
+| 实施状态 | Phase 1 (1.1–1.5) ✅ 已完成 — commit 462260e8; Phase 2.1/2.2 ✅ 已完成 — commit cfbfe4c5 | Phase 2.3–8 未开始 (见 §1 分阶段计划打钩) |
 
 ## 1. 分阶段计划
 
@@ -85,3 +86,11 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
   内部迁移完成 (需求一.5); 兼容映射: 前端 Lane 显示层 ↔ 内部 engineering_run 契约, 迁移列入 backlog。
 - seed/live 双模式保留 (产品约束, 本地 DB 基本为空) — 但 UI 必须标识数据来源 (preview 徽标),
   未授权写操作禁用 (需求三.2/3.3)。
+
+## 3. 修订历史
+
+| 日期 | 版本 | 内容 | commit |
+|---|---|---|---|
+| 2026-11-15 | v1.0 | 初版: 调查结论 + 8 阶段分阶段计划 + 关键决策 (Phase 1 打钩) | 462260e8 |
+| 2026-11-15 | v1.1 | Phase 2.1/2.2 打钩: BranchWorkspace → Lane 级中央应用, Group Workspace 双页签 | cfbfe4c5 |
+| 2026-11-15 | v1.2 | §0 状态表补实施状态行 (Phase 1/2.1/2.2 已完成 commit 指认) + 修订历史表 | 本提交 (见 git log) |
