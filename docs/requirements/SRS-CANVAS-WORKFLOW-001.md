@@ -1,4 +1,9 @@
 # SRS-CANVAS-WORKFLOW-001
+# SRS-CANVAS-WORKFLOW-001
+
+> ⚠️ **现状纠正 (2026-11-15)**: 任务看板功能已收敛为独立权威文档 —
+> 见 docs/requirements/SRS-KANBAN-001.md (1b mockup 对齐, 6 视图/创建栏/列操作)。
+> 本 SRS 保留 workflow/自动化流程域内容; 看板类改动只改 SRS-KANBAN-001。
 
 **无限画布 — 专题 3: n8n 式自动化流程 (Automation Flow) + 标签绑定任务卡**
 

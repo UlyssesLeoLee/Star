@@ -1,4 +1,9 @@
 # SRS-CANVAS-001
+# SRS-CANVAS-001
+
+> ⚠️ **现状纠正 (2026-11-15)**: /canvas 现在是**唯一无限画布入口** — 直进 canvas-001
+> 3 标签 (画布白板 / Agent 画布 / 关系图), 无三选一画廊; /canvas/worktree-graph 为 5 视图子页;
+> 非无限画布类 (workflow) 恢复独立页。Agent 中心已并入 (见 SRS-AGENT-VIEW-001 注记)。
 
 > **无限画布 (Infinite Canvas) 总册 SRS v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート; Worktree 群组集成补充)
 >

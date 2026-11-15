@@ -1,4 +1,8 @@
 # BD-AGENT-VIEW-001
+# BD-AGENT-VIEW-001
+
+> ⚠️ **现状纠正 (2026-11-15)**: Agent View 页面已并入 Canvas (Agent 画布标签),
+> 见 SRS-AGENT-VIEW-001 纠正注记; 本 BD 描述的画布组件 (AgentCanvasView) 仍复用, 宿主为 canvas/[id]。
 
 > **Agent View 基本設計書 v1.0** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >

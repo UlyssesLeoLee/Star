@@ -1,5 +1,8 @@
 ﻿# Star 平台《Frontend Canvas Design — 无限画布协作》
 
+> ⚠️ **现状纠正 (2026-11-15)**: canvas 现状以 docs/requirements/SRS-CANVAS-001.md 纠正注记为准
+> (3 标签直进 + ?tab 深链 + worktree-graph 子页 + Agent 中心并入 + workflow 独立页)。
+
 > **文档版本**: v0.1 (2026-08-26)
 > **修订历史**:
 >

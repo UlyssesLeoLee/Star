@@ -1,4 +1,9 @@
 # BD-CANVAS-001
+# BD-CANVAS-001
+
+> ⚠️ **现状纠正 (2026-11-15)**: /canvas 直进 3 标签 (无画廊); 新增 ?tab= 深链
+> (board/agent/relation); Worktree 图在 /canvas/worktree-graph; workflow 独立页。
+> 详见 SRS-CANVAS-001 纠正注记。
 
 > **无限画布 (Infinite Canvas) — 总册基本設計書 v0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >

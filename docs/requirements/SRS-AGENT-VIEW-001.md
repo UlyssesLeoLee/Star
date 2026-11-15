@@ -1,4 +1,11 @@
 # SRS-AGENT-VIEW-001
+# SRS-AGENT-VIEW-001
+
+> ⚠️ **现状纠正 (2026-11-15)**: Agent 中心所有无限画布已并入 Canvas 界面 —
+> /agent-view 等入口全部 307 → /canvas/canvas-001?tab=agent (commit 7b129089)。
+> 本 SRS 描述的 agent 拓扑画布能力现由 Canvas 的「Agent 画布」标签承载 (AgentViewPage 组件复用),
+> 不再作为独立页面。后续修改 agent 画布功能: 以本 SRS 为功能需求来源, 实现位置见
+> frontend/src/app/canvas/[id]/page.tsx。
 
 > **Agent View 要件定義書 v1.0** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >

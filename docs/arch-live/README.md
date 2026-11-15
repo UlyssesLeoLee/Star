@@ -17,7 +17,7 @@ docs/arch-live/index.html
 |---|---|---|
 | [index.html](index.html) | 规模基线 + 六层系统全景 + 7 步构造链 | 这个系统整体长什么样？ |
 | [01-crate-map.html](01-crate-map.html) | 110 个 crate 分 8 家族，可搜索/过滤 + 实装度 Top-15 | 我这段逻辑该写进哪个 crate？ |
-| [02-navigation-model.html](02-navigation-model.html) | Project → Engineering Run → Worktree → Branch 四级模型；源码支持无宿主 Run，目标 DB 与 checkout binding 部署门仍开放；59 个前端页面 + 54 条 REST 路由 | 一个页面/接口该挂在哪一层？ |
+| [02-navigation-model.html](02-navigation-model.html) | Project → Lane (对外层级; 内部 engineering_run 契约保留, per 2026-11-15) → Worktree → Branch 四级模型；源码支持无宿主 Run，目标 DB 与 checkout binding 部署门仍开放；59 个前端页面 + 54 条 REST 路由 | 一个页面/接口该挂在哪一层？ |
 | [03-request-lifecycle.html](03-request-lifecycle.html) | 13 步请求生命周期（可自动播放）+ 错误码语义 + 真实 SQL | 一次写操作在运行时怎么跑？ |
 | [04-agent-runtime.html](04-agent-runtime.html) | Agent 执行闭环 10 步 + Task 状态机 + Hook 判定器 + 资源预算 | Agent 到底被什么约束住？ |
 | [05-worktree-canvas.html](05-worktree-canvas.html) | worktree-canvas 14 crate + 3 WASM 桥 + ARG 三层 + Canvas 四进程 | 图谱 / Canvas / Agent 关系各由谁实现？ |

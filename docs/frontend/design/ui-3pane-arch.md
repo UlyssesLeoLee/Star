@@ -8,6 +8,17 @@
 > **关联**: `docs/frontend/design/ui-detailed-design.md` (像素级 wireframe)
 > **上游架构基线**: [`docs/frontend-internal-01-architecture.md`](../../frontend-internal-01-architecture.md)(组件树/Store 分层/模块依赖总纲,本文档为其三栏信息架构的下游延伸)
 
+
+
+## §0.2 现状纠正注记 (2026-11-15 Lane 工作空间收敛)
+
+> 本文件 v0.1/v0.2 的 5 tab 模型已演进, 现状以以下为准 (详见 docs/architecture/2026-11-15-lane-workspace/WBS-LANE-WORKSPACE-001.md):
+> 1. **导航层级 = Project → Lane → Worktree → Branch** (对外不再用 Engineering Run; 内部 engineering_run 契约保留)
+> 2. **Branch 功能集 = 顶栏固定页签**: 任务(/kanban) · 画布(/canvas 唯一无限画布入口) · 协同(/nema) · 沙盒(/sandbox) · 原型(/prototype)
+> 3. **侧栏两段**: LANE 树 (ProjectRunTree 四层) + 底部全局组 (收件箱/Agent 中心/分析) — Agent 中心已并入 Canvas (307 → /canvas/canvas-001?tab=agent)
+> 4. **添加模块界面 = 6 模块分组 + 设置** (MODULE_GROUPS: tasks/canvas/execution/analytics/agents/plugins; 非 7)
+> 5. **任务卡 = 可关闭子窗口** (WorkItemDetailDrawer; group 页深链 ?work_item_id= 同款)
+> 6. **右侧全局聊天栏** (RightChatRail 折叠 56px ⇄ 展开 320px) + WORKTREE/GLOBAL 范围 (IM1.0 域模型)
 ## §0.1 实装注记 (per 2026-08-29 22:49 JST Ulysses 拍板 + 2026-08-31 12:48 JST handoff 兜底)
 
 **4 view → 5 tab**: v0.1 §1.3 line 145-156 设计 `/projects` Cmd+1/2/3/4 = 看板/时间线/列表/概览 (4 view), 实装 (per `frontend/src/app/projects/page.tsx:78` ProjectsTabId) 5 tab: **kanban / timeline / backlog / agents / worktrees** (option 1, per `commit 7d85c34` 2026-08-29 22:49 JST 拍板)。

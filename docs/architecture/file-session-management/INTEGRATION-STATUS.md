@@ -4,7 +4,7 @@
 
 ## 与当前导航/归属规范的差异
 
-当前主导航和协作边界为 **Project → Cloud Branch → Engineering Run → 本地 Worktree**。Run 是任务、Canvas、Inbox、BI/Benchmark、Workflow/LangGraph 与插件应用协作的 canonical scope；Worktree 是绑定 Branch 的本地 checkout。现有提案将 FileSession 直接放在 Worktree 下，并与 Task Card 并列，未经裁决不能视为当前层级。
+当前主导航和协作边界为 **Project → Cloud Branch → Lane (对外层级; 内部 engineering_run 契约保留, per 2026-11-15) → 本地 Worktree**。Run 是任务、Canvas、Inbox、BI/Benchmark、Workflow/LangGraph 与插件应用协作的 canonical scope；Worktree 是绑定 Branch 的本地 checkout。现有提案将 FileSession 直接放在 Worktree 下，并与 Task Card 并列，未经裁决不能视为当前层级。
 
 ## 实施前必须裁决
 
