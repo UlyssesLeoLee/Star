@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=39f2ce2ae14f726209800dbc377d0311993fa36a4faaf96380db9daca0b30d3a
+@cypher schema=1 source_sha256=6995789fcd228e2199fe12379132138a3f231103c25378da13e00b67edb15540
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -44,9 +44,19 @@ export function RightChatRail() {
       } catch {
         /* ignore */
       }
+      // 顶端内容 (AppHeader) 随展开/折叠自适应排版
+      document.documentElement.style.setProperty("--chat-rail-w", next ? "320px" : "56px");
       return next;
     });
   };
+
+  // 初始化 CSS 变量 (恢复持久化状态)
+  useEffect(() => {
+    document.documentElement.style.setProperty("--chat-rail-w", open ? "320px" : "56px");
+    return () => {
+      document.documentElement.style.removeProperty("--chat-rail-w");
+    };
+  }, [open]);
 
   const totalMessages = topics.reduce((acc, t) => acc + t.messages.length, 0);
 
@@ -54,7 +64,7 @@ export function RightChatRail() {
     <div
       data-testid="right-chat-rail"
       className={clsx(
-        "shrink-0 border-l border-line bg-bg-card flex flex-col h-full transition-all duration-200",
+        "shrink-0 border-l-2 border-line bg-bg-card/95 backdrop-blur-xl flex flex-col h-full transition-all duration-200",
         open ? "w-80" : "w-14",
       )}
     >

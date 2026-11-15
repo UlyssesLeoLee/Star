@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=337ef632b37af63a1aa1abbc1b4aecfb35e32ee955d1408827baf8f7e6ff7bdc
+@cypher schema=1 source_sha256=ca77642bc0956b24ca34f1e852b4c22e04e0cda80b63370b10a8ad7cc00fb817
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -52,11 +52,12 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
         SubNav slot — U2 接管, 会在路由为 /projects /agents /analytics 时
         自动渲染 180px sticky 左侧导航 (per §4). 当前 U1 不实现, 留 comment 占位.
       */}
-      {/* 主区 + 全局右侧可折叠聊天栏 (per 2026-11-14: 所有界面通用) */}
-      <div className="relative z-10 flex" style={{ height: "calc(100vh - 64px)" }}>
+      {/* 主区 + 全局右侧可折叠聊天栏 (per 2026-11-14: 所有界面通用;
+          header 76px → 高度按 76px 对齐, 聊天栏顶端不被截断) */}
+      <div className="relative z-10 flex" style={{ height: "calc(100vh - 76px)" }}>
         <main
           data-testid="app-main"
-          style={fullBleed ? { minHeight: "calc(100vh - 64px)" } : { minHeight: "calc(100vh - 64px)" }}
+          style={fullBleed ? { minHeight: "calc(100vh - 76px)" } : { minHeight: "calc(100vh - 76px)" }}
           className={
             fullBleed
               ? "overflow-hidden w-full"

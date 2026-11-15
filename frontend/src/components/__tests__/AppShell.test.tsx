@@ -2,7 +2,7 @@
 // AppShell.test.tsx — AppShell layout test (per design §3 + §8.1)
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=9cb1c103f823e5ae9e8d320dc7470fd4b4275c43d14eee94aacf41129e15d16c
+@cypher schema=1 source_sha256=da6d34b07545d9301c23954a3892a099de22ecad3bf757a33bc62aaf7919333a
 MERGE (self:File {path:"frontend/src/components/__tests__/AppShell.test.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/AppShell.tsx::AppShell",kind:"component"})
 MERGE (self)-[:IMPORTS]->(shell)
@@ -79,14 +79,13 @@ describe("AppShell", () => {
     expect(shell.className).toMatch(/min-h-screen/);
   });
 
-  it("app-main has min-height calc(100vh - 64px) inline style (per §3 64px 顶栏)", () => {
+  it("app-main has min-height calc(100vh - 76px) inline style (per 2026-11-14: 顶栏 76px)", () => {
     renderWithI18n(
       <AppShell>
         <span>x</span>
       </AppShell>
     );
     const main = screen.getByTestId("app-main");
-        // calc(-64px + 100vh) 与 calc(100vh - 64px) 数学等价，浏览器标准化后顺序不固定
-        expect(main.style.minHeight).toMatch(/calc\(.*(100vh.*64px|64px.*100vh).*\)/);
+    expect(main.style.minHeight).toMatch(/calc\(.*(100vh.*76px|76px.*100vh).*\)/);
   });
 });

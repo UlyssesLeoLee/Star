@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=82a08e8bd4f58728aca4ec5e7389f5becbd78b9fdc2d1a266e4bc2bb472fb302
+@cypher schema=1 source_sha256=2e88c6115dff3a5b345da2b4e5b9f01569047a23bb4c1ebe65bb656e4065186e
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:IMPORTS]->(guardedLink)
@@ -63,6 +63,7 @@ export function AppHeader() {
       <header
         data-testid="app-header"
         className="h-[76px] sticky top-0 z-30 border-b-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))]/95 backdrop-blur-xl cel-shadow transition-all select-none text-[var(--cel-text-primary,var(--color-text))]"
+        style={{ paddingRight: "var(--chat-rail-w, 56px)" }}
       >
         <div className="h-full px-6 flex items-center gap-4">
           {/* === Left: Workspace Switcher + Worktree ID sub-label === */}
