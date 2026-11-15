@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a3b21d8a9c3bacb33f4cd753210ea63088561680cff6c85f29f268fa5e7281c6
+@cypher schema=1 source_sha256=bc255932dbcff9305497cdaed232f11b90227955b355bd7c03e817b1fd52e8ea
 MERGE (self:File {path:"frontend/src/components/run/BranchWorkspace.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/BranchWorkspace.tsx::BranchWorkspace",kind:"component"})
 MERGE (self)-[:DEFINES]->(shell)
@@ -244,6 +244,7 @@ export function BranchWorkspace({ worktreeId, branch, projectId, laneId }: {
         projectId={projectId}
         tenantId={worktree?.tenant_id}
         reporterId="usr-002"
+        onOpenChildTask={(childId) => setDrawer({ kind: "view", workItemId: childId })}
       />
     </section>
   );

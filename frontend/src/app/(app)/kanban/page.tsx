@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=ed236fb318eb15cdb4d05d4a6e7c5fee722b134b887ad6f47ff28791639f9c15
+@cypher schema=1 source_sha256=9e7d48317272244455b1dc36d68f0ca4838cede20fbc59cb22e8f84b541b9fb5
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -432,6 +432,7 @@ export default function KanbanPage() {
         projectId={projectId}
         tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
         reporterId={project?.owner_id ?? "usr-002"}
+        onOpenChildTask={(childId) => setDrawerMode({ kind: "view", workItemId: childId })}
       />
     </div>
   );

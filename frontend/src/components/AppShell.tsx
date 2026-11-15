@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d0ace1ffc6615b2023c547640594432b93e6f92820863c29bd8e8b3bab93cf64
+@cypher schema=1 source_sha256=bc1a7bc1712dc512790b5ee5f82fd0bfc064ed8ad4920f88b9628265de937cda
 MERGE (self:File {path:"frontend/src/components/AppShell.tsx"})
 @endcypher
 */
@@ -54,13 +54,16 @@ export function AppShell({ children, fullBleed = false, wide = false }: AppShell
       */}
       {/* 主区 + 全局右侧可折叠聊天栏 (per 2026-11-14: 所有界面通用;
           header 76px → 高度按 76px 对齐, 聊天栏顶端不被截断) */}
-      <div className="relative z-10 flex" style={{ height: "calc(100vh - 76px)" }}>
+      <div
+        className="relative z-10 flex"
+        style={{ height: "calc(100vh - 76px)", paddingRight: "var(--chat-rail-w, 56px)" }}
+      >
         <main
           data-testid="app-main"
           style={fullBleed ? { minHeight: "calc(100vh - 76px)" } : { minHeight: "calc(100vh - 76px)" }}
           className={
             fullBleed
-              ? "overflow-hidden w-full"
+              ? "overflow-x-auto overflow-y-hidden w-full"
               : wide
                 ? "px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-y-auto w-full"
                 : "px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-y-auto max-w-[1440px] mx-auto w-full"

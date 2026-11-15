@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=88dca54bb97873b8eb7028d0251090ac9cd5ac2f72d1833576c5bbed2ae447f3
+@cypher schema=1 source_sha256=b5cb2c7260cd2a0b10ea0a895805b678fedae3910bdd8207424d6987f2b0a040
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
@@ -425,4 +425,13 @@ export function AgentViewPage({ variant }: {
   );
 }
 
-export default AgentViewPage;
+/**
+ * /agent-view 路由页 (per 2026-11-15 用户发令: Agent 中心界面不要了 —
+ *   无限画布类 (agent 关系图等) 全部合并进 canvas 界面)
+ *   AgentViewPage 组件本身保留 — canvas「Agent 画布」tab 仍复用其 canvas-only 变体
+ */
+import { redirect } from "next/navigation";
+
+export default function AgentViewRoutePage() {
+  redirect("/canvas/canvas-001?tab=relation");
+}
