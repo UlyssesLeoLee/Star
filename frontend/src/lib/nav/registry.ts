@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=75638b202bb56d930cd284e11388a1ea967f5b96b9428eaa95e40571a563e876
+@cypher schema=1 source_sha256=53f3f3808d7f5dfd9df01ba8dc6ba3c306987e33ca621b7bc050d8a63874e603
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -321,7 +321,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "validation",
     label: "Validation Test",
     code: "VAL",
-    href: "/validation",
+    href: "/agent-view?tab=validation",
     category: "agent",
     categoryLabel: "Worktree / Agent",
     description: "自动化用例验证与断言测试套件",
@@ -341,7 +341,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "feedback",
     label: "Agent Feedback",
     code: "FB",
-    href: "/feedback",
+    href: "/inbox?type=feedback",
     category: "agent",
     categoryLabel: "Worktree / Agent",
     description: "人机协作反馈回路与异常预警",
@@ -359,6 +359,16 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "无限画布 · 当前工作 agent 关联 worktree / work-items 拓扑图",
     icon: Bot,
   },
+  {
+    id: "agent-relationships",
+    label: "Agent Relationships",
+    code: "AR",
+    href: "/agent-relationships",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "Agent 关系图谱 (成就/编辑/模板/视图, per 2026-11-15 canvas 自审补注册)",
+    icon: Network,
+  },
 
   // ── Work Management Modules ──────────────────────────────────────
   {
@@ -375,7 +385,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "development",
     label: "Development Hub",
     code: "DEV",
-    href: "/development",
+    href: "/agent-view?tab=development",
     category: "work",
     categoryLabel: "Work Management",
     description: "变更集 ChangeSet 与分支代码协同",
@@ -605,7 +615,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     href: "/canvas",
     category: "agent",
     categoryLabel: "Worktree / Agent",
-    description: "无限画布中心 · Canvas / Worktree 图 / Agent 拓扑统一入口 (per 2026-11-14 用户发令整合)",
+    description: "无限画布中心 · 白板/Agent画布/关系图 3 标签 (Worktree 5 视图在关系图标签内直达)",
     icon: Network,
   },
   {
@@ -721,7 +731,7 @@ export const NAV_GROUP_ORDER: NavGroupId[] = [
 //   Branch 固定页签(任务/画布) + 可添加页签(验证/BI/插件) + 全局组 + 设置
 // 归并结果: 6 模块 + 设置(右上角用户菜单, 不算模块)
 //   1. 任务 (看板/Backlog/时间线/问题/规划/Sprint/Worktree)
-//   2. 画布 (白板/关系图/流程/上下文/协同/原型)
+//   2. 画布 (白板/Agent画布/关系图 — 只无限画布类, per 二轮收紧)
 //   3. 执行 (开发/重构/NEMA/验证/反馈)
 //   4. 分析 (概览/运维/审计/沙盒)
 //   5. Agent 中心 (会话/Runtime/远程/搜索 + 收件箱流)
@@ -752,14 +762,14 @@ export const MODULE_GROUPS: ModuleGroupDef[] = [
     id: "canvas",
     name: "画布",
     blurb: "全部无限画布集中: 白板/Agent画布/关系图 (标签切换)",
-    tabs: ["canvas", "agent-view", "agent-relationships", "prototype"],
+    tabs: ["canvas", "agent-view", "agent-relationships"],
     defaultTab: "canvas",
   },
   {
     id: "execution",
     name: "执行",
-    blurb: "开发 · 重构 · NEMA · 验证 · 反馈",
-    tabs: ["development", "refactor", "nema", "validation", "feedback"],
+    blurb: "开发 · 重构 · NEMA · 验证 · 反馈 · 原型",
+    tabs: ["development", "refactor", "nema", "validation", "feedback", "prototype"],
     defaultTab: "development",
   },
   {

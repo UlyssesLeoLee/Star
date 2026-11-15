@@ -33,7 +33,7 @@ const LEGACY_REDIRECTS = [
   { source: "/planning", destination: "/projects?tab=timeline", permanent: false },
   { source: "/scm", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/collaboration", destination: "/projects?tab=worktrees", permanent: false },
-  { source: "/workflow", destination: "/projects?tab=timeline", permanent: false },
+  // /workflow: no redirect — 独立页 src/app/workflow/page.tsx 直接可达 (2026-11-15 canvas 自审)
   { source: "/relation", destination: "/projects?tab=worktrees", permanent: false },
   // /canvas/:id 不在 legacy redirect 列表 (per 2026-09-04 canvas e2e 守门 prerequisite):
   //   app/canvas/[id]/page.tsx (CanvasView 详情页) 是设计文档意图主入口.

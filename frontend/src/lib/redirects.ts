@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=facd0d93acd822e6645cb56c2a19025ac238834767d9a42b26d7f088f01a1a35
+@cypher schema=1 source_sha256=596d7e6f975e123a33cf0ed782ff5cfe5a240f874c6311469706a78b584f026c
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -68,12 +68,9 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     destination: "/projects?tab=worktrees",
     permanent: false,
   },
-  {
-    // per 2026-11-14 二轮: workflow 恢复独立页 (非无限画布类, 不进 canvas)
-    source: "/workflow",
-    destination: "/projects?tab=timeline",
-    permanent: false,
-  },
+  // /workflow 无 redirect (per 2026-11-15 canvas 自审):
+  //   workflow 已恢复独立页 (src/app/workflow/page.tsx), redirect 规则在路由层
+  //   抢先拦截会让独立页永远不可达 — 与二轮拍板语义矛盾, 删除规则。
   {
     source: "/relation",
     destination: "/projects?tab=worktrees",

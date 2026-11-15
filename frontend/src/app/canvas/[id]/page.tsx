@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4a125a48de9ecf2f47146b9eea03f2c476854db7c76489ef15f168da72265947
+@cypher schema=1 source_sha256=d5a60069c1b396b12babd40ae03cba5b8c870c1bec3e6c587b68e5c87362b391
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -22,6 +22,7 @@ MERGE (self)-[:IMPORTS]->(agentCanvas)
 // =====================================================================
 
 import { Suspense, useState } from "react";
+import { Network } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CanvasView } from "@/components/CanvasView";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
@@ -90,6 +91,16 @@ export default function CanvasDetailPage() {
       case "关系图":
         return (
           <div className="h-full overflow-y-auto p-4" data-testid="canvas-tab-relation">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs text-ink-dim">租户关系图 (RelationshipView)</span>
+              <a
+                href="/canvas/worktree-graph"
+                data-testid="canvas-relation-open-wtg"
+                className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+              >
+                <Network size={12} /> Worktree 图 · 5 视图
+              </a>
+            </div>
             <RelationshipView tenantId="tn-001" />
           </div>
         );

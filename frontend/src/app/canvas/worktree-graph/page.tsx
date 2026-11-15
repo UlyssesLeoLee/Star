@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d50127f7f085a5c9850b6ae1ed722e4b74b5ea8a04a2d1361e2cffcafe25a5df
+@cypher schema=1 source_sha256=f7a2b5944f22b05a5cee42f76645e9ca7df36949fee043407832fc26f256a756
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -184,6 +184,13 @@ export default function WorktreeGraphPage() {
     <div className="flex h-full flex-col bg-bg">
       {/* 顶部视图切换 */}
       <div className="flex items-center gap-4 border-b border-line bg-bg-card px-4 py-2">
+        <a
+          href="/canvas/canvas-001"
+          data-testid="wtg-back-canvas"
+          className="flex items-center gap-1 text-[11px] text-ink-mute hover:text-accent shrink-0"
+        >
+          <Network size={12} /> 画布
+        </a>
         <div className="flex items-center gap-1">
           {GRAPH_VIEWS.map((v) => (
             <button

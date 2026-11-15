@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a3397972dd843e7c71aae76d74f5d35fcafe930e77f6332b1cca558ff660fc8e
+@cypher schema=1 source_sha256=fa5b91be5b26ff6cdc6b2d2907f1d3dc1f04f8758133a52cdf7b74e68ed01bb8
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -38,6 +38,7 @@ import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { GanttView } from "@/components/gantt";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
@@ -99,6 +100,13 @@ export default function KanbanPage() {
       /* 创建失败静默 (store 本地) */
     }
   };
+
+  // 列内创建 Drawer + 列操作 (per 2026-11-15 用户发令: 每列创建按钮/移动列/增减列 — 沿用原有 kanban 功能)
+  const [drawerMode, setDrawerMode] = useState<WorkItemDrawerMode | null>(null);
+  const addBoardColumn = useStore((s) => s.addBoardColumn);
+  const removeBoardColumn = useStore((s) => s.removeBoardColumn);
+  const renameBoardColumn = useStore((s) => s.renameBoardColumn);
+  const reorderBoardColumns = useStore((s) => s.reorderBoardColumns);
 
   const [activeView, setActiveView] = useState<ViewTab>("Sprint");
 
@@ -173,6 +181,31 @@ export default function KanbanPage() {
               {tab}
             </button>
           ))}
+        </div>
+
+        {/* Branch 上下文条 (per 2026-11-15 用户发令: 不放右侧栏位, 内容进中心区域) */}
+        <div data-testid="kanban-branch-context" className="flex items-center gap-2 flex-wrap text-[11px]">
+          <a href="/worktree" className="flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 font-semibold text-ok hover:bg-ok/20 transition-colors">
+            <GitBranch size={11} /> feat/relation-bfs · 干净
+          </a>
+          <a href="/canvas/canvas-001" className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent hover:bg-accent/20 transition-colors">
+            <PenTool size={11} /> 画布
+          </a>
+          <span className="flex items-center gap-1 text-ink-mute">
+            <Users size={11} />
+            <span className="flex -space-x-1">
+              {identities.slice(0, 4).map((who, i) => (
+                <span
+                  key={who.id ?? i}
+                  title={who.display_name}
+                  className="size-5 rounded-full border border-line bg-accent/15 text-accent text-[9px] font-bold grid place-items-center"
+                >
+                  {who.display_name?.slice(0, 1) ?? "?"}
+                </span>
+              ))}
+            </span>
+            {identities.length} 在线
+          </span>
         </div>
 
         {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
@@ -250,6 +283,11 @@ export default function KanbanPage() {
               identities={identities}
               onTransition={transitionWorkItem}
               onWorkItemClick={(id) => router.push(`/work-item/${id}`)}
+              onRequestNewWorkItem={(status) => setDrawerMode({ kind: "new", defaultStatus: status })}
+              onAddColumn={addBoardColumn}
+              onRemoveColumn={removeBoardColumn}
+              onRenameColumn={renameBoardColumn}
+              onReorderColumns={reorderBoardColumns}
             />
           </section>
         )}
@@ -326,59 +364,14 @@ export default function KanbanPage() {
         )}
       </main>
 
-      {/* ============ 右侧 rail (per 2026-11-14: 内容改子页面, 聊天由全局右侧聊天栏接管) ============ */}
-      <aside data-testid="kanban-right-rail" className="w-72 shrink-0 border-l border-line bg-bg-card flex flex-col">
-        <div className="px-3 py-2.5 border-b border-line flex items-center gap-2 text-xs font-semibold text-ink-dim">
-          <GitCommitHorizontal size={13} className="text-ok" />
-          Branch 上下文
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          <a
-            href="/worktree"
-            data-testid="kanban-rail-worktree-link"
-            className="flex items-center gap-2 rounded-lg border border-line bg-bg p-2.5 hover:border-accent/50 transition-colors"
-          >
-            <GitBranch size={13} className="text-ok shrink-0" />
-            <span className="min-w-0">
-              <span className="block text-xs font-semibold text-ink">Worktree 状态</span>
-              <span className="block text-[10px] font-mono text-ink-mute">feat/relation-bfs · 干净 →</span>
-            </span>
-          </a>
-
-          <a
-            href="/canvas/canvas-001"
-            data-testid="kanban-rail-canvas-link"
-            className="flex items-center gap-2 rounded-lg border border-line bg-bg p-2.5 hover:border-accent/50 transition-colors"
-          >
-            <PenTool size={13} className="text-accent shrink-0" />
-            <span className="min-w-0">
-              <span className="block text-xs font-semibold text-ink">画布</span>
-              <span className="block text-[10px] font-mono text-ink-mute">关系图 / Agent 画布 / 流程 →</span>
-            </span>
-          </a>
-
-          <div className="pt-1">
-            <div className="flex items-center gap-2 text-xs font-semibold text-ink-dim mb-1.5">
-              <Users size={13} className="text-ink-dim" /> Team
-            </div>
-            <div className="flex -space-x-1.5">
-              {identities.slice(0, 4).map((who, i) => (
-                <span
-                  key={who.id ?? i}
-                  title={who.display_name}
-                  className="size-7 rounded-full border-2 border-line bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
-                >
-                  {who.display_name?.slice(0, 1) ?? "?"}
-                </span>
-              ))}
-              <span className="size-7 rounded-full border-2 border-line bg-bg-soft text-ink-dim text-[9px] font-bold grid place-items-center">
-                {identities.length} 在线
-              </span>
-            </div>
-          </div>
-        </div>
-      </aside>
+      {/* 列内创建 Drawer (per 2026-11-15: 每列 +Add task → Drawer 新建) */}
+      <WorkItemDetailDrawer
+        open={drawerMode}
+        onClose={() => setDrawerMode(null)}
+        projectId={projectId}
+        tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
+        reporterId={project?.owner_id ?? "usr-002"}
+      />
     </div>
   );
 }
