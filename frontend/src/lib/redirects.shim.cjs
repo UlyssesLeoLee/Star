@@ -46,7 +46,7 @@ const LEGACY_REDIRECTS = [
   // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
   { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
   { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/agent-view", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  // /agent-view: no redirect — Agent 中心独立页 (非无限画布) 直接可达 (2026-11-15)
   { source: "/validation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
   { source: "/automation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
   { source: "/development", destination: "/canvas/canvas-001?tab=agent", permanent: false },

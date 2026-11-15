@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=28f7041e3bb87a8b4aa9a74fd25530cba9ed81b5fbe9fee1229ef6c2118701b4
+@cypher schema=1 source_sha256=2ca0cc80335cff1d3652718c8c2a71898887e4f04b132d392d3be1045256583a
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -127,7 +127,7 @@ export default function CanvasDetailPage() {
       case "Agent 画布":
         return (
           <div className="h-full overflow-hidden" data-testid="canvas-tab-agent-canvas">
-            <AgentViewPage />
+            <AgentViewPage variant="canvas-only" />
           </div>
         );
       case "关系图":

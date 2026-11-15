@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=de035e9f20d7cd1229d1ebc914ff607a2391c2bd34c69b4f196fb19ad204b643
+@cypher schema=1 source_sha256=8a8f6bfdb3af7571c46ce88cdee3f344d96cf74167b7d1efded0dc919099ea4e
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -212,7 +212,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     // Per 2026-09-02 16:13 JST 域分色: Agents 是智能 agent 编排, 归 agent 域
     category: "agent",
     categoryLabel: "Core Workspace",
-    description: "Agent 中心已并入画布 — 无限画布集中在 Canvas 的 Agent 画布标签 (per 2026-11-15)",
+    description: "Agent 中心 (非无限画布: 工作流/设置) — Agent 无限画布在 Canvas 的 Agent 画布选项卡 (per 2026-11-15)",
     icon: Bot,
     isCore: true,
   },
@@ -353,10 +353,10 @@ export const ALL_MODULES: ModuleDefinition[] = [
     id: "agent-view",
     label: "Agent View",
     code: "AV",
-    href: "/canvas/canvas-001?tab=agent",
+    href: "/agent-view",
     category: "agent",
     categoryLabel: "Worktree / Agent",
-    description: "无限画布 · 当前工作 agent 关联 worktree / work-items 拓扑图",
+    description: "Agent 中心 (非无限画布: 工作流/设置) — Agent 无限画布在 Canvas 的 Agent 画布选项卡 (per 2026-11-15)",
     icon: Bot,
   },
   {

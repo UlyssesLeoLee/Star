@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b257c91e02ba67986d003c07471e458dad96857c9e4cc02084294474020ae463
+@cypher schema=1 source_sha256=1f90ff31a2bdf9311a15c2c6e38e0c5c7f26927c00f8b205b994964ce2898a15
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -95,7 +95,8 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
   //     /agent-view 独立页关闭, 全部 307 → canvas Agent 画布标签 ?tab=agent) ──
   { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
   { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/agent-view", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  // /agent-view 无 redirect (per 2026-11-15: Agent 中心恢复独立页 — 只放非无限画布 workflow/settings;
+  // 无限画布 (Agent 拓扑) 在 canvas 选项卡内 canvas-only)
   {
     source: "/validation",
     destination: "/canvas/canvas-001?tab=agent",

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=25bc13a3837ba157855784df0569bf0e19fcdf6fc3c92c9510e5f54e80887b2f
+@cypher schema=1 source_sha256=c679165db2c0c41175f17041714212ce468a9536ec14f9d0279e7bcc64f45a3f
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
@@ -76,7 +76,11 @@ import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
 
 type ViewMode = "canvas" | "settings" | "relationships" | "workflow";
 
-function AgentViewContent() {
+function AgentViewContent({ variant }: {
+  /** per 2026-11-15: canvas-only = 只渲染 Agent 无限画布 (canvas 选项卡内, 无子层级);
+   *  center = Agent 中心独立页 (只放非无限画布: workflow/settings) */
+  variant?: "canvas-only" | "center";
+}) {
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -109,13 +113,13 @@ function AgentViewContent() {
 
   // View 模式通过 URL 保留，默认显示工作画布。
   const [viewMode, setViewMode] = useState<ViewMode>(
-    urlView === "settings"
-      ? "settings"
-      : urlView === "relationships"
-        ? "relationships"
+    variant === "canvas-only"
+      ? "canvas"
+      : urlView === "settings"
+        ? "settings"
         : urlView === "workflow"
           ? "workflow"
-          : "canvas",
+          : "workflow",
   );
 
   // 用户注释 / 自由连接 (per 2026-10-01 OOB 恢复无限画布画笔) - local-only state + localStorage 持久化 + undo/redo
@@ -270,37 +274,25 @@ function AgentViewContent() {
       </div>
 
       {/* Agent workspace views */}
-      <div className="border-b-2 border-black bg-[var(--cel-surface-card, var(--color-surface-2))] px-6 py-2.5 flex items-center gap-2.5 shadow-soft" data-testid="view-mode-tabs">
-        <button
-          data-testid="view-mode-canvas"
-          onClick={() => handleViewModeChange("canvas")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "canvas" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
-        >
-          <LayoutDashboard size={13} /> Canvas
-        </button>
-        <button
-          data-testid="view-mode-relationships"
-          onClick={() => handleViewModeChange("relationships")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "relationships" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
-        >
-          <Network size={13} /> Relationship
-        </button>
-        <button
-          data-testid="view-mode-workflow"
-          onClick={() => handleViewModeChange("workflow")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "workflow" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
-        >
-          <Workflow size={13} /> Workflow 工作流
-        </button>
-        <button
-          data-testid="view-mode-settings"
-          onClick={() => handleViewModeChange("settings")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "settings" ? "bg-[var(--cel-text-primary, var(--color-text))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
-        >
-          <Settings size={13} /> Agent 设置
-        </button>
-      </div>
-
+      {variant !== "canvas-only" && (
+        <div className="border-b-2 border-black bg-[var(--cel-surface-card, var(--color-surface-2))] px-6 py-2.5 flex items-center gap-2.5 shadow-soft" data-testid="view-mode-tabs">
+          <span className="mr-1 text-[10px] font-mono font-bold text-ink-mute uppercase tracking-widest">Agent 中心</span>
+          <button
+            data-testid="view-mode-workflow"
+            onClick={() => handleViewModeChange("workflow")}
+            className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "workflow" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
+          >
+            <Workflow size={13} /> Workflow 工作流
+          </button>
+          <button
+            data-testid="view-mode-settings"
+            onClick={() => handleViewModeChange("settings")}
+            className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "settings" ? "bg-[var(--cel-text-primary, var(--color-text))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
+          >
+            <Settings size={13} /> Agent 设置
+          </button>
+        </div>
+      )}
       {/* Content (switch by viewMode) */}
       {viewMode === "canvas" ? (
         <>
@@ -425,10 +417,14 @@ function AgentViewContent() {
   );
 }
 
-export function AgentViewPage() {
+export function AgentViewPage({ variant }: {
+  /** per 2026-11-15: canvas-only = canvas 选项卡内的纯 Agent 无限画布 (无子层级);
+   *  center (默认) = Agent 中心独立页 (只放非无限画布: workflow/settings) */
+  variant?: "canvas-only" | "center";
+}) {
   return (
     <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-ink-dim">Loading Agent workspace…</div>}>
-      <AgentViewContent />
+      <AgentViewContent variant={variant} />
     </Suspense>
   );
 }
