@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e8104eb24ec79e60db54157666e757ee04da7e0eb37dabb4eac6f75afb736b00
+@cypher schema=1 source_sha256=bc97454f1542cc9b2c0cfcfac4860d53ef74463747bf8cac910304204c44e3d9
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -34,11 +34,13 @@ import {
   Flag,
   Search,
   Check,
+  Brain,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { IdentityPanel, ProfilePanel, PermissionPanel, TenantPanel } from "@/components/settings/IdentityPanels";
 import { IntegrationPanels } from "@/components/settings/IntegrationPanels";
 import { ModDirectory } from "@/components/settings/ModDirectory";
+import { MemorySettingsPanel } from "@/components/settings/MemorySettingsPanel";
 
 interface NavItem {
   id: string;
@@ -54,6 +56,12 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
       { id: "profile", label: "个人资料", icon: <User size={13} />, href: "" },
       { id: "apikeys", label: "凭据与 API Key", icon: <Key size={13} />, href: "/settings/api-keys" },
       { id: "cli-profiles", label: "CLI 配置", icon: <Terminal size={13} />, href: "/settings/cli-profiles" },
+    ],
+  },
+  {
+    group: "Agent",
+    items: [
+      { id: "memory", label: "总记忆", icon: <Brain size={13} />, href: "" },
     ],
   },
   {
@@ -193,6 +201,7 @@ const LEGACY_TAB_MAP: Record<string, { id: string; label: string }> = {
   webhooks: { id: "webhooks", label: "API 与 Webhook" },
   flags: { id: "flags", label: "Feature Flags" },
   "cli-profiles": { id: "cli-profiles", label: "CLI 配置" },
+  memory: { id: "memory", label: "总记忆" },
 };
 
 function SettingsInner() {
@@ -261,6 +270,8 @@ function SettingsInner() {
             <PermissionPanel />
           ) : activeId === "tenant" ? (
             <TenantPanel />
+          ) : activeId === "memory" ? (
+            <MemorySettingsPanel projects={useStore((s) => s.projects)} />
           ) : activeId === "scm" || activeId === "automation" || activeId === "webhooks" ||
             activeId === "skills" || activeId === "plugins" || activeId === "hooks" || activeId === "flags" ? (
             <IntegrationPanels active={activeId} />

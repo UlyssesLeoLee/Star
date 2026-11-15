@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5ab21916a30683eca7549dad46104fbeb447689b87b681af76623b5a23f27ccb
+@cypher schema=1 source_sha256=3dc373e4c7549702c56f7f304e771266ed4de8eb48c1d0e16fbbda5dd575acc2
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -18,10 +18,11 @@ MERGE (self)-[:IMPORTS]->(panel)
 // =====================================================================
 
 import { useEffect, useState } from "react";
-import { MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { MessageSquare, PanelRightClose, PanelRightOpen, Braces } from "lucide-react";
 import { clsx } from "clsx";
 import { SideChatPanel } from "./SideChatPanel";
 import { useChatStore, CHAT_MODELS, type ChatEffort } from "@/lib/chat/chatStore";
+import { ContextPanel, estimateTokens } from "@/components/agent/ContextPanel";
 import { useTranslation } from "@/lib/i18n";
 
 export function RightChatRail() {
@@ -29,7 +30,25 @@ export function RightChatRail() {
   const topics = useChatStore((s) => s.topics);
   const chatScope = useChatStore((s) => s.chatScope);
   const setChatScope = useChatStore((s) => s.setChatScope);
-  const [open, setOpen] = useState(false);
+  const activeTopicId = useChatStore((s) => s.activeTopicId);
+  const [ctxOpen, setCtxOpen] = useState(false);
+  const [ctxCompactState, setCtxCompactState] = useState<"idle" | "compacting" | "done" | "failed">("idle");
+
+  const activeTopic = topics.find((tp) => tp.id === activeTopicId) ?? null;
+  const activeTopicMessages = (activeTopic?.messages ?? []).map((msg) => ({
+    id: msg.id,
+    role: msg.authorKind,
+    content: msg.text,
+    timestamp: msg.sequence.toString(),
+  }));
+  const ctxTokenEstimate = activeTopicMessages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+  const compactContext = async () => {
+    setCtxCompactState("compacting");
+    await new Promise((r) => setTimeout(r, 600));
+    setCtxCompactState("done");
+  };
+
+const [open, setOpen] = useState(false);
 
   // 持久化展开状态
   useEffect(() => {

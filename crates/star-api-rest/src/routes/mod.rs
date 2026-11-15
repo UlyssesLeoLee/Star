@@ -1,8 +1,12 @@
 /*
-@cypher schema=1 source_sha256=36407e46a20969629a384b97030b7ccddb939936b1ba8276ed4758576fb8989f
+@cypher schema=1 source_sha256=1f94213b73168f39da2d4d1794be19a17fec5f25866527ba8f29dfdd36fe0dd6
 MERGE (self:File {path:"crates/star-api-rest/src/routes/mod.rs"})
 MERGE (integrations:File {path:"crates/star-api-rest/src/routes/integrations.rs"})
+MERGE (memory:File {path:"crates/star-api-rest/src/routes/memory.rs"})
+MERGE (agents:File {path:"crates/star-api-rest/src/routes/agents.rs"})
 MERGE (self)-[:DECLARES]->(integrations)
+MERGE (self)-[:DECLARES]->(memory)
+MERGE (self)-[:DECLARES]->(agents)
 @endcypher
 */
 // SPDX-License-Identifier: MIT OR Apache-2.0
@@ -13,6 +17,7 @@ MERGE (self)-[:DECLARES]->(integrations)
 //! - `code` (4) + `context` (1) + `merge_requests` (1) + `reviews` (1) + `validations` (1) + `submissions` (1) + `pipelines` (1) = Batch 2 (10)
 //! - `webhooks` (9) = Batch 3 (端点本地 + 复用 star-webhook::DeliveryStore)
 //! - `ex_01..ex_08` (8) = §14.9 Star-EI 8 子项 stub 路由 (per brief v0.53, 跨 session 续, 5 域 Lead 拍板 临时代签 per 守门 #3 v2 + #14 v3)
+//! - `memory` (4) + `agents` (1) = Agent 记忆 + Agent 列表 (2026-11-15, star-memory / agent-domain 内存态)
 //!
 //! 已知简化 (per 独立 WBS §3):
 //! - `code::get_symbol` / `code::find_references` 占位 (P0 helper 缺, 真实实现留 Phase II 持久化时)
@@ -21,6 +26,7 @@ MERGE (self)-[:DECLARES]->(integrations)
 //! - `webhooks::replay_delivery` 仅标记新状态, 真实 retry 调度留 Phase II
 //! - `ex_01..ex_08` 全部 501 not_implemented 跨 session 占位 (跟 OAuth2 introspect handler 同模式, per brief v0.53 §3)
 
+pub mod agents;
 pub mod code;
 pub mod context;
 pub mod ex_01;
@@ -32,6 +38,7 @@ pub mod ex_06;
 pub mod ex_07;
 pub mod ex_08;
 pub mod integrations;
+pub mod memory;
 pub mod merge_requests;
 pub mod pipelines;
 pub mod reviews;

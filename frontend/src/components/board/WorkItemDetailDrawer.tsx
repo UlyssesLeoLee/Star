@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=deb7bbb76a616cca19ad536e42f87bf20e8e19d7cb316a24903435789cc9c772
+@cypher schema=1 source_sha256=ac03a2814c9467b78a0338abbcfaaddd59d1957e281ca39148f7d3b9367c12b5
 MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
@@ -48,6 +48,8 @@ MERGE (workItemDetailDrawer)-[:CALLS]->(agentKindDisplayLabel)
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { TaskCardCommand } from "@/components/board/TaskCardCommand";
+import { useChatStore } from "@/lib/chat/chatStore";
 import { clsx } from "clsx";
 import {
   X, Trash2, Plus, Flag, Hash, Tag, FileText, User, Bot, Users,
@@ -955,28 +957,19 @@ export function WorkItemDetailDrawer({
               <span className="text-[8px] font-mono text-[#8b949e]">
                 {currentWi?.worktree_id ? `worktree ${currentWi.worktree_id}` : "—"}
               </span>
-              <span className="ml-auto rounded border border-[#d29922]/40 bg-[#d29922]/10 px-1 py-0.5 text-[8px] text-[#d29922]">
-                会话未接入 — 宿主 CLI 接入后启用
-              </span>
             </div>
-            <div className="max-h-24 overflow-y-auto px-3 py-1.5 font-mono text-[9px] leading-relaxed text-[#8b949e]">
-              <p>$ star task show {currentWi?.key ?? "—"}</p>
-              <p className="text-[#79c0ff]">任务 {currentWi?.key ?? "—"} · {currentWi?.title ?? ""} · {currentWi?.status ?? ""}</p>
-              <p>$ </p>
-            </div>
-            <div className="flex items-center gap-1 border-t border-white/10 px-2 py-1.5">
-              <input
-                type="text"
-                disabled
-                placeholder="CLI 会话未接入 — 输入命令不可用"
-                aria-label="CLI 命令输入"
-                data-testid="work-item-cli-input"
-                className="h-6 flex-1 rounded bg-white/5 px-2 font-mono text-[10px] text-[#c9d1d9] placeholder:text-[#484f58] border border-white/10 cursor-not-allowed"
-              />
-              <button type="button" disabled className="rounded border border-white/10 px-2 py-1 text-[9px] font-mono text-[#484f58]">
-                Run
-              </button>
-            </div>
+            <TaskCardCommand
+              taskId={currentWi?.id ?? ""}
+              taskKey={currentWi?.key ?? ""}
+              onSubmitCommand={(cmd) => {
+                const topicId = useChatStore.getState().openTopicForTask(currentWi?.id ?? "", currentWi?.title ?? "");
+                useChatStore.getState().reply(topicId, "Ulysses", "human", cmd);
+              }}
+              onHandoff={(target) => {
+                const topicId = useChatStore.getState().openTopicForTask(currentWi?.id ?? "", currentWi?.title ?? "");
+                useChatStore.getState().reply(topicId, "Ulysses", "human", `[交接] 任务 ${currentWi?.key} 交接给 ${target}`);
+              }}
+            />
           </div>
         )}
       </div>

@@ -105,6 +105,9 @@ star-webhook = { path = "../star-webhook" }
 # Context (P0-1 联动审计 ActorContext 共享, per AGENTS.md §4.1 v16)
 star-context = { path = "../star-context" }
 star-dto = { path = "../star-dto" }
+# Agent 记忆 + Agent 列表端点 (2026-11-15, routes/memory.rs + routes/agents.rs, 内存态)
+star-memory = { path = "../star-memory" }
+agent-domain = { path = "../agent-domain" }
 # 注意: star-mcp 只有 [[bin]] 无 [lib], 不可作 path dep;
 #       共享鉴权逻辑放 star-context (per P0-1 联动审计, AGENTS.md §4.1 v16)
 

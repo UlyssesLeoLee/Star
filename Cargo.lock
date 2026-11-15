@@ -7416,6 +7416,7 @@ version = "0.1.0"
 name = "star-api-rest"
 version = "0.1.0"
 dependencies = [
+ "agent-domain",
  "anyhow",
  "argo-core",
  "async-trait",
@@ -7465,6 +7466,7 @@ dependencies = [
  "star-context",
  "star-dto",
  "star-git-core",
+ "star-memory",
  "star-pg-adapter",
  "star-webhook",
  "thiserror 2.0.21",

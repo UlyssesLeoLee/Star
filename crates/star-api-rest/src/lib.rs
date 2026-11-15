@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=f4afd2a85e4b94175f0ca3b25c243c1b134e20109b25a65f5a923611ffca60a9
+@cypher schema=1 source_sha256=239594d11de86b18f396913aa4d6ea0222318924032eb9d48be88cc13b0b0960
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
 MERGE (deviceRouter:Symbol {id:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs::router",kind:"function"})
+MERGE (memoryFile:File {path:"crates/star-api-rest/src/routes/memory.rs"})
+MERGE (agentsFile:File {path:"crates/star-api-rest/src/routes/agents.rs"})
 MERGE (self)-[:DEFINES]->(router)
 MERGE (router)-[:CALLS]->(deviceRouter)
+MERGE (self)-[:DECLARES]->(memoryFile)
+MERGE (self)-[:DECLARES]->(agentsFile)
 @endcypher
 */
 //! `crates/star-api-rest` — STAR Developer REST API
@@ -136,6 +140,9 @@ pub fn build_router() -> Router {
         .route("/validations", post(routes::validations::run))
         .route("/pipelines/{id}", get(routes::pipelines::get_status))
         .route("/submissions", post(routes::submissions::submit))
+        // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
+        .nest("/memory", routes::memory::router())
+        .nest("/agents", routes::agents::router())
         // ── 6+3 Webhook 管理端点 (per spec §2.3) ───────────────────────
         .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
         .route(
@@ -291,6 +298,9 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .route("/validations", post(routes::validations::run))
                 .route("/pipelines/{id}", get(routes::pipelines::get_status))
                 .route("/submissions", post(routes::submissions::submit))
+                // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
+                .nest("/memory", routes::memory::router())
+                .nest("/agents", routes::agents::router())
                 .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
                 .route(
                     "/webhooks/endpoints",

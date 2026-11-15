@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=993e78e60391664efaf53765546579919021adf2f3f34178db06c1e88272fd28
+MERGE (self:File {path:"crates/star-api-rest/src/error.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! 6-field 错误模型 (per spec §2.4, 复用 MCP `agent-api/v1#Error`)
 //!
@@ -647,6 +652,25 @@ impl From<domain_project::ProjectError> for RestError {
             hint:
                 "Check the project id + slug + workspace + tenant + role (project_admin/developer)"
                     .to_string(),
+        }
+    }
+}
+
+/// `star_memory::MemoryError` → `RestError` (per 2026-11-15 routes/memory.rs 接线)
+impl From<star_memory::MemoryError> for RestError {
+    fn from(e: star_memory::MemoryError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            star_memory::MemoryError::NotFound(_) => ("RESOURCE_NOT_FOUND", "Validation", false),
+            star_memory::MemoryError::Invalid(_) => ("VALIDATION_FAILED", "Validation", false),
+            star_memory::MemoryError::Storage(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("memory: {e}"),
+            source_module: "star-memory".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the record id + agent id + layer ('short_term'/'long_term')".to_string(),
         }
     }
 }
