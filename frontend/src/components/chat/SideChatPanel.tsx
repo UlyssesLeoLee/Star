@@ -2,9 +2,11 @@
 @cypher schema=1 source_sha256=e0720cb6a11648cb3036f011115d8aada099271e09f19311b7909b85a494f78f
 MERGE (self:File {path:"frontend/src/components/chat/SideChatPanel.tsx"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
+MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
 MERGE (chatStore:Symbol {id:"frontend/src/lib/chat/chatStore.ts::useChatStore",kind:"hook"})
 MERGE (appStore:Symbol {id:"frontend/src/lib/store.ts::useStore",kind:"hook"})
 MERGE (self)-[:DEFINES]->(panel)
+MERGE (self)-[:IMPORTS]->(statusNotice)
 MERGE (self)-[:USES]->(chatStore)
 MERGE (self)-[:IMPORTS]->(appStore)
 @endcypher
@@ -34,6 +36,7 @@ import { useChatStore } from "@/lib/chat/chatStore";
 import { useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/lib/i18n";
+import { StatusNotice } from "@/components/status/StatusNotice";
 
 type ChatTab = "task" | "global";
 
@@ -288,13 +291,14 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                     : activeTopic.title
                   : "选择一个话题"}
               </h2>
-              {/* 未接入状态 (per 2026-11-15 任务: 聊天后端未接入 → 显示明确状态并禁用相关能力) */}
+              {/* 未接入状态 (per 2026-11-15 任务: 聊天后端未接入 → 显示明确状态并禁用相关能力;
+                  内部渲染统一收敛到 StatusNotice disconnected 态, 外层保留 chat-backend-status testid) */}
               <span
                 data-testid="chat-backend-status"
                 title="聊天后端尚未接入，消息仅本地暂存"
-                className="shrink-0 rounded border border-warn/30 px-1.5 py-0.5 text-[8px] text-warn"
+                className="shrink-0"
               >
-                {t.chatScope.backendNotConnected}
+                <StatusNotice state="disconnected" compact title={t.chatScope.backendNotConnected} />
               </span>
             </div>
             {!compact && activeTopic && (

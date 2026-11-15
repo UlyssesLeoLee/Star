@@ -442,7 +442,6 @@ import {
   ArrowUpRight,
   Archive,
   Blocks,
-  Bot,
   CalendarDays,
   CheckSquare,
   ChevronRight,
@@ -466,6 +465,7 @@ import {
 
 import { CanvasView } from "@/components/CanvasView";
 import { StatusPill } from "@/components/StatusPill";
+import { TeamPanel } from "@/components/team/TeamPanel";
 import { TerminalStackContainer } from "@/components/terminal/TerminalStackContainer";
 import { TaskRunHistoryPanel } from "./TaskRunHistoryPanel";
 
@@ -473,6 +473,11 @@ import { TaskRunHistoryPanel } from "./TaskRunHistoryPanel";
 MATCH (page:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"}),
       (runPanel:Function {name:"TaskRunHistoryPanel"});
 CREATE (page)-[:USES]->(runPanel);
+*/
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (page:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"});
+MERGE (teamPanel:Function {name:"TeamPanel",type:"function",language:"tsx",visibility:"public",complexity:"complex"});
+CREATE (page)-[:USES]->(teamPanel);
 */
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (page:Function {name:"GroupWorkspacePage"}),
@@ -3369,29 +3374,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
 
             {rightPanelTab === "team" && (
               <section data-testid="right-team-panel" aria-label="Team 页面">
-                <div className="mb-3"><div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-mute">TEAM</div><h2 className="text-sm font-semibold">运行时与 Agent 小队</h2><p className="mt-1 text-[9px] leading-relaxed text-ink-mute">Runtime、Worker / Router 小队与跨租户协作统一在团队管理。</p></div>
-                <div className="space-y-2">
-                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
-                    <div className="flex items-center gap-2 text-[10px] font-semibold"><Cpu size={13} className="text-accent" />Runtime / Daemon</div>
-                    <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">当前 Worktree 的 Runtime 绑定没有由 Group API 返回；不会显示或启动未授权的宿主命令。</p>
-                    <Link href="/local-runtime" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">管理 Runtime <ArrowUpRight size={10} /></Link>
-                  </article>
-                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
-                    <div className="flex items-center gap-2 text-[10px] font-semibold"><Bot size={13} className="text-accent" />Agent 小队</div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5">
-                      <div className="rounded border border-line p-2"><div className="text-[9px] font-semibold">Worker</div><div className="mt-1 text-[8px] text-ink-mute">执行配置待授权</div></div>
-                      <div className="rounded border border-line p-2"><div className="text-[9px] font-semibold">Router</div><div className="mt-1 text-[8px] text-ink-mute">路由配置待授权</div></div>
-                    </div>
-                    <Link href="/agent-relationships" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">管理小队关系 <ArrowUpRight size={10} /></Link>
-                    <Link href="/agents" className="ml-3 inline-flex items-center gap-1 text-[9px] text-accent">Agent 会话 <ArrowUpRight size={10} /></Link>
-                  </article>
-                  <article className="rounded-lg border border-line bg-bg-soft/40 p-3">
-                    <div className="flex items-center gap-2 text-[10px] font-semibold"><ShieldCheck size={13} className="text-accent" />多租户协作</div>
-                    <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">远程租户 Agent 仅凭可撤销的任务级授权参与评审和建议；任务所属租户的 Daemon 复验权限与预算，并在隔离 Runtime 中执行。</p>
-                    <div className="mt-2 rounded border border-warning/30 bg-warning/5 px-2 py-1.5 text-[8px] text-warning">Daemon 连接与租户授权目录未接入此面板</div>
-                    <Link href="/remote" className="mt-2 inline-flex items-center gap-1 text-[9px] text-accent">查看远程协作入口 <ArrowUpRight size={10} /></Link>
-                  </article>
-                </div>
+                <TeamPanel />
               </section>
             )}
           </div>

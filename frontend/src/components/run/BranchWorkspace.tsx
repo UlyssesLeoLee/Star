@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bc255932dbcff9305497cdaed232f11b90227955b355bd7c03e817b1fd52e8ea
+@cypher schema=1 source_sha256=1449b2b335d48a486b03baf5eb2c5691ceb6944a42b32207c2330d5666d38420
 MERGE (self:File {path:"frontend/src/components/run/BranchWorkspace.tsx"})
 MERGE (shell:Symbol {id:"frontend/src/components/run/BranchWorkspace.tsx::BranchWorkspace",kind:"component"})
 MERGE (self)-[:DEFINES]->(shell)
@@ -179,39 +179,16 @@ export function BranchWorkspace({ worktreeId, branch, projectId, laneId }: {
 
         {active === "bi" && (
           <div data-testid="lane-app-bi" className="space-y-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className="rounded-lg border border-line bg-bg-soft/50 p-2.5 text-center">
-                <div className="text-lg font-bold text-ink">{stats.total}</div>
-                <div className="text-[10px] text-ink-mute">任务总数</div>
-              </div>
-              <div className="rounded-lg border border-line bg-bg-soft/50 p-2.5 text-center">
-                <div className="text-lg font-bold text-ok">{stats.done}</div>
-                <div className="text-[10px] text-ink-mute">已完成</div>
-              </div>
-              <div className="rounded-lg border border-line bg-bg-soft/50 p-2.5 text-center">
-                <div className="text-lg font-bold text-accent">{stats.throughput}</div>
-                <div className="text-[10px] text-ink-mute">7 日吞吐</div>
-              </div>
-              <div className="rounded-lg border border-line bg-bg-soft/50 p-2.5 text-center">
-                <div className="text-lg font-bold text-warn">{sprints.filter((s) => (s.status ?? "planning") === "active").length}</div>
-                <div className="text-[10px] text-ink-mute">进行中 Sprint</div>
-              </div>
+            <div className="rounded-xl border border-line bg-bg-card p-4 text-center">
+              <p className="text-xs font-semibold text-ink">BI / 分析已合并进分析界面</p>
+              <p className="mt-1 text-[11px] text-ink-dim">
+                燃尽图 / 燃起图 / 速度 / CFD / 吞吐量 等全部图表在
+                <a href="/analytics" className="mx-1 font-semibold text-accent underline underline-offset-2" data-testid="lane-bi-open-analytics">
+                  /analytics 分析界面
+                </a>
+                以标签页切换 (per 2026-11-15)
+              </p>
             </div>
-            {stats.total > 0 && (
-              <div className="rounded-lg border border-line bg-bg-soft/50 p-2.5">
-                <div className="mb-1.5 text-[10px] text-ink-mute">状态分布</div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[...stats.byStatus.entries()].map(([status, count]) => (
-                    <span key={status} className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-line bg-bg text-ink-dim">
-                      {status} ×{count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <p className="text-[10px] text-ink-mute">
-              数据源: {worktreeId ? `worktree ${worktreeId}` : `project ${projectId}`} · 宿主 BI 面板就绪后切换服务端指标
-            </p>
           </div>
         )}
 
