@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>页面合并图</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 40px 48px; background: #F7F7F5; font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; display: flex; flex-direction: column; gap: 20px">
+  <div style="display: flex; align-items: baseline; gap: 16px">
+    <h1 style="margin: 0; font-size: 28px; font-weight: 600">64 个页面 → 7 个界面</h1>
+    <span style="font-size: 14px; color: #4B5563">左列是合并后的界面，右侧是被并入的现有路由</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; flex: 1 1 auto">
+
+    <section style="background: #FFFFFF; border: 2px solid #1D4ED8; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #1D4ED8; font-weight: 600">Branch 工作区 · 固定页签</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">任务</h2>
+      <div style="font-size: 13px; color: #374151">页内视图：Sprint（含 Backlog、启动 / 完成冲刺、Backlog 内开卡）· 任务看板 · IPA 流程图 · 按文件开卡 · 时间线 · 日历</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/sprint  /board  /projects?tab=kanban|timeline|backlog|ipa  /planning  /work-item  /development  /refactor  /nema  /worktree  /worktree/[id]/group  /projects/…/runs/…</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 2px solid #1D4ED8; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #1D4ED8; font-weight: 600">Branch 工作区 · 固定页签</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">画布（唯一的无限画布）</h2>
+      <div style="font-size: 13px; color: #374151">画布内图层：白板 · 关系图（Worktree/任务/文件/上下文）· IPA（V 字模型）· 代码（低代码流程，Agent 与 Workflow 都是节点）</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/canvas  /canvas/[id]  /canvas/worktree-graph  /agent-view  /agent-relationships  /workflow  /context  /relation  /collaboration</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #C7D2FE; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #4338CA; font-weight: 600">Branch 工作区 · 可添加页签</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">验证 · BI · 插件</h2>
+      <div style="font-size: 13px; color: #374151">用户从顶栏「+」按需添加，默认不显示</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/validation  /feedback（Branch 范围）  Run 级 BI  插件授权</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #6B7280; font-weight: 600">全局 · 左栏底部</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">收件箱</h2>
+      <div style="font-size: 13px; color: #374151">页内分类：全部 · 评审请求 · 评论 · 通知</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/inbox  /notification  /review  /comment</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #6B7280; font-weight: 600">全局 · 左栏底部</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">Agent 中心</h2>
+      <div style="font-size: 13px; color: #374151">页内页签：会话窗口 · Runtime · 远程控制</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/agents  /agent  /agent-windows  /local-runtime  /remote  /remote/desktop|files|terminal/[id]  /worktree/chat</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #6B7280; font-weight: 600">全局 · 左栏底部</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">分析</h2>
+      <div style="font-size: 13px; color: #374151">页内页签：概览 · 运维 · 审计日志</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/analytics  /ops  /audit</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #6B7280; font-weight: 600">右上角用户资料菜单</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">设置</h2>
+      <div style="font-size: 13px; color: #374151">左侧分组：账户 · 组织与权限 · 集成 · 扩展（Mod / MCP 官方+自定义 / Skills / Plugins / Hooks）· 开发者（开发者模式 / 调试工具 / API 与 Webhook / Feature Flags）</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/settings/*  /identity  /permission  /tenant  /admin  /integration  /scm  /automation  /automation-debug</div>
+    </section>
+
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #6B7280; font-weight: 600">顶栏</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">搜索</h2>
+      <div style="font-size: 13px; color: #374151">顶栏搜索框 + ⌘K 结果弹层，不再是独立页面</div>
+      <div style="font-size: 12px; color: #6B7280; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/search  命令面板</div>
+    </section>
+
+    <section style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 12px; color: #991B1B; font-weight: 600">下线</div>
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600; color: #7F1D1D">演示与空壳页</h2>
+      <div style="font-size: 13px; color: #7F1D1D">移出导航，旧链接重定向到对应新界面</div>
+      <div style="font-size: 12px; color: #991B1B; line-height: 1.8; font-family: ui-monospace, Consolas, monospace">/wasm-demo  /terminal-stack-demo  /chrono-vibe  /project  /workspace</div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>沙盒</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #C7D2FE; background: #EEF2FF; color: #3730A3">⎇ feat/relation-bfs ▾</button>
+  <nav aria-label="Branch 功能" style="display: flex; align-items: stretch; height: 52px; gap: 2px; flex: 1 1 auto">
+    <a href="TasksIpa.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">任务</a>
+    <a href="Canvas.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">画布</a>
+    <a href="Docs.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">协同</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #1D4ED8; font-weight: 600; text-decoration: none; box-shadow: inset 0 -3px 0 #1D4ED8">沙盒</a>
+    <a href="Prototype.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">原型</a>
+    <button type="button" aria-label="添加页签" style="align-self: center; width: 28px; height: 28px; border-radius: 6px; border: 1px dashed #C7C9CF; background: #FFFFFF; color: #4B5563">+</button>
+  </nav>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索</span>
+    <input type="search" placeholder="搜索主机、容器 ⌘K" style="width: 200px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #E5E7EB; background: #FFFFFF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+
+<div style="flex: 1 1 auto; display: flex; min-width: 0; flex-wrap: wrap">
+
+<aside aria-label="资源树" style="flex: 0 0 270px; background: #FFFFFF; border-right: 1px solid #E2E1DC; padding: 10px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12px">
+  <div style="display: flex; gap: 6px">
+    <button type="button" style="flex: 1 1 0; height: 30px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">+ 新建沙盒</button>
+    <button type="button" style="flex: 1 1 0; height: 30px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">接入实体机</button>
+  </div>
+  <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+    <section>
+      <div style="display: flex; align-items: center; font-size: 11px; color: #6B7280; margin-bottom: 4px"><span>{{g.label}}</span><span style="margin-left: auto">{{g.note}}</span></div>
+      <sc-for list="{{g.items}}" as="it" hint-placeholder-count="2">
+        <button type="button" onClick="{{it.pick}}" style="{{it.style}}">
+          <span style="{{it.dot}}"></span>
+          <span style="min-width: 0; flex: 1 1 auto"><span style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{it.name}}</span><span style="display: block; font-size: 10px; color: #6B7280">{{it.meta}}</span></span>
+          <span style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #F3F4F6; color: #4B5563">{{it.mode}}</span>
+        </button>
+      </sc-for>
+    </section>
+  </sc-for>
+  <div style="margin-top: auto; padding: 8px; border-radius: 6px; background: #F9FAFB; color: #4B5563; line-height: 1.6">观测方式：原生 → 执行 → 探针 → 元数据。每个值都标出来源、可信度和新鲜度；离线的主机仍列出，不当作空。</div>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+  <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #FFFFFF; border-bottom: 1px solid #E5E7EB; flex-wrap: wrap">
+    <div><h1 style="margin: 0; font-size: 16px; font-weight: 600">{{cur.name}}</h1><div style="font-size: 12px; color: #6B7280">{{cur.meta}}</div></div>
+    <span style="{{cur.healthStyle}}">{{cur.health}}</span>
+    <div style="margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap">
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">启动</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">停止</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">快照</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #FCA5A5; background: #FFFFFF; color: #B91C1C">销毁</button>
+    </div>
+  </div>
+  <div role="tablist" aria-label="沙盒页签" style="display: flex; gap: 2px; padding: 0 16px; background: #FFFFFF; border-bottom: 1px solid #E5E7EB">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <button type="button" role="tab" aria-selected="{{t.active}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+    </sc-for>
+  </div>
+
+  <div style="flex: 1 1 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <sc-if value="{{isOverview}}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 6px 10px; font-size: 12px">
+          <span style="color: #6B7280">类型</span><span>{{cur.kind}}</span>
+          <span style="color: #6B7280">系统</span><span>{{cur.os}}</span>
+          <span style="color: #6B7280">资源</span><span>{{cur.res}}</span>
+          <span style="color: #6B7280">接入方式</span><span>{{cur.via}}</span>
+          <span style="color: #6B7280">网络出站</span><span>{{cur.egress}}</span>
+        </section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; font-size: 12px">
+          <div style="font-weight: 600; margin-bottom: 8px">已安装的 Agent CLI</div>
+          <sc-for list="{{cur.clis}}" as="cl" hint-placeholder-count="3">
+            <div style="display: flex; gap: 8px; padding: 4px 0"><span>{{cl.name}}</span><span style="margin-left: auto; color: {{cl.color}}">{{cl.state}}</span></div>
+          </sc-for>
+          <div style="margin-top: 8px; color: #6B7280">Worker 心跳 {{cur.heartbeat}} · 任务租约 {{cur.leases}}</div>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isWorktree}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) 100px 120px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>Worktree</span><span>Branch</span><span>沙盒内路径</span><span>状态</span><span>操作</span></div>
+          <sc-for list="{{worktrees}}" as="w" hint-placeholder-count="2">
+            <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr) 100px 120px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center">
+              <span style="font-weight: 600">{{w.name}}</span><span style="font-family: ui-monospace, Consolas, monospace">{{w.branch}}</span><span style="font-family: ui-monospace, Consolas, monospace; color: #4B5563">{{w.path}}</span><span>{{w.state}}</span>
+              <span style="display: flex; gap: 4px"><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">登录</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">同步</button></span>
+            </div>
+          </sc-for>
+        </section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px 14px; align-items: center; font-size: 12px">
+          <div style="grid-column: 1 / -1; font-weight: 600">在此沙盒开设 Worktree</div>
+          <span style="color: #374151">仓库</span><select aria-label="仓库" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>Physis / GVPE · star</option></select>
+          <span style="color: #374151">Branch</span><select aria-label="Branch" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>feat/relation-bfs（当前）</option><option>新建 Branch…</option></select>
+          <span style="color: #374151">关联任务卡</span><select aria-label="关联任务卡" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>T-142 BFS 环检测</option></select>
+          <span style="color: #374151">代码进入方式</span>
+          <div role="group" aria-label="代码进入方式" style="display: flex; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{bridges}}" as="br" hint-placeholder-count="3">
+              <button type="button" onClick="{{br.pick}}" aria-pressed="{{br.active}}" style="{{br.style}}">{{br.label}}</button>
+            </sc-for>
+          </div>
+          <span></span><span style="color: #6B7280">{{bridgeNote}}</span>
+          <span></span><div style="display: flex; gap: 8px"><button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">开设 Worktree</button><span style="align-self: center; color: #6B7280">提交后生成一个操作任务，完成后写入审计</span></div>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isTerminal}}" hint-placeholder-val="{{ false }}">
+      <section style="flex: 1 1 auto; background: #0B1020; color: #E5E7EB; border-radius: 8px; padding: 12px 14px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.8; min-height: 420px">
+        <div style="color: #9CA3AF">已登录 {{cur.name}} · 会话 30 分钟后过期 · 所有命令记入审计</div>
+        <div>ulysses@{{cur.short}}:~/worktrees/wt-relation-bfs$ cargo test -p domain-relation</div>
+        <div style="color: #86EFAC">test result: ok. 41 passed; 0 failed</div>
+        <div>ulysses@{{cur.short}}:~/worktrees/wt-relation-bfs$ <span style="display: inline-block; width: 8px; height: 14px; background: #E5E7EB; vertical-align: -2px"></span></div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isDocker}}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <div style="display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid #E5E7EB"><span style="font-weight: 600">Docker</span><span style="margin-left: 8px; color: #6B7280; font-size: 12px">守护进程 · {{cur.short}}</span><button type="button" style="margin-left: auto; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">+ 运行容器</button></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) 90px 200px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>容器</span><span>镜像</span><span>Compose 组</span><span>状态</span><span>操作</span></div>
+        <sc-for list="{{containers}}" as="ct" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) 90px 200px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center">
+            <span style="font-weight: 600">{{ct.name}}</span><span style="font-family: ui-monospace, Consolas, monospace; color: #4B5563">{{ct.image}}</span><span>{{ct.group}}</span><span style="color: {{ct.color}}">{{ct.state}}</span>
+            <span style="display: flex; gap: 4px"><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">日志</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">进入</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">重启</button></span>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isObserve}}" hint-placeholder-val="{{ false }}">
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 90px 90px 110px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>观测项</span><span>值</span><span>方式</span><span>可信度</span><span>更新于</span></div>
+        <sc-for list="{{observations}}" as="ob" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 90px 90px 110px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>{{ob.k}}</span><span>{{ob.v}}</span><span>{{ob.mode}}</span><span style="color: {{ob.color}}">{{ob.trust}}</span><span style="color: #6B7280">{{ob.when}}</span></div>
+        </sc-for>
+      </section>
+    </sc-if>
+  </div>
+</main>
+
+<aside aria-label="操作任务" style="flex: 0 0 280px; background: #FFFFFF; border-left: 1px solid #E2E1DC; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+  <div style="font-weight: 600">操作任务</div>
+  <sc-for list="{{jobs}}" as="j" hint-placeholder-count="4">
+    <div style="padding: 8px; border: 1px solid #E5E7EB; border-radius: 6px"><div style="display: flex"><span style="font-weight: 600">{{j.t}}</span><span style="margin-left: auto; color: {{j.color}}">{{j.state}}</span></div><div style="color: #6B7280; margin-top: 2px">{{j.meta}}</div></div>
+  </sc-for>
+  <div style="margin-top: auto; padding: 8px; border-radius: 6px; background: #FFFBEB; color: #78350F; line-height: 1.6">Agent、插件和任务卡 CLI 拿不到宿主的 Docker 或虚拟机控制权；这些操作只由受信的宿主管理进程执行，并需要你的授权。</div>
+</aside>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'mp1', tab: 'worktree', bridge: 'clone' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var R = {
+      ws: ['ws-office', '实体机 · Controller', 'ok', '原生', 'Windows 11 · 本机', '实体机（Controller）', 'Windows 11 Pro', '16 核 · 64 GB · 1.2 TB 可用', '本机', '开放', 'ws'],
+      lab: ['lab-01', '实体机 · Worker · WireGuard', 'ok', '执行', 'Ubuntu 24.04', '实体机（Worker）', 'Ubuntu 24.04', '32 核 · 128 GB', 'Worker 守护进程 · WireGuard', '仅允许 GitHub 与镜像仓库', 'lab01'],
+      mac: ['mbp-ulysses', '实体机 · 离线 2 小时', 'off', '元数据', 'macOS', '实体机（Worker）', 'macOS 15', '—', 'Worker 守护进程', '—', 'mbp'],
+      mp1: ['star-k3s-1', 'Multipass · K3s 节点', 'ok', '执行', 'Ubuntu 24.04 · 4 核 8 GB', '虚拟机（Multipass）', 'Ubuntu 24.04', '4 核 · 8 GB · 40 GB', '宿主管理进程（受信）', '严格出站（已封印）', 'k3s1'],
+      mp2: ['star-k3s-2', 'Multipass · 已停止', 'warn', '元数据', 'Ubuntu 24.04', '虚拟机（Multipass）', 'Ubuntu 24.04', '2 核 · 4 GB', '宿主管理进程（受信）', '严格出站', 'k3s2'],
+      wsb: ['wsb-relation', 'Windows Sandbox', 'ok', '探针', 'Windows 沙盒', '虚拟机（Windows Sandbox）', 'Windows Sandbox', '4 GB', '.wsb 配置 · 探针', '禁止写回宿主目录', 'wsb'],
+      dk: ['docker · 本机', 'Docker 守护进程 · 6 个容器', 'ok', '原生', 'Docker Engine', 'Docker 守护进程', 'Docker Engine 27', '6 个容器 · 2 个 Compose 组', '本机守护进程', '按容器网络策略', 'docker'],
+      ds: ['sbx-relation', 'Docker 沙盒 · 集成测试', 'ok', '探针', '隔离容器沙盒', 'Docker 沙盒', 'Debian 12', '2 核 · 4 GB', '沙盒 API', '严格出站', 'sbx']
+    };
+    var G = [['实体机', '经 Worker 接入', ['ws', 'lab', 'mac']], ['虚拟机', 'Multipass 最多保留 2 台', ['mp1', 'mp2', 'wsb']], ['Docker', '', ['dk', 'ds']]];
+    var HC = { ok: ['#10B981', '在线', '#ECFDF5', '#065F46'], warn: ['#F59E0B', '已停止', '#FFFBEB', '#92400E'], off: ['#9CA3AF', '离线', '#F3F4F6', '#4B5563'] };
+    var c = R[s.sel];
+    var tab = function (on) { return 'border: 0; background: transparent; padding: 10px 12px; font-size: 13px; color: ' + (on ? '#1D4ED8; font-weight: 600; box-shadow: inset 0 -2px 0 #1D4ED8' : '#4B5563'); };
+    var pill = function (on) { return 'height: 30px; padding: 0 10px; border-radius: 6px; font-size: 12px; border: 1px solid ' + (on ? '#1D4ED8; background: #EEF2FF; color: #1E3A8A' : '#E5E7EB; background: #FFFFFF; color: #374151'); };
+    var BR = [['clone', '在沙盒内克隆'], ['bridge', '限路径同步（可审计）'], ['readonly', '只读挂载']];
+    var BRN = { clone: '沙盒内独立克隆仓库并检出 Branch，与宿主完全隔离，推荐。', bridge: '只同步选定路径，每次同步留痕，不开放宿主任意目录。', readonly: '只读挂载宿主 Worktree，适合只跑测试，不能写回。' };
+    return {
+      groups: G.map(function (g) { return { label: g[0], note: g[1], items: g[2].map(function (k) { var r = R[k]; var on = s.sel === k; var h = HC[r[2]];
+        return { name: r[0], meta: r[1], mode: r[3], pick: function () { self.setState({ sel: k }); },
+          dot: 'flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: ' + h[0],
+          style: 'display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 6px; font-size: 12px; background: ' + (on ? '#EEF2FF' : 'transparent') }; }) }; }),
+      cur: { name: c[0], meta: c[4], kind: c[5], os: c[6], res: c[7], via: c[8], egress: c[9], short: c[10], health: HC[c[2]][1],
+        healthStyle: 'font-size: 11px; padding: 2px 8px; border-radius: 4px; background: ' + HC[c[2]][2] + '; color: ' + HC[c[2]][3],
+        heartbeat: c[2] === 'off' ? '2 小时前' : '3 秒前', leases: c[2] === 'ok' ? '1 个活动' : '无',
+        clis: [['Claude Code', c[2] === 'off' ? '未知' : '已登录'], ['Codex', c[2] === 'off' ? '未知' : '已登录'], ['Hermes', '未安装']].map(function (x) { return { name: x[0], state: x[1], color: x[1] === '已登录' ? '#047857' : '#6B7280' }; }) },
+      tabs: [['overview', '概览'], ['worktree', 'Worktree'], ['terminal', '终端'], ['docker', 'Docker'], ['observe', '观测']].map(function (t) { var on = s.tab === t[0]; return { label: t[1], active: on, style: tab(on), pick: function () { self.setState({ tab: t[0] }); } }; }),
+      isOverview: s.tab === 'overview', isWorktree: s.tab === 'worktree', isTerminal: s.tab === 'terminal', isDocker: s.tab === 'docker', isObserve: s.tab === 'observe',
+      worktrees: [['wt-relation-bfs', 'feat/relation-bfs', '~/worktrees/wt-relation-bfs', '运行中'], ['wt-cache-ttl', 'fix/cache-ttl', '~/worktrees/wt-cache-ttl', '空闲']].map(function (w) { return { name: w[0], branch: w[1], path: w[2], state: w[3] }; }),
+      bridges: BR.map(function (b) { var on = s.bridge === b[0]; return { label: b[1], active: on, style: pill(on), pick: function () { self.setState({ bridge: b[0] }); } }; }),
+      bridgeNote: BRN[s.bridge],
+      containers: [['star-api-rest', 'star-api-rest:0.4.2', 'star-dev', '运行中'], ['postgres', 'postgres:16', 'star-dev', '运行中'], ['nats', 'nats:2.10', 'star-dev', '运行中'], ['canvas-realtime', 'canvas-realtime:0.2.4', 'canvas', '重启中']].map(function (x) { return { name: x[0], image: x[1], group: x[2], state: x[3], color: x[3] === '运行中' ? '#047857' : '#B45309' }; }),
+      observations: [['CPU 使用', '38%', '原生', '高', '3 秒前'], ['进程列表', '142 个', '执行', '高', '10 秒前'], ['文件系统', '已用 61%', '执行', '高', '1 分钟前'], ['嵌套容器', '2 个', '探针', '中', '2 分钟前'], ['网络连接', '仅白名单', '元数据', '低', '15 分钟前']].map(function (o) { return { k: o[0], v: o[1], mode: o[2], trust: o[3], when: o[4], color: o[3] === '高' ? '#047857' : (o[3] === '中' ? '#B45309' : '#6B7280') }; }),
+      jobs: [['开设 Worktree', '完成', 'star-k3s-1 · wt-relation-bfs · 2 分钟前', '#047857'], ['快照', '运行中', 'star-k3s-1 · 第 2/3 步', '#1D4ED8'], ['启动虚拟机', '待授权', 'star-k3s-2 · 需要你确认', '#B45309'], ['重启容器', '失败', 'canvas-realtime · 健康检查超时', '#B91C1C']].map(function (j) { return { t: j[0], state: j[1], meta: j[2], color: j[3] }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

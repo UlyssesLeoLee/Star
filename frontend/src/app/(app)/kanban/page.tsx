@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d291871b9d4bb69c2e5d46e38bea400f0e327e789f5dc75136a0eab065c743dd
+@cypher schema=1 source_sha256=c3947a273daf44697aa4f45867a92481deb064be16c9d87942c02ff8dc02d1df
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -311,6 +311,27 @@ export default function KanbanPage() {
         {/* ============ 视图内容 = 原有真实功能 ============ */}
         {activeView === "Sprint" && (
           <section data-testid="kanban-sprint-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+            {/* Backlog 快捷建卡 (per 1b mockup: 从 IPA 流程建卡 / 按文件开卡) */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-ink-dim">从下方 Backlog 把卡移进来</span>
+              <span className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setActiveView("IPA 流程图")}
+                data-testid="kanban-backlog-create-ipa"
+                className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+              >
+                从 IPA 流程建卡
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("按文件开卡")}
+                data-testid="kanban-backlog-create-file"
+                className="rounded-lg border border-line bg-bg-soft/60 px-2.5 py-1.5 text-[11px] font-semibold text-ink hover:border-accent/50 transition-colors"
+              >
+                按文件开卡
+              </button>
+            </div>
             <SprintBoardView />
           </section>
         )}

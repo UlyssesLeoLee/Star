@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=16468e525781b4e6c8c591619b6c75ed8f25fd16ec8e5a616086dfc91ade68da
+@cypher schema=1 source_sha256=f595caf252c2d6d79cf113cb5e72d5693827529ccdd20fa4869fece45e01294d
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -14,6 +14,7 @@ MERGE (self)-[:DEFINES]->(page)
 "use client";
 
 import { useEffect, useState } from "react";
+import { useStore } from "@/lib/store";
 import {
   User,
   Key,
@@ -247,6 +248,8 @@ function SettingsInner() {
 
           {activeId === "mcp" ? (
             <McpPanel />
+          ) : activeId === "mod" ? (
+            <ModPanel />
           ) : (
             <StubPanel
               id={activeId}
@@ -261,6 +264,72 @@ function SettingsInner() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// =====================================================================
+// ModPanel — Mod 目录管理 (per 2026-11-15 docs/prototypes/6 设置 mockup:
+//   浏览 Mod 目录 / 从文件安装 / 用模板新建 + Mod 表 + 隔离运行时说明)
+//   目录后端未接入 → 操作禁用并说明原因 (per 用户约束: 不接通界面交互)
+// =====================================================================
+function ModPanel() {
+  const integrations = useStore((s) => s.integrations);
+  const [sourceTab, setSourceTab] = useState<"official" | "custom">("official");
+
+  return (
+    <div data-testid="settings-mod-panel" className="space-y-3">
+      {/* 目录源切换 + 已连接徽标 */}
+      <div className="flex items-center gap-2">
+        {(["official", "custom"] as const).map((src) => (
+          <button
+            key={src}
+            type="button"
+            onClick={() => setSourceTab(src)}
+            data-testid={`settings-mod-src-${src}`}
+            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
+              sourceTab === src ? "border-accent bg-accent/10 text-accent" : "border-line text-ink-mute hover:text-ink"
+            }`}
+          >
+            {src === "official" ? "官方目录" : "自定义"}
+          </button>
+        ))}
+        <span className="ml-auto rounded-full border border-ok/40 bg-ok/10 px-2 py-0.5 text-[10px] text-ok" data-testid="settings-mod-connected">
+          已连接 · {integrations.length}
+        </span>
+      </div>
+
+      {/* 3 按钮 (目录后端未接入 → 禁用 + 原因) */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" disabled data-testid="settings-mod-browse" className="rounded-lg border border-line bg-bg-soft/60 px-3 py-1.5 text-[11px] text-ink-mute cursor-not-allowed">
+          浏览 Mod 目录
+        </button>
+        <button type="button" disabled data-testid="settings-mod-install" className="rounded-lg border border-line bg-bg-soft/60 px-3 py-1.5 text-[11px] text-ink-mute cursor-not-allowed">
+          从文件安装
+        </button>
+        <button type="button" disabled data-testid="settings-mod-template" className="rounded-lg border border-line bg-bg-soft/60 px-3 py-1.5 text-[11px] text-ink-mute cursor-not-allowed">
+          用模板新建 Mod
+        </button>
+        <span className="text-[10px] text-warn" data-testid="settings-mod-disabled-reason">
+          目录服务未接入 — 接入后启用安装/新建
+        </span>
+      </div>
+
+      {/* Mod 表 */}
+      <div className="rounded-xl border border-line overflow-hidden">
+        <div className="grid grid-cols-[1.2fr_0.8fr_1fr_0.5fr_0.5fr] gap-2 border-b border-line bg-bg-soft/60 px-3 py-2 text-[10px] font-semibold text-ink-mute">
+          <span>Mod</span><span>类型</span><span>声明的能力</span><span>版本</span><span>启用</span>
+        </div>
+        <div className="px-3 py-6 text-center text-[11px] text-ink-mute" data-testid="settings-mod-empty">
+          暂无已安装 Mod — 浏览 Mod 目录安装 (目录服务接入后)
+        </div>
+      </div>
+
+      {/* 隔离运行时说明 (mockup 原文) */}
+      <div className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[10px] leading-relaxed text-warn" data-testid="settings-mod-isolation">
+        Mod 在隔离运行时中执行，只能使用声明的能力；不会在主进程加载原生代码。
+        安全相关 Hook 由 Star 核心执行，Mod 不能替代或减弱。
+      </div>
     </div>
   );
 }

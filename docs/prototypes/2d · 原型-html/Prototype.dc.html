@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>原型</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #C7D2FE; background: #EEF2FF; color: #3730A3">⎇ feat/relation-bfs ▾</button>
+  <nav aria-label="Branch 功能" style="display: flex; align-items: stretch; height: 52px; gap: 2px; flex: 1 1 auto">
+    <a href="TasksIpa.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">任务</a>
+    <a href="Canvas.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">画布</a>
+    <a href="Docs.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">协同</a>
+    <a href="Sandbox.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">沙盒</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #1D4ED8; font-weight: 600; text-decoration: none; box-shadow: inset 0 -3px 0 #1D4ED8">原型</a>
+    <button type="button" aria-label="添加页签" style="align-self: center; width: 28px; height: 28px; border-radius: 6px; border: 1px dashed #C7C9CF; background: #FFFFFF; color: #4B5563">+</button>
+  </nav>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索</span>
+    <input type="search" placeholder="搜索原型 ⌘K" style="width: 200px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #E5E7EB; background: #FFFFFF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+
+<div style="flex: 1 1 auto; display: flex; min-width: 0; flex-wrap: wrap">
+
+<aside aria-label="生成" style="flex: 0 0 300px; background: #FFFFFF; border-right: 1px solid #E2E1DC; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; font-size: 12px">
+  <div style="font-weight: 600; font-size: 13px">要生成什么</div>
+  <div role="group" aria-label="原型类型" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+    <sc-for list="{{kinds}}" as="k" hint-placeholder-count="8">
+      <button type="button" onClick="{{k.pick}}" aria-pressed="{{k.active}}" style="{{k.style}}"><span style="display: block; font-weight: 600">{{k.label}}</span><span style="display: block; font-size: 11px; color: #6B7280; margin-top: 2px">{{k.note}}</span></button>
+    </sc-for>
+  </div>
+  <div>
+    <div style="color: #6B7280; margin-bottom: 4px">引用上下文</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 4px">
+      <sc-for list="{{ctx}}" as="c" hint-placeholder-count="4">
+        <span style="padding: 2px 8px; border-radius: 4px; background: #EEF2FF; color: #3730A3">{{c.t}}</span>
+      </sc-for>
+      <button type="button" style="height: 22px; padding: 0 8px; border-radius: 4px; border: 1px dashed #D1D5DB; background: #FFFFFF; font-size: 11px">+ 文件 / 截图 / 任务卡</button>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto">
+    <div style="align-self: flex-end; max-width: 240px; background: #EEF2FF; color: #1E1B4B; padding: 8px 10px; border-radius: 8px">{{prompt}}</div>
+    <div style="max-width: 260px; background: #F3F4F6; padding: 8px 10px; border-radius: 8px">{{reply}}</div>
+  </div>
+  <label style="color: #6B7280">描述你要的原型<textarea rows="3" placeholder="例如：给关系服务做一个可点击的移动端查询界面，附带 3D 机房分布" style="display: block; width: 100%; box-sizing: border-box; margin-top: 4px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 8px; font: inherit; resize: vertical"></textarea></label>
+  <div style="display: flex; gap: 6px"><button type="button" style="flex: 1 1 auto; height: 32px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">生成</button><button type="button" style="height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">从模板</button></div>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+  <div style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: #FFFFFF; border-bottom: 1px solid #E5E7EB; flex-wrap: wrap; font-size: 11px">
+    <span style="color: #6B7280; margin-right: 4px">流水线</span>
+    <sc-for list="{{pipeline}}" as="p" hint-placeholder-count="6">
+      <span style="{{p.style}}">{{p.label}}</span><span style="color: #9CA3AF">{{p.arrow}}</span>
+    </sc-for>
+    <div style="margin-left: auto; display: flex; gap: 6px">
+      <button type="button" onClick="{{togglePlay}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: #059669; color: #FFFFFF; font-size: 12px">{{playLabel}}</button>
+      <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 12px">导出</button>
+      <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 12px">分享</button>
+    </div>
+  </div>
+
+  <div style="position: relative; flex: 1 1 auto; min-height: 780px; overflow: hidden; background-color: #ECEBE7; background-image: radial-gradient(#D6D5CF 1px, transparent 1px); background-size: 20px 20px">
+
+    <section aria-label="UI 原型" style="{{frameUi}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">UI · 关系查询（手机）</div>
+      <div style="height: 100%; display: flex; flex-direction: column; background: #FFFFFF; border-radius: 20px; overflow: hidden">
+        <div style="padding: 14px 14px 8px; font-weight: 600">关系查询</div>
+        <div style="display: flex; gap: 4px; padding: 0 14px 8px">
+          <sc-for list="{{uiTabs}}" as="ut" hint-placeholder-count="3">
+            <button type="button" onClick="{{ut.pick}}" style="{{ut.style}}">{{ut.label}}</button>
+          </sc-for>
+        </div>
+        <div style="flex: 1 1 auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 6px">
+          <sc-for list="{{uiRows}}" as="ur" hint-placeholder-count="4">
+            <div style="padding: 10px; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 12px"><div style="font-weight: 600">{{ur.a}}</div><div style="color: #6B7280">{{ur.b}}</div></div>
+          </sc-for>
+        </div>
+        <button type="button" style="margin: 10px 14px 14px; height: 40px; border-radius: 10px; border: 0; background: #1D4ED8; color: #FFFFFF">查询环路径</button>
+      </div>
+    </section>
+
+    <section aria-label="2D 关系原型" style="{{frame2d}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">2D · 节点关系</div>
+      <svg role="img" aria-label="节点关系示意" width="300" height="200" style="display: block; background: #FFFFFF; border-radius: 8px">
+        <line x1="60" y1="60" x2="150" y2="140" stroke="#9CA3AF" stroke-width="2"></line><line x1="150" y1="140" x2="240" y2="60" stroke="#9CA3AF" stroke-width="2"></line><line x1="240" y1="60" x2="60" y2="60" stroke="#DC2626" stroke-width="2" stroke-dasharray="5 4"></line>
+        <circle cx="60" cy="60" r="18" fill="#DBEAFE" stroke="#1D4ED8"></circle><circle cx="150" cy="140" r="18" fill="#DBEAFE" stroke="#1D4ED8"></circle><circle cx="240" cy="60" r="18" fill="#FEE2E2" stroke="#DC2626"></circle>
+        <text x="60" y="64" font-size="11" text-anchor="middle" fill="#1E3A8A">A</text><text x="150" y="144" font-size="11" text-anchor="middle" fill="#1E3A8A">B</text><text x="240" y="64" font-size="11" text-anchor="middle" fill="#991B1B">C</text>
+      </svg>
+    </section>
+
+    <section aria-label="3D 空间原型" style="{{frame3d}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">3D · 机房 → 机柜 → 服务</div>
+      <div style="height: 100%; background: #0F172A; border-radius: 8px; position: relative; overflow: hidden">
+        <div style="position: absolute; left: 50px; top: 70px; width: 200px; height: 100px; background: #1E293B; transform: skewX(-30deg); border: 1px solid #334155"></div>
+        <sc-for list="{{racks}}" as="rk" hint-placeholder-count="3">
+          <button type="button" onClick="{{rk.pick}}" aria-label="{{rk.label}}" style="{{rk.style}}"></button>
+        </sc-for>
+        <div style="position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: #CBD5E1">{{rackInfo}}</div>
+      </div>
+    </section>
+
+    <section aria-label="4D 时间演化原型" style="{{frame4d}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">4D · 事件随时间传播</div>
+      <div style="height: 100%; background: #FFFFFF; border-radius: 8px; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; gap: 10px; justify-content: space-around; flex: 1 1 auto; align-items: center">
+          <sc-for list="{{nodes4d}}" as="n4" hint-placeholder-count="4">
+            <div style="{{n4.style}}">{{n4.t}}</div>
+          </sc-for>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 11px"><span>t = {{tick}}</span><div style="flex: 1 1 auto; height: 4px; background: #E5E7EB; border-radius: 2px"><div style="height: 4px; border-radius: 2px; background: #1D4ED8; width: {{tickPct}}"></div></div><span style="color: #6B7280">{{tickNote}}</span></div>
+      </div>
+    </section>
+
+    <section aria-label="5D 反事实原型" style="{{frame5d}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">5D · 反事实对照</div>
+      <div style="height: 100%; background: #FFFFFF; border-radius: 8px; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+        <label style="display: flex; align-items: center; gap: 8px"><input type="checkbox" checked="{{disableQueue}}" onChange="{{toggleQueue}}">屏蔽「队列」模块</label>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <div style="padding: 8px; border-radius: 6px; background: #F3F4F6"><div style="color: #6B7280">正常</div><div style="font-size: 18px; font-weight: 600">P95 42 ms</div></div>
+          <div style="padding: 8px; border-radius: 6px; background: {{cfBg}}"><div style="color: #6B7280">反事实</div><div style="font-size: 18px; font-weight: 600">{{cfValue}}</div></div>
+        </div>
+        <div style="color: #6B7280">按显式规则推演，不是一般意义的因果推断</div>
+      </div>
+    </section>
+
+    <section aria-label="1D 文本原型" style="{{frame1d}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">1D · 结构化说明</div>
+      <div style="height: 100%; background: #FFFFFF; border-radius: 8px; padding: 12px; box-sizing: border-box; font-size: 12px; line-height: 1.7">
+        <div style="font-weight: 600">关系查询 · 用户流程</div>
+        <div>1. 输入起点节点</div><div>2. 选择方向与深度</div><div>3. 查看环路径并跳到任务卡</div>
+      </div>
+    </section>
+
+    <section aria-label="动效原型" style="{{frameMotion}}">
+      <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">动效 · 合并成功提示</div>
+      <div style="height: 100%; background: #FFFFFF; border-radius: 8px; display: flex; align-items: center; justify-content: center">
+        <div style="{{motionStyle}}">✓ 已合并到 dev</div>
+      </div>
+    </section>
+
+    <div style="position: absolute; right: 12px; bottom: 12px; display: flex; gap: 2px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 3px">
+      <button type="button" aria-label="缩小" style="width: 28px; height: 28px; border: 0; background: transparent">−</button>
+      <button type="button" style="height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px">80%</button>
+      <button type="button" aria-label="放大" style="width: 28px; height: 28px; border: 0; background: transparent">+</button>
+      <button type="button" style="height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px">适配</button>
+    </div>
+  </div>
+</main>
+
+<aside aria-label="属性" style="flex: 0 0 260px; background: #FFFFFF; border-left: 1px solid #E2E1DC; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; font-size: 12px">
+  <div role="tablist" aria-label="属性面板" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px">
+    <button type="button" role="tab" aria-selected="true" style="flex: 1 1 0; border: 0; border-radius: 6px; height: 28px; background: #FFFFFF; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB">调整</button>
+    <button type="button" role="tab" aria-selected="false" style="flex: 1 1 0; border: 0; border-radius: 6px; height: 28px; background: transparent; color: #4B5563">图层</button>
+    <button type="button" role="tab" aria-selected="false" style="flex: 1 1 0; border: 0; border-radius: 6px; height: 28px; background: transparent; color: #4B5563">评论</button>
+  </div>
+  <div style="font-weight: 600">{{selName}}</div>
+  <label style="color: #6B7280">主色<span style="display: flex; gap: 6px; margin-top: 4px"><span style="width: 24px; height: 24px; border-radius: 6px; background: #1D4ED8; box-shadow: 0 0 0 2px #111827"></span><span style="width: 24px; height: 24px; border-radius: 6px; background: #059669"></span><span style="width: 24px; height: 24px; border-radius: 6px; background: #D97706"></span></span></label>
+  <label style="color: #6B7280">设备<select style="display: block; width: 100%; margin-top: 4px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>手机 390 × 844</option><option>桌面 1440 × 900</option></select></label>
+  <label style="color: #6B7280">数据来源<select style="display: block; width: 100%; margin-top: 4px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>示例数据（原型用）</option><option>当前 Branch 的接口</option></select></label>
+  <div>
+    <div style="color: #6B7280; margin-bottom: 4px">版本</div>
+    <sc-for list="{{versions}}" as="v" hint-placeholder-count="3">
+      <div style="display: flex; gap: 8px; padding: 4px 0"><span style="color: #6B7280">{{v.when}}</span><span>{{v.t}}</span></div>
+    </sc-for>
+  </div>
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
+    <button type="button" style="height: 30px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">附加到任务卡 T-142</button>
+    <button type="button" style="height: 30px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">放进画布白板</button>
+    <button type="button" style="height: 30px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">导出 HTML / 视频</button>
+  </div>
+</aside>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { kind: 'ui', uiTab: 0, rack: 1, tick: 0, playing: false, disableQueue: true }; }
+  componentDidMount() { var self = this; this.timer = setInterval(function () { if (self.state.playing) self.setState({ tick: (self.state.tick + 1) % 5 }); }, 900); }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    var s = this.state, self = this;
+    var K = [['ui', 'UI 界面', '可点击的多页面'], ['2d', '2D 关系', '节点与连线'], ['3d', '3D 空间', '建筑 · 楼层 · 房间'], ['4d', '4D 时间', '事件随时间传播'], ['5d', '5D 推演', '屏蔽模块做反事实'], ['1d', '1D 文本', '结构化说明'], ['motion', '动效', '过渡与微交互'], ['media', '图片与视频', '生成配图与演示片']];
+    var PROMPT = { ui: ['做一个手机端的关系查询界面，能切换出边、入边、环路径', '已生成 3 个页签的可点击原型，数据来自示例。可以把数据来源切到当前 Branch 的接口。'], '2d': ['把 A、B、C 的依赖画出来，标出环', '已生成节点关系图，C→A 这条回边用红色虚线标出。'], '3d': ['做机房里服务分布的 3D 原型', '已生成「机房 → 机柜 → 服务」三层，点机柜可看部署的服务。'], '4d': ['演示一次故障如何沿依赖扩散', '已生成离散事件时间线，按播放逐步传播。'], '5d': ['如果去掉队列模块，P95 会怎样', '按显式规则推演了对照组，结果在右侧卡片。'], '1d': ['写一份关系查询的用户流程', '已生成三步流程说明。'], motion: ['合并成功时给一个提示动效', '已生成淡入上浮提示，点「播放」预览。'], media: ['给发布说明配一张图和 10 秒演示片', '生成媒体需要接入多媒体模型，当前显示「未接入」。'] };
+    var frame = function (k, x, y, w, h) { var on = s.kind === k; return 'position: absolute; left: ' + x + 'px; top: ' + y + 'px; width: ' + w + 'px; height: ' + h + 'px; box-sizing: border-box; border-radius: ' + (k === 'ui' ? '24px' : '10px') + '; padding: ' + (k === 'ui' ? '8px' : '0') + '; background: ' + (k === 'ui' ? '#111827' : 'transparent') + '; box-shadow: ' + (on ? '0 0 0 3px #1D4ED8' : '0 0 0 1px #D1D5DB') + '; transition: box-shadow 0.2s'; };
+    var RACK = [['机柜 A1 · star-api-rest ×2', 70, 60], ['机柜 A2 · canvas-realtime ×3', 130, 40], ['机柜 B1 · postgres 主备', 190, 60]];
+    var STAGE = ['建模', '校验', '推演', '构建', '验证', '导出'];
+    var curStage = { ui: 3, '2d': 3, '3d': 3, '4d': 2, '5d': 2, '1d': 5, motion: 3, media: 0 }[s.kind];
+    var cfSlow = s.disableQueue;
+    return {
+      kinds: K.map(function (k) { var on = s.kind === k[0]; return { label: k[1], note: k[2], active: on, pick: function () { self.setState({ kind: k[0] }); },
+        style: 'text-align: left; padding: 8px; border-radius: 8px; font-size: 12px; border: 1px solid ' + (on ? '#1D4ED8; background: #EEF2FF' : '#E5E7EB; background: #FFFFFF') }; }),
+      ctx: [{ t: '任务卡 T-142' }, { t: 'relation-api.md' }, { t: 'IPA ipa-s03-005 画面設計' }],
+      prompt: PROMPT[s.kind][0], reply: PROMPT[s.kind][1],
+      pipeline: STAGE.map(function (p, i) { var done = i < curStage; var now = i === curStage; return { label: p, arrow: i < STAGE.length - 1 ? '→' : '', style: 'padding: 3px 8px; border-radius: 999px; ' + (now ? 'background: #1D4ED8; color: #FFFFFF' : (done ? 'background: #DBEAFE; color: #1E3A8A' : 'background: #F3F4F6; color: #6B7280')) }; }),
+      togglePlay: function () { self.setState({ playing: !s.playing }); }, playLabel: s.playing ? '⏸ 停止预览' : '▶ 交互预览',
+      frameUi: frame('ui', 40, 40, 260, 520), frame2d: frame('2d', 350, 40, 300, 200), frame3d: frame('3d', 350, 290, 300, 220),
+      frame4d: frame('4d', 700, 40, 320, 180), frame5d: frame('5d', 700, 270, 320, 180), frame1d: frame('1d', 350, 560, 300, 140), frameMotion: frame('motion', 700, 500, 320, 140),
+      uiTabs: ['出边', '入边', '环路径'].map(function (t, i) { var on = s.uiTab === i; return { label: t, pick: function () { self.setState({ uiTab: i, kind: 'ui' }); }, style: 'height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; border: 0; background: ' + (on ? '#1D4ED8; color: #FFFFFF' : '#F3F4F6; color: #374151') }; }),
+      uiRows: [[['A → B', '依赖'], ['A → D', '引用']], [['C → A', '回边'], ['E → A', '引用']], [['A → B → C → A', '长度 3 的环']]][s.uiTab].map(function (r) { return { a: r[0], b: r[1] }; }),
+      racks: RACK.map(function (r, i) { var on = s.rack === i; return { label: r[0], pick: function () { self.setState({ rack: i, kind: '3d' }); },
+        style: 'position: absolute; left: ' + (r[1] + 30) + 'px; top: ' + (r[2] + 40) + 'px; width: 30px; height: 70px; border-radius: 3px; padding: 0; border: 2px solid ' + (on ? '#FBBF24' : '#64748B') + '; background: ' + (on ? '#3B82F6' : '#334155') + '; box-shadow: 8px -6px 0 ' + (on ? '#1E40AF' : '#1E293B') }; }),
+      rackInfo: RACK[s.rack][0],
+      tick: s.tick, tickPct: Math.round(s.tick / 4 * 100) + '%', tickNote: ['正常', 'postgres 延迟升高', 'star-api-rest 超时', 'canvas-realtime 降级', '告警触发'][s.tick],
+      nodes4d: ['postgres', 'api', 'realtime', '告警'].map(function (t, i) { var hit = s.tick > i; return { t: t, style: 'padding: 10px 12px; border-radius: 8px; font-size: 12px; transition: background 0.4s; border: 1px solid ' + (hit ? '#FCA5A5; background: #FEE2E2; color: #991B1B' : '#E5E7EB; background: #F9FAFB; color: #374151') }; }),
+      disableQueue: s.disableQueue, toggleQueue: function () { self.setState({ disableQueue: !s.disableQueue }); },
+      cfValue: cfSlow ? 'P95 118 ms' : 'P95 42 ms', cfBg: cfSlow ? '#FEF2F2' : '#F3F4F6',
+      motionStyle: 'padding: 10px 16px; border-radius: 8px; background: #ECFDF5; color: #065F46; font-weight: 600; transition: transform 0.6s, opacity 0.6s; ' + (s.playing && s.tick % 2 ? 'transform: translateY(-10px); opacity: 1' : 'transform: translateY(6px); opacity: 0.4'),
+      selName: K.filter(function (k) { return k[0] === s.kind; })[0][1] + ' 原型',
+      versions: [['刚刚', '生成 v3'], ['5 分钟前', '改为手机尺寸'], ['10 分钟前', '首次生成']].map(function (v) { return { when: v[0], t: v[1] }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

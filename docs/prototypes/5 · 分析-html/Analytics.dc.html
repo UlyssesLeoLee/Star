@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>分析</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px; width: 208px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <span style="color: #6B7280">全局</span><span style="color: #9CA3AF">/</span><span style="font-weight: 600">分析</span>
+  <nav aria-label="分析页签" style="display: flex; align-items: stretch; height: 52px; gap: 2px; margin-left: 12px">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+      <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.active}}" style="{{t.style}}">{{t.label}}</button>
+    </sc-for>
+  </nav>
+  <span style="flex: 1 1 auto"></span>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索</span>
+    <input type="search" placeholder="搜索 ⌘K" style="width: 220px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #E5E7EB; background: #FFFFFF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 848px">
+<aside style="flex: 0 0 240px; background: #FFFFFF; border-right: 1px solid #E2E1DC; padding: 10px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #374151">
+  <span>▸ Physis / GVPE</span><span>▸ StarGate Dashboard</span><span>▸ Mobile Companion</span>
+  <div style="margin-top: auto; border-top: 1px solid #E5E7EB; padding-top: 10px; display: flex; flex-direction: column; gap: 4px">
+    <div style="font-size: 11px; color: #6B7280; margin-bottom: 2px">全局</div>
+    <a href="Inbox.dc.html" style="padding: 6px 8px; color: #374151; text-decoration: none">收件箱 · 5</a>
+    <a href="Agents.dc.html" style="padding: 6px 8px; color: #374151; text-decoration: none">Agent 中心</a>
+    <a href="#" aria-current="page" style="padding: 6px 8px; border-radius: 5px; background: #EEF2FF; color: #3730A3; font-weight: 600; text-decoration: none">分析</a>
+  </div>
+</aside>
+<main style="flex: 999 1 560px; min-width: 0; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+  <div style="display: flex; gap: 8px; align-items: center; font-size: 12px; color: #4B5563">范围
+    <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D1D5DB; border-radius: 6px; background: #FFFFFF">Physis / GVPE ▾</button>
+    <button type="button" style="height: 30px; padding: 0 10px; border: 1px solid #D1D5DB; border-radius: 6px; background: #FFFFFF">近 14 天 ▾</button>
+  </div>
+
+  <sc-if value="{{isOverview}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><div style="font-size: 12px; color: #6B7280">完成任务</div><div style="font-size: 24px; font-weight: 600; margin-top: 4px">[数值]</div></section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><div style="font-size: 12px; color: #6B7280">验证通过率</div><div style="font-size: 24px; font-weight: 600; margin-top: 4px">[数值]</div></section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><div style="font-size: 12px; color: #6B7280">Agent 运行时长</div><div style="font-size: 24px; font-weight: 600; margin-top: 4px">[数值]</div></section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><div style="font-size: 12px; color: #6B7280">IPA 技能覆盖</div><div style="font-size: 24px; font-weight: 600; margin-top: 4px">[数值]</div></section>
+      </div>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px">
+        <h2 style="margin: 0 0 12px; font-size: 14px; font-weight: 600">IPA 阶段进度</h2>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px">
+          <sc-for list="{{phaseBars}}" as="b" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 60px; gap: 10px; align-items: center">
+              <span>{{b.label}}</span>
+              <div style="height: 10px; background: #F3F4F6; border-radius: 5px"><div style="height: 10px; border-radius: 5px; background: #1D4ED8; width: {{b.w}}"></div></div>
+              <span style="color: #6B7280">{{b.text}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isOps}}" hint-placeholder-val="{{ false }}">
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><h2 style="margin: 0 0 6px; font-size: 14px; font-weight: 600">集群</h2><div style="font-size: 12px; color: #6B7280">K3s local-a · 就绪 · 未接入时显示「未接入」</div></section>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><h2 style="margin: 0 0 6px; font-size: 14px; font-weight: 600">指标</h2><div style="font-size: 12px; color: #6B7280">P95 延迟、错误率、队列深度</div></section>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><h2 style="margin: 0 0 6px; font-size: 14px; font-weight: 600">发布</h2><div style="font-size: 12px; color: #6B7280">金丝雀进度与回滚记录</div></section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isAudit}}" hint-placeholder-val="{{ false }}">
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+      <div style="display: grid; grid-template-columns: 160px 140px 1fr 140px; gap: 10px; padding: 10px 14px; background: #F9FAFB; font-size: 12px; color: #6B7280"><span>时间</span><span>操作者</span><span>事件</span><span>范围</span></div>
+      <div style="display: grid; grid-template-columns: 160px 140px 1fr 140px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>11-14 14:02</span><span>Agent B</span><span>工具调用 cargo test（已授权）</span><span>wt-relation-bfs</span></div>
+      <div style="display: grid; grid-template-columns: 160px 140px 1fr 140px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>11-14 13:40</span><span>Ulysses</span><span>修改 Hooks 策略 v3</span><span>Project</span></div>
+    </section>
+  </sc-if>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'overview' }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var T = [['overview','概览'],['ops','运维'],['audit','审计日志']];
+    var P = [['P2 需求定义', 2, 20],['P3 基本设计', 1, 21],['P4 详细设计', 2, 20],['P5 实现', 2, 15],['P6.1 单元测试', 2, 11],['P6.2 集成测试', 1, 12]];
+    return {
+      tabs: T.map(function (t) { var on = s.tab === t[0]; return { label: t[1], active: on, pick: function () { self.setState({ tab: t[0] }); },
+        style: 'border: 0; background: transparent; padding: 0 12px; height: 52px; color: ' + (on ? '#1D4ED8; font-weight: 600; box-shadow: inset 0 -3px 0 #1D4ED8' : '#4B5563') }; }),
+      isOverview: s.tab === 'overview', isOps: s.tab === 'ops', isAudit: s.tab === 'audit',
+      phaseBars: P.map(function (p) { return { label: p[0], w: Math.round(p[1] / p[2] * 100) + '%', text: p[1] + ' / ' + p[2] }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

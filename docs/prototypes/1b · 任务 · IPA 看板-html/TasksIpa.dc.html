@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>任务 · IPA</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px; width: 208px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #C7D2FE; background: #EEF2FF; color: #3730A3">⎇ feat/relation-bfs ▾</button>
+  <nav aria-label="Branch 功能" style="display: flex; align-items: stretch; height: 52px; gap: 2px; flex: 1 1 auto">
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #1D4ED8; font-weight: 600; text-decoration: none; box-shadow: inset 0 -3px 0 #1D4ED8">任务</a>
+    <a href="Canvas.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">画布</a>
+    <a href="Docs.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">协同</a>
+    <a href="Sandbox.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">沙盒</a>
+    <a href="Prototype.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">原型</a>
+    <button type="button" aria-label="添加页签" style="align-self: center; width: 28px; height: 28px; border-radius: 6px; border: 1px dashed #C7C9CF; background: #FFFFFF; color: #4B5563">+</button>
+  </nav>
+  <div aria-label="正在查看此 Branch 的成员" style="display: flex; align-items: center">
+    <span title="Ulysses" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid #FFFFFF; background: #DBEAFE; color: #1E3A8A; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">U</span>
+    <span title="林 · 设计" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid #FFFFFF; margin-left: -8px; background: #FCE7F3; color: #831843; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">林</span>
+    <span title="Agent A" style="width: 28px; height: 28px; border-radius: 6px; border: 2px solid #FFFFFF; margin-left: -8px; background: #DCFCE7; color: #14532D; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">A</span>
+    <span title="Agent B" style="width: 28px; height: 28px; border-radius: 6px; border: 2px solid #FFFFFF; margin-left: -8px; background: #EDE9FE; color: #4C1D95; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">B</span>
+    <span style="margin-left: 6px; font-size: 11px; color: #6B7280">4 在线</span>
+  </div>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索</span>
+    <input type="search" placeholder="搜索任务、IPA 技能 ⌘K" style="width: 220px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #E5E7EB; background: #FFFFFF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+
+<div style="flex: 1 1 auto; display: flex; min-height: 848px; min-width: 0">
+
+<aside style="flex: 0 0 200px; background: #FFFFFF; border-right: 1px solid #E2E1DC; padding: 10px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #374151">
+  <span>▾ Physis / GVPE</span>
+  <span style="padding-left: 12px">▾ LANE · auth-refactor</span>
+  <span style="padding-left: 24px">▾ wt-relation-bfs</span>
+  <span style="margin-left: 30px; padding: 4px 6px; color: #3730A3; font-weight: 600; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 5px">⎇ feat/relation-bfs</span>
+  <span style="padding-left: 36px">⎇ fix/bfs-cycle</span>
+</aside>
+
+<main style="flex: 1 1 auto; min-width: 0; position: relative; padding: 14px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+    <div role="tablist" aria-label="任务视图" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px">
+      <sc-for list="{{views}}" as="v" hint-placeholder-count="6">
+        <button type="button" role="tab" aria-selected="{{v.active}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button>
+      </sc-for>
+    </div>
+    <div aria-label="任务卡生命周期" style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #4B5563; flex-wrap: wrap">
+      <sc-for list="{{legend}}" as="lg" hint-placeholder-count="6">
+        <span style="display: flex; align-items: center; gap: 4px"><span style="{{lg.dot}}"></span>{{lg.label}}<span style="color: #9CA3AF">{{lg.arrow}}</span></span>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{isSprint}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 12px; overflow: auto">
+      <sc-for list="{{sprintBoxes}}" as="sp" hint-placeholder-count="2">
+        <section style="{{sp.boxStyle}}">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+            <h2 style="margin: 0; font-size: 14px; font-weight: 600">{{sp.name}}</h2>
+            <span style="{{sp.badgeStyle}}">{{sp.stateLabel}}</span>
+            <span style="font-size: 12px; color: #6B7280">{{sp.dates}} · {{sp.count}} 张卡 · {{sp.points}} 点</span>
+            <span style="font-size: 12px; color: #374151">目标：{{sp.goal}}</span>
+            <sc-if value="{{sp.isActive}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 11px; color: #6B7280">
+                <div style="width: 120px; height: 6px; background: #E5E7EB; border-radius: 3px"><div style="height: 6px; border-radius: 3px; background: #059669; width: {{sp.donePct}}"></div></div>{{sp.doneText}}
+                <button type="button" onClick="{{sp.complete}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; color: #111827">完成冲刺</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{sp.isPlanned}}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{sp.start}}" aria-disabled="{{sp.cannotStart}}" title="{{sp.startTip}}" style="{{sp.startStyle}}">启动冲刺</button>
+            </sc-if>
+          </div>
+          <div style="display: flex; flex-direction: column; margin-top: 8px">
+            <sc-for list="{{sp.rows}}" as="rw" hint-placeholder-count="4">
+              <div style="display: grid; grid-template-columns: 70px minmax(0, 1.6fr) minmax(0, 1.3fr) 60px 50px 90px 110px; gap: 8px; align-items: center; padding: 7px 8px; border-top: 1px solid #F3F4F6; font-size: 12px; background: {{rw.bg}}">
+                <span style="font-family: ui-monospace, Consolas, monospace; color: #6B7280">{{rw.id}}</span>
+                <button type="button" onClick="{{rw.open}}" style="text-align: left; border: 0; background: transparent; padding: 0; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{rw.title}}</button>
+                <span style="font-size: 11px; color: #3730A3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{rw.skill}}</span>
+                <span style="font-size: 11px; color: #6B7280">文件 {{rw.files}}</span>
+                <span style="font-size: 11px; padding: 1px 6px; border-radius: 999px; background: #F3F4F6; text-align: center">{{rw.points}}</span>
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 11px"><span style="{{rw.dot}}"></span>{{rw.status}}</span>
+                <span style="display: flex; gap: 4px"><sc-for list="{{rw.moves}}" as="mv" hint-placeholder-count="1"><button type="button" onClick="{{mv.go}}" style="height: 24px; padding: 0 6px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">{{mv.label}}</button></sc-for></span>
+              </div>
+            </sc-for>
+            <sc-if value="{{sp.empty}}" hint-placeholder-val="{{ false }}"><div style="padding: 10px 8px; font-size: 12px; color: #9CA3AF; border-top: 1px dashed #E5E7EB">从下方 Backlog 把卡移进来</div></sc-if>
+          </div>
+        </section>
+      </sc-for>
+
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <h2 style="margin: 0; font-size: 14px; font-weight: 600">Backlog</h2>
+          <span style="font-size: 12px; color: #6B7280">{{backlogCount}} 张 · 未排入任何冲刺</span>
+          <div style="margin-left: auto; display: flex; gap: 6px">
+            <button type="button" onClick="{{goMap}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 12px">从 IPA 流程建卡</button>
+            <button type="button" onClick="{{goFiles}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 12px">按文件开卡</button>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 70px 80px; gap: 8px; align-items: center; margin-top: 10px; padding: 8px; border: 1px dashed #A5B4FC; border-radius: 8px; background: #F5F7FF; font-size: 12px">
+          <input aria-label="新任务卡标题" placeholder="新任务卡标题" value="{{draftTitle}}" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; min-width: 0">
+          <select aria-label="IPA 流程" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit; min-width: 0"><option>IPA：ipa-s05-002 ソースコード作成</option><option>IPA：ipa-s06-ut-005 単体試験実施</option><option>不关联 IPA</option></select>
+          <select aria-label="工作流" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit; min-width: 0"><option>工作流：标准研发</option><option>工作流：缺陷修复</option><option>工作流：文档评审</option></select>
+          <select aria-label="关联文件" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit; min-width: 0"><option>文件：bfs.rs</option><option>文件：无</option><option>从 Branch 选择…</option></select>
+          <select aria-label="估点" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>3 点</option><option>1 点</option><option>5 点</option><option>8 点</option></select>
+          <button type="button" onClick="{{quickCreate}}" style="height: 30px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">开卡</button>
+        </div>
+        <div style="display: flex; flex-direction: column; margin-top: 6px">
+          <sc-for list="{{backlogRows}}" as="rw" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 70px minmax(0, 1.6fr) minmax(0, 1.3fr) 60px 50px 90px 110px; gap: 8px; align-items: center; padding: 7px 8px; border-top: 1px solid #F3F4F6; font-size: 12px; background: {{rw.bg}}">
+              <span style="font-family: ui-monospace, Consolas, monospace; color: #6B7280">{{rw.id}}</span>
+              <button type="button" onClick="{{rw.open}}" style="text-align: left; border: 0; background: transparent; padding: 0; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{rw.title}}</button>
+              <span style="font-size: 11px; color: #3730A3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{rw.skill}}</span>
+              <span style="font-size: 11px; color: #6B7280">文件 {{rw.files}}</span>
+              <span style="font-size: 11px; padding: 1px 6px; border-radius: 999px; background: #F3F4F6; text-align: center">{{rw.points}}</span>
+              <span style="display: flex; align-items: center; gap: 4px; font-size: 11px"><span style="{{rw.dot}}"></span>{{rw.status}}</span>
+              <span style="display: flex; gap: 4px"><sc-for list="{{rw.moves}}" as="mv" hint-placeholder-count="1"><button type="button" onClick="{{mv.go}}" style="height: 24px; padding: 0 6px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">{{mv.label}}</button></sc-for></span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isMap}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; align-items: center; gap: 12px; font-size: 12px; color: #4B5563; flex-wrap: wrap">
+      <span>横向为工程阶段，纵向为流程。点流程展开它的任务卡并可增加，点别处自动收起。</span>
+      <button type="button" onClick="{{toggleOnlyCards}}" aria-pressed="{{onlyCards}}" style="{{onlyCardsStyle}}">只看已建卡</button>
+      <button type="button" onClick="{{toggleCross}}" aria-pressed="{{showCross}}" style="{{crossStyle}}">显示横断工程</button>
+    </div>
+    <div onClick="{{collapseAll}}" style="overflow-x: auto; flex: 1 1 auto; border: 1px solid #E5E7EB; border-radius: 8px; background: #FFFFFF">
+      <div style="display: flex; align-items: flex-start; min-height: 100%">
+        <sc-for list="{{columns}}" as="col" hint-placeholder-count="12">
+          <section style="{{col.style}}">
+            <div style="position: sticky; top: 0; z-index: 1; background: {{col.headBg}}; padding: 10px 10px 8px; border-bottom: 1px solid #E5E7EB">
+              <div style="font-size: 11px; color: #6B7280">{{col.code}}</div>
+              <h2 style="margin: 2px 0 0; font-size: 13px; font-weight: 600">{{col.zh}}</h2>
+              <div style="font-size: 11px; color: #6B7280">{{col.ja}}</div>
+              <div style="height: 4px; background: #F3F4F6; border-radius: 2px; margin-top: 6px"><div style="height: 4px; border-radius: 2px; background: #1D4ED8; width: {{col.pct}}"></div></div>
+              <div style="font-size: 11px; color: #4B5563; margin-top: 4px">{{col.progress}}</div>
+              <div style="font-size: 11px; color: #4338CA; margin-top: 2px">{{col.pair}}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px; padding: 6px">
+              <sc-for list="{{col.skills}}" as="sk" hint-placeholder-count="12">
+                <div style="{{sk.wrapStyle}}">
+                  <button type="button" onClick="{{sk.toggle}}" aria-expanded="{{sk.open}}" title="{{sk.tip}}" style="{{sk.style}}">
+                    <span style="{{sk.dot}}"></span>
+                    <span style="min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{sk.name}}</span>
+                    <sc-if value="{{sk.gate}}" hint-placeholder-val="{{ false }}"><span aria-label="人工闸门" style="font-size: 10px; color: #92400E">闸</span></sc-if>
+                    <sc-if value="{{sk.hasCount}}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: #E0E7FF; color: #3730A3; text-align: center">{{sk.count}}</span></sc-if>
+                  </button>
+                  <sc-if value="{{sk.open}}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{sk.stop}}" style="display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 6px 18px">
+                      <div style="font-size: 10px; color: #6B7280">ipa-{{sk.id}}</div>
+                      <sc-for list="{{sk.cards}}" as="cd" hint-placeholder-count="2">
+                        <button type="button" onClick="{{cd.open}}" style="{{cd.style}}">
+                          <span style="display: flex; align-items: center; gap: 5px"><span style="{{cd.dot}}"></span><span style="font-size: 10px; color: #6B7280">{{cd.id}} · {{cd.status}}</span></span>
+                          <span style="display: block; font-size: 11px; color: #111827; margin-top: 2px">{{cd.title}}</span>
+                        </button>
+                      </sc-for>
+                      <button type="button" onClick="{{sk.add}}" style="text-align: left; border: 1px dashed #A5B4FC; background: #F5F7FF; color: #3730A3; border-radius: 5px; padding: 5px 6px; font-size: 11px">+ 增加任务卡（进 Backlog）</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isBoard}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px">
+      <span style="color: #4B5563">阶段</span>
+      <sc-for list="{{phaseChips}}" as="pc" hint-placeholder-count="8">
+        <button type="button" onClick="{{pc.pick}}" aria-pressed="{{pc.active}}" style="{{pc.style}}">{{pc.label}}</button>
+      </sc-for>
+      <button type="button" onClick="{{toggleArchive}}" aria-pressed="{{showArchive}}" style="{{archiveBtnStyle}}">显示归档</button>
+    </div>
+    <div style="display: flex; gap: 10px; flex: 1 1 auto; overflow-x: auto; align-items: stretch">
+      <sc-for list="{{lanes}}" as="ln" hint-placeholder-count="5">
+        <section style="flex: 1 1 0; min-width: 170px; background: #EFEFEC; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+          <h2 style="margin: 0; font-size: 12px; font-weight: 600; color: #374151; display: flex; align-items: center; gap: 6px"><span style="{{ln.dot}}"></span>{{ln.title}}</h2>
+          <div style="font-size: 11px; color: #6B7280">{{ln.hint}}</div>
+          <sc-for list="{{ln.cards}}" as="cd" hint-placeholder-count="2">
+            <div style="{{cd.style}}">
+              <button type="button" onClick="{{cd.open}}" style="display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 0">
+                <span style="display: flex; gap: 6px; align-items: center"><span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #EEF2FF; color: #3730A3">{{cd.phase}}</span><span style="font-size: 11px; color: #6B7280">{{cd.id}}</span></span>
+                <span style="display: block; margin-top: 6px; font-size: 12px; color: #111827">{{cd.title}}</span>
+                <span style="display: block; margin-top: 3px; font-size: 11px; color: #4338CA">{{cd.skill}}</span>
+                <span style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: #6B7280"><span style="{{cd.avatar}}">{{cd.initial}}</span>{{cd.owner}}</span>
+                <sc-if value="{{cd.hasLive}}" hint-placeholder-val="{{ false }}"><span style="display: block; margin-top: 4px; font-size: 11px; color: #7C3AED">{{cd.live}}</span></sc-if>
+              </button>
+              <sc-if value="{{cd.canStart}}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{cd.start}}" style="margin-top: 8px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #1D4ED8; background: #FFFFFF; color: #1D4ED8; font-size: 12px">开启 → 待执行</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isFiles}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4B5563; flex-wrap: wrap">
+      <span>勾选当前 Branch 里的文件即可批量开卡；每张卡自动配 .nema 侧车，文件即任务。</span>
+      <sc-for list="{{fileFilters}}" as="ff" hint-placeholder-count="4">
+        <button type="button" onClick="{{ff.pick}}" aria-pressed="{{ff.active}}" style="{{ff.style}}">{{ff.label}}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; gap: 12px; flex: 1 1 auto; min-height: 0; flex-wrap: wrap">
+      <section aria-label="文件树" style="flex: 0 0 300px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 12px">
+        <div style="font-size: 11px; color: #6B7280; padding: 2px 6px 6px">wt-relation-bfs · feat/relation-bfs</div>
+        <sc-for list="{{fileRows}}" as="fr" hint-placeholder-count="10">
+          <div style="display: flex; align-items: center; gap: 2px">
+            <sc-if value="{{fr.isFile}}" hint-placeholder-val="{{ true }}"><input type="checkbox" checked="{{fr.checked}}" onChange="{{fr.toggle}}" aria-label="{{fr.checkLabel}}" style="flex: 0 0 auto; margin: 0 4px"></sc-if>
+            <button type="button" onClick="{{fr.pick}}" style="{{fr.style}}">
+              <span style="{{fr.indent}}"></span>
+              <span style="flex: 0 0 auto; color: #9CA3AF">{{fr.icon}}</span>
+              <span style="min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{fr.name}}</span>
+              <sc-if value="{{fr.hasChange}}" hint-placeholder-val="{{ false }}"><span style="{{fr.changeStyle}}">{{fr.change}}</span></sc-if>
+              <sc-if value="{{fr.shared}}" hint-placeholder-val="{{ false }}"><span title="多人共同编辑" style="font-size: 10px; color: #6B7280">{{fr.editors}}人</span></sc-if>
+              <sc-if value="{{fr.hasNema}}" hint-placeholder-val="{{ false }}"><span style="display: flex; align-items: center; gap: 4px; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #EEF2FF; color: #3730A3"><span style="{{fr.dot}}"></span>{{fr.card}}</span></sc-if>
+              <sc-if value="{{fr.noCard}}" hint-placeholder-val="{{ false }}"><span style="font-size: 10px; color: #9CA3AF">无卡</span></sc-if>
+            </button>
+          </div>
+        </sc-for>
+      </section>
+
+      <sc-if value="{{hasChecked}}" hint-placeholder-val="{{ false }}">
+        <section aria-label="按文件开卡" style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border: 2px solid #1D4ED8; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 12px">
+          <div style="display: flex; align-items: center; gap: 8px"><h2 style="margin: 0; font-size: 15px; font-weight: 600">为 {{checkedCount}} 个文件开任务卡</h2><button type="button" onClick="{{clearChecked}}" style="margin-left: auto; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">取消选择</button></div>
+          <div role="group" aria-label="开卡方式" style="display: flex; gap: 6px">
+            <sc-for list="{{batchModes}}" as="bm" hint-placeholder-count="2">
+              <button type="button" onClick="{{bm.pick}}" aria-pressed="{{bm.active}}" style="{{bm.style}}">{{bm.label}}</button>
+            </sc-for>
+          </div>
+          <div style="border: 1px solid #E5E7EB; border-radius: 6px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 80px; gap: 8px; padding: 8px 10px; background: #F9FAFB; color: #6B7280"><span>文件</span><span>任务卡标题</span><span>建议的 IPA 流程</span><span>配 .nema</span></div>
+            <sc-for list="{{batchRows}}" as="br" hint-placeholder-count="2">
+              <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 80px; gap: 8px; padding: 8px 10px; border-top: 1px solid #F3F4F6; align-items: center">
+                <span style="font-family: ui-monospace, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{br.name}}<span style="display: block; font-size: 10px; color: #047857">{{br.change}}</span></span>
+                <input aria-label="任务卡标题" value="{{br.title}}" style="height: 28px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; font-size: 12px; min-width: 0">
+                <select aria-label="IPA 流程" style="height: 28px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit; font-size: 12px; min-width: 0"><option>{{br.skill}}</option><option>不关联</option></select>
+                <input type="checkbox" checked="{{br.nema}}" aria-label="配 .nema">
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; align-items: center">
+            <span style="color: #6B7280">初始状态</span>
+            <div role="group" aria-label="初始状态" style="display: flex; gap: 6px">
+              <sc-for list="{{statusOpts}}" as="so" hint-placeholder-count="2">
+                <button type="button" onClick="{{so.pick}}" aria-pressed="{{so.active}}" style="{{so.style}}">{{so.label}}</button>
+              </sc-for>
+            </div>
+            <span style="color: #6B7280">负责人</span><select aria-label="负责人" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>交给 Router 分派</option><option>Agent A</option><option>Agent B</option><option>Ulysses</option></select>
+            <span style="color: #6B7280">标签</span><input aria-label="标签" value="relation, bfs" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit">
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center"><button type="button" onClick="{{createCards}}" style="height: 34px; padding: 0 14px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">{{createLabel}}</button><span style="color: #6B7280">新卡隶属当前 Worktree 与 Branch，会出现在任务看板和 IPA 流程图里</span></div>
+        </section>
+      </sc-if>
+      <sc-if value="{{noChecked}}" hint-placeholder-val="{{ true }}">
+      <section aria-label="文件详情" style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <div style="min-width: 0">
+            <div style="font-size: 11px; color: #6B7280">{{file.dir}}</div>
+            <h2 style="margin: 2px 0 0; font-size: 15px; font-weight: 600; font-family: ui-monospace, Consolas, monospace">{{file.name}}</h2>
+          </div>
+          <div style="display: flex; margin-left: auto" aria-label="编辑者">
+            <sc-for list="{{file.editorChips}}" as="ec" hint-placeholder-count="2">
+              <span title="{{ec.name}}" style="{{ec.style}}">{{ec.initial}}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{file.noNema}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px dashed #C7D2FE; background: #F5F7FF; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+            <div style="font-weight: 600">这个文件还没有 .nema</div>
+            <div style="font-size: 12px; color: #4B5563">配套后会生成 {{file.name}}.nema，记录 5W1H、子任务表和关系图，并作为一张任务卡进入 Backlog。</div>
+            <button type="button" onClick="{{createNema}}" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">为此文件配套 .nema</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{file.hasNema}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px">
+              <span style="font-family: ui-monospace, Consolas, monospace; color: #3730A3">{{file.name}}.nema</span>
+              <span style="color: #6B7280">REV {{file.rev}} · {{file.origin}}</span>
+              <span style="margin-left: auto; display: flex; align-items: center; gap: 6px"><span style="{{file.dot}}"></span>{{file.card}} · {{file.status}}</span>
+            </div>
+            <div role="tablist" aria-label=".nema 内容" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px; align-self: flex-start">
+              <sc-for list="{{nemaTabs}}" as="nt" hint-placeholder-count="5">
+                <button type="button" role="tab" aria-selected="{{nt.active}}" onClick="{{nt.pick}}" style="{{nt.style}}">{{nt.label}}</button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{nemaIsCard}}" hint-placeholder-val="{{ true }}">
+              <div style="display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; font-size: 12px">
+                <span style="color: #6B7280">任务卡</span><span>{{file.card}} {{file.title}}</span>
+                <span style="color: #6B7280">状态</span><span>{{file.status}}</span>
+                <span style="color: #6B7280">IPA 流程</span><span>{{file.skill}}</span>
+                <span style="color: #6B7280">负责人</span><span>{{file.owner}}</span>
+                <span style="color: #6B7280">子任务</span><span>{{file.subs}}</span>
+                <span style="color: #6B7280">关联文件</span><span style="font-family: ui-monospace, Consolas, monospace">{{file.related}}</span>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button type="button" onClick="{{advanceFile}}" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">{{file.advanceLabel}}</button>
+                <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">在任务看板中查看</button>
+                <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">打开源文件</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{nemaIs5w}}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+                <sc-for list="{{file.w5}}" as="w" hint-placeholder-count="6">
+                  <label style="font-size: 12px; color: #6B7280">{{w.label}}<input value="{{w.value}}" style="display: block; width: 100%; box-sizing: border-box; margin-top: 4px; height: 32px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; color: #111827"></label>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{nemaIsTable}}" hint-placeholder-val="{{ false }}">
+              <div style="border: 1px solid #E5E7EB; border-radius: 6px; overflow: hidden; font-size: 12px">
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px; gap: 8px; padding: 8px 10px; background: #F9FAFB; color: #6B7280"><span>子任务</span><span>状态</span><span>负责人</span></div>
+                <sc-for list="{{file.rows}}" as="r" hint-placeholder-count="3">
+                  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px; gap: 8px; padding: 8px 10px; border-top: 1px solid #F3F4F6"><span>{{r.a}}</span><span>{{r.b}}</span><span>{{r.c}}</span></div>
+                </sc-for>
+              </div>
+              <button type="button" style="align-self: flex-start; height: 30px; padding: 0 10px; border-radius: 6px; border: 1px dashed #A5B4FC; background: #F5F7FF; color: #3730A3">+ 子任务行</button>
+            </sc-if>
+
+            <sc-if value="{{nemaIsGraph}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px">
+                <span style="padding: 8px 10px; border: 1px solid #1D4ED8; border-radius: 6px; background: #EEF2FF">{{file.name}}</span><span style="color: #6B7280">依赖 →</span>
+                <span style="padding: 8px 10px; border: 1px solid #D1D5DB; border-radius: 6px">graph.rs</span><span style="color: #6B7280">被测 ←</span>
+                <span style="padding: 8px 10px; border: 1px solid #D1D5DB; border-radius: 6px">bfs_test.rs</span>
+              </div>
+              <div style="font-size: 12px; color: #6B7280">也可以在画布「关系图」图层里展开查看</div>
+            </sc-if>
+
+            <sc-if value="{{nemaIsSource}}" hint-placeholder-val="{{ false }}">
+              <pre style="margin: 0; background: #111827; color: #E5E7EB; border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.7; white-space: pre-wrap">{{file.source}}</pre>
+            </sc-if>
+          </div>
+        </sc-if>
+      </section>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isOtherView}}" hint-placeholder-val="{{ false }}">
+    <div style="flex: 1 1 auto; border: 1px dashed #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6B7280; min-height: 400px">{{viewLabel}} 视图沿用同一批任务卡，下一轮细化</div>
+  </sc-if>
+
+  <sc-if value="{{showDetail}}" hint-placeholder-val="{{ false }}">
+    <section aria-label="任务卡子页面" style="position: absolute; inset: 8px; z-index: 6; background: #FFFFFF; border: 1px solid #9CA3AF; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column">
+      <div style="flex: 0 0 auto; padding: 12px 16px 0; border-bottom: 1px solid #E5E7EB; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <button type="button" onClick="{{closeDetail}}" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">← 返回</button>
+          <span style="font-size: 12px; color: #6B7280; font-family: ui-monospace, Consolas, monospace">{{detail.id}}</span>
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{detail.title}}</h2>
+          <span style="{{detail.statusStyle}}">{{detail.status}}</span>
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #EEF2FF; color: #3730A3">{{detail.phase}}</span>
+          <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #F3F4F6; color: #374151">{{detail.sprint}} · {{detail.points}} 点</span>
+          <div aria-label="正在查看此任务卡" style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; color: #7C3AED">
+            <span>Agent B 正在编辑 bfs.rs · 林 查看中</span>
+            <span style="display: flex"><span title="Agent B" style="width: 24px; height: 24px; border-radius: 6px; background: #EDE9FE; color: #4C1D95; display: flex; align-items: center; justify-content: center; font-weight: 600">B</span><span title="林" style="width: 24px; height: 24px; border-radius: 50%; margin-left: -6px; border: 2px solid #FFFFFF; background: #FCE7F3; color: #831843; display: flex; align-items: center; justify-content: center; font-weight: 600">林</span></span>
+          </div>
+          <button type="button" onClick="{{closeDetail}}" aria-label="关闭任务卡" style="width: 32px; height: 32px; border: 0; background: transparent; color: #6B7280; font-size: 18px">×</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+          <ol aria-label="生命周期" style="list-style: none; margin: 0; padding: 0; display: flex; gap: 0; align-items: center">
+            <sc-for list="{{detail.steps}}" as="st" hint-placeholder-count="6">
+              <li style="{{st.style}}">{{st.label}}</li>
+            </sc-for>
+          </ol>
+          <div style="margin-left: auto; display: flex; gap: 6px">
+            <sc-if value="{{detail.canAdvance}}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{advance}}" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">{{detail.advanceLabel}}</button>
+            </sc-if>
+            <sc-if value="{{detail.canArchive}}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{archive}}" style="height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">归档</button>
+            </sc-if>
+          </div>
+        </div>
+        <div role="tablist" aria-label="任务卡页签" style="display: flex; gap: 2px">
+          <sc-for list="{{cardTabs}}" as="ctb" hint-placeholder-count="5">
+            <button type="button" role="tab" aria-selected="{{ctb.active}}" onClick="{{ctb.pick}}" style="{{ctb.style}}">{{ctb.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{cardIsInfo}}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; overflow: auto">
+          <div style="flex: 1 1 520px; min-width: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 18px">
+            <section aria-label="描述">
+              <h3 style="margin: 0 0 6px; font-size: 13px; font-weight: 600">描述</h3>
+              <textarea rows="3" aria-label="描述" style="width: 100%; box-sizing: border-box; border: 1px solid #E5E7EB; border-radius: 6px; padding: 8px 10px; font: inherit; color: #111827; resize: vertical">{{detail.desc}}</textarea>
+            </section>
+            <section aria-label="验收标准">
+              <h3 style="margin: 0 0 6px; font-size: 13px; font-weight: 600">验收标准</h3>
+              <sc-for list="{{detail.accept}}" as="ac" hint-placeholder-count="3">
+                <div style="display: flex; gap: 8px; padding: 5px 0; font-size: 13px"><span style="color: {{ac.color}}">{{ac.mark}}</span>{{ac.t}}<span style="margin-left: auto; font-size: 11px; color: #6B7280">{{ac.src}}</span></div>
+              </sc-for>
+            </section>
+            <section aria-label="IPA 流程关联">
+              <div style="display: flex; align-items: center; margin-bottom: 6px"><h3 style="margin: 0; font-size: 13px; font-weight: 600">IPA 流程关联</h3><input type="search" aria-label="搜索 IPA 流程" placeholder="搜索流程：编号 / 名称 / 阶段" style="margin-left: auto; width: 220px; height: 28px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; font-size: 12px"></div>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+                <sc-for list="{{detail.skills}}" as="sk2" hint-placeholder-count="2">
+                  <div style="padding: 10px; border: 1px solid #C7D2FE; background: #F5F7FF; border-radius: 8px; font-size: 12px">
+                    <div style="display: flex; align-items: center; gap: 6px"><span style="font-family: ui-monospace, Consolas, monospace; color: #3730A3">{{sk2.id}}</span><button type="button" aria-label="{{sk2.removeLabel}}" style="margin-left: auto; border: 0; background: transparent; color: #9CA3AF">×</button></div>
+                    <div style="font-weight: 600; margin-top: 2px">{{sk2.name}}</div>
+                    <div style="color: #4338CA; margin-top: 4px">V 字对应：{{detail.pair}}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+            <section aria-label="关联文档">
+              <h3 style="margin: 0 0 6px; font-size: 13px; font-weight: 600">关联文档</h3>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{detail.docs}}" as="dc" hint-placeholder-count="3">
+                  <a href="Docs.dc.html" style="display: flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #E5E7EB; border-radius: 6px; text-decoration: none; color: #111827; font-size: 12px"><span style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #F3F4F6; color: #374151">{{dc.kind}}</span>{{dc.t}}</a>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+          <aside aria-label="任务卡属性" style="flex: 0 0 300px; border-left: 1px solid #E5E7EB; background: #FAFAF9; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; font-size: 12px">
+            <sc-for list="{{detail.props}}" as="pr" hint-placeholder-count="8">
+              <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; align-items: center"><span style="color: #6B7280">{{pr.k}}</span><span style="{{pr.style}}">{{pr.v}}</span></div>
+            </sc-for>
+            <div>
+              <div style="color: #6B7280; margin-bottom: 6px">标签</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px">
+                <sc-for list="{{detail.labels}}" as="lb" hint-placeholder-count="3">
+                  <span style="padding: 2px 8px; border-radius: 999px; background: #F3F4F6; color: #374151">{{lb.t}}</span>
+                </sc-for>
+                <button type="button" style="height: 22px; padding: 0 8px; border-radius: 999px; border: 1px dashed #D1D5DB; background: #FFFFFF; font-size: 11px">+ 标签</button>
+              </div>
+            </div>
+            <div style="color: #92400E">闸门：{{detail.gate}}</div>
+          </aside>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{cardIsFiles}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; display: flex; min-height: 0; flex-wrap: wrap">
+          <section aria-label="关联文件" style="flex: 0 0 280px; border-right: 1px solid #E5E7EB; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; font-size: 12px; background: #FAFAF9">
+            <sc-for list="{{cardFiles}}" as="cf" hint-placeholder-count="4">
+              <button type="button" onClick="{{cf.pick}}" style="{{cf.style}}">
+                <span style="display: flex; align-items: center; gap: 6px"><span style="{{cf.badge}}">{{cf.kind}}</span><span style="font-family: ui-monospace, Consolas, monospace; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{cf.name}}</span></span>
+                <span style="display: flex; gap: 8px; margin-top: 4px; font-size: 11px; color: #6B7280"><span style="color: #047857">{{cf.add}}</span><span style="color: #B91C1C">{{cf.del}}</span><span style="margin-left: auto; color: #7C3AED">{{cf.who}}</span></span>
+              </button>
+            </sc-for>
+            <button type="button" style="margin-top: 6px; height: 30px; border-radius: 6px; border: 1px dashed #A5B4FC; background: #F5F7FF; color: #3730A3">+ 从 Branch 关联文件</button>
+          </section>
+          <section aria-label="内嵌编辑" style="flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #E5E7EB; font-size: 12px">
+              <span style="font-family: ui-monospace, Consolas, monospace; font-weight: 600">{{cardFile.name}}</span>
+              <span style="color: #6B7280">{{cardFile.lease}}</span>
+              <a href="Docs.dc.html" style="margin-left: auto; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; display: flex; align-items: center; text-decoration: none; color: #111827">在协同中打开 ↗</a>
+            </div>
+            <div style="flex: 1 1 auto; background: #0B1020; color: #E5E7EB; padding: 8px 0; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.75; overflow: auto">
+              <sc-for list="{{cardFile.lines}}" as="cl" hint-placeholder-count="10">
+                <div style="{{cl.style}}"><span style="display: inline-block; width: 28px; color: #4B5563; text-align: right; margin-right: 10px">{{cl.n}}</span>{{cl.t}}<sc-if value="{{cl.hasTag}}" hint-placeholder-val="{{ false }}"><span style="margin-left: 6px; font-size: 10px; padding: 0 4px; border-radius: 3px; background: #7C3AED; color: #FFFFFF">{{cl.tag}}</span></sc-if></div>
+              </sc-for>
+            </div>
+            <div style="display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #E5E7EB; font-size: 12px">
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">保存检查点</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">查看 .nema 规约</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">与 dev 对比</button>
+              <span style="margin-left: auto; align-self: center; color: #6B7280">编辑与协同页同步，同一文件同一份草稿</span>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{cardIsSubs}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; padding: 16px 20px; overflow: auto; font-size: 12px">
+          <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr) 110px 100px 120px; gap: 8px; padding: 8px 10px; background: #F9FAFB; color: #6B7280; border-radius: 6px 6px 0 0"><span></span><span>子任务</span><span>类型</span><span>状态</span><span>负责人</span></div>
+          <sc-for list="{{detail.allSubs}}" as="sb" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr) 110px 100px 120px; gap: 8px; padding: 9px 10px; border-bottom: 1px solid #F3F4F6; align-items: center"><input type="checkbox" checked="{{sb.done}}" aria-label="{{sb.t}}"><span style="{{sb.tStyle}}">{{sb.t}}</span><span style="color: #6B7280">{{sb.kind}}</span><span>{{sb.st}}</span><span>{{sb.who}}</span></div>
+          </sc-for>
+          <div style="display: flex; gap: 6px; margin-top: 10px"><button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px dashed #A5B4FC; background: #F5F7FF; color: #3730A3">+ 子任务</button><button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px dashed #A5B4FC; background: #F5F7FF; color: #3730A3">+ 把文件作为子任务</button></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{cardIsActivity}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; padding: 16px 20px; overflow: auto; font-size: 12px; display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{detail.audit}}" as="au" hint-placeholder-count="5">
+            <div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #F3F4F6"><span style="color: #6B7280; flex: 0 0 110px">{{au.when}}</span><span style="font-weight: 600; flex: 0 0 90px">{{au.who}}</span><span>{{au.t}}</span></div>
+          </sc-for>
+          <textarea rows="2" aria-label="写评论" placeholder="写评论，@ 可提及成员或 Agent" style="margin-top: 8px; width: 100%; box-sizing: border-box; border: 1px solid #D1D5DB; border-radius: 6px; padding: 8px 10px; font: inherit; resize: vertical"></textarea>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{cardIsWorkflow}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; padding: 16px 20px; overflow: auto; display: flex; flex-direction: column; gap: 16px; font-size: 12px">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+            <label style="color: #6B7280">工作流<select style="margin-left: 6px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>标准研发（IPA 実装）</option><option>缺陷修复</option><option>文档评审</option></select></label>
+            <label style="color: #6B7280">Sprint<select style="margin-left: 6px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>{{detail.sprint}}</option><option>Backlog</option></select></label>
+            <label style="color: #6B7280">估点<select style="margin-left: 6px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>{{detail.points}} 点</option><option>1 点</option><option>8 点</option></select></label>
+          </div>
+          <section aria-label="状态流转">
+            <h3 style="margin: 0 0 8px; font-size: 13px; font-weight: 600">状态流转</h3>
+            <div style="display: flex; align-items: stretch; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{detail.flow}}" as="fl" hint-placeholder-count="6">
+                <div style="{{fl.style}}"><div style="font-weight: 600">{{fl.label}}</div><div style="font-size: 11px; margin-top: 4px; color: {{fl.sub}}">{{fl.rule}}</div></div>
+              </sc-for>
+            </div>
+          </section>
+          <section aria-label="自动化">
+            <h3 style="margin: 0 0 8px; font-size: 13px; font-weight: 600">自动化（来自画布「代码」图层）</h3>
+            <sc-for list="{{detail.autos}}" as="au2" hint-placeholder-count="3">
+              <div style="display: flex; gap: 10px; padding: 8px 10px; border: 1px solid #E5E7EB; border-radius: 6px; margin-bottom: 6px"><span style="font-weight: 600">{{au2.when}}</span><span style="color: #4B5563">{{au2.then}}</span><span style="margin-left: auto; color: {{au2.color}}">{{au2.state}}</span></div>
+            </sc-for>
+            <a href="Canvas.dc.html" style="font-size: 12px">在画布中编辑流程 ↗</a>
+          </section>
+          <section aria-label="流转记录">
+            <h3 style="margin: 0 0 8px; font-size: 13px; font-weight: 600">流转记录</h3>
+            <sc-for list="{{detail.history}}" as="hs" hint-placeholder-count="4">
+              <div style="display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #F3F4F6"><span style="color: #6B7280; flex: 0 0 100px">{{hs.when}}</span><span style="flex: 0 0 90px; font-weight: 600">{{hs.who}}</span><span>{{hs.t}}</span></div>
+            </sc-for>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{cardIsCli}}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; position: relative">
+          <div style="display: flex; align-items: stretch; gap: 2px; padding: 6px 8px 0; background: #1F2937">
+            <sc-for list="{{cliTabs}}" as="ct" hint-placeholder-count="2">
+              <button type="button" onClick="{{ct.pick}}" style="{{ct.style}}"><span style="{{ct.dot}}"></span>{{ct.label}}<span style="font-size: 10px; color: #9CA3AF">{{ct.state}}</span></button>
+            </sc-for>
+            <button type="button" onClick="{{toggleCliMenu}}" aria-expanded="{{cliMenuOpen}}" style="border: 0; background: transparent; color: #D1D5DB; padding: 0 10px; font-size: 12px">+ 新会话 ▾</button>
+            <button type="button" onClick="{{toggleSplit}}" aria-pressed="{{cliSplit}}" style="margin-left: auto; align-self: center; height: 24px; padding: 0 8px; border-radius: 5px; border: 1px solid #4B5563; background: transparent; color: #D1D5DB; font-size: 11px">{{splitLabel}}</button>
+          </div>
+          <sc-if value="{{cliMenuOpen}}" hint-placeholder-val="{{ false }}">
+            <div role="menu" aria-label="选择 CLI" style="position: absolute; top: 40px; left: 220px; z-index: 5; width: 240px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; padding: 6px; display: flex; flex-direction: column; font-size: 12px">
+              <sc-for list="{{cliProviders}}" as="cp" hint-placeholder-count="4">
+                <button type="button" role="menuitem" onClick="{{cp.add}}" style="text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 5px"><span style="display: block; color: #111827">{{cp.label}}</span><span style="display: block; font-size: 11px; color: #6B7280">{{cp.note}}</span></button>
+              </sc-for>
+              <div style="border-top: 1px solid #F3F4F6; margin-top: 4px; padding: 6px 8px; font-size: 11px; color: #6B7280">CLI 配置在 设置 → CLI 配置 中管理</div>
+            </div>
+          </sc-if>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; background: #111827; border-bottom: 1px solid #374151; font-size: 11px">
+            <span style="color: #9CA3AF">上下文</span>
+            <sc-for list="{{cliContext}}" as="cx" hint-placeholder-count="5">
+              <span style="padding: 2px 6px; border-radius: 4px; background: #1F2937; color: #C7D2FE; font-family: ui-monospace, Consolas, monospace">{{cx.v}}</span>
+            </sc-for>
+          </div>
+          <div style="flex: 1 1 auto; display: flex; min-height: 0; background: #0B1020">
+            <sc-for list="{{panes}}" as="pn" hint-placeholder-count="1">
+              <div style="{{pn.style}}">
+                <div style="font-size: 11px; color: #9CA3AF; padding-bottom: 6px; border-bottom: 1px solid #1F2937; margin-bottom: 6px">{{pn.title}}</div>
+                <sc-for list="{{pn.lines}}" as="ln" hint-placeholder-count="6">
+                  <div style="{{ln.style}}">{{ln.t}}</div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: #111827; border-top: 1px solid #374151">
+            <label style="font-size: 11px; color: #9CA3AF">发给 {{activeCliName}}<textarea rows="2" placeholder="例如：按任务描述补完环路径输出，并跑 bfs 单测" style="display: block; width: 100%; box-sizing: border-box; margin-top: 4px; border: 1px solid #374151; border-radius: 6px; background: #0B1020; color: #E5E7EB; padding: 6px 8px; font: inherit; resize: none"></textarea></label>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF; font-size: 12px">发送</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #4B5563; background: transparent; color: #E5E7EB; font-size: 12px">插入任务描述</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #4B5563; background: transparent; color: #E5E7EB; font-size: 12px">附加文件</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #4B5563; background: transparent; color: #E5E7EB; font-size: 12px">交接给另一个 CLI</button>
+              <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #7F1D1D; background: transparent; color: #FCA5A5; font-size: 12px">中断</button>
+              <span style="margin-left: auto; align-self: center; font-size: 11px; color: #9CA3AF">输出与工具调用写入任务卡证据</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </section>
+  </sc-if>
+</main>
+
+<aside style="flex: 0 0 280px; background: #FFFFFF; border-left: 1px solid #E2E1DC; padding: 10px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12px">
+  <div style="padding: 8px 10px; border: 1px solid #E5E7EB; border-radius: 6px; background: #F9FAFB; color: #374151">▸ Worktree 状态 · 干净</div>
+  <div style="display: flex; gap: 16px; border-bottom: 1px solid #E5E7EB"><span style="padding: 6px 0; font-weight: 600; box-shadow: inset 0 -2px 0 #1D4ED8">聊天</span><span style="padding: 6px 0; color: #6B7280">Team</span></div>
+  <div style="align-self: flex-end; max-width: 220px; background: #EEF2FF; color: #1E1B4B; padding: 8px 10px; border-radius: 8px">详细设计还有哪些流程没建卡？</div>
+  <div style="max-width: 240px; background: #F3F4F6; padding: 8px 10px; border-radius: 8px">P4 共 20 个流程，已建卡 3 个。建议先建 ロジック設計 和 DB詳細設計，要我放进 Backlog 吗？</div>
+  <div style="margin-top: auto; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px; color: #9CA3AF">问问这个 Branch 的进展 · WORKTREE</div>
+</aside>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      cardTab: 'info', cardFileSel: 'bfs', checked: {}, batchMode: 'each', initStatus: 'backlog', cliSessions: [['Claude Code', 'wait'], ['Codex', 'run']], cliActive: 0, cliMenu: false, cliSplit: false,
+      fileSel: 'bfs', fileFilter: 'all', nemaTab: 'card', nemaFiles: { bfs: ['T-142', 'doing'], graph: ['T-126', 'doing'], api: ['T-122', 'done'], bfstest: ['T-150', 'backlog'] },
+      view: 'sprint', draftTitle: '',
+      sprints: { S12: { name: 'Sprint 12', short: 'S12', dates: '11-11 → 11-25', goal: '关系图环检测上线', state: 'active' }, S13: { name: 'Sprint 13', short: 'S13', dates: '11-25 → 12-09', goal: '结果分页与集成测试', state: 'planned' } },
+      sprintOf: { 'T-142': 'S12', 'T-143': 'S12', 'T-126': 'S12', 'T-127': 'S12', 'T-128': 'S12', 'T-121': 'S12', 'T-122': 'S12', 'T-123': 'S12', 'T-131': 'S12', 'T-133': 'S12', 'T-151': 'S12', 'T-152': 'S13', 'T-150': 'S13' }, onlyCards: false, showCross: false, phase: 'all', showArchive: false, open: null, expanded: 's05-002', seq: 200,
+      cards: {
+        's02-003': [['T-118', 'backlog', '关系查询的性能与规模约束', 'Ulysses']],
+        's03-003': [['T-121', 'review', '关系图服务边界与契约', 'Agent A']],
+        's03-007': [['T-122', 'done', '关系查询 API 契约', 'Agent A'], ['T-123', 'todo', '分页与游标 API 契约', '未分配']],
+        's04-002': [['T-126', 'doing', 'BFS 模块接口与状态', 'Agent A']],
+        's04-003': [['T-127', 'todo', '遍历器与访问集类设计', '未分配']],
+        's04-014': [['T-128', 'todo', 'BFS 详细测试设计', '未分配']],
+        's05-001': [['T-130', 'archived', '开发环境与工具链', 'Agent B']],
+        's05-002': [['T-131', 'done', 'BFS 基础实现', 'Agent B'], ['T-142', 'doing', 'BFS 环检测', 'Agent B'], ['T-143', 'review', '关系权重', 'Agent A'], ['T-152', 'backlog', '结果分页', '未分配']],
+        's05-006': [['T-133', 'done', 'BFS 基础实现代码评审', 'Ulysses']],
+        's06-ut-002': [['T-151', 'doing', 'BFS 单测规格', 'Agent A']],
+        's06-ut-003': [['T-150', 'backlog', '环检测边界用例', '未分配']],
+        's06-it-003': [['T-160', 'backlog', '关系服务集成环境', '未分配']]
+      }
+    };
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var CAT = {"P1":[["s01-001","経営要求確認",0],["s01-002","システム化構想",0],["s01-003","システム化計画",0],["s01-004","企画",0],["s01-005","プロジェクト立上げ",0],["s01-006","現行業務調査",0],["s01-007","現行システム調査",0],["s01-008","課題分析",0],["s01-009","新業務設計",0],["s01-010","投資効果検討",0],["s01-011","実現性検討",0],["s01-012","リスク分析",0],["s01-013","スコープ検討",0],["s01-014","プロジェクト計画策定",0],["s01-015","体制検討",0],["s01-016","スケジュール検討",0],["s01-017","予算策定",0],["s01-018","ステークホルダー分析",0],["s01-019","利害調整",0],["s01-020","承認・キックオフ",1]],"P2":[["s02-001","ユーザー要求定義",0],["s02-002","業務要件定義",0],["s02-003","システム要件定義",0],["s02-004","機能要件定義",0],["s02-005","非機能要件定義",0],["s02-006","データ要件定義",0],["s02-007","外部IF要件定義",0],["s02-008","セキュリティ要件定義",0],["s02-009","運用要件定義",0],["s02-010","移行要件定義",0],["s02-011","要件分析・整理",0],["s02-012","要件定義書作成",0],["s02-013","要件レビュー",0],["s02-014","要件確認",0],["s02-015","要件承認",1],["s02-016","ベースライン化",0],["s02-017","トレーサビリティ確立",0],["s02-018","要件管理計画策定",0],["s02-019","関係者合意",1],["s02-020","承認",1]],"P3":[["s03-001","システム方式設計",0],["s03-002","ソフトウェア方式設計",0],["s03-003","アーキテクチャ設計",0],["s03-004","機能設計",0],["s03-005","画面設計",0],["s03-006","帳票設計",0],["s03-007","API設計",0],["s03-008","外部IF設計",0],["s03-009","データベース基本設計",0],["s03-010","データモデル設計",0],["s03-011","バッチ設計",0],["s03-012","権限設計",0],["s03-013","セキュリティ設計",0],["s03-014","インフラ基本設計",0],["s03-015","ネットワーク設計",0],["s03-016","運用設計",0],["s03-017","監視設計",0],["s03-018","バックアップ設計",0],["s03-019","移行設計",0],["s03-020","基本設計レビュー",0],["s03-021","承認",1]],"P4":[["s04-001","プログラム構造設計",0],["s04-002","モジュール設計",0],["s04-003","クラス設計",0],["s04-004","ロジック設計",0],["s04-005","API詳細設計",0],["s04-006","DB詳細設計",0],["s04-007","SQL設計",0],["s04-008","バッチ詳細設計",0],["s04-009","画面詳細設計",0],["s04-010","帳票詳細設計",0],["s04-011","エラー処理設計",0],["s04-012","ログ設計",0],["s04-013","パラメータ設計",0],["s04-014","テスト設計（詳細）",0],["s04-015","詳細設計書作成",0],["s04-016","詳細設計レビュー",0],["s04-017","設計検証",0],["s04-018","承認",1],["s04-019","ベースライン化",0],["s04-020","設計書管理",0]],"P5":[["s05-001","開発環境構築",0],["s05-002","ソースコード作成",0],["s05-003","コーディング規約適用",0],["s05-004","静的解析（SAST）",0],["s05-005","単体設計レビュー",0],["s05-006","コードレビュー",0],["s05-007","単体テスト実装",0],["s05-008","ビルド",0],["s05-009","CI（継続的インテグレーション）",0],["s05-010","パッケージ作成",0],["s05-011","バージョン管理",0],["s05-012","構成管理",0],["s05-013","ドキュメント作成",0],["s05-014","実装レビュー",0],["s05-015","成果物管理",0]],"P6.2":[["s06-it-001","試験計画",0],["s06-it-002","試験仕様書作成",0],["s06-it-003","試験環境構築",0],["s06-it-004","結合試験実施",0],["s06-it-005","API結合試験",0],["s06-it-006","DB結合試験",0],["s06-it-007","外部IF試験",0],["s06-it-008","結果記録",0],["s06-it-009","不具合対応",0],["s06-it-010","回帰試験",0],["s06-it-011","完了確認",0],["s06-it-012","承認",1]],"P6.3":[["s06-st-001","試験計画",0],["s06-st-002","試験仕様書作成",0],["s06-st-003","機能試験",0],["s06-st-004","シナリオ試験",0],["s06-st-005","性能試験",0],["s06-st-006","負荷試験",0],["s06-st-007","セキュリティ試験",0],["s06-st-008","障害試験",0],["s06-st-009","復旧試験",0],["s06-st-010","運用試験",0],["s06-st-011","結果記録",0],["s06-st-012","不具合対応",0],["s06-st-013","完了確認",0],["s06-st-014","承認",1]],"P6.4":[["s06-uat-001","試験計画",0],["s06-uat-002","試験仕様書作成",0],["s06-uat-003","ユーザー受入試験",0],["s06-uat-004","業務シナリオ試験",0],["s06-uat-005","受入判定",1],["s06-uat-006","検収",1],["s06-uat-007","承認",1]],"P6.1":[["s06-ut-001","試験計画",0],["s06-ut-002","試験仕様書作成",0],["s06-ut-003","試験ケース作成",0],["s06-ut-004","試験データ作成",0],["s06-ut-005","単体試験実施",0],["s06-ut-006","結果記録",0],["s06-ut-007","不具合登録",0],["s06-ut-008","不具合修正",0],["s06-ut-009","再試験",0],["s06-ut-010","完了確認",0],["s06-ut-011","承認",1]],"P7":[["s07-001","移行計画",0],["s07-002","移行手順作成",0],["s07-003","移行リハーサル",0],["s07-004","データ移行",0],["s07-005","システム移行",0],["s07-006","移行結果確認",0],["s07-007","リリース計画",0],["s07-008","リリース判定",1],["s07-009","本番環境構築",0],["s07-010","デプロイ",0],["s07-011","稼働確認（スモークテスト）",0],["s07-012","サービス開始（Go-Live）",1],["s07-013","初期稼働対応",0],["s07-014","リリース完了確認",0]],"P8":[["s08-001","運用引継ぎ",0],["s08-002","システム監視",0],["s08-003","ジョブ管理",0],["s08-004","バックアップ",0],["s08-005","キャパシティ管理",0],["s08-006","インシデント管理",0],["s08-007","障害管理",0],["s08-008","問題管理",0],["s08-009","問い合わせ管理",0],["s08-010","変更要求（CR）",0],["s08-011","影響分析",0],["s08-012","変更管理",0],["s08-013","構成管理（CM）",0],["s08-014","パッチ適用",0],["s08-015","脆弱性対応",0],["s08-016","改修・改善",0],["s08-017","緊急改修（Hotfix）",0],["s08-018","回帰テスト",0],["s08-019","定期レビュー",0],["s08-020","運用報告",0]],"P9":[["s09-001","プロジェクト完了判定",1],["s09-002","成果物引渡し",0],["s09-003","運用引継ぎ完了確認",0],["s09-004","完了報告",0],["s09-005","契約終了手続き",0],["s09-006","振り返り（レトロスペクティブ）",0],["s09-007","ナレッジ移管",0],["s09-008","ドキュメント整備",0],["s09-009","アーカイブ",0],["s09-010","解散・クローズ",0]],"PX-DL":[["xdl-001","要求定義書",0],["xdl-002","要件定義書",0],["xdl-003","基本設計書",0],["xdl-004","詳細設計書",0],["xdl-005","プログラム仕様書",0],["xdl-006","テスト仕様書",0],["xdl-007","テスト結果報告書",0],["xdl-008","移行手順書",0],["xdl-009","運用手順書",0],["xdl-010","システム構成図",0],["xdl-011","DB定義書",0],["xdl-012","画面定義書",0],["xdl-013","帳票定義書",0],["xdl-014","API仕様書",0],["xdl-015","インターフェース仕様書",0],["xdl-016","セキュリティ設計書",0],["xdl-017","運用設計書",0],["xdl-018","移行設計書",0]],"PX-MG":[["xmg-001","プロジェクト計画管理",0],["xmg-002","進捗管理",0],["xmg-003","課題管理",0],["xmg-004","リスク管理",0],["xmg-005","変更管理",0],["xmg-006","構成管理",0],["xmg-007","品質管理",0],["xmg-008","成果物管理",0],["xmg-009","レビュー管理",0],["xmg-010","コミュニケーション管理",0],["xmg-011","ステークホルダー管理",0]],"PX-RV":[["xrv-001","要件定義レビュー",0],["xrv-002","基本設計レビュー",0],["xrv-003","詳細設計レビュー",0],["xrv-004","単体テストレビュー",0],["xrv-005","結合テストレビュー",0],["xrv-006","システムテストレビュー",0],["xrv-007","受入テストレビュー",0],["xrv-008","リリース判定（Go/No-Go）",1],["xrv-009","検収",1],["xrv-010","プロジェクト完了レビュー",0]],"PX-TT":[["xtt-001","単体試験（UT）",0],["xtt-002","結合試験（IT）",0],["xtt-003","システム試験（ST）",0],["xtt-004","受入試験（UAT）",0],["xtt-005","性能試験（PT）",0],["xtt-006","負荷試験",0],["xtt-007","ストレス試験",0],["xtt-008","セキュリティ試験",0],["xtt-009","障害試験",0],["xtt-010","復旧試験",0],["xtt-011","バックアップ・リストア試験",0],["xtt-012","運用試験",0],["xtt-013","回帰試験",0],["xtt-014","ユーザビリティ試験",0]]};
+    var PH = [
+      ['P1','超上游','超上流',''],['P2','需求定义','要件定義','↔ P6.4 验收测试'],['P3','基本设计','基本設計','↔ P6.3 系统测试'],['P4','详细设计','詳細設計','↔ P6.2 集成测试'],['P5','实现','実装','↔ P6.1 单元测试'],
+      ['P6.1','单元测试','単体テスト','↔ P5 实现'],['P6.2','集成测试','結合テスト','↔ P4 详细设计'],['P6.3','系统测试','システムテスト','↔ P3 基本设计'],['P6.4','验收测试','受入テスト','↔ P2 需求定义'],
+      ['P7','迁移发布','移行・リリース',''],['P8','运维保守','運用・保守',''],['P9','终结','終結',''],
+      ['PX-MG','管理','マネジメント','横断'],['PX-RV','审查','レビュー','横断'],['PX-TT','测试型','テスト型','横断'],['PX-DL','交付物','成果物','横断']
+    ];
+    var ST = [['backlog','Backlog','#9CA3AF','新建与待梳理'],['todo','待执行','#6366F1','已开启，等待领取'],['doing','进行中','#1D4ED8','Agent 或人员执行中'],['review','评审','#D97706','验证与评审，闸门在此'],['done','完成','#059669','已合入，可归档'],['archived','归档','#D1D5DB','完成后归档，可搜索']];
+    var ORDER = ST.map(function (x) { return x[0]; });
+    var stOf = function (k) { return ST[ORDER.indexOf(k)]; };
+    var dot = function (color, hollow) { return 'flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; ' + (hollow ? 'border: 1.5px solid #D1D5DB; box-sizing: border-box' : 'background: ' + color); };
+    var phaseOfSkill = {}; var skillName = {}; var skillGate = {};
+    PH.forEach(function (p) { (CAT[p[0]] || []).forEach(function (k) { phaseOfSkill[k[0]] = p; skillName[k[0]] = k[1]; skillGate[k[0]] = k[2]; }); });
+    var VIEWS = [['sprint','Sprint'],['board','任务看板'],['map','IPA 流程图'],['files','按文件开卡'],['timeline','时间线'],['calendar','日历']];
+    var pill = function (on) { return 'height: 28px; padding: 0 10px; border-radius: 6px; font-size: 12px; border: 1px solid ' + (on ? '#1D4ED8; background: #EEF2FF; color: #1E3A8A' : '#E5E7EB; background: #FFFFFF; color: #374151'); };
+    var cards = s.cards;
+    var all = [];
+    Object.keys(cards).forEach(function (k) { cards[k].forEach(function (c, i) { all.push({ skill: k, i: i, c: c }); }); });
+    var byId = {}; all.forEach(function (x) { byId[x.c[0]] = x; });
+    var setCard = function (skill, i, row) { var n = Object.assign({}, cards); var arr = n[skill].slice(); arr[i] = row; n[skill] = arr; self.setState({ cards: n }); };
+    var stop = function (e) { if (e && e.stopPropagation) e.stopPropagation(); };
+    var lead = function (list) { var best = -1; list.forEach(function (c) { var i = ORDER.indexOf(c[1]); if (c[1] !== 'archived' && i > best) best = i; }); return best < 0 ? ST[5] : ST[best]; };
+    var visiblePH = PH.filter(function (p) { return s.showCross || p[3] !== '横断'; });
+    var columns = visiblePH.map(function (p) {
+      var list = CAT[p[0]] || [];
+      var built = list.filter(function (k) { return cards[k[0]] && cards[k[0]].length; });
+      var cardN = 0, doneN = 0;
+      built.forEach(function (k) { cards[k[0]].forEach(function (c) { cardN++; if (c[1] === 'done' || c[1] === 'archived') doneN++; }); });
+      var shown = s.onlyCards ? built : list;
+      return {
+        code: p[0], zh: p[1], ja: p[2], pair: p[3] === '横断' ? '横断工程' : p[3],
+        progress: '流程 ' + built.length + ' / ' + list.length + ' · 卡 ' + cardN + ' · 完成 ' + doneN,
+        pct: (list.length ? Math.round(built.length / list.length * 100) : 0) + '%',
+        headBg: p[3] === '横断' ? '#FAFAF9' : '#FFFFFF',
+        style: 'flex: 0 0 196px; border-right: 1px solid #F3F4F6; background: ' + (p[3] === '横断' ? '#FAFAF9' : '#FFFFFF'),
+        skills: shown.map(function (k) {
+          var list2 = cards[k[0]] || []; var has = list2.length > 0; var open = s.expanded === k[0]; var st = has ? lead(list2) : null;
+          return { id: k[0], name: k[1], gate: k[2] === 1, open: open, hasCount: has, count: list2.length,
+            tip: 'ipa-' + k[0] + (has ? ' · ' + list2.length + ' 张卡' : ' · 未建卡'),
+            dot: has ? dot(st[2]) : dot(null, true),
+            wrapStyle: 'border-radius: 6px; ' + (open ? 'background: #F5F7FF; box-shadow: 0 0 0 1px #C7D2FE' : ''),
+            style: 'display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 5px; padding: 5px 6px; font-size: 12px; background: transparent; color: ' + (has ? '#111827' : '#4B5563') + (open ? '; font-weight: 600' : ''),
+            toggle: function (e) { stop(e); self.setState({ expanded: open ? null : k[0] }); },
+            stop: stop,
+            cards: list2.map(function (c) { var cs = stOf(c[1]);
+              return { id: c[0], title: c[2], status: cs[1], dot: dot(cs[2]),
+                style: 'text-align: left; width: 100%; border: ' + (s.open === c[0] ? '2px solid #1D4ED8' : '1px solid #E5E7EB') + '; background: #FFFFFF; border-radius: 5px; padding: 5px 6px' + (c[1] === 'archived' ? '; opacity: 0.6' : ''),
+                open: function (e) { stop(e); self.setState({ open: c[0] }); } }; }),
+            add: function (e) { stop(e); var n = Object.assign({}, cards); var arr = (n[k[0]] || []).slice(); var id = 'T-' + s.seq;
+              arr.push([id, 'backlog', k[1] + (arr.length ? ' #' + (arr.length + 1) : ''), '未分配']); n[k[0]] = arr; self.setState({ cards: n, seq: s.seq + 1 }); }
+          };
+        })
+      };
+    });
+    var inPhase = function (x) { return s.phase === 'all' || phaseOfSkill[x.skill][0] === s.phase; };
+    var laneDefs = ST.filter(function (x) { return x[0] !== 'archived' || s.showArchive; });
+    var lanes = laneDefs.map(function (x) {
+      var here = all.filter(function (a) { return a.c[1] === x[0] && inPhase(a); });
+      return { title: x[1] + ' · ' + here.length, hint: x[3], dot: dot(x[2]),
+        cards: here.map(function (a) { var c = a.c;
+          var AV = { 'Agent A': ['#DCFCE7', '#14532D', 'A', 6], 'Agent B': ['#EDE9FE', '#4C1D95', 'B', 6], 'Ulysses': ['#DBEAFE', '#1E3A8A', 'U', 99], '未分配': ['#F3F4F6', '#9CA3AF', '?', 99] }[c[3]] || ['#F3F4F6', '#374151', '?', 99];
+          var LIVE = { 'T-142': '● Agent B 正在编辑 · 林 查看中', 'T-143': '● 林 正在评审' }[c[0]];
+          return { initial: AV[2], avatar: 'width: 18px; height: 18px; border-radius: ' + AV[3] + 'px; background: ' + AV[0] + '; color: ' + AV[1] + '; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600',
+            hasLive: !!LIVE, live: LIVE || '',
+            id: c[0], title: c[2], owner: c[3], phase: phaseOfSkill[a.skill][0] + ' ' + phaseOfSkill[a.skill][1], skill: 'ipa-' + a.skill + ' ' + skillName[a.skill],
+            canStart: c[1] === 'backlog',
+            start: function () { setCard(a.skill, a.i, [c[0], 'todo', c[2], c[3]]); },
+            open: function () { self.setState({ open: c[0] }); },
+            style: 'background: #FFFFFF; border-radius: 6px; padding: 10px; border: ' + (s.open === c[0] ? '2px solid #1D4ED8' : '1px solid #E5E7EB') + (c[1] === 'archived' ? '; opacity: 0.7' : '') };
+        }) };
+    });
+    var phaseChips = [['all','全部']].concat(PH.filter(function (p) { return p[3] !== '横断'; }).map(function (p) { return [p[0], p[0] + ' ' + p[1]]; })).map(function (p) {
+      var on = s.phase === p[0]; return { label: p[1], active: on, style: pill(on), pick: function () { self.setState({ phase: p[0] }); } };
+    });
+    var FILES = [
+      ['dir', 'crates/domain-relation', 0, '', 0, '', ''],
+      ['dir', 'src', 1, '', 0, '', ''],
+      ['bfs', 'bfs.rs', 2, 'crates/domain-relation/src', 2, 's05-002', 'M +18 −3'],
+      ['cycle', 'cycle.rs', 2, 'crates/domain-relation/src', 1, 's05-002', 'A +60'],
+      ['graph', 'graph.rs', 2, 'crates/domain-relation/src', 2, 's04-002', 'M +4 −1'],
+      ['weights', 'weights.rs', 2, 'crates/domain-relation/src', 1, 's05-002', 'M +22 −8'],
+      ['lib', 'lib.rs', 2, 'crates/domain-relation/src', 1, '', ''],
+      ['dir', 'tests', 1, '', 0, '', ''],
+      ['bfstest', 'bfs_test.rs', 2, 'crates/domain-relation/tests', 1, 's06-ut-003', 'A +40'],
+      ['dir', 'docs/design', 0, '', 0, '', ''],
+      ['api', 'relation-api.md', 1, 'docs/design', 3, 's03-007', 'M +12 −2'],
+      ['adr', 'ADR-0031-context-graph.md', 1, 'docs/design', 1, '', ''],
+      ['readme', 'README.md', 0, '', 1, '', '']
+    ];
+    var EDITORS = { 1: [['Ulysses', '#DBEAFE', '#1E3A8A']], 2: [['Ulysses', '#DBEAFE', '#1E3A8A'], ['Agent B', '#EDE9FE', '#4C1D95']], 3: [['Ulysses', '#DBEAFE', '#1E3A8A'], ['Agent A', '#DCFCE7', '#14532D'], ['Agent B', '#EDE9FE', '#4C1D95']] };
+    var FF = [['all', '全部文件'], ['changed', '本分支改动'], ['nocard', '无任务卡'], ['nema', '有任务卡'], ['shared', '共同编辑']];
+    var NT = [['card', '任务卡'], ['w5', '5W1H'], ['table', '子任务表'], ['graph', '关系'], ['source', '.nema 源码']];
+    var nf = s.nemaFiles;
+    var fileRows = FILES.filter(function (f) {
+      if (f[0] === 'dir') return true;
+      if (s.fileFilter === 'nema') return !!nf[f[0]];
+      if (s.fileFilter === 'changed') return !!f[6];
+      if (s.fileFilter === 'nocard') return !nf[f[0]];
+      if (s.fileFilter === 'plain') return !nf[f[0]];
+      if (s.fileFilter === 'shared') return f[4] >= 2;
+      return true;
+    }).map(function (f) {
+      var isDir = f[0] === 'dir'; var on = !isDir && s.fileSel === f[0]; var n = nf[f[0]];
+      return { isFile: !isDir, checked: !!s.checked[f[0]], checkLabel: '选择 ' + f[1], toggle: function () { var c = Object.assign({}, s.checked); if (c[f[0]]) delete c[f[0]]; else c[f[0]] = true; self.setState({ checked: c }); },
+        hasChange: !isDir && !!f[6], change: f[6] || '', changeStyle: 'font-size: 10px; font-family: ui-monospace, Consolas, monospace; color: ' + ((f[6] || '').charAt(0) === 'A' ? '#047857' : '#B45309'),
+        noCard: !isDir && !n, card: n ? n[0] : '',
+        name: f[1], icon: isDir ? '▾' : '·', indent: 'flex: 0 0 auto; width: ' + (f[2] * 14) + 'px', shared: !isDir && f[4] >= 2, editors: f[4],
+        hasNema: !!n, dot: n ? dot(stOf(n[1])[2]) : '',
+        pick: function () { if (!isDir) self.setState({ fileSel: f[0] }); },
+        style: 'display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; border-radius: 5px; padding: 5px 6px; font-size: 12px; font-family: ' + (isDir ? 'inherit; color: #6B7280' : 'ui-monospace, Consolas, monospace; color: #111827') + '; background: ' + (on ? '#EEF2FF' : 'transparent') };
+    });
+    var sel = FILES.filter(function (f) { return f[0] === s.fileSel; })[0];
+    var sn = nf[sel[0]]; var sst = sn ? stOf(sn[1]) : null; var sIdx = sn ? ORDER.indexOf(sn[1]) : -1;
+    var skillKey = sel[5];
+    var fileView = {
+      dir: sel[3], name: sel[1], noNema: !sn, hasNema: !!sn,
+      editorChips: (EDITORS[sel[4]] || EDITORS[1]).map(function (e, i) { return { name: e[0], initial: e[0].replace('Agent ', '').charAt(0), style: 'width: 26px; height: 26px; border-radius: 50%; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; background: ' + e[1] + '; color: ' + e[2] + (i ? '; margin-left: -6px' : '') }; }),
+      rev: sn ? 3 : 0, origin: sel[4] >= 2 ? sel[4] + ' 人共同编辑，自动生成' : '手动配套',
+      card: sn ? sn[0] : '', status: sst ? sst[1] : '', dot: sst ? dot(sst[2]) : '',
+      title: sel[1] + ' 的任务', skill: skillKey ? 'ipa-' + skillKey + ' ' + skillName[skillKey] : '未关联（可在任务卡里关联）',
+      owner: sel[4] >= 2 ? 'Agent B' : 'Ulysses', subs: '回边判定 ✓ · 环路径输出 · 单测覆盖', related: sel[1] === 'bfs.rs' ? 'graph.rs · bfs_test.rs' : '—',
+      advanceLabel: !sst ? '' : (sIdx < 4 ? (sn[1] === 'backlog' ? '开启 → 待执行' : '推进到 ' + ST[sIdx + 1][1]) : '归档'),
+      w5: [['What 做什么', sel[1] + ' 中的 BFS 环检测'], ['Why 为什么', '防止关系图遍历死循环'], ['How 怎么做', '记录访问集，遇回边终止并输出环路径'], ['Who 谁', 'Agent B, Ulysses'], ['When 何时', '2026-11-20 前'], ['Where 哪里', sel[3] + '/' + sel[1]]].map(function (w) { return { label: w[0], value: w[1] }; }),
+      rows: [['回边判定', '完成', 'Agent B'], ['环路径输出', '进行中', 'Agent B'], ['单测覆盖', '—', '—']].map(function (r) { return { a: r[0], b: r[1], c: r[2] }; }),
+      source: '\\!NEMAT1\n\\?1 REV 3\n' + sel[1] + ' 中的 BFS 环检测\n防止关系图遍历死循环\n记录访问集，遇回边终止并输出环路径\nAgent B, Ulysses\n2026-11-20\n' + sel[3] + '/' + sel[1] + '\n\\2 REV 1\n\\# 子任务 状态 负责人\n回边判定 完成 Agent\\ B\n环路径输出 进行中 Agent\\ B\n单测覆盖 ~ ~'
+    };
+    var createNema = function () { var n = Object.assign({}, nf); n[sel[0]] = ['T-' + s.seq, 'backlog']; self.setState({ nemaFiles: n, seq: s.seq + 1, nemaTab: 'card' }); };
+    var advanceFile = function () { if (!sn) return; var n = Object.assign({}, nf); n[sel[0]] = [sn[0], sIdx < 4 ? ST[sIdx + 1][0] : 'archived']; self.setState({ nemaFiles: n }); };
+    var CLI_STATE = { run: ['#22C55E', '运行中'], wait: ['#F59E0B', '等待输入'], idle: ['#9CA3AF', '空闲'], done: ['#60A5FA', '已完成'] };
+    var CLI_PROVIDERS = [['Claude Code', '默认配置 · 继承任务上下文'], ['Codex', '默认配置 · 继承任务上下文'], ['Hermes', '默认配置 · 继承任务上下文'], ['自定义 CLI 配置…', '从 CLI 配置中选择']];
+    var CLI_LINES = {
+      'Claude Code': [['p', '$ claude  # 已注入 T-142 描述、子任务与 IPA 约束'], ['o', '我先看 bfs.rs 里回边判定的位置。'], ['tool', '● Read crates/domain-relation/src/bfs.rs'], ['tool', '● Edit bfs.rs（+12 −2）输出完整环路径'], ['tool', '● Bash cargo test -p domain-relation bfs'], ['ok', '  test bfs::detects_cycle ... ok'], ['ok', '  test bfs::self_loop ... ok'], ['o', '环路径输出已完成，子任务「环路径输出」可以勾掉。要我把结果写回任务卡吗？'], ['ask', '? 等待你的回复']],
+      'Codex': [['p', '$ codex --task T-142'], ['o', '复查 Claude Code 的改动并补边界用例。'], ['tool', '● 读取 diff（bfs.rs）'], ['tool', '● 新增 bfs_test.rs::long_cycle'], ['err', '  test bfs::long_cycle ... FAILED（路径顺序相反）'], ['o', '路径输出是逆序的，建议在返回前 reverse。']],
+      _new: [['p', '$ 新会话已启动，已注入任务上下文'], ['o', '准备就绪，输入指令开始。']]
+    };
+    var SUGGEST = { rs: 'ipa-s05-002 ソースコード作成', test: 'ipa-s06-ut-005 単体試験実施', md: 'ipa-s04-015 詳細設計書作成' };
+    var checkedIds = Object.keys(s.checked);
+    var fileById = {}; FILES.forEach(function (f) { fileById[f[0]] = f; });
+    var pillB = function (on) { return 'height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; border: 1px solid ' + (on ? '#1D4ED8; background: #EEF2FF; color: #1E3A8A' : '#E5E7EB; background: #FFFFFF; color: #374151'); };
+    var batchModes = [['each', '每个文件一张卡'], ['one', '合并成一张卡（文件作子任务）']].map(function (m) { var on = s.batchMode === m[0]; return { label: m[1], active: on, style: pillB(on), pick: function () { self.setState({ batchMode: m[0] }); } }; });
+    var batchRows = checkedIds.map(function (id) { var f = fileById[id]; var nm = f[1];
+      var sug = /_test\.rs$/.test(nm) ? SUGGEST.test : (/\.md$/.test(nm) ? SUGGEST.md : SUGGEST.rs);
+      return { name: nm, change: f[6] || '未改动', title: (nf[id] ? '（已有 ' + nf[id][0] + '）' : '') + nm.replace(/\.(rs|md)$/, '') + ' 的任务', skill: sug, nema: true }; });
+    var statusOpts = [['backlog', '放进 Backlog'], ['todo', '直接开启 → 待执行']].map(function (o) { var on = s.initStatus === o[0]; return { label: o[1], active: on, style: pillB(on), pick: function () { self.setState({ initStatus: o[0] }); } }; });
+    var createLabel = s.batchMode === 'each' ? '开 ' + checkedIds.length + ' 张任务卡' : '开 1 张任务卡（含 ' + checkedIds.length + ' 个文件子任务）';
+    var createCards = function () { var n = Object.assign({}, nf); var seq = s.seq;
+      if (s.batchMode === 'each') checkedIds.forEach(function (id) { if (n[id]) return; n[id] = ['T-' + seq, s.initStatus]; seq++; });
+      else { var id0 = 'T-' + seq; seq++; checkedIds.forEach(function (id) { n[id] = [id0, s.initStatus]; }); }
+      self.setState({ nemaFiles: n, seq: seq, checked: {} }); };
+    var CF = [['bfs', 'code', 'bfs.rs', '+18', '−3', 'Agent B 编辑中'], ['bfsnema', 'nema', 'bfs.rs.nema', '+4', '−1', ''], ['bfstest', 'code', 'bfs_test.rs', '+40', '', '林 查看中'], ['api', 'doc', 'relation-api.md', '+12', '−2', '']];
+    var CFB = { code: ['代码', '#F3F4F6', '#374151'], nema: ['.nema', '#EEF2FF', '#3730A3'], doc: ['文档', '#EFF6FF', '#1E40AF'] };
+    var cardFiles = CF.map(function (f) { var on = s.cardFileSel === f[0]; var b = CFB[f[1]];
+      return { name: f[2], kind: b[0], add: f[3], del: f[4], who: f[5], pick: function () { self.setState({ cardFileSel: f[0] }); },
+        badge: 'flex: 0 0 auto; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: ' + b[1] + '; color: ' + b[2],
+        style: 'display: block; width: 100%; text-align: left; border: 1px solid ' + (on ? '#1D4ED8' : '#E5E7EB') + '; border-radius: 6px; padding: 8px; background: #FFFFFF' }; });
+    var CODE = {
+      bfs: [['pub fn detect_cycle(g: &Graph, start: NodeId) -> Option<Vec<NodeId>> {', ''], ['    let mut visited = HashSet::new();', ''], ['    let mut path = Vec::new();', ''], ['    dfs(g, start, &mut visited, &mut path)', 'Agent B'], ['}', ''], ['', ''], ['fn on_back_edge(path: &[NodeId], to: NodeId) -> Vec<NodeId> {', ''], ['    let i = path.iter().position(|n| *n == to).unwrap();', ''], ['    path[i..].to_vec()', ''], ['}', '']],
+      bfsnema: [['\\!NEMAT1', ''], ['\\?1 REV 3', ''], ['BFS 环检测', ''], ['防止遍历死循环', ''], ['访问集 + 路径栈判回边', ''], ['\\2 REV 2', ''], ['\\# 子任务 状态 负责人', ''], ['回边判定 完成 Agent\\ B', ''], ['环路径输出 进行中 Agent\\ B', '']],
+      bfstest: [['#[test]', ''], ['fn detects_cycle() {', ''], ['    let g = graph![a => b, b => c, c => a];', ''], ['    assert_eq!(detect_cycle(&g, a), Some(vec![a, b, c]));', '林'], ['}', '']],
+      api: [['## 3.2 环检测', ''], ['遍历时维护访问集与路径栈，', ''], ['遇到回边即返回完整环路径。', ''], ['深度上限默认 64。', '']]
+    };
+    var cfSel = CF.filter(function (f) { return f[0] === s.cardFileSel; })[0];
+    var cardFile = { name: cfSel[2], lease: cfSel[5] ? cfSel[5] + ' · 持有段落租约' : '你可以直接编辑',
+      lines: CODE[cfSel[0]].map(function (l, i) { return { n: i + 1, t: l[0], hasTag: !!l[1], tag: l[1], style: 'padding: 0 12px; white-space: pre; ' + (l[1] ? 'box-shadow: inset 3px 0 0 #7C3AED; background: rgba(124,58,237,0.12)' : '') }; }) };
+    var SPRINTS = s.sprints;
+    var sprintOf = s.sprintOf;
+    var POINTS = { 'T-142': 5, 'T-143': 3, 'T-126': 3, 'T-127': 2, 'T-128': 2, 'T-121': 5, 'T-122': 3, 'T-131': 5, 'T-133': 1, 'T-151': 2, 'T-152': 3, 'T-118': 3, 'T-150': 2, 'T-160': 3, 'T-123': 2, 'T-130': 1 };
+    var FILECOUNT = { 'T-142': 3, 'T-126': 1, 'T-151': 1, 'T-150': 1, 'T-122': 1 };
+    var ptsOf = function (id) { return POINTS[id] || 3; };
+    var activeId = Object.keys(SPRINTS).filter(function (k) { return SPRINTS[k].state === 'active'; })[0];
+    var moveCard = function (x, to) {
+      var so = Object.assign({}, sprintOf); if (to) so[x.c[0]] = to; else delete so[x.c[0]];
+      var n = Object.assign({}, cards); var arr = n[x.skill].slice(); var row = arr[x.i].slice();
+      if (to && SPRINTS[to].state === 'active' && row[1] === 'backlog') row[1] = 'todo';
+      if (!to && row[1] !== 'backlog') row[1] = 'backlog';
+      arr[x.i] = row; n[x.skill] = arr; self.setState({ sprintOf: so, cards: n });
+    };
+    var rowOf = function (x) {
+      var c = x.c; var st = stOf(c[1]); var inS = sprintOf[c[0]];
+      var moves = [];
+      Object.keys(SPRINTS).forEach(function (k) { if (k !== inS && SPRINTS[k].state !== 'closed') moves.push({ label: '→ ' + SPRINTS[k].short, go: function () { moveCard(x, k); } }); });
+      if (inS && c[1] === 'backlog') moves.push({ label: '→ Backlog', go: function () { moveCard(x, null); } });
+      return { id: c[0], title: c[2], skill: 'ipa-' + x.skill + ' ' + skillName[x.skill], files: FILECOUNT[c[0]] || 0, points: ptsOf(c[0]), status: st[1], dot: dot(st[2]),
+        open: function () { self.setState({ open: c[0], cardTab: 'info' }); }, moves: moves.slice(0, 2), bg: s.open === c[0] ? '#F5F7FF' : '#FFFFFF' };
+    };
+    var live = all.filter(function (x) { return x.c[1] !== 'archived'; });
+    var sprintBoxes = Object.keys(SPRINTS).filter(function (k) { return SPRINTS[k].state !== 'closed'; }).map(function (k) {
+      var sp = SPRINTS[k]; var items = live.filter(function (x) { return sprintOf[x.c[0]] === k; });
+      var pts = 0, donePts = 0; items.forEach(function (x) { pts += ptsOf(x.c[0]); if (x.c[1] === 'done') donePts += ptsOf(x.c[0]); });
+      var isActive = sp.state === 'active'; var cannot = !isActive && !!activeId;
+      return { name: sp.name, goal: sp.goal, dates: sp.dates, count: items.length, points: pts, isActive: isActive, isPlanned: !isActive,
+        stateLabel: isActive ? '进行中' : '计划中', badgeStyle: 'font-size: 11px; padding: 2px 8px; border-radius: 999px; ' + (isActive ? 'background: #DBEAFE; color: #1E3A8A' : 'background: #F3F4F6; color: #374151'),
+        boxStyle: 'background: #FFFFFF; border: ' + (isActive ? '2px solid #1D4ED8' : '1px solid #E5E7EB') + '; border-radius: 8px; padding: 12px',
+        donePct: (pts ? Math.round(donePts / pts * 100) : 0) + '%', doneText: '完成 ' + donePts + ' / ' + pts + ' 点',
+        rows: items.map(rowOf), empty: items.length === 0,
+        cannotStart: cannot, startTip: cannot ? '先完成当前进行中的冲刺' : '开始后，卡片从 Backlog 进入待执行',
+        startStyle: 'margin-left: auto; height: 28px; padding: 0 12px; border-radius: 6px; border: 0; background: ' + (cannot ? '#E5E7EB; color: #9CA3AF' : '#1D4ED8; color: #FFFFFF'),
+        complete: function () {
+          var sps = JSON.parse(JSON.stringify(SPRINTS)); sps[k].state = 'closed';
+          var next = Object.keys(sps).filter(function (q) { return sps[q].state === 'planned'; })[0];
+          var so = Object.assign({}, sprintOf); items.forEach(function (x) { if (x.c[1] !== 'done') { if (next) so[x.c[0]] = next; else delete so[x.c[0]]; } });
+          self.setState({ sprints: sps, sprintOf: so });
+        },
+        start: function () {
+          if (cannot) return;
+          var sps = JSON.parse(JSON.stringify(SPRINTS)); sps[k].state = 'active';
+          var n = Object.assign({}, cards);
+          items.forEach(function (x) { var arr = n[x.skill].slice(); var row = arr[x.i].slice(); if (row[1] === 'backlog') row[1] = 'todo'; arr[x.i] = row; n[x.skill] = arr; });
+          self.setState({ sprints: sps, cards: n });
+        }
+      };
+    });
+    var backlogItems = live.filter(function (x) { return !sprintOf[x.c[0]]; });
+    var quickCreate = function () { var n = Object.assign({}, cards); var arr = (n['s05-002'] || []).slice(); var id = 'T-' + s.seq;
+      arr.push([id, 'backlog', s.draftTitle || '新任务卡', '未分配']); n['s05-002'] = arr; self.setState({ cards: n, seq: s.seq + 1, draftTitle: '' }); };
+    var detail = null; var cur = s.open ? byId[s.open] : null;
+    if (cur) {
+      var c = cur.c; var p = phaseOfSkill[cur.skill]; var idx = ORDER.indexOf(c[1]); var next = idx < 4 ? ST[idx + 1] : null;
+      detail = {
+        head: c[0] + ' ' + c[2], id: c[0], title: c[2], status: ST[idx][1],
+        sprint: sprintOf[c[0]] ? SPRINTS[sprintOf[c[0]]].name : 'Backlog', points: ptsOf(c[0]),
+        flow: ST.map(function (x, i) { var on = i === idx; var past = i < idx;
+          var rule = ['新建、待梳理', '进入冲刺或手动开启', 'Agent 或人员领取', '自动验证 · 闸门审批', '合入 dev', '完成 14 天后自动归档'][i];
+          return { label: x[1], rule: rule, sub: on ? '#DBEAFE' : '#6B7280', style: 'flex: 1 1 120px; padding: 10px; border-radius: 8px; border: 1px solid ' + (on ? x[2] + '; background: ' + x[2] + '; color: #FFFFFF' : (past ? '#A7F3D0; background: #ECFDF5; color: #065F46' : '#E5E7EB; background: #FFFFFF; color: #374151')) }; }),
+        autos: [['进入「评审」时', '运行「任务卡进入评审时自动验证」流程', '已启用', '#047857'], ['验证全部通过时', '有闸门则等待审批，否则推进到完成', '已启用', '#047857'], ['完成 14 天后', '自动归档并保留检索', '已启用', '#047857']].map(function (a) { return { when: a[0], then: a[1], state: a[2], color: a[3] }; }),
+        history: [['11-13 11:05', 'Ulysses', '待执行 → 进行中'], ['11-12 18:20', '系统', '随 Sprint 12 启动：Backlog → 待执行'], ['11-12 18:02', 'Ulysses', '从 IPA 流程建卡，放入 Backlog']].map(function (h) { return { when: h[0], who: h[1], t: h[2] }; }),
+        statusStyle: 'font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #FFFFFF; background: ' + ST[idx][2],
+        accept: [['✓', '#047857', '检测到回边时返回环路径', '单测 detects_cycle'], ['✓', '#047857', '自环也被判定为环', '单测 self_loop'], ['○', '#9CA3AF', '长环路径顺序正确', '单测 long_cycle（待通过）']].map(function (x) { return { mark: x[0], color: x[1], t: x[2], src: x[3] }; }),
+        props: [['优先级', 'P1', ''], ['类型', '任务', ''], ['人员', 'Ulysses', ''], ['Agent', c[3], 'color: #4C1D95'], ['小队', 'Worker 小队 · Router 分派', ''], ['Worktree', 'wt-relation-bfs', 'font-family: ui-monospace, Consolas, monospace'], ['Branch', 'feat/relation-bfs', 'font-family: ui-monospace, Consolas, monospace'], ['截止', '2026-11-20', ''], ['创建', '2026-11-12 · Ulysses', 'color: #6B7280']].map(function (x) { return { k: x[0], v: x[1], style: x[2] }; }),
+        allSubs: [['回边判定', '子任务', '完成', 'Agent B', true], ['环路径输出', '子任务', '进行中', 'Agent B', false], ['单测覆盖', '子任务', 'Backlog', '未分配', false], ['crates/domain-relation/src/bfs.rs', '文件子任务 · .nema', '进行中', 'Agent B', false], ['crates/domain-relation/tests/bfs_test.rs', '文件子任务', 'Backlog', '林', false]].map(function (x) { return { t: x[0], kind: x[1], st: x[2], who: x[3], done: x[4], tStyle: /\//.test(x[0]) ? 'font-family: ui-monospace, Consolas, monospace' : '' }; }),
+
+        desc: '遍历时记录已访问节点，遇到回边时终止并报告环路径。',
+        subDone: '1 / 3', subs: [['回边判定', true, 'Agent B'], ['环路径输出', false, 'Agent B'], ['单测覆盖', false, '未分配']].map(function (x) { return { t: x[0], done: x[1], who: x[2] }; }),
+        fileSubs: [['crates/domain-relation/src/bfs.rs', '.nema', '进行中'], ['crates/domain-relation/tests/bfs_test.rs', '文件', 'Backlog']].map(function (x) { return { p: x[0], tag: x[1], st: x[2] }; }),
+        docs: [['设计', '详细设计 · 关系服务'], ['ADR', 'ADR-0031 Context Graph'], ['规格', 'relation-api.md']].map(function (x) { return { kind: x[0], t: x[1] }; }),
+        timeline: [['2 分钟前', 'Agent B', '补了自环判定，测试重跑中'], ['1 小时前', 'Ulysses', '环路径要输出完整顺序'], ['昨天', 'Router', '分派给 Agent B']].map(function (x) { return { when: x[0], who: x[1], t: x[2] }; }),
+        audit: [['14:02', 'Agent B', '工具调用 cargo test（已授权）'], ['13:40', 'Agent B', '编辑 bfs.rs +12 −2'], ['11:05', 'Ulysses', '状态 待执行 → 进行中'], ['昨天 18:20', 'Ulysses', '开启 Backlog → 待执行'], ['昨天 18:02', 'Ulysses', '从 IPA 流程建卡']].map(function (x) { return { when: x[0], who: x[1], t: x[2] }; }),
+        skills: [['ipa-' + cur.skill, skillName[cur.skill]], ['ipa-s04-014', 'テスト設計（詳細）']].map(function (x) { return { id: x[0], name: x[1], removeLabel: '取消关联 ' + x[0] }; }),
+        labels: [{ t: 'relation' }, { t: 'bfs' }, { t: 'P5' }], skill: 'ipa-' + cur.skill + ' ' + skillName[cur.skill], phase: p[0] + ' ' + p[1] + '（' + p[2] + '）', pair: p[3] || '—', owner: c[3],
+        gate: skillGate[cur.skill] ? '需要人工审批才能从评审进入完成' : '无',
+        steps: ST.map(function (x, i) { var on = i === idx; var past = i < idx;
+          return { label: x[1], style: 'font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid ' + (on ? x[2] + '; background: ' + x[2] + '; color: #FFFFFF' : (past ? '#C7D2FE; background: #EEF2FF; color: #3730A3' : '#E5E7EB; background: #FFFFFF; color: #6B7280')) }; }),
+        canAdvance: !!next, advanceLabel: next ? (c[1] === 'backlog' ? '开启 → 待执行' : '推进到 ' + next[1] + (c[1] === 'review' && skillGate[cur.skill] ? '（需审批）' : '')) : '',
+        canArchive: c[1] === 'done'
+      };
+    }
+    return {
+      views: VIEWS.map(function (v) { var on = s.view === v[0]; return { label: v[1], active: on, pick: function () { self.setState({ view: v[0] }); },
+        style: 'border: 0; border-radius: 6px; height: 30px; padding: 0 12px; font-size: 12px; ' + (on ? 'background: #FFFFFF; color: #111827; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB' : 'background: transparent; color: #4B5563') }; }),
+      viewLabel: VIEWS.filter(function (v) { return v[0] === s.view; })[0][1],
+      legend: ST.map(function (x, i) { return { label: x[1], dot: dot(x[2]), arrow: i < ST.length - 1 ? '→' : '' }; }),
+      isMap: s.view === 'map', isBoard: s.view === 'board', isFiles: s.view === 'files', isOtherView: ['map', 'board', 'files', 'sprint'].indexOf(s.view) < 0, isSprint: s.view === 'sprint',
+      sprintBoxes: sprintBoxes, backlogRows: backlogItems.map(rowOf), backlogCount: backlogItems.length, quickCreate: quickCreate, draftTitle: s.draftTitle,
+      goMap: function () { self.setState({ view: 'map' }); }, goFiles: function () { self.setState({ view: 'files' }); },
+      fileFilters: FF.map(function (f) { var on = s.fileFilter === f[0]; return { label: f[1], active: on, style: pill(on), pick: function () { self.setState({ fileFilter: f[0] }); } }; }),
+      fileRows: fileRows, file: fileView, createNema: createNema, advanceFile: advanceFile,
+      nemaTabs: NT.map(function (t) { var on = s.nemaTab === t[0]; return { label: t[1], active: on, pick: function () { self.setState({ nemaTab: t[0] }); },
+        style: 'border: 0; border-radius: 6px; height: 28px; padding: 0 10px; font-size: 12px; ' + (on ? 'background: #FFFFFF; color: #111827; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB' : 'background: transparent; color: #4B5563') }; }),
+      nemaIsCard: s.nemaTab === 'card', nemaIs5w: s.nemaTab === 'w5', nemaIsTable: s.nemaTab === 'table', nemaIsGraph: s.nemaTab === 'graph', nemaIsSource: s.nemaTab === 'source',
+      onlyCards: s.onlyCards, toggleOnlyCards: function () { self.setState({ onlyCards: !s.onlyCards }); }, onlyCardsStyle: pill(s.onlyCards),
+      showCross: s.showCross, toggleCross: function () { self.setState({ showCross: !s.showCross }); }, crossStyle: pill(s.showCross),
+      collapseAll: function () { if (s.expanded) self.setState({ expanded: null }); },
+      columns: columns, lanes: lanes, phaseChips: phaseChips,
+      showArchive: s.showArchive, toggleArchive: function () { self.setState({ showArchive: !s.showArchive }); }, archiveBtnStyle: pill(s.showArchive),
+      showDetail: !!detail, detail: detail || { head: '', steps: [], skill: '', phase: '', pair: '', owner: '', gate: '', canAdvance: false, advanceLabel: '', canArchive: false },
+      closeDetail: function () { self.setState({ open: null }); },
+      cardTabs: [['info', '概览'], ['files', '文件 · 3'], ['subs', '子任务 · 5'], ['workflow', '工作流'], ['cli', 'CLI'], ['activity', '活动']].map(function (t) { var on = s.cardTab === t[0]; return { label: t[1], active: on, pick: function () { self.setState({ cardTab: t[0] }); },
+        style: 'border: 0; background: transparent; padding: 0 10px; font-size: 13px; color: ' + (on ? '#1D4ED8; font-weight: 600; box-shadow: inset 0 -2px 0 #1D4ED8' : '#4B5563') }; }),
+      cardIsCli: s.cardTab === 'cli', cardIsInfo: s.cardTab === 'info', cardIsActivity: s.cardTab === 'activity', cardIsFiles: s.cardTab === 'files', cardIsWorkflow: s.cardTab === 'workflow', cardIsSubs: s.cardTab === 'subs', cardFiles: cardFiles, cardFile: cardFile,
+      hasChecked: checkedIds.length > 0, noChecked: checkedIds.length === 0, checkedCount: checkedIds.length, clearChecked: function () { self.setState({ checked: {} }); },
+      batchModes: batchModes, batchRows: batchRows, statusOpts: statusOpts, createCards: createCards, createLabel: createLabel, openCli: function () { self.setState({ cardTab: 'cli' }); },
+      detailBoxStyle: 'position: absolute; top: 56px; right: 16px; width: ' + (s.cardTab === 'cli' ? 860 : 560) + 'px; max-width: calc(100% - 32px); background: #FFFFFF; border: 1px solid #9CA3AF; border-radius: 10px; overflow: hidden; z-index: 4',
+      cliTabs: s.cliSessions.map(function (cs, i) { var on = s.cliActive === i; var col = CLI_STATE[cs[1]];
+        return { label: cs[0], state: col[1], dot: 'width: 7px; height: 7px; border-radius: 50%; background: ' + col[0],
+          pick: function () { self.setState({ cliActive: i }); },
+          style: 'display: flex; align-items: center; gap: 6px; border: 0; border-radius: 6px 6px 0 0; padding: 6px 12px; font-size: 12px; ' + (on ? 'background: #111827; color: #F9FAFB' : 'background: transparent; color: #9CA3AF') }; }),
+      cliMenuOpen: s.cliMenu, toggleCliMenu: function () { self.setState({ cliMenu: !s.cliMenu }); },
+      cliProviders: CLI_PROVIDERS.map(function (p) { return { label: p[0], note: p[1], add: function () { var n = s.cliSessions.concat([[p[0], 'idle']]); self.setState({ cliSessions: n, cliActive: n.length - 1, cliMenu: false }); } }; }),
+      cliSplit: s.cliSplit, toggleSplit: function () { self.setState({ cliSplit: !s.cliSplit }); }, splitLabel: s.cliSplit ? '单窗格' : '左右分屏',
+      cliContext: [cur ? cur.c[0] : 'T-142', 'wt-relation-bfs', 'feat/relation-bfs', cur ? 'ipa-' + cur.skill : 'ipa-s05-002', '预算 30 分钟', '权限：仅本 Worktree'].map(function (v) { return { v: v }; }),
+      activeCliName: (s.cliSessions[s.cliActive] || s.cliSessions[0])[0],
+      panes: (s.cliSplit && s.cliSessions.length > 1 ? [s.cliActive, s.cliActive === 0 ? 1 : 0] : [s.cliActive]).map(function (i, k, arr) {
+        var cs = s.cliSessions[i] || s.cliSessions[0]; var lines = CLI_LINES[cs[0]] || CLI_LINES._new;
+        return { title: cs[0] + ' · ' + CLI_STATE[cs[1]][1] + ' · cwd ~/worktrees/wt-relation-bfs',
+          style: 'flex: 1 1 0; min-width: 0; padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.7; overflow: auto' + (k ? '; border-left: 1px solid #1F2937' : ''),
+          lines: lines.map(function (l) { return { t: l[1], style: 'white-space: pre-wrap; color: ' + ({ p: '#9CA3AF', o: '#E5E7EB', ok: '#86EFAC', err: '#FCA5A5', tool: '#93C5FD', ask: '#FCD34D' })[l[0]] }; }) };
+      }),
+      advance: function () { var idx = ORDER.indexOf(cur.c[1]); if (idx < 4) setCard(cur.skill, cur.i, [cur.c[0], ST[idx + 1][0], cur.c[2], cur.c[3]]); },
+      archive: function () { setCard(cur.skill, cur.i, [cur.c[0], 'archived', cur.c[2], cur.c[3]]); }
+    };
+  }
+}
+</script>
+</body>
+</html>

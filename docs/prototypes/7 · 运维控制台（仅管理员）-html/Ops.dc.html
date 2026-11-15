@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>运维控制台</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+<header style="height: 52px; background: #111827; color: #F9FAFB; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #F9FAFB; color: #111827; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star 运维控制台</span>
+    <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #DC2626; color: #FFFFFF">仅管理员</span>
+  </div>
+  <nav aria-label="运维页签" style="display: flex; align-items: stretch; height: 52px; gap: 2px; margin-left: 12px; flex: 1 1 auto">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.active}}" style="{{t.style}}">{{t.label}}</button>
+    </sc-for>
+  </nav>
+  <span style="font-size: 12px; color: #D1D5DB">环境</span>
+  <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #4B5563; background: transparent; color: #F9FAFB">staging ▾</button>
+  <button type="button" aria-label="用户资料：管理员" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #4B5563; background: transparent; color: #F9FAFB; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #FECACA; color: #7F1D1D; font-weight: 600; display: flex; align-items: center; justify-content: center">L</span>lidian727@gmail.com</button>
+</header>
+
+<main style="flex: 1 1 auto; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+
+  <sc-if value="{{isOverview}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+          <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px"><div style="font-size: 12px; color: #6B7280">{{k.label}}</div><div style="font-size: 24px; font-weight: 600; margin-top: 4px">{{k.value}}</div><div style="font-size: 11px; color: {{k.color}}; margin-top: 2px">{{k.sub}}</div></section>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px">
+          <h2 style="margin: 0 0 10px; font-size: 14px; font-weight: 600">集群与节点</h2>
+          <sc-for list="{{clusters}}" as="c" hint-placeholder-count="2">
+            <div style="display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid #F3F4F6; font-size: 12px"><span style="font-weight: 600; flex: 0 0 140px">{{c.name}}</span><span style="flex: 1 1 auto; color: #4B5563">{{c.meta}}</span><span style="color: {{c.color}}">{{c.state}}</span></div>
+          </sc-for>
+        </section>
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px">
+          <h2 style="margin: 0 0 10px; font-size: 14px; font-weight: 600">告警</h2>
+          <sc-for list="{{alerts}}" as="a" hint-placeholder-count="3">
+            <div style="display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid #F3F4F6; font-size: 12px"><span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: {{a.bg}}; color: {{a.fg}}">{{a.level}}</span><span style="flex: 1 1 auto">{{a.t}}</span><span style="color: #6B7280">{{a.when}}</span></div>
+          </sc-for>
+        </section>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isApps}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; gap: 16px; flex-wrap: wrap">
+      <section aria-label="原子化 App 列表" style="flex: 1 1 640px; min-width: 0; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <div style="display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid #E5E7EB"><h2 style="margin: 0; font-size: 14px; font-weight: 600">原子化 App</h2><span style="margin-left: 10px; font-size: 12px; color: #6B7280">每个 App 独立构建、独立晋级、独立回滚</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 110px 110px 90px 90px 120px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>App</span><span>当前版本</span><span>可升级到</span><span>契约</span><span>健康</span><span>操作</span></div>
+        <sc-for list="{{apps}}" as="ap" hint-placeholder-count="7">
+          <div style="{{ap.rowStyle}}">
+            <button type="button" onClick="{{ap.pick}}" style="text-align: left; border: 0; background: transparent; padding: 0"><span style="display: block; font-weight: 600">{{ap.name}}</span><span style="display: block; font-size: 11px; color: #6B7280">{{ap.kind}}</span></button>
+            <span style="font-family: ui-monospace, Consolas, monospace">{{ap.cur}}</span>
+            <span style="font-family: ui-monospace, Consolas, monospace; color: {{ap.nextColor}}">{{ap.next}}</span>
+            <span style="color: {{ap.contractColor}}">{{ap.contract}}</span>
+            <span style="color: {{ap.healthColor}}">{{ap.health}}</span>
+            <span style="display: flex; gap: 4px"><button type="button" onClick="{{ap.update}}" style="{{ap.btnStyle}}">{{ap.btn}}</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">回滚</button></span>
+          </div>
+        </sc-for>
+      </section>
+      <section aria-label="发布详情" style="flex: 0 1 420px; min-width: 0; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 12px">
+        <div><h2 style="margin: 0; font-size: 15px; font-weight: 600">{{sel.name}}</h2><div style="color: #6B7280; margin-top: 2px">{{sel.cur}} → {{sel.next}}</div></div>
+        <div>
+          <div style="font-weight: 600; margin-bottom: 6px">兼容性检查（晋级前必过）</div>
+          <sc-for list="{{sel.checks}}" as="ck" hint-placeholder-count="4">
+            <div style="display: flex; gap: 8px; padding: 4px 0"><span style="color: {{ck.color}}">{{ck.mark}}</span><span>{{ck.t}}</span></div>
+          </sc-for>
+        </div>
+        <div>
+          <div style="font-weight: 600; margin-bottom: 6px">晋级路径</div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+            <sc-for list="{{sel.stages}}" as="sg" hint-placeholder-count="3">
+              <span style="{{sg.style}}">{{sg.t}}</span>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight: 600; margin-bottom: 6px">渐进发布</div>
+          <div style="display: flex; gap: 4px">
+            <sc-for list="{{sel.canary}}" as="cn" hint-placeholder-count="4">
+              <span style="{{cn.style}}">{{cn.t}}</span>
+            </sc-for>
+          </div>
+          <div style="color: #6B7280; margin-top: 6px">每一步跑分析门禁（错误率、P95 延迟、事件积压），失败自动回滚，只影响这一个 App</div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap">
+          <button type="button" onClick="{{sel.update}}" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">{{sel.updateLabel}}</button>
+          <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">暂停</button>
+          <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">查看发布记录</button>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isTenants}}" hint-placeholder-val="{{ false }}">
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+      <div style="display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid #E5E7EB"><h2 style="margin: 0; font-size: 14px; font-weight: 600">租户</h2><button type="button" style="margin-left: auto; height: 30px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">+ 新建租户</button></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) 100px 100px minmax(0, 1fr) 90px 160px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>租户</span><span>成员</span><span>Project</span><span>配额（Run 并发 / 存储）</span><span>状态</span><span>操作</span></div>
+      <sc-for list="{{tenants}}" as="tn" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) 100px 100px minmax(0, 1fr) 90px 160px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center">
+          <span style="font-weight: 600">{{tn.name}}</span><span>{{tn.members}}</span><span>{{tn.projects}}</span><span>{{tn.quota}}</span><span style="color: {{tn.color}}">{{tn.state}}</span>
+          <span style="display: flex; gap: 4px"><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">配额</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">停用</button></span>
+        </div>
+      </sc-for>
+    </section>
+  </sc-if>
+
+  <sc-if value="{{isUsers}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <section style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #7F1D1D">平台管理员：lidian727@gmail.com（唯一）。系统至少保留一名平台管理员，最后一名管理员不能被降级或删除；增删管理员需要二次确认并写入审计。</section>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 120px minmax(0, 1fr) 140px; gap: 8px; padding: 8px 14px; background: #F9FAFB; font-size: 11px; color: #6B7280"><span>用户 / Agent</span><span>租户</span><span>平台角色</span><span>租户内角色</span><span>操作</span></div>
+        <sc-for list="{{users}}" as="u" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 120px minmax(0, 1fr) 140px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center">
+            <span><span style="display: block; font-weight: 600">{{u.name}}</span><span style="display: block; font-size: 11px; color: #6B7280">{{u.id}}</span></span><span>{{u.tenant}}</span>
+            <span style="{{u.roleStyle}}">{{u.role}}</span><span>{{u.trole}}</span>
+            <span style="display: flex; gap: 4px"><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">权限</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">{{u.act}}</button></span>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isAudit}}" hint-placeholder-val="{{ false }}">
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+      <sc-for list="{{audit}}" as="au" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: 140px 200px minmax(0, 1fr) 160px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span style="color: #6B7280">{{au.when}}</span><span>{{au.who}}</span><span>{{au.t}}</span><span style="color: #6B7280">{{au.scope}}</span></div>
+      </sc-for>
+    </section>
+  </sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'apps', app: 'domain-canvas', updating: {} }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var T = [['overview', '运维数据'], ['apps', 'App 集群'], ['tenants', '租户'], ['users', '用户与权限'], ['audit', '审计']];
+    var A = [
+      ['star-api-rest', '服务 · REST API', '0.4.2', '0.4.3', 'v3 兼容', '健康', 'ok'],
+      ['star-bff', '服务 · 前端网关', '0.2.0', '—', 'v3 兼容', '健康', 'none'],
+      ['canvas-engine', '服务 · 画布平台', '0.3.1', '0.3.2', 'v2 兼容', '健康', 'ok'],
+      ['domain-canvas', '服务 · 画布业务域', '0.3.0', '0.4.0', '需迁移', '健康', 'warn'],
+      ['canvas-realtime', '服务 · 实时协作', '0.2.4', '0.2.5', 'v1 兼容', '降级', 'ok'],
+      ['web', '前端 · Vercel 独立发布', '2026.11.14', '—', '—', '健康', 'none'],
+      ['star-desktop', '桌面 · 独立发布链', '0.9.0', '0.9.1', '—', '—', 'ok']
+    ];
+    var cur = A.filter(function (a) { return a[0] === s.app; })[0];
+    var upd = s.updating[cur[0]];
+    var CHECKS = {
+      warn: [['✓', '#047857', '镜像已签名，SBOM 无新增阻断许可证'], ['✓', '#047857', '对外 API v3 不变，新增字段向后兼容'], ['!', '#B45309', '数据库迁移含删列：需先发布「扩展」步骤，旧版本仍可读写'], ['✓', '#047857', '依赖方 canvas-engine 0.3.1 满足 requires ≥ 0.3.0'], ['✓', '#047857', '事件 schema canvas.element.v2 兼容旧消费者']],
+      ok: [['✓', '#047857', '镜像已签名，SBOM 通过'], ['✓', '#047857', 'API 契约与依赖方兼容'], ['✓', '#047857', '无破坏性数据库迁移'], ['✓', '#047857', '事件 schema 向后兼容']],
+      none: [['—', '#6B7280', '没有可升级的新版本']]
+    };
+    var stagePos = upd ? 2 : 0;
+    var badge = function (bg, fg) { return 'height: 26px; padding: 0 8px; border-radius: 5px; font-size: 11px; border: 0; background: ' + bg + '; color: ' + fg; };
+    return {
+      tabs: T.map(function (t) { var on = s.tab === t[0]; return { label: t[1], active: on, pick: function () { self.setState({ tab: t[0] }); },
+        style: 'border: 0; background: transparent; padding: 0 12px; height: 52px; color: ' + (on ? '#FFFFFF; font-weight: 600; box-shadow: inset 0 -3px 0 #60A5FA' : '#9CA3AF') }; }),
+      isOverview: s.tab === 'overview', isApps: s.tab === 'apps', isTenants: s.tab === 'tenants', isUsers: s.tab === 'users', isAudit: s.tab === 'audit',
+      kpis: [['在线用户', '[数值]', '近 24 小时', '#6B7280'], ['运行中的 Run', '[数值]', '并发上限 [数值]', '#6B7280'], ['API 错误率', '[数值]', '目标 < 0.5%', '#047857'], ['事件积压', '[数值]', '告警阈值 [数值]', '#047857']].map(function (k) { return { label: k[0], value: k[1], sub: k[2], color: k[3] }; }),
+      clusters: [['local-a', 'K3s · 2 节点 · Multipass', '就绪', '#047857'], ['local-b', 'K3s · 1 节点 · 实验', '未接入', '#6B7280']].map(function (c) { return { name: c[0], meta: c[1], state: c[2], color: c[3] }; }),
+      alerts: [['警告', '#FFFBEB', '#92400E', 'canvas-realtime P95 延迟升高', '5 分钟前'], ['信息', '#EFF6FF', '#1E40AF', 'domain-canvas 0.4.0 可升级，含数据库迁移', '1 小时前'], ['严重', '#FEF2F2', '#991B1B', '未接入：生产集群监控数据源', '—']].map(function (a) { return { level: a[0], bg: a[1], fg: a[2], t: a[3], when: a[4] }; }),
+      apps: A.map(function (a) { var on = a[0] === s.app; var u = s.updating[a[0]];
+        return { name: a[0], kind: a[1], cur: a[2], next: a[3], nextColor: a[3] === '—' ? '#9CA3AF' : '#1D4ED8', contract: a[4], contractColor: a[6] === 'warn' ? '#B45309' : '#047857', health: a[5], healthColor: a[5] === '降级' ? '#B45309' : '#047857',
+          btn: u ? '发布中' : '单独更新', btnStyle: a[3] === '—' ? badge('#F3F4F6', '#9CA3AF') : (u ? badge('#DBEAFE', '#1E3A8A') : badge('#1D4ED8', '#FFFFFF')),
+          pick: function () { self.setState({ app: a[0] }); },
+          update: function () { if (a[3] === '—') return; var n = Object.assign({}, s.updating); n[a[0]] = true; self.setState({ updating: n, app: a[0] }); },
+          rowStyle: 'display: grid; grid-template-columns: minmax(0, 1.3fr) 110px 110px 90px 90px 120px; gap: 8px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center; background: ' + (on ? '#F5F7FF' : '#FFFFFF') };
+      }),
+      sel: { name: cur[0], cur: cur[2], next: cur[3],
+        checks: CHECKS[cur[6]].map(function (c) { return { mark: c[0], color: c[1], t: c[2] }; }),
+        stages: ['dev', 'staging', 'prod（需审批）'].map(function (t, i) { var done = i < stagePos; var now = i === stagePos && upd;
+          return { t: t, style: 'padding: 4px 10px; border-radius: 999px; font-size: 11px; border: 1px solid ' + (now ? '#1D4ED8; background: #1D4ED8; color: #FFFFFF' : (done ? '#A7F3D0; background: #ECFDF5; color: #065F46' : '#E5E7EB; background: #FFFFFF; color: #6B7280')) }; }),
+        canary: ['10%', '30%', '60%', '100%'].map(function (t, i) { var on = upd && i === 0;
+          return { t: t, style: 'flex: 1 1 0; text-align: center; padding: 6px 0; border-radius: 5px; font-size: 11px; background: ' + (on ? '#1D4ED8; color: #FFFFFF' : '#F3F4F6; color: #6B7280') }; }),
+        updateLabel: cur[3] === '—' ? '已是最新' : (upd ? '发布中 · 10% 流量' : (cur[6] === 'warn' ? '先发布扩展迁移，再更新' : '单独更新这个 App')),
+        update: function () { if (cur[3] === '—') return; var n = Object.assign({}, s.updating); n[cur[0]] = true; self.setState({ updating: n }); } },
+      tenants: [['Physis 研发', '12', '3', '20 / 200 GB', '正常', '#047857'], ['StarGate', '4', '1', '5 / 50 GB', '正常', '#047857'], ['试用 · Mobile', '2', '1', '2 / 10 GB', '即将到期', '#B45309']].map(function (t) { return { name: t[0], members: t[1], projects: t[2], quota: t[3], state: t[4], color: t[5] }; }),
+      users: [['lidian727@gmail.com', 'user · 平台', '全部', '平台管理员', '所有租户 · 所有者', '不可降级'], ['Ulysses', 'user · u-102', 'Physis 研发', '成员', 'Project 管理员', '停用'], ['林', 'user · u-118', 'Physis 研发', '成员', '开发者', '停用'], ['Agent B', 'agent · ag-7', 'Physis 研发', '服务账号', 'Worker · 仅本 Worktree', '吊销']].map(function (u) {
+        return { name: u[0], id: u[1], tenant: u[2], role: u[3], trole: u[4], act: u[5], roleStyle: 'font-size: 11px; padding: 2px 8px; border-radius: 4px; justify-self: start; background: ' + (u[3] === '平台管理员' ? '#FEF2F2; color: #991B1B' : '#F3F4F6; color: #374151') }; }),
+      audit: [['11-14 14:20', 'lidian727@gmail.com', '单独更新 canvas-engine 0.3.1 → 0.3.2（staging）', 'App 集群'], ['11-14 13:02', 'lidian727@gmail.com', '调整租户 Physis 研发 Run 并发上限 16 → 20', '租户'], ['11-13 22:40', 'Kargo', 'canvas-realtime 0.2.4 自动回滚（P95 超阈值）', 'App 集群'], ['11-13 18:11', 'lidian727@gmail.com', '吊销 Agent C 的服务账号', '用户与权限'], ['11-13 09:00', '系统', '平台管理员引导：从部署配置写入唯一管理员', '用户与权限']].map(function (a) { return { when: a[0], who: a[1], t: a[2], scope: a[3] }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>设置</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px; width: 208px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <span style="font-weight: 600">设置</span>
+  <sc-if value="{{devOn}}" hint-placeholder-val="{{ true }}">
+    <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: #FEF3C7; color: #78350F">开发者模式</span>
+  </sc-if>
+  <span style="flex: 1 1 auto"></span>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索设置</span>
+    <input type="search" placeholder="搜索设置" style="width: 220px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #1D4ED8; background: #EEF2FF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 848px">
+<nav aria-label="设置分组" style="flex: 0 0 240px; background: #FFFFFF; border-right: 1px solid #E2E1DC; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+  <sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+    <div>
+      <div style="font-size: 11px; color: #6B7280; padding: 0 8px 4px">{{g.label}}</div>
+      <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+        <button type="button" onClick="{{it.pick}}" style="{{it.style}}">{{it.label}}</button>
+      </sc-for>
+    </div>
+  </sc-for>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; max-width: 1040px">
+  <div style="font-size: 12px; color: #6B7280">{{cur.group}}</div>
+  <h1 style="margin: 0; font-size: 20px; font-weight: 600">{{cur.label}}</h1>
+  <p style="margin: 0; color: #4B5563">{{cur.desc}}</p>
+
+  <sc-if value="{{isMod}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">浏览 Mod 目录</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">从文件安装</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">用模板新建 Mod</button>
+      </div>
+      <div role="group" aria-label="Mod 类型" style="display: flex; gap: 6px; flex-wrap: wrap">
+        <sc-for list="{{modTypes}}" as="mt" hint-placeholder-count="6">
+          <button type="button" onClick="{{mt.pick}}" aria-pressed="{{mt.active}}" style="{{mt.style}}">{{mt.label}}</button>
+        </sc-for>
+      </div>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) 100px minmax(0, 1.4fr) 80px 70px; gap: 10px; padding: 10px 14px; background: #F9FAFB; font-size: 12px; color: #6B7280"><span>Mod</span><span>类型</span><span>声明的能力</span><span>版本</span><span>启用</span></div>
+        <sc-for list="{{mods}}" as="m" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) 100px minmax(0, 1.4fr) 80px 70px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px; align-items: center">
+            <span><span style="display: block; font-weight: 600">{{m.name}}</span><span style="display: block; color: #6B7280; margin-top: 2px">{{m.desc}}</span></span>
+            <span>{{m.type}}</span>
+            <span style="color: #4B5563">{{m.caps}}</span>
+            <span style="color: #6B7280">{{m.ver}}</span>
+            <button type="button" role="switch" aria-checked="{{m.on}}" aria-label="{{m.toggleLabel}}" onClick="{{m.toggle}}" style="{{m.switchStyle}}"><span style="{{m.knobStyle}}"></span></button>
+          </div>
+        </sc-for>
+      </section>
+      <div style="font-size: 12px; color: #6B7280">Mod 在隔离运行时中执行，只能使用声明的能力；不会在主进程加载原生代码。安全相关 Hook 由 Star 核心执行，Mod 不能替代或减弱。</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isMcp}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div role="tablist" aria-label="MCP 来源" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px; align-self: flex-start">
+        <button type="button" role="tab" aria-selected="{{mcpOfficial}}" onClick="{{showOfficial}}" style="{{officialTabStyle}}">官方目录</button>
+        <button type="button" role="tab" aria-selected="{{mcpCustom}}" onClick="{{showCustom}}" style="{{customTabStyle}}">自定义</button>
+        <button type="button" role="tab" aria-selected="{{mcpInstalled}}" onClick="{{showInstalled}}" style="{{installedTabStyle}}">已连接 · 4</button>
+      </div>
+
+      <sc-if value="{{mcpOfficial}}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+          <sc-for list="{{catalog}}" as="c" hint-placeholder-count="6">
+            <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; align-items: center; gap: 6px"><h2 style="margin: 0; font-size: 14px; font-weight: 600">{{c.name}}</h2><span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #ECFDF5; color: #065F46">已验证</span></div>
+              <div style="font-size: 12px; color: #4B5563">{{c.desc}}</div>
+              <div style="font-size: 11px; color: #6B7280">{{c.meta}}</div>
+              <button type="button" style="{{c.btnStyle}}">{{c.btn}}</button>
+            </section>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{mcpCustom}}" hint-placeholder-val="{{ false }}">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px 16px; align-items: center; font-size: 12px">
+          <label for="mcp-name" style="color: #374151">名称</label><input id="mcp-name" value="内部知识库" style="height: 32px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit">
+          <span style="color: #374151">传输方式</span>
+          <div role="group" aria-label="传输方式" style="display: flex; gap: 6px">
+            <sc-for list="{{transports}}" as="tp" hint-placeholder-count="3">
+              <button type="button" onClick="{{tp.pick}}" aria-pressed="{{tp.active}}" style="{{tp.style}}">{{tp.label}}</button>
+            </sc-for>
+          </div>
+          <label for="mcp-target" style="color: #374151">{{targetLabel}}</label><input id="mcp-target" value="{{targetValue}}" style="height: 32px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; font-family: ui-monospace, Consolas, monospace">
+          <label for="mcp-env" style="color: #374151">{{secretLabel}}</label><input id="mcp-env" value="KB_TOKEN = ••••••（引用凭据，不明文保存）" style="height: 32px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit">
+          <span style="color: #374151">作用范围</span>
+          <div style="display: flex; gap: 6px"><button type="button" aria-pressed="false" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">仅我</button><button type="button" aria-pressed="true" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #1D4ED8; background: #EEF2FF; color: #1E3A8A">当前 Project</button><button type="button" aria-pressed="false" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">整个组织</button></div>
+          <span style="color: #374151">工具授权</span><span style="color: #4B5563">连接后列出该服务器的工具，逐个选择「始终允许 / 每次询问 / 禁止」</span>
+          <span></span>
+          <div style="display: flex; gap: 8px"><button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">测试连接</button><button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">保存</button><button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">从 JSON 导入</button></div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{mcpInstalled}}" hint-placeholder-val="{{ false }}">
+        <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 90px 90px; gap: 10px; padding: 10px 14px; background: #F9FAFB; font-size: 12px; color: #6B7280"><span>服务器</span><span>来源</span><span>范围</span><span>状态</span><span>工具</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 90px 90px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>GitHub</span><span>官方</span><span>整个组织</span><span style="color: #047857">已连接</span><span>14</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 90px 90px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>PostgreSQL</span><span>官方</span><span>当前 Project</span><span style="color: #047857">已连接</span><span>6</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 90px 90px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>内部知识库</span><span>自定义</span><span>当前 Project</span><span style="color: #047857">已连接</span><span>3</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 110px 90px 90px; gap: 10px; padding: 10px 14px; border-top: 1px solid #F3F4F6; font-size: 12px"><span>本地脚本工具</span><span>自定义</span><span>仅我</span><span style="color: #B91C1C">连接失败 · 重试</span><span>—</span></div>
+        </section>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isDevMode}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: flex; align-items: center; gap: 12px">
+        <div><div style="font-weight: 600">开发者模式</div><div style="font-size: 12px; color: #6B7280; margin-top: 2px">开启后顶栏显示标记，并出现调试面板入口；只影响你自己的界面</div></div>
+        <button type="button" role="switch" aria-checked="{{devOn}}" aria-label="开发者模式" onClick="{{toggleDev}}" style="{{devSwitchStyle}}"><span style="{{devKnobStyle}}"></span></button>
+      </section>
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden">
+        <sc-for list="{{devFeatures}}" as="d" hint-placeholder-count="8">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid #F3F4F6">
+            <div style="flex: 1 1 auto"><div style="font-size: 13px">{{d.label}}</div><div style="font-size: 12px; color: #6B7280; margin-top: 2px">{{d.desc}}</div></div>
+            <button type="button" role="switch" aria-checked="{{d.on}}" aria-label="{{d.label}}" onClick="{{d.toggle}}" style="{{d.switchStyle}}"><span style="{{d.knobStyle}}"></span></button>
+          </div>
+        </sc-for>
+      </section>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">打开调试面板</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">导出诊断包</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">清除本地缓存</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">重置引导</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isDebug}}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div role="tablist" aria-label="调试工具" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px; align-self: flex-start">
+        <button type="button" role="tab" aria-selected="true" style="border: 0; border-radius: 6px; height: 30px; padding: 0 12px; background: #FFFFFF; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB">事件流</button>
+        <button type="button" role="tab" aria-selected="false" style="border: 0; border-radius: 6px; height: 30px; padding: 0 12px; background: transparent; color: #4B5563">网络请求</button>
+        <button type="button" role="tab" aria-selected="false" style="border: 0; border-radius: 6px; height: 30px; padding: 0 12px; background: transparent; color: #4B5563">前端状态</button>
+        <button type="button" role="tab" aria-selected="false" style="border: 0; border-radius: 6px; height: 30px; padding: 0 12px; background: transparent; color: #4B5563">Agent 工具调用</button>
+        <button type="button" role="tab" aria-selected="false" style="border: 0; border-radius: 6px; height: 30px; padding: 0 12px; background: transparent; color: #4B5563">脚本控制台</button>
+      </div>
+      <section style="background: #111827; border-radius: 8px; padding: 14px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.8; color: #E5E7EB; min-height: 320px">
+        <div style="color: #9CA3AF">过滤：worktree=wt-relation-bfs · 有界缓冲 2000 条</div>
+        <div>14:02:11  task.lifecycle   TASK-142  running → verifying</div>
+        <div>14:02:12  tool.call        Agent B   cargo test -p domain-relation（已授权）</div>
+        <div>14:02:19  validation.done  TASK-142  2 / 3 passed</div>
+        <div style="color: #FCA5A5">14:02:19  hook.block       写入 Worktree 外路径被拦截</div>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isHooks}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px; display: grid; grid-template-columns: 160px minmax(0, 1fr) 120px; gap: 10px; align-items: center; font-size: 12px">
+        <span style="color: #6B7280">触发时机</span><span style="color: #6B7280">动作</span><span style="color: #6B7280">作用范围</span>
+        <span>工具调用前</span><span>拦截写入 Worktree 外路径（原生，不可关闭）</span><span>全部 Project</span>
+        <span>任务完成时</span><span>运行 cargo check -p 受影响 crate</span><span>Physis / GVPE</span>
+      </section>
+      <button type="button" style="align-self: flex-start; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">+ 新建 Hook（可视化编辑）</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isOther}}" hint-placeholder-val="{{ false }}">
+    <section style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 18px; color: #6B7280">{{cur.label}} 的表单区，沿用现有页面字段，下一轮细化</section>
+  </sc-if>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'mcp', mcpTab: 'official', transport: 'stdio', modType: 'all', mods: { theme: true, panel: true, status: true, slash: false, toolhook: true }, dev: true,
+      devf: { panel: true, bounds: false, mock: false, perf: true, verbose: false, flags: false, api: false, sse: true } };
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var sw = function (on) {
+      return { switchStyle: 'position: relative; width: 40px; height: 22px; border-radius: 11px; border: 0; padding: 0; background: ' + (on ? '#1D4ED8' : '#D1D5DB'),
+        knobStyle: 'position: absolute; top: 3px; left: ' + (on ? '21px' : '3px') + '; width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF' };
+    };
+    var G = [
+      ['账户', [['profile','个人资料','头像、语言、主题（原 /settings）'],['credentials','凭据与 API Key','LLM 与服务凭据（原 /settings/api-keys、/settings/credentials）'],['cli','CLI 配置','本机 CLI 配置文件（原 /settings/cli-profiles）']]],
+      ['组织与权限', [['identity','成员与身份','原 /identity'],['permission','角色与权限','原 /permission、/admin'],['tenant','租户','原 /tenant']]],
+      ['集成', [['scm','代码托管','原 /scm'],['automation','自动化触发','原 /automation']]],
+      ['扩展', [['mod','Mod','主题、面板、状态栏、斜杠命令、工具钩子等界面与行为扩展'],['mcp','MCP 服务器','官方目录一键安装，或自定义接入任意 MCP 服务器（原 /integration）'],['skills','Skills','可复用的 Agent 技能包'],['plugins','Plugins','可授权的功能插件'],['hooks','Hooks','Hook 策略只在这里配置，Worktree 与 Run 页只显示生效结果并链接回来']]],
+      ['开发者', [['devmode','开发者模式','调试开关与诊断工具的总开关'],['debug','调试工具','事件流、网络、前端状态、Agent 工具调用、脚本控制台（原 /automation-debug）'],['developer','API 与 Webhook','个人访问令牌、Webhook、SDK 示例（原 /settings/developer）'],['flags','Feature Flags','按用户或 Project 开关实验功能']]]
+    ];
+    var cur = null;
+    var groups = G.map(function (g) {
+      return { label: g[0], items: g[1].map(function (it) {
+        var on = s.sel === it[0]; if (on) cur = { group: g[0], label: it[1], desc: it[2] };
+        return { label: it[1], pick: function () { self.setState({ sel: it[0] }); },
+          style: 'display: block; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 7px 8px; font-size: 12px; background: ' + (on ? '#EEF2FF; color: #3730A3; font-weight: 600' : 'transparent; color: #374151') };
+      }) };
+    });
+    var MT = [['all','全部'],['theme','主题'],['panel','面板'],['status','状态栏'],['slash','斜杠命令'],['toolhook','工具钩子']];
+    var MODS = [
+      ['theme','暗色高对比主题','界面配色与字号','主题','颜色变量','1.2.0'],
+      ['panel','构建进度面板','聊天旁常驻显示 CI 与测试进度','面板','读取验证结果、事件流','0.4.1'],
+      ['status','Token 预算状态栏','底部显示当前 Run 的预算余量','状态栏','读取资源预算','0.2.0'],
+      ['slash','/ipa 斜杠命令','在聊天里用 /ipa 搜索并建任务卡','斜杠命令','创建任务卡、读取 IPA 目录','0.1.3'],
+      ['toolhook','提交前格式检查','Agent 提交前运行格式化并提示','工具钩子','读取工具调用、只读 Worktree','1.0.0']
+    ];
+    var tab = function (on) { return 'border: 0; border-radius: 6px; height: 30px; padding: 0 12px; font-size: 12px; ' + (on ? 'background: #FFFFFF; color: #111827; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB' : 'background: transparent; color: #4B5563'); };
+    var chip = function (on) { return 'height: 30px; padding: 0 10px; border-radius: 6px; font-size: 12px; border: 1px solid ' + (on ? '#1D4ED8; background: #EEF2FF; color: #1E3A8A' : '#E5E7EB; background: #FFFFFF; color: #374151'); };
+    var CAT = [
+      ['GitHub','仓库、Issue、PR 读写','官方 · 14 个工具 · OAuth',true],
+      ['PostgreSQL','只读查询与表结构','官方 · 6 个工具 · 连接串',true],
+      ['文件系统','受限目录读写','官方 · 8 个工具 · 本地',false],
+      ['浏览器自动化','打开页面、截图、表单','官方 · 12 个工具 · 本地',false],
+      ['Slack','频道消息读取与发送','官方 · 9 个工具 · OAuth',false],
+      ['Sentry','错误事件与发布追踪','官方 · 7 个工具 · Token',false]
+    ];
+    var TP = [['stdio','本地命令（stdio）'],['http','远程 HTTP'],['sse','SSE']];
+    var DF = [
+      ['panel','调试面板','右下角浮动面板：事件流、网络、状态'],
+      ['bounds','显示组件边界','给每个组件描边并显示名称'],
+      ['mock','使用 Mock 数据','仅开发环境；生产环境强制关闭并显示「未接入」'],
+      ['perf','性能浮层','帧率、渲染耗时、虚拟列表命中率'],
+      ['verbose','详细日志','记录 debug 级日志到本地有界缓冲'],
+      ['flags','显示实验功能','让 Feature Flags 中的实验项出现在界面'],
+      ['api','覆盖 API 地址','指向本地或测试环境的后端'],
+      ['sse','显示实时连接状态','顶栏显示推送连接、重连与补齐次数']
+    ];
+    return {
+      groups: groups, cur: cur,
+      isMod: s.sel === 'mod', isMcp: s.sel === 'mcp', isDevMode: s.sel === 'devmode', isDebug: s.sel === 'debug', isHooks: s.sel === 'hooks',
+      isOther: ['mod','mcp','devmode','debug','hooks'].indexOf(s.sel) < 0,
+      modTypes: MT.map(function (t) { var on = s.modType === t[0]; return { label: t[1], active: on, style: chip(on), pick: function () { self.setState({ modType: t[0] }); } }; }),
+      mods: MODS.filter(function (m) { return s.modType === 'all' || s.modType === m[0]; }).map(function (m) {
+        var on = !!s.mods[m[0]]; var st = sw(on);
+        return { name: m[1], desc: m[2], type: m[3], caps: m[4], ver: m[5], on: on, toggleLabel: '启用 ' + m[1], switchStyle: st.switchStyle, knobStyle: st.knobStyle,
+          toggle: function () { var n = Object.assign({}, s.mods); n[m[0]] = !on; self.setState({ mods: n }); } };
+      }),
+      mcpOfficial: s.mcpTab === 'official', mcpCustom: s.mcpTab === 'custom', mcpInstalled: s.mcpTab === 'installed',
+      showOfficial: function () { self.setState({ mcpTab: 'official' }); }, showCustom: function () { self.setState({ mcpTab: 'custom' }); }, showInstalled: function () { self.setState({ mcpTab: 'installed' }); },
+      officialTabStyle: tab(s.mcpTab === 'official'), customTabStyle: tab(s.mcpTab === 'custom'), installedTabStyle: tab(s.mcpTab === 'installed'),
+      catalog: CAT.map(function (c) { return { name: c[0], desc: c[1], meta: c[2], btn: c[3] ? '已连接 · 管理' : '安装',
+        btnStyle: 'align-self: flex-start; margin-top: 4px; height: 30px; padding: 0 12px; border-radius: 6px; ' + (c[3] ? 'border: 1px solid #D1D5DB; background: #FFFFFF; color: #374151' : 'border: 0; background: #1D4ED8; color: #FFFFFF') }; }),
+      transports: TP.map(function (t) { var on = s.transport === t[0]; return { label: t[1], active: on, style: chip(on), pick: function () { self.setState({ transport: t[0] }); } }; }),
+      targetLabel: s.transport === 'stdio' ? '启动命令' : '服务地址',
+      targetValue: s.transport === 'stdio' ? 'npx -y @acme/kb-mcp --root ./docs' : (s.transport === 'http' ? 'https://kb.internal.example/mcp' : 'https://kb.internal.example/sse'),
+      secretLabel: s.transport === 'stdio' ? '环境变量' : '请求头',
+      devOn: s.dev, toggleDev: function () { self.setState({ dev: !s.dev }); },
+      devSwitchStyle: sw(s.dev).switchStyle, devKnobStyle: sw(s.dev).knobStyle,
+      devFeatures: DF.map(function (d) { var on = s.dev && !!s.devf[d[0]]; var st = sw(on);
+        return { label: d[1], desc: d[2], on: on, switchStyle: st.switchStyle + (s.dev ? '' : '; opacity: 0.5'), knobStyle: st.knobStyle,
+          toggle: function () { if (!s.dev) return; var n = Object.assign({}, s.devf); n[d[0]] = !s.devf[d[0]]; self.setState({ devf: n }); } }; })
+    };
+  }
+}
+</script>
+</body>
+</html>
