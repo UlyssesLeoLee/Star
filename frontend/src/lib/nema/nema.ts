@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2c0b215f119a2b8f1f85939e1a8dd0783775a9ae991885a7cddf05178d1c020b
+@cypher schema=1 source_sha256=cb0eb2717f0a6321ebdff315a0bb9ad2cb38c45c13c600f8e07132b0110718df
 MERGE (self:File {path:"frontend/src/lib/nema/nema.ts"})
 MERGE (parse:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNema",kind:"function"})
 MERGE (serialize:Symbol {id:"frontend/src/lib/nema/nema.ts::serializeNema",kind:"function"})
@@ -326,4 +326,46 @@ export function taskViewFromDocument(doc: NemaDocument): {
     where: five?.where || "",
     filePath,
   };
+}
+
+
+// =====================================================================
+// WASM 渐进增强通道 (per 2026-11-14: nema-codec-wasm 前端对接)
+//   wasm 加载成功 → 解析走 Rust 实现; 失败/不可用 → 回退上方 JS 实现
+// =====================================================================
+
+let wasmReady: Promise<typeof import("./wasm/nema_codec_wasm")> | null = null;
+
+/** 预加载 wasm codec (幂等; 失败后不再重试, 静默回退 JS) */
+export function loadNemaWasm(): Promise<boolean> {
+  if (wasmReady === null) {
+    wasmReady = import("./wasm/nema_codec_wasm")
+      .then(async (mod) => {
+        const wasmUrl = new URL("./wasm/nema_codec_wasm_bg.wasm", import.meta.url);
+        const res = await fetch(wasmUrl.toString());
+        if (!res.ok) throw new Error(`wasm fetch ${res.status}`);
+        mod.initSync({ module: await res.arrayBuffer() });
+        return mod;
+      })
+      .catch((e) => {
+        console.warn("[nema] wasm codec unavailable, JS fallback:", e);
+        wasmReady = null;
+        throw e;
+      });
+  }
+  return wasmReady.then(() => true).catch(() => false);
+}
+
+/** 用 Rust wasm 解析 NEMA (返回 JS 版同构文档; 失败抛错由调用方回退) */
+export async function parseNemaWasm(source: string): Promise<NemaDocument> {
+  const mod = await wasmReady;
+  if (!mod) throw new Error("wasm not loaded");
+  return JSON.parse(mod.parseNema(source)) as NemaDocument;
+}
+
+/** 用 Rust wasm 渲染视图摘要 (views/overview 计数) */
+export async function renderViewWasm(source: string): Promise<{ total: number; by_kind: Record<string, number> }> {
+  const mod = await wasmReady;
+  if (!mod) throw new Error("wasm not loaded");
+  return JSON.parse(mod.renderView(source)) as { total: number; by_kind: Record<string, number> };
 }

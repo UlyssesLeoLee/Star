@@ -1,38 +1,196 @@
 /*
-@cypher schema=1 source_sha256=cfff0eae34e846e50f649709a3c43b071068c6c1bf4d9c9a8c18dea742a62c68
+@cypher schema=1 source_sha256=d50127f7f085a5c9850b6ae1ed722e4b74b5ea8a04a2d1361e2cffcafe25a5df
 MERGE (self:File {path:"frontend/src/app/canvas/worktree-graph/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/worktree-graph/page.tsx::WorktreeGraphPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
 @endcypher
 */
-// =====================================================================
-// /canvas/worktree-graph — Worktree 图 (per 0·页面合并图: 画布子页 关系图核心)
-// 5 视图: 树 / 依赖 / 风险 / Agent / 历史 + 6 级缩放
-// =====================================================================
 "use client";
+
+// =====================================================================
+// /canvas/worktree-graph — Worktree 图 (per 2026-11-14: 占位 → 实装)
+// 5 视图: 树 / 依赖 / 风险 / Agent / 历史 + 缩放, 数据源 store
+// =====================================================================
 
 import { useState } from "react";
 import { Network, GitBranch, AlertTriangle, Bot, History } from "lucide-react";
 import { clsx } from "clsx";
-import { useTranslation } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
 
 const GRAPH_VIEWS = ["树", "依赖", "风险", "Agent", "历史"] as const;
 
 export default function WorktreeGraphPage() {
-  const { t } = useTranslation();
   const [activeView, setActiveView] = useState<typeof GRAPH_VIEWS[number]>("树");
   const [zoom, setZoom] = useState(1);
+  const worktrees = useStore((s) => s.worktrees);
+  const workItems = useStore((s) => s.workItems);
+  const agentSessions = useStore((s) => s.agentSessions);
+
+  // 图布局: worktree 为列 hub, 下挂任务; agent 列在右侧
+  const cols = Math.min(4, Math.max(1, worktrees.length));
+  const colW = 220;
+
+  const renderView = () => {
+    switch (activeView) {
+      case "树": {
+        // 树视图: Project → LANE → Worktree → Branch 层级
+        return (
+          <div data-testid="wtg-view-tree" className="min-w-[640px] p-6">
+            <div className="flex items-start gap-4">
+              <div className="rounded-lg border-2 border-accent/60 bg-accent/10 px-4 py-3 text-sm font-bold text-accent" data-testid="wtg-root">
+                Project · Physis / GVPE
+              </div>
+              <div className="w-6 border-t-2 border-line mt-5" />
+              <div className="flex-1">
+                <div className="rounded-lg border border-warn/50 bg-warn/10 px-3 py-2 text-xs font-semibold text-warn inline-block">
+                  LANE · auth-refactor
+                </div>
+                <div className="mt-3 space-y-2">
+                  {worktrees.slice(0, 6).map((wt) => (
+                    <div key={wt.id} className="flex items-center gap-3">
+                      <div className="w-4 border-t border-line" />
+                      <div className="flex items-center gap-2 rounded-lg border border-line bg-bg-card px-3 py-2" data-testid={`wtg-node-${wt.id}`}>
+                        <GitBranch size={13} className="text-ok" />
+                        <div>
+                          <div className="text-xs font-semibold text-ink">{wt.name}</div>
+                          <div className="text-[9px] font-mono text-ink-mute">{wt.id} · {wt.status}</div>
+                        </div>
+                      </div>
+                      <div className="w-4 border-t border-line" />
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-line bg-bg-soft text-ink-dim">
+                        {workItems.filter((w) => w.worktree_id === wt.id).length} 任务
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      case "依赖": {
+        // 依赖视图: 任务按 worktree 分组 + 依赖关系线 (worktree→任务)
+        return (
+          <div data-testid="wtg-view-deps" className="p-6" style={{ width: cols * colW + 120 }}>
+            <div className="flex items-start gap-8">
+              {worktrees.slice(0, cols).map((wt, ci) => (
+                <div key={wt.id} className="flex-1" style={{ minWidth: colW }}>
+                  <div className="rounded-lg border border-ok/50 bg-ok/10 px-3 py-2 text-xs font-bold text-ok text-center" data-testid={`wtg-dep-hub-${wt.id}`}>
+                    {wt.name}
+                  </div>
+                  <div className="mt-2 flex flex-col items-center gap-1.5">
+                    {workItems.filter((w) => w.worktree_id === wt.id).slice(0, 8).map((wi) => (
+                      <div key={wi.id} className="w-full flex items-center gap-1.5">
+                        <div className="w-3 border-t border-line" />
+                        <a
+                          href={`/work-item/${wi.id}`}
+                          className="flex-1 truncate rounded border border-line bg-bg-card px-2 py-1.5 text-[11px] text-ink hover:border-accent/50 font-mono"
+                          data-testid={`wtg-dep-task-${wi.id}`}
+                        >
+                          {wi.key} {wi.title}
+                        </a>
+                      </div>
+                    ))}
+                    {workItems.filter((w) => w.worktree_id === wt.id).length === 0 && (
+                      <span className="text-[10px] text-ink-mute">无任务</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      case "风险": {
+        // 风险视图: 阻塞/冲突任务 + 高优先级
+        const risky = workItems.filter((w) => w.status === "blocked" || w.priority === "p0" || w.priority === "p1");
+        return (
+          <div data-testid="wtg-view-risk" className="p-6 space-y-2 max-w-xl">
+            <div className="flex items-center gap-2 text-xs text-ink-dim mb-2">
+              <AlertTriangle size={13} className="text-err" /> 风险项 ({risky.length})
+            </div>
+            {risky.length === 0 ? (
+              <p className="text-xs text-ink-mute">无阻塞/高优先风险任务</p>
+            ) : (
+              risky.map((wi) => (
+                <a
+                  key={wi.id}
+                  href={`/work-item/${wi.id}`}
+                  className="flex items-center gap-2 rounded-lg border border-err/40 bg-err/5 px-3 py-2 hover:border-err/70"
+                  data-testid={`wtg-risk-${wi.id}`}
+                >
+                  <AlertTriangle size={12} className="text-err shrink-0" />
+                  <span className="font-mono text-[11px] text-err font-bold">{wi.key}</span>
+                  <span className="flex-1 truncate text-xs text-ink">{wi.title}</span>
+                  <span className="text-[10px] font-mono text-ink-mute">{wi.status} · {wi.priority}</span>
+                </a>
+              ))
+            )}
+          </div>
+        );
+      }
+      case "Agent": {
+        // Agent 视图: agent 会话 ↔ worktree 关联
+        return (
+          <div data-testid="wtg-view-agent" className="p-6">
+            <div className="space-y-2 max-w-xl">
+              {agentSessions.slice(0, 8).map((ag) => {
+                const wt = worktrees.find((w) => w.id === ag.worktree_id);
+                return (
+                  <div key={ag.id} className="flex items-center gap-3 rounded-lg border border-line bg-bg-card px-3 py-2">
+                    <Bot size={13} className="text-accent shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-ink truncate">{ag.name}</div>
+                      <div className="text-[9px] font-mono text-ink-mute">{ag.id} · {ag.agent_kind} · {ag.status}</div>
+                    </div>
+                    {wt && (
+                      <a href={`/worktree/${wt.id}/group`} className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-ok/40 bg-ok/10 text-ok shrink-0" data-testid={`wtg-agent-wt-${ag.id}`}>
+                        <GitBranch size={9} /> {wt.name}
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+              {agentSessions.length === 0 && <p className="text-xs text-ink-mute">无 Agent 会话</p>}
+            </div>
+          </div>
+        );
+      }
+      case "历史": {
+        // 历史视图: 最近更新任务 (按 updated_at 排序)
+        const recent = [...workItems].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 10);
+        return (
+          <div data-testid="wtg-view-history" className="p-6 space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2 text-xs text-ink-dim mb-2">
+              <History size={13} className="text-ink-mute" /> 最近更新
+            </div>
+            {recent.map((wi) => (
+              <div key={wi.id} className="flex items-center gap-2 rounded border border-line bg-bg-card px-3 py-1.5" data-testid={`wtg-hist-${wi.id}`}>
+                <span className="font-mono text-[11px] text-info font-bold">{wi.key}</span>
+                <span className="flex-1 truncate text-xs text-ink">{wi.title}</span>
+                <span className="text-[9px] font-mono text-ink-mute">{(wi.updated_at ?? "").slice(0, 16)}</span>
+              </div>
+            ))}
+            {recent.length === 0 && <p className="text-xs text-ink-mute">无历史</p>}
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex h-full flex-col bg-bg">
       {/* 顶部视图切换 */}
       <div className="flex items-center gap-4 border-b border-line bg-bg-card px-4 py-2">
-        <div className="flex items-center gap-1 border-b border-line">
+        <div className="flex items-center gap-1">
           {GRAPH_VIEWS.map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setActiveView(v)}
+              data-testid={`wtg-tab-${v}`}
               className={clsx(
                 "px-3 py-1.5 text-sm border-b-2 -mb-px transition-colors",
                 activeView === v
@@ -54,18 +212,11 @@ export default function WorktreeGraphPage() {
       </div>
 
       {/* 图区域 */}
-      <main className="flex-1 overflow-auto bg-bg relative">
+      <main className="flex-1 overflow-auto bg-bg relative" data-testid="wtg-canvas">
         <div
-          className="absolute inset-0"
-          style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+          style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}
         >
-          <div className="h-full w-full flex items-center justify-center">
-            <div className="text-center text-ink-dim">
-              <Network size={48} className="mx-auto mb-3 text-ink-mute" />
-              <p className="text-sm">Worktree {activeView} 视图 (待实装 6 级缩放 + 5 视图切换)</p>
-              <p className="text-xs text-ink-mute mt-1">树 / 依赖 / 风险 / Agent / 历史</p>
-            </div>
-          </div>
+          {renderView()}
         </div>
       </main>
     </div>

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c21320ea8b122a865330eb53d20b31d028e582a9b90c2a5506e51e813e2961d6
+@cypher schema=1 source_sha256=4eb30998717385a700b90c6d7a355acd243142b28a8c2f355533a6afc985c968
 MERGE (self:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::useNemaStore",kind:"hook"})
 MERGE (register:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::registerSharedFile",kind:"function"})
@@ -22,7 +22,25 @@ import {
   serializeNema,
   taskViewFromDocument,
   parseNema,
+  parseNemaWasm,
+  loadNemaWasm,
+  type NemaDocument,
 } from "./nema";
+
+// wasm codec 预加载 (per 2026-11-14: nema-codec-wasm 前端对接; 失败静默回退 JS)
+void loadNemaWasm();
+
+/** wasm-first 解析: wasm 就绪走 Rust 实现, 否则 JS 回退 (解析失败也回退 JS) */
+async function parseNemaSmart(source: string): Promise<NemaDocument> {
+  if (await loadNemaWasm()) {
+    try {
+      return await parseNemaWasm(source);
+    } catch {
+      /* wasm 解析失败 → JS 回退 */
+    }
+  }
+  return parseNema(source);
+}
 import { useStore as useMainStore } from "@/lib/store";
 import type { WorkItemDocument } from "@/types/ids";
 
@@ -58,9 +76,9 @@ interface NemaState {
   /** 移除 .nema 任务记录。 */
   removeNemaTask: (nemaId: string) => void;
   /** 由 .nema 源码导入任务。 */
-  importNemaSource: (nemaPath: string, source: string) => NemaTaskEntry;
+  importNemaSource: (nemaPath: string, source: string) => Promise<NemaTaskEntry>;
   /** 文件系统监听同步 (per WBS 8.4.4): 磁盘 .nema 内容变化 → 更新记录 + 回写已绑定任务。 */
-  syncNemaSource: (nemaPath: string, source: string) => { action: "imported" | "updated" | "unchanged"; entry: NemaTaskEntry };
+  syncNemaSource: (nemaPath: string, source: string) => Promise<{ action: "imported" | "updated" | "unchanged"; entry: NemaTaskEntry }>;
 }
 
 function makeId(prefix: string): string {
@@ -159,8 +177,8 @@ export const useNemaStore = create<NemaState>()(
         set((s) => ({ nemaTasks: s.nemaTasks.filter((t) => t.id !== nemaId) }));
       },
 
-      importNemaSource: (nemaPath, source) => {
-        const doc = parseNema(source);
+      importNemaSource: async (nemaPath, source) => {
+        const doc = await parseNemaSmart(source);
         const view = taskViewFromDocument(doc);
         const id = makeId("nema");
         const entry: NemaTaskEntry = {
@@ -177,16 +195,16 @@ export const useNemaStore = create<NemaState>()(
         return entry;
       },
 
-      syncNemaSource: (nemaPath, source) => {
+      syncNemaSource: async (nemaPath, source) => {
         const existing = get().nemaTasks.find((t) => t.nemaPath === nemaPath);
         if (!existing) {
-          const entry = get().importNemaSource(nemaPath, source);
+          const entry = await get().importNemaSource(nemaPath, source);
           return { action: "imported" as const, entry };
         }
         if (existing.source === source) {
           return { action: "unchanged" as const, entry: existing };
         }
-        const doc = parseNema(source);
+        const doc = await parseNemaSmart(source);
         const view = taskViewFromDocument(doc);
         const now = new Date().toISOString();
         const updated: NemaTaskEntry = {

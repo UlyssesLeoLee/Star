@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=175675158543ffae9f92c0fdabb4e26a3b1b88d20d76e06f526a411a96b9ac37
+@cypher schema=1 source_sha256=8e44be908b8684567f3c2057af0281e48f4633f40eb6e5c3e0268748159c8980
 MERGE (self:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
 MERGE (scan:Function {name:"nemaWatcher::scanNemaFiles",language:"typescript"})
 MERGE (hook:Function {name:"nemaWatcher::useNemaWatcher",language:"typescript"})
@@ -68,7 +68,7 @@ export async function scanNemaFiles(roots: string[] = [""]): Promise<NemaScanRes
         if (read.error) result.errors.push(`${nemaPath}: ${read.error}`);
         continue;
       }
-      const synced = store.syncNemaSource(nemaPath, read.body.text);
+      const synced = await store.syncNemaSource(nemaPath, read.body.text);
       if (synced.action === "imported") result.imported += 1;
       else if (synced.action === "updated") result.updated += 1;
     }

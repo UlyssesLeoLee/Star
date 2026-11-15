@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=72641aa03894b4987fdcf754d8bb813be4a8914ba6450608beeb42691c19f61c
+@cypher schema=1 source_sha256=e2c6269d15c388b75ef7a1138fddc9718e6a225be6844f674d174cdfc0294c20
 MERGE (self:File {path:"frontend/src/components/CanvasView.tsx"})
 MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",kind:"interface"})
 MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -49,7 +49,7 @@ import type {
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
-import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser, Undo2, Redo2 } from "lucide-react";
+import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser, Undo2, Redo2, Layers, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
@@ -119,6 +119,8 @@ export function CanvasView(props: CanvasViewProps) {
   const [lineStart, setLineStart] = useState<{ x: number; y: number } | null>(null);
   // Space 临时平移 (Miro 标准, per 2026-11-14 调研)
   const [spacePanning, setSpacePanning] = useState(false);
+  // 图层面板 (per 2026-11-14: Miro 图层管理)
+  const [layersOpen, setLayersOpen] = useState(false);
   // 撤销/重做栈 (per WBS W3.2; 仅 store 模式 onCreateElement===undefined 时生效)
   const undoStackRef = useRef<typeof elements[]>([]);
   const redoStackRef = useRef<typeof elements[]>([]);
@@ -126,6 +128,32 @@ export function CanvasView(props: CanvasViewProps) {
     undoStackRef.current = [...undoStackRef.current.slice(-29), elements];
     redoStackRef.current = [];
   }, [elements]);
+
+  /** 图层操作: 上移/下移/显隐/锁定 (store 模式 replaceCanvasElements) */
+  const moveLayer = useCallback((id: string, dir: 1 | -1) => {
+    if (onCreateElement !== undefined) return;
+    pushUndoSnapshot();
+    const els = [...elements].sort((a, b) => a.z_index - b.z_index);
+    const idx = els.findIndex((e) => e.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= els.length) return;
+    const zi = els[idx].z_index;
+    els[idx] = { ...els[idx], z_index: els[target].z_index };
+    els[target] = { ...els[target], z_index: zi };
+    useStore.getState().replaceCanvasElements(els);
+  }, [elements, onCreateElement, pushUndoSnapshot]);
+
+  const toggleLayerVisible = useCallback((id: string) => {
+    if (onCreateElement !== undefined) return;
+    const els = elements.map((e) => (e.id === id ? { ...e, hidden: !e.hidden } : e));
+    useStore.getState().replaceCanvasElements(els);
+  }, [elements, onCreateElement]);
+
+  const toggleLayerLock = useCallback((id: string) => {
+    if (onCreateElement !== undefined) return;
+    const els = elements.map((e) => (e.id === id ? { ...e, locked: !e.locked } : e));
+    useStore.getState().replaceCanvasElements(els);
+  }, [elements, onCreateElement]);
   // 双击编辑 (per W3.4): 编辑中的 text/sticky element id
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -1180,6 +1208,15 @@ export function CanvasView(props: CanvasViewProps) {
           <Maximize2 size={14} />
         </button>
         <span className="text-[10px] text-ink-dim font-mono px-2">{Math.round(viewport.zoom * 100)}%</span>
+        <div className="w-px h-5 bg-line" />
+        <button
+          onClick={() => setLayersOpen((v) => !v)}
+          className={`btn p-1.5 ${layersOpen ? "border-accent text-accent" : ""}`}
+          title="图层 (Layers)"
+          data-testid="canvas-tool-layers"
+        >
+          <Layers size={14} />
+        </button>
         {onCreateElement === undefined && !readOnly && (
           <>
             <div className="w-px h-5 bg-line" />
@@ -1358,6 +1395,62 @@ export function CanvasView(props: CanvasViewProps) {
       </svg>
 
       {/* Minimap */}
+      {/* 图层面板 (per 2026-11-14: Miro 图层管理) */}
+      {layersOpen && (
+        <div
+          data-testid="canvas-layers-panel"
+          className="absolute top-14 right-3 z-20 w-60 max-h-[60%] overflow-y-auto rounded-lg border border-line bg-bg-card shadow-soft"
+        >
+          <div className="px-3 py-2 border-b border-line text-[10px] font-mono uppercase tracking-wider text-ink-mute flex items-center justify-between">
+            图层 · {elements.length}
+            <button onClick={() => setLayersOpen(false)} className="text-ink-mute hover:text-ink">✕</button>
+          </div>
+          <ul className="p-1.5 space-y-0.5">
+            {[...elements]
+              .sort((a, b) => b.z_index - a.z_index)
+              .map((el) => (
+                <li
+                  key={el.id}
+                  data-testid={`canvas-layer-${el.id}`}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] ${
+                    selected.includes(el.id) ? "bg-accent/10 text-accent" : "text-ink hover:bg-bg-soft"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelected([el.id])}
+                    className="flex-1 text-left truncate font-mono"
+                    title={`${el.id} · z=${el.z_index}`}
+                  >
+                    <span className={el.hidden ? "line-through opacity-50" : ""}>
+                      {el.kind}{el.entity_ref ? ` · ${el.id.slice(0, 10)}` : ""}
+                    </span>
+                  </button>
+                  {onCreateElement === undefined && (
+                    <>
+                      <button type="button" onClick={() => moveLayer(el.id, -1)} title="上移一层" className="p-0.5 rounded hover:bg-bg-soft text-ink-mute hover:text-accent" data-testid={`canvas-layer-up-${el.id}`}>
+                        <ArrowUp size={10} />
+                      </button>
+                      <button type="button" onClick={() => moveLayer(el.id, 1)} title="下移一层" className="p-0.5 rounded hover:bg-bg-soft text-ink-mute hover:text-accent" data-testid={`canvas-layer-down-${el.id}`}>
+                        <ArrowDown size={10} />
+                      </button>
+                      <button type="button" onClick={() => toggleLayerVisible(el.id)} title="显隐" className="p-0.5 rounded hover:bg-bg-soft text-ink-mute" data-testid={`canvas-layer-eye-${el.id}`}>
+                        {el.hidden ? <EyeOff size={10} /> : <Eye size={10} />}
+                      </button>
+                      <button type="button" onClick={() => toggleLayerLock(el.id)} title="锁定" className="p-0.5 rounded hover:bg-bg-soft text-ink-mute" data-testid={`canvas-layer-lock-${el.id}`}>
+                        {el.locked ? <Lock size={10} /> : <Unlock size={10} />}
+                      </button>
+                    </>
+                  )}
+                </li>
+              ))}
+            {elements.length === 0 && (
+              <li className="px-2 py-3 text-center text-[11px] text-ink-mute">无元素</li>
+            )}
+          </ul>
+        </div>
+      )}
+
       <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border border-line rounded-md overflow-hidden shadow-soft">
         <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className="w-full h-full">
           {/* viewport rect */}
