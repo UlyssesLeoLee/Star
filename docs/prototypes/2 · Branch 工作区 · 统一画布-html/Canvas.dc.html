@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>统一画布</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="font-family: Inter, 'PingFang SC', 'Hiragino Sans', 'Microsoft YaHei', system-ui, sans-serif; color: #111827; background: #F7F7F5; min-height: 900px; display: flex; flex-direction: column; font-size: 13px">
+
+<header style="height: 52px; background: #FFFFFF; border-bottom: 1px solid #E2E1DC; display: flex; align-items: center; gap: 16px; padding: 0 16px; flex-wrap: wrap">
+  <div style="display: flex; align-items: center; gap: 8px">
+    <div style="width: 26px; height: 26px; border-radius: 6px; background: #1F2937; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 600">S</div>
+    <span style="font-weight: 600; font-size: 15px">Star</span>
+  </div>
+  <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #C7D2FE; background: #EEF2FF; color: #3730A3">⎇ feat/relation-bfs ▾</button>
+  <nav aria-label="Branch 功能" style="display: flex; align-items: stretch; height: 52px; gap: 2px; flex: 1 1 auto">
+    <a href="TasksIpa.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">任务</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; padding: 0 12px; color: #1D4ED8; font-weight: 600; text-decoration: none; box-shadow: inset 0 -3px 0 #1D4ED8">画布</a>
+    <a href="Docs.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">协同</a>
+    <a href="Sandbox.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">沙盒</a>
+    <a href="Prototype.dc.html" style="display: flex; align-items: center; padding: 0 12px; color: #4B5563; text-decoration: none">原型</a>
+    <button type="button" aria-label="添加页签" style="align-self: center; width: 28px; height: 28px; border-radius: 6px; border: 1px dashed #C7C9CF; background: #FFFFFF; color: #4B5563">+</button>
+  </nav>
+  <label style="display: flex; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">搜索</span>
+    <input type="search" placeholder="搜索 ⌘K" style="width: 200px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F3F4F6; padding: 0 10px; font: inherit"></label>
+  <button type="button" aria-label="用户资料：Ulysses" style="height: 36px; padding: 0 10px 0 4px; border-radius: 999px; border: 1px solid #E5E7EB; background: #FFFFFF; display: flex; align-items: center; gap: 8px">
+    <span style="width: 28px; height: 28px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; font-weight: 600; display: flex; align-items: center; justify-content: center">U</span>Ulysses</button>
+</header>
+
+<div style="flex: 1 1 auto; display: flex; min-width: 0">
+
+<aside aria-label="导航（已收起）" style="flex: 0 0 44px; background: #FFFFFF; border-right: 1px solid #E2E1DC; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 10px">
+  <button type="button" aria-label="展开导航" style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">☰</button>
+  <button type="button" aria-label="快捷入口" style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">☆</button>
+</aside>
+
+<main style="flex: 1 1 auto; min-width: 0; position: relative; display: flex; flex-direction: column">
+  <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #E5E7EB; background: #FFFFFF; flex-wrap: wrap">
+    <div role="tablist" aria-label="画布图层" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 8px">
+      <sc-for list="{{layers}}" as="l" hint-placeholder-count="4">
+        <button type="button" role="tab" aria-selected="{{l.active}}" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button>
+      </sc-for>
+    </div>
+    <span style="font-size: 12px; color: #6B7280; flex: 1 1 200px; min-width: 0">{{layerHint}}</span>
+    <div style="display: flex; align-items: center; gap: 6px">
+      <div aria-label="在线成员" style="display: flex">
+        <span title="Ulysses" style="width: 26px; height: 26px; border-radius: 50%; background: #DBEAFE; color: #1E3A8A; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">U</span>
+        <span title="Agent B" style="width: 26px; height: 26px; border-radius: 50%; background: #EDE9FE; color: #4C1D95; border: 2px solid #FFFFFF; margin-left: -6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">B</span>
+      </div>
+      <button type="button" aria-label="撤销" style="width: 30px; height: 30px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">↶</button>
+      <button type="button" aria-label="重做" style="width: 30px; height: 30px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">↷</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">演示</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">导出</button>
+      <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">分享</button>
+    </div>
+  </div>
+
+  <div style="flex: 1 1 auto; display: flex; min-height: 0">
+
+    <sc-if value="{{isCode}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="节点库" style="flex: 0 0 180px; background: #FFFFFF; border-right: 1px solid #E5E7EB; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12px">
+        <input type="search" aria-label="搜索节点" placeholder="搜索节点" style="height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit">
+        <div style="font-size: 11px; color: #6B7280">拖到画布，或点节点右侧的 + 接在后面</div>
+        <sc-for list="{{palette}}" as="pg" hint-placeholder-count="4">
+          <div>
+            <div style="font-size: 11px; color: #6B7280; margin-bottom: 4px">{{pg.label}}</div>
+            <sc-for list="{{pg.items}}" as="pi" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 1px solid #F3F4F6; border-radius: 5px; margin-bottom: 3px; background: #FAFAF9"><span style="{{pi.dot}}"></span>{{pi.label}}</div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <div style="{{surfaceStyle}}">
+
+      <sc-if value="{{showDrawTools}}" hint-placeholder-val="{{ true }}">
+        <div role="toolbar" aria-label="画布工具" style="position: absolute; left: 12px; top: 120px; z-index: 3; display: flex; flex-direction: column; gap: 2px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 4px">
+          <sc-for list="{{tools}}" as="t" hint-placeholder-count="11">
+            <button type="button" aria-label="{{t.label}}" title="{{t.label}}" aria-pressed="{{t.active}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.icon}}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isBoard}}" hint-placeholder-val="{{ true }}">
+        <div>
+          <svg aria-hidden="true" width="100%" height="780" style="position: absolute; left: 0; top: 0">
+            <line x1="330" y1="100" x2="360" y2="120" stroke="#9CA3AF" stroke-width="1.5"></line>
+            <line x1="540" y1="120" x2="580" y2="160" stroke="#9CA3AF" stroke-width="1.5"></line>
+          </svg>
+          <sc-for list="{{boardNodes}}" as="n" hint-placeholder-count="5">
+            <div style="{{n.style}}"><div style="font-size: 12px; font-weight: 600">{{n.title}}</div><div style="font-size: 11px; margin-top: 4px">{{n.meta}}</div></div>
+          </sc-for>
+          <div style="position: absolute; left: 580px; top: 90px; display: flex; gap: 2px; background: #1F2937; border-radius: 8px; padding: 4px; z-index: 2">
+            <button type="button" aria-label="颜色" style="width: 26px; height: 26px; border: 0; border-radius: 5px; background: #FCD34D"></button>
+            <button type="button" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #FFFFFF; font-size: 12px">字号</button>
+            <button type="button" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #FFFFFF; font-size: 12px">对齐</button>
+            <button type="button" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #FFFFFF; font-size: 12px">锁定</button>
+            <button type="button" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #FFFFFF; font-size: 12px">转为任务卡</button>
+          </div>
+          <div style="position: absolute; left: 120px; top: 340px; width: 420px; height: 200px; border: 1.5px dashed #9CA3AF; border-radius: 6px">
+            <span style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #4B5563">框架 · 冲刺回顾</span>
+          </div>
+          <div aria-hidden="true" style="position: absolute; left: 700px; top: 300px; display: flex; align-items: center; gap: 4px">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 1l10 4-4 2-2 4z" fill="#7C3AED"></path></svg>
+            <span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #7C3AED; color: #FFFFFF">Agent B</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isGraph}}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="position: absolute; left: 70px; top: 16px; display: flex; gap: 14px; align-items: center; font-size: 11px; color: #4B5563; flex-wrap: wrap; z-index: 2">
+            <span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #FFFFFF; border: 2px solid #374151"></span>提交</span>
+            <span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #374151"></span>合并提交</span>
+            <span style="display: flex; align-items: center; gap: 4px"><span style="width: 16px; border-top: 2px dashed #DC2626"></span>冲突</span>
+            <span style="display: flex; align-items: center; gap: 4px"><span style="width: 16px; border-top: 2px dotted #9CA3AF"></span>待合并</span>
+            <button type="button" style="height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">时间 ▾</button>
+            <button type="button" style="height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">只看我的 Worktree</button>
+          </div>
+          <svg aria-hidden="true" width="1340" height="560" style="position: absolute; left: 0; top: 0">
+            <sc-for list="{{gitPaths}}" as="gp" hint-placeholder-count="8">
+              <path d="{{gp.d}}" fill="none" stroke="{{gp.color}}" stroke-width="{{gp.w}}" stroke-dasharray="{{gp.dash}}"></path>
+            </sc-for>
+          </svg>
+          <sc-for list="{{lanes}}" as="ln" hint-placeholder-count="6">
+            <div style="{{ln.labelStyle}}">
+              <div style="display: flex; align-items: center; gap: 6px"><span style="{{ln.swatch}}"></span><span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; font-weight: 600">{{ln.name}}</span></div>
+              <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap">
+                <span style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #F3F4F6; color: #374151">{{ln.wt}}</span>
+                <span style="{{ln.statusStyle}}">{{ln.status}}</span>
+              </div>
+            </div>
+          </sc-for>
+          <sc-for list="{{commits}}" as="c" hint-placeholder-count="20">
+            <button type="button" onClick="{{c.pick}}" aria-label="{{c.label}}" title="{{c.label}}" style="{{c.style}}"></button>
+          </sc-for>
+          <sc-for list="{{heads}}" as="h" hint-placeholder-count="3">
+            <span style="{{h.style}}">{{h.text}}</span>
+          </sc-for>
+          <section aria-label="提交详情" style="position: absolute; left: 70px; top: 580px; right: 220px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 110px minmax(0, 1fr) 110px minmax(0, 1fr); gap: 6px 12px; font-size: 12px">
+            <span style="color: #6B7280">提交</span><span style="font-family: ui-monospace, Consolas, monospace">{{cm.sha}} · {{cm.msg}}</span>
+            <span style="color: #6B7280">分支</span><span>{{cm.branch}}</span>
+            <span style="color: #6B7280">Worktree</span><span>{{cm.wt}}</span>
+            <span style="color: #6B7280">相对 dev</span><span>{{cm.ab}}</span>
+            <span style="color: #6B7280">关联任务卡</span><span>{{cm.task}}</span>
+            <span style="color: #6B7280">合并状态</span><span>{{cm.merge}}</span>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isIpa}}" hint-placeholder-val="{{ false }}">
+        <div>
+          <svg aria-hidden="true" width="1340" height="1400" style="position: absolute; left: 0; top: 0">
+            <polyline points="{{vPath}}" fill="none" stroke="#C7D2FE" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"></polyline>
+            <sc-for list="{{pairLines}}" as="pl" hint-placeholder-count="4">
+              <line x1="{{pl.x1}}" y1="{{pl.y}}" x2="{{pl.x2}}" y2="{{pl.y}}" stroke="#A5B4FC" stroke-width="1.5" stroke-dasharray="6 5"></line>
+            </sc-for>
+          </svg>
+          <sc-for list="{{pairLabels}}" as="pb" hint-placeholder-count="4">
+            <span style="{{pb.style}}">{{pb.text}}</span>
+          </sc-for>
+          <div style="position: absolute; left: 330px; top: 70px; width: 190px; font-size: 12px; color: #4B5563; line-height: 1.6">
+            <div style="font-size: 16px; font-weight: 600; color: #111827">V 字模型</div>
+            <div>左翼设计、右翼测试，虚线连接对应层级。顶部是发布、运维与终结，底部是贯穿全程的横断工程。</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px">
+              <sc-for list="{{legend}}" as="lg" hint-placeholder-count="7">
+                <span style="display: flex; align-items: center; gap: 4px; font-size: 11px"><span style="{{lg.sw}}"></span>{{lg.label}}</span>
+              </sc-for>
+            </div>
+          </div>
+          <sc-for list="{{zones}}" as="z" hint-placeholder-count="4">
+            <div style="{{z.style}}"><span style="font-size: 11px; font-weight: 600; color: {{z.color}}">{{z.label}}</span></div>
+          </sc-for>
+          <sc-for list="{{regions}}" as="r" hint-placeholder-count="16">
+            <section style="{{r.style}}">
+              <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px">
+                <span style="font-size: 11px; color: #6B7280">{{r.code}}</span>
+                <h2 style="margin: 0; font-size: 13px; font-weight: 600">{{r.zh}}</h2>
+                <span style="font-size: 11px; color: #6B7280">{{r.ja}}</span>
+                <span style="margin-left: auto; font-size: 11px; color: #3730A3">{{r.progress}}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px">
+                <sc-for list="{{r.chips}}" as="ch" hint-placeholder-count="12">
+                  <button type="button" title="{{ch.tip}}" onClick="{{ch.pick}}" style="{{ch.style}}">{{ch.name}}</button>
+                </sc-for>
+              </div>
+            </section>
+          </sc-for>
+          <sc-if value="{{hasChipSel}}" hint-placeholder-val="{{ false }}">
+            <section aria-label="流程详情" style="position: absolute; right: 16px; top: 400px; width: 260px; background: #FFFFFF; border: 1px solid #9CA3AF; border-radius: 10px; padding: 12px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 4">
+              <div style="display: flex; align-items: center"><span style="font-weight: 600">{{chipSel.name}}</span><button type="button" onClick="{{clearChip}}" aria-label="关闭" style="margin-left: auto; width: 28px; height: 28px; border: 0; background: transparent; color: #6B7280">×</button></div>
+              <div style="color: #6B7280">ipa-{{chipSel.id}} · {{chipSel.phase}}</div>
+              <div>{{chipSel.state}}</div>
+              <a href="TasksIpa.dc.html" style="margin-top: 4px">在任务页打开</a>
+            </section>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isCode}}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="position: absolute; left: 16px; top: 12px; z-index: 3; display: flex; gap: 6px; align-items: center; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 6px 8px; font-size: 12px">
+            <span style="font-weight: 600">任务卡进入评审时自动验证</span>
+            <button type="button" onClick="{{runFlow}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">测试运行</button>
+            <button type="button" role="switch" aria-checked="{{flowActive}}" aria-label="启用流程" onClick="{{toggleFlow}}" style="{{flowSwitchStyle}}"><span style="{{flowKnobStyle}}"></span></button>
+            <span style="color: #6B7280">{{flowStatus}}</span>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">执行记录</button>
+            <button type="button" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF">版本</button>
+          </div>
+          <svg aria-hidden="true" width="900" height="760" style="position: absolute; left: 0; top: 0">
+            <sc-for list="{{codeEdges}}" as="ce" hint-placeholder-count="7">
+              <path d="{{ce.d}}" fill="none" stroke="{{ce.color}}" stroke-width="2"></path>
+            </sc-for>
+          </svg>
+          <sc-for list="{{edgeLabels}}" as="el" hint-placeholder-count="7">
+            <span style="{{el.style}}">{{el.text}}</span>
+          </sc-for>
+          <sc-for list="{{codeNodes}}" as="cn" hint-placeholder-count="8">
+            <div style="{{cn.style}}">
+              <sc-if value="{{cn.selected}}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: -34px; left: 0; display: flex; gap: 2px; background: #1F2937; border-radius: 6px; padding: 3px">
+                  <button type="button" style="height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #FFFFFF; font-size: 11px">▶ 运行</button>
+                  <button type="button" style="height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #FFFFFF; font-size: 11px">停用</button>
+                  <button type="button" style="height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #FFFFFF; font-size: 11px">复制</button>
+                  <button type="button" style="height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #FCA5A5; font-size: 11px">删除</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{cn.hasIn}}" hint-placeholder-val="{{ true }}">
+                <span aria-hidden="true" style="position: absolute; left: -7px; top: 44px; width: 12px; height: 12px; border-radius: 50%; background: #FFFFFF; border: 2px solid #6B7280"></span>
+              </sc-if>
+              <sc-for list="{{cn.outs}}" as="po" hint-placeholder-count="1">
+                <span aria-hidden="true" style="{{po.dot}}"></span>
+                <span style="{{po.labelStyle}}">{{po.label}}</span>
+              </sc-for>
+              <button type="button" onClick="{{cn.pick}}" style="display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 0">
+                <span style="display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid #F3F4F6">
+                  <span style="{{cn.badge}}">{{cn.icon}}</span>
+                  <span style="min-width: 0"><span style="display: block; font-size: 12px; font-weight: 600; color: #111827">{{cn.title}}</span><span style="display: block; font-size: 10px; color: #6B7280">{{cn.kind}}</span></span>
+                </span>
+                <span style="display: block; padding: 6px 10px">
+                  <sc-for list="{{cn.params}}" as="pp" hint-placeholder-count="2">
+                    <span style="display: flex; gap: 6px; font-size: 11px; line-height: 1.7"><span style="color: #6B7280; flex: 0 0 auto">{{pp.k}}</span><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; color: #1E3A8A">{{pp.v}}</span></span>
+                  </sc-for>
+                </span>
+                <sc-if value="{{cn.hasRun}}" hint-placeholder-val="{{ false }}"><span style="display: block; padding: 4px 10px 6px; font-size: 11px; color: {{cn.runColor}}; border-top: 1px solid #F3F4F6">{{cn.run}}</span></sc-if>
+              </button>
+              <sc-if value="{{cn.isEnd}}" hint-placeholder-val="{{ false }}">
+                <button type="button" aria-label="在后面添加节点" style="position: absolute; right: -40px; top: 38px; width: 24px; height: 24px; border-radius: 6px; border: 1px dashed #9CA3AF; background: #FFFFFF; color: #4B5563">+</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isGame}}" hint-placeholder-val="{{ false }}">
+        <div>
+          <svg aria-hidden="true" width="1000" height="600" style="position: absolute; left: 0; top: 0">
+            <sc-for list="{{corridors}}" as="co" hint-placeholder-count="7">
+              <line x1="{{co.x1}}" y1="{{co.y1}}" x2="{{co.x2}}" y2="{{co.y2}}" stroke="{{co.color}}" stroke-width="10" stroke-linecap="round"></line>
+            </sc-for>
+          </svg>
+          <sc-for list="{{rooms}}" as="rm" hint-placeholder-count="7">
+            <div style="{{rm.style}}">
+              <div style="display: flex; align-items: center; gap: 6px"><span style="font-size: 10px; padding: 1px 5px; border-radius: 4px; background: {{rm.tagBg}}; color: {{rm.tagFg}}">{{rm.tag}}</span><span style="font-size: 11px; color: #6B7280">{{rm.id}}</span></div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 4px">{{rm.title}}</div>
+              <div style="display: flex; gap: 3px; margin-top: 6px; align-items: center">
+                <sc-for list="{{rm.enemies}}" as="en" hint-placeholder-count="2">
+                  <span title="{{en.tip}}" style="width: 12px; height: 12px; border-radius: 3px; background: #DC2626; box-shadow: 0 0 0 2px #FEE2E2"></span>
+                </sc-for>
+                <span style="font-size: 10px; color: #6B7280; margin-left: 2px">{{rm.loot}}</span>
+              </div>
+            </div>
+          </sc-for>
+          <sc-for list="{{heroes}}" as="hr" hint-placeholder-count="2">
+            <button type="button" onClick="{{hr.pick}}" aria-label="{{hr.label}}" title="{{hr.label}}" style="{{hr.style}}">
+              <span style="display: block; font-size: 11px; font-weight: 700; color: #FFFFFF">{{hr.initial}}</span>
+              <span style="position: absolute; left: -4px; right: -4px; bottom: -8px; height: 4px; border-radius: 2px; background: #FEE2E2"><span style="display: block; height: 4px; border-radius: 2px; background: #EF4444; width: {{hr.hp}}"></span></span>
+            </button>
+          </sc-for>
+          <section aria-label="角色与任务挑战" style="position: absolute; right: 12px; top: 12px; width: 280px; display: flex; flex-direction: column; gap: 10px; z-index: 3; font-size: 12px">
+            <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px">
+              <div style="display: flex; align-items: center; gap: 8px"><span style="{{hero.avatar}}">{{hero.initial}}</span><span><span style="display: block; font-weight: 600">{{hero.name}}</span><span style="display: block; color: #6B7280">Lv {{hero.level}} · {{hero.cls}}</span></span></div>
+              <sc-for list="{{hero.bars}}" as="b" hint-placeholder-count="3">
+                <div style="margin-top: 8px"><div style="display: flex; justify-content: space-between; color: #4B5563; font-size: 11px"><span>{{b.k}}</span><span>{{b.text}}</span></div><div style="height: 6px; background: #F3F4F6; border-radius: 3px; margin-top: 3px"><div style="height: 6px; border-radius: 3px; background: {{b.color}}; width: {{b.pct}}"></div></div></div>
+              </sc-for>
+              <div style="margin-top: 8px; color: #6B7280; font-size: 11px">技能树：{{hero.skills}}</div>
+              <div style="margin-top: 4px; color: #6B7280; font-size: 11px">冷却：{{hero.cooldown}}</div>
+            </div>
+            <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px">
+              <div style="display: flex; justify-content: space-between"><span style="font-weight: 600">每日挑战</span><span style="color: #C2410C">连续 5 天</span></div>
+              <sc-for list="{{daily}}" as="dy" hint-placeholder-count="3">
+                <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px"><input type="checkbox" checked="{{dy.done}}">{{dy.t}}<span style="margin-left: auto; color: #6B7280">+{{dy.xp}} XP</span></label>
+              </sc-for>
+            </div>
+            <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px">
+              <div style="font-weight: 600">道具栏</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap">
+                <button type="button" style="height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid #FCD34D; background: #FFFBEB">双倍积分 ×1</button>
+                <button type="button" style="height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid #C7D2FE; background: #EEF2FF">自动聚类 ×2</button>
+                <button type="button" style="height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid #E5E7EB; background: #F9FAFB">隐身 ×0</button>
+              </div>
+            </div>
+            <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px">
+              <div style="font-weight: 600">本周排行</div>
+              <sc-for list="{{board}}" as="lb" hint-placeholder-count="3">
+                <div style="display: flex; gap: 8px; margin-top: 6px"><span style="color: #6B7280; width: 14px">{{lb.rank}}</span><span>{{lb.name}}</span><span style="margin-left: auto; font-weight: 600">{{lb.score}}</span></div>
+              </sc-for>
+              <div style="display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap"><span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #ECFDF5; color: #065F46">首杀 · 环检测</span><span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #EEF2FF; color: #3730A3">十连通过</span></div>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <div aria-label="智能动态" style="position: absolute; left: 70px; bottom: 12px; z-index: 4; display: flex; align-items: center; gap: 10px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 6px 10px; font-size: 12px; max-width: 760px">
+        <button type="button" onClick="{{togglePlay}}" style="height: 28px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">{{playLabel}}</button>
+        <div aria-label="LangGraph 动态规划" style="display: flex; align-items: center; gap: 3px">
+          <sc-for list="{{pipeline}}" as="pp" hint-placeholder-count="4">
+            <span style="{{pp.style}}">{{pp.label}}</span>
+          </sc-for>
+        </div>
+        <div style="flex: 1 1 200px; min-width: 0">
+          <div style="height: 4px; background: #E5E7EB; border-radius: 2px"><div style="height: 4px; border-radius: 2px; background: #1D4ED8; width: {{progressPct}}"></div></div>
+          <div style="margin-top: 4px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{narration}}</div>
+        </div>
+      </div>
+
+      <div style="position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 3">
+        <div style="width: 150px; height: 90px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 6px; position: relative">
+          <div style="position: absolute; left: 28px; top: 18px; width: 66px; height: 40px; border: 2px solid #1D4ED8; border-radius: 3px"></div>
+          <span style="position: absolute; left: 8px; bottom: 4px; font-size: 11px; color: #6B7280">小地图</span>
+        </div>
+        <div style="display: flex; gap: 2px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 3px">
+          <button type="button" aria-label="缩小" style="width: 28px; height: 28px; border: 0; background: transparent">−</button>
+          <button type="button" style="height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px">{{zoomText}}</button>
+          <button type="button" aria-label="放大" style="width: 28px; height: 28px; border: 0; background: transparent">+</button>
+          <button type="button" style="height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px">适配</button>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{isCode}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="节点设置" style="flex: 0 0 290px; background: #FFFFFF; border-left: 1px solid #E5E7EB; padding: 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12px">
+        <div style="display: flex; align-items: center; gap: 6px"><h2 style="margin: 0; font-size: 14px; font-weight: 600">{{insp.title}}</h2><span style="margin-left: auto; font-size: 11px; color: #6B7280">{{insp.kind}}</span></div>
+        <div role="tablist" aria-label="节点设置页" style="display: flex; gap: 2px; padding: 2px; background: #F3F4F6; border-radius: 6px">
+          <sc-for list="{{inspTabs}}" as="it" hint-placeholder-count="3">
+            <button type="button" role="tab" aria-selected="{{it.active}}" onClick="{{it.pick}}" style="{{it.style}}">{{it.label}}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{inspParams}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <sc-for list="{{insp.fields}}" as="f" hint-placeholder-count="3">
+              <label style="color: #4B5563">{{f.label}}<span style="display: flex; margin-top: 4px; gap: 4px"><input value="{{f.value}}" style="flex: 1 1 auto; min-width: 0; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; padding: 0 8px; font: inherit; font-family: ui-monospace, Consolas, monospace; font-size: 12px"><button type="button" aria-label="切换为表达式" style="width: 30px; height: 30px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF; font-size: 11px">fx</button></span></label>
+            </sc-for>
+            <div style="font-size: 11px; color: #6B7280">从「输入」页把字段拖进参数即生成表达式，例如 {{exprSample}}</div>
+            <label style="color: #4B5563">凭据<select style="display: block; width: 100%; margin-top: 4px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>继承 Run 授权</option><option>凭据 · CI Token</option></select></label>
+            <label style="color: #4B5563">失败时<select style="display: block; width: 100%; margin-top: 4px; height: 30px; border: 1px solid #D1D5DB; border-radius: 6px; font: inherit"><option>重试 3 次后停止流程</option><option>继续，走错误输出</option></select></label>
+          </div>
+        </sc-if>
+        <sc-if value="{{inspInput}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="color: #6B7280">上游 · {{insp.upstream}}</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{insp.inFields}}" as="inf" hint-placeholder-count="4">
+                <span draggable="true" style="padding: 3px 8px; border-radius: 4px; background: #EEF2FF; color: #3730A3; font-family: ui-monospace, Consolas, monospace; font-size: 11px; cursor: grab">{{inf.k}} <span style="color: #6B7280">{{inf.v}}</span></span>
+              </sc-for>
+            </div>
+            <div style="font-size: 11px; color: #6B7280">拖动字段到「参数」页的输入框</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{inspOutput}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; gap: 6px"><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #1D4ED8; background: #EEF2FF; color: #1E3A8A">JSON</button><button type="button" style="height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid #E5E7EB; background: #FFFFFF">表格</button><span style="margin-left: auto; color: #6B7280">{{insp.count}}</span></div>
+            <pre style="margin: 0; background: #111827; color: #E5E7EB; border-radius: 6px; padding: 10px; font-size: 11px; line-height: 1.7; white-space: pre-wrap">{{insp.output}}</pre>
+          </div>
+        </sc-if>
+        <div style="display: flex; gap: 6px; margin-top: auto"><button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 0; background: #1D4ED8; color: #FFFFFF">测试此节点</button>
+          <button type="button" style="height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid #D1D5DB; background: #FFFFFF">固定数据</button></div>
+      </section>
+    </sc-if>
+
+    <aside aria-label="聊天（已收起）" style="flex: 0 0 44px; background: #FFFFFF; border-left: 1px solid #E2E1DC; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 10px">
+      <button type="button" aria-label="展开聊天" style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF; font-size: 11px">聊</button>
+      <button type="button" aria-label="展开 Team" style="width: 32px; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; background: #FFFFFF; font-size: 11px">T</button>
+    </aside>
+  </div>
+</main>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { layer: 'graph', tool: 'select', sel: 'n3', insTab: 'params', ran: false, active: true, commit: 'c9', chip: null, playing: false, step: -1, sub: 0, hero: 'B' }; }
+  componentDidMount() {
+    var self = this;
+    this.timer = setInterval(function () {
+      var s = self.state; if (!s.playing) return;
+      if (s.sub < 3) { self.setState({ sub: s.sub + 1 }); return; }
+      var n = { graph: 17, ipa: 12, code: 8, board: 5, game: 6 }[s.layer];
+      if (s.step + 1 >= n) self.setState({ playing: false, sub: 3 }); else self.setState({ step: s.step + 1, sub: 0 });
+    }, 300);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    var s = this.state, self = this;
+    var L = [
+      ['board', '白板', '便签、形状、框架、画笔、评论、模板，多人实时协作'],
+      ['graph', '关系图', '分支、Worktree 与合并关系，横轴为时间，像 git 提交图'],
+      ['ipa', 'IPA', 'V 字模型：237 个流程按工程阶段分区排布，颜色为任务卡状态'],
+      ['code', '代码', '低代码流程：节点有输入输出端口、参数表达式和逐节点数据'],
+      ['game', '游戏化', '任务卡是关卡、Agent 是角色：失败用例是敌人，完成即通关，配合每日挑战与排行'],
+    ];
+    var TOOLS = [['select','↖','选择'],['hand','✋','抓手'],['sticky','▢','便签'],['shape','◇','形状'],['text','T','文本'],['pen','✎','画笔'],['connector','↗','连线'],['frame','⬚','框架'],['image','⬒','图片与文件'],['comment','◔','评论'],['template','▦','模板']];
+    var abs = function (x, y, w) { return 'position: absolute; left: ' + x + 'px; top: ' + y + 'px; width: ' + w + 'px; box-sizing: border-box'; };
+
+    var boardNodes = [
+      [150, 60, 180, '#FEF3C7', '#FCD34D', '#78350F', '待讨论', '环检测要不要报完整路径？'],
+      [360, 90, 180, '#FEF3C7', '#FCD34D', '#78350F', '想法', '深度上限做成 Worktree 配置'],
+      [150, 370, 180, '#DCFCE7', '#86EFAC', '#14532D', '做得好', '单测先行'],
+      [350, 370, 170, '#FCE7F3', '#F9A8D4', '#831843', '要改进', '评审排队太久'],
+      [580, 140, 200, '#E0F2FE', '#7DD3FC', '#0C4A6E', '链接：TASK-142', '任务卡引用']
+    ].filter(function (n, i) { return !(s.step >= 0 && s.layer === 'board') || i <= s.step; }).map(function (n) { return { title: n[6], meta: n[7], style: abs(n[0], n[1], n[2]) + '; padding: 10px 12px; border-radius: 8px; background: ' + n[3] + '; border: 1px solid ' + n[4] + '; color: ' + n[5] }; });
+
+    var LANES = [
+      ['dev', 'wt-main', '集成分支', '#374151', 'neutral'],
+      ['feat/relation-bfs', 'wt-relation-bfs', 'PR #44 待合并 · 领先 4', '#1D4ED8', 'open'],
+      ['fix/bfs-cycle', 'wt-relation-bfs', '已合并到 feat/relation-bfs', '#7C3AED', 'merged'],
+      ['feat/ipa-map', 'wt-ipa-map', '已合并到 dev', '#059669', 'merged'],
+      ['fix/cache-ttl', 'wt-cache-ttl', '冲突 2 处 · 落后 3', '#DC2626', 'conflict'],
+      ['feat/context-cache', 'wt-context-cache', '已合并后回退', '#D97706', 'reverted']
+    ];
+    var X0 = 300, DX = 76, laneY = function (i) { return 90 + i * 76; };
+    var C = [
+      ['c1', 0, 0, 'a1f3e20', '初始化关系服务', ''],
+      ['c2', 0, 1, 'b72c118', '依赖升级', ''],
+      ['c3', 5, 2, 'c0d9a41', '上下文缓存层', ''],
+      ['c4', 1, 2, 'd51e7b0', 'BFS 基础实现', 'T-131'],
+      ['c5', 0, 3, 'e8a2c37', 'CI 调整', ''],
+      ['c6', 5, 4, 'f13b9d2', '缓存失效策略', ''],
+      ['c7', 2, 4, '0a7d5e1', '自环判定', 'T-142'],
+      ['c8', 4, 5, '19c4f80', 'TTL 可配置', ''],
+      ['c9', 1, 6, '2e6a1bc', '合并 fix/bfs-cycle', 'T-142'],
+      ['c10', 0, 6, '3f0b7d4', '合并 feat/context-cache', ''],
+      ['c11', 3, 6, '4a9e2c6', 'IPA 流程图', ''],
+      ['c12', 3, 7, '5b1d8e3', 'IPA 建卡', ''],
+      ['c13', 1, 8, '6c2f9a0', '关系权重', 'T-143'],
+      ['c14', 0, 9, '7d3a0b1', '回退 context-cache', ''],
+      ['c15', 4, 9, '8e4b1c2', 'TTL 单测', ''],
+      ['c16', 0, 10, '9f5c2d3', '合并 feat/ipa-map', ''],
+      ['c17', 1, 11, 'a06d3e4', '结果分页（进行中）', 'T-152']
+    ];
+    var pos = {}; C.forEach(function (c) { pos[c[0]] = [X0 + c[2] * DX, laneY(c[1])]; });
+    var MERGE = { c9: 1, c10: 1, c16: 1 };
+    var curve = function (a, b) { var x1 = a[0], y1 = a[1], x2 = b[0], y2 = b[1]; var mx = (x1 + x2) / 2; return 'M' + x1 + ' ' + y1 + ' C' + mx + ' ' + y1 + ' ' + mx + ' ' + y2 + ' ' + x2 + ' ' + y2; };
+    var line = function (a, b) { return 'M' + a[0] + ' ' + a[1] + ' L' + b[0] + ' ' + b[1]; };
+    var gp = [];
+    var seq = function (ids, color, dash) { for (var i = 1; i < ids.length; i++) gp.push({ ids: [ids[i - 1], ids[i]], d: line(pos[ids[i - 1]], pos[ids[i]]), color: color, w: 2.5, dash: dash || '' }); };
+    seq(['c1', 'c2', 'c5', 'c10', 'c14', 'c16'], '#374151');
+    seq(['c4', 'c9', 'c13', 'c17'], '#1D4ED8');
+    seq(['c3', 'c6'], '#D97706'); seq(['c11', 'c12'], '#059669'); seq(['c8', 'c15'], '#DC2626');
+    gp.push({ ids: ['c2', 'c4'], d: curve(pos.c2, pos.c4), color: '#1D4ED8', w: 2.5, dash: '' });
+    gp.push({ ids: ['c1', 'c3'], d: curve(pos.c1, pos.c3), color: '#D97706', w: 2.5, dash: '' });
+    gp.push({ ids: ['c4', 'c7'], d: curve(pos.c4, pos.c7), color: '#7C3AED', w: 2.5, dash: '' });
+    gp.push({ ids: ['c7', 'c9'], d: curve(pos.c7, pos.c9), color: '#7C3AED', w: 2.5, dash: '' });
+    gp.push({ ids: ['c6', 'c10'], d: curve(pos.c6, pos.c10), color: '#D97706', w: 2.5, dash: '' });
+    gp.push({ ids: ['c10', 'c11'], d: curve(pos.c10, pos.c11), color: '#059669', w: 2.5, dash: '' });
+    gp.push({ ids: ['c12', 'c16'], d: curve(pos.c12, pos.c16), color: '#059669', w: 2.5, dash: '' });
+    gp.push({ ids: ['c5', 'c8'], d: curve(pos.c5, pos.c8), color: '#DC2626', w: 2.5, dash: '' });
+    gp.push({ ids: ['c17', 'c16'], d: curve(pos.c17, [pos.c16[0] + DX * 2, laneY(0)]), color: '#9CA3AF', w: 2, dash: '3 4' });
+    gp.push({ ids: ['c15', 'c16'], d: curve(pos.c15, [pos.c16[0] + DX * 2, laneY(0)]), color: '#DC2626', w: 2, dash: '6 4' });
+    var replay = s.step >= 0;
+    var visC = {}; C.forEach(function (c, i) { visC[c[0]] = !(replay && s.layer === 'graph') || i <= s.step; });
+    gp = gp.filter(function (g) { return g.ids.every(function (id) { return visC[id]; }); });
+    var laneList = LANES.map(function (l, i) {
+      var st = l[4]; var col = st === 'conflict' ? ['#FEF2F2', '#991B1B'] : st === 'open' ? ['#EFF6FF', '#1E40AF'] : st === 'merged' ? ['#ECFDF5', '#065F46'] : st === 'reverted' ? ['#FFFBEB', '#92400E'] : ['#F3F4F6', '#374151'];
+      return { name: l[0], wt: l[1], status: l[2], swatch: 'width: 10px; height: 10px; border-radius: 3px; background: ' + l[3],
+        statusStyle: 'font-size: 10px; padding: 1px 5px; border-radius: 4px; background: ' + col[0] + '; color: ' + col[1],
+        labelStyle: abs(70, laneY(i) - 22, 210) + '; padding: 6px 8px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 6px' };
+    });
+    var commits = C.filter(function (c) { return visC[c[0]]; }).map(function (c) {
+      var p = pos[c[0]]; var isNow = replay && s.layer === 'graph' && C[s.step] && C[s.step][0] === c[0]; var color = LANES[c[1]][3]; var on = s.commit === c[0]; var m = MERGE[c[0]];
+      return { label: c[3] + ' ' + c[4], pick: function () { self.setState({ commit: c[0] }); },
+        style: 'position: absolute; left: ' + (p[0] - 8) + 'px; top: ' + (p[1] - 8) + 'px; width: 16px; height: 16px; border-radius: 50%; padding: 0; z-index: 2; border: 2.5px solid ' + color + '; background: ' + (m ? color : '#FFFFFF') + (on ? '; box-shadow: 0 0 0 4px #BFDBFE' : '') + (isNow ? '; box-shadow: 0 0 0 7px rgba(29,78,216,0.25); transform: scale(1.3)' : '') + '; transition: transform 0.3s, box-shadow 0.3s' };
+    });
+    var endX = pos.c16[0] + DX * 2;
+    var heads = [
+      { text: 'HEAD · wt-relation-bfs', style: abs(pos.c17[0] + 14, pos.c17[1] - 9, 160) + '; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #1D4ED8; color: #FFFFFF' },
+      { text: 'PR #44 → dev', style: abs(endX + 12, laneY(0) - 30, 110) + '; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #F3F4F6; color: #374151' },
+      { text: '冲突 cache.rs ×2', style: abs(pos.c15[0] + 14, pos.c15[1] - 9, 120) + '; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #FEF2F2; color: #991B1B' }
+    ];
+    var cc = C.filter(function (c) { return c[0] === s.commit; })[0] || C[8];
+    var lane = LANES[cc[1]];
+    var cm = { sha: cc[3], msg: cc[4], branch: lane[0], wt: lane[1], ab: cc[1] === 1 ? '领先 4 · 落后 1' : (cc[1] === 4 ? '领先 2 · 落后 3' : '—'), task: cc[5] || '—', merge: lane[2] };
+
+    var CAT = {"P1":[["s01-001","経営要求確認",0],["s01-002","システム化構想",0],["s01-003","システム化計画",0],["s01-004","企画",0],["s01-005","プロジェクト立上げ",0],["s01-006","現行業務調査",0],["s01-007","現行システム調査",0],["s01-008","課題分析",0],["s01-009","新業務設計",0],["s01-010","投資効果検討",0],["s01-011","実現性検討",0],["s01-012","リスク分析",0],["s01-013","スコープ検討",0],["s01-014","プロジェクト計画策定",0],["s01-015","体制検討",0],["s01-016","スケジュール検討",0],["s01-017","予算策定",0],["s01-018","ステークホルダー分析",0],["s01-019","利害調整",0],["s01-020","承認・キックオフ",1]],"P2":[["s02-001","ユーザー要求定義",0],["s02-002","業務要件定義",0],["s02-003","システム要件定義",0],["s02-004","機能要件定義",0],["s02-005","非機能要件定義",0],["s02-006","データ要件定義",0],["s02-007","外部IF要件定義",0],["s02-008","セキュリティ要件定義",0],["s02-009","運用要件定義",0],["s02-010","移行要件定義",0],["s02-011","要件分析・整理",0],["s02-012","要件定義書作成",0],["s02-013","要件レビュー",0],["s02-014","要件確認",0],["s02-015","要件承認",1],["s02-016","ベースライン化",0],["s02-017","トレーサビリティ確立",0],["s02-018","要件管理計画策定",0],["s02-019","関係者合意",1],["s02-020","承認",1]],"P3":[["s03-001","システム方式設計",0],["s03-002","ソフトウェア方式設計",0],["s03-003","アーキテクチャ設計",0],["s03-004","機能設計",0],["s03-005","画面設計",0],["s03-006","帳票設計",0],["s03-007","API設計",0],["s03-008","外部IF設計",0],["s03-009","データベース基本設計",0],["s03-010","データモデル設計",0],["s03-011","バッチ設計",0],["s03-012","権限設計",0],["s03-013","セキュリティ設計",0],["s03-014","インフラ基本設計",0],["s03-015","ネットワーク設計",0],["s03-016","運用設計",0],["s03-017","監視設計",0],["s03-018","バックアップ設計",0],["s03-019","移行設計",0],["s03-020","基本設計レビュー",0],["s03-021","承認",1]],"P4":[["s04-001","プログラム構造設計",0],["s04-002","モジュール設計",0],["s04-003","クラス設計",0],["s04-004","ロジック設計",0],["s04-005","API詳細設計",0],["s04-006","DB詳細設計",0],["s04-007","SQL設計",0],["s04-008","バッチ詳細設計",0],["s04-009","画面詳細設計",0],["s04-010","帳票詳細設計",0],["s04-011","エラー処理設計",0],["s04-012","ログ設計",0],["s04-013","パラメータ設計",0],["s04-014","テスト設計（詳細）",0],["s04-015","詳細設計書作成",0],["s04-016","詳細設計レビュー",0],["s04-017","設計検証",0],["s04-018","承認",1],["s04-019","ベースライン化",0],["s04-020","設計書管理",0]],"P5":[["s05-001","開発環境構築",0],["s05-002","ソースコード作成",0],["s05-003","コーディング規約適用",0],["s05-004","静的解析（SAST）",0],["s05-005","単体設計レビュー",0],["s05-006","コードレビュー",0],["s05-007","単体テスト実装",0],["s05-008","ビルド",0],["s05-009","CI（継続的インテグレーション）",0],["s05-010","パッケージ作成",0],["s05-011","バージョン管理",0],["s05-012","構成管理",0],["s05-013","ドキュメント作成",0],["s05-014","実装レビュー",0],["s05-015","成果物管理",0]],"P6.2":[["s06-it-001","試験計画",0],["s06-it-002","試験仕様書作成",0],["s06-it-003","試験環境構築",0],["s06-it-004","結合試験実施",0],["s06-it-005","API結合試験",0],["s06-it-006","DB結合試験",0],["s06-it-007","外部IF試験",0],["s06-it-008","結果記録",0],["s06-it-009","不具合対応",0],["s06-it-010","回帰試験",0],["s06-it-011","完了確認",0],["s06-it-012","承認",1]],"P6.3":[["s06-st-001","試験計画",0],["s06-st-002","試験仕様書作成",0],["s06-st-003","機能試験",0],["s06-st-004","シナリオ試験",0],["s06-st-005","性能試験",0],["s06-st-006","負荷試験",0],["s06-st-007","セキュリティ試験",0],["s06-st-008","障害試験",0],["s06-st-009","復旧試験",0],["s06-st-010","運用試験",0],["s06-st-011","結果記録",0],["s06-st-012","不具合対応",0],["s06-st-013","完了確認",0],["s06-st-014","承認",1]],"P6.4":[["s06-uat-001","試験計画",0],["s06-uat-002","試験仕様書作成",0],["s06-uat-003","ユーザー受入試験",0],["s06-uat-004","業務シナリオ試験",0],["s06-uat-005","受入判定",1],["s06-uat-006","検収",1],["s06-uat-007","承認",1]],"P6.1":[["s06-ut-001","試験計画",0],["s06-ut-002","試験仕様書作成",0],["s06-ut-003","試験ケース作成",0],["s06-ut-004","試験データ作成",0],["s06-ut-005","単体試験実施",0],["s06-ut-006","結果記録",0],["s06-ut-007","不具合登録",0],["s06-ut-008","不具合修正",0],["s06-ut-009","再試験",0],["s06-ut-010","完了確認",0],["s06-ut-011","承認",1]],"P7":[["s07-001","移行計画",0],["s07-002","移行手順作成",0],["s07-003","移行リハーサル",0],["s07-004","データ移行",0],["s07-005","システム移行",0],["s07-006","移行結果確認",0],["s07-007","リリース計画",0],["s07-008","リリース判定",1],["s07-009","本番環境構築",0],["s07-010","デプロイ",0],["s07-011","稼働確認（スモークテスト）",0],["s07-012","サービス開始（Go-Live）",1],["s07-013","初期稼働対応",0],["s07-014","リリース完了確認",0]],"P8":[["s08-001","運用引継ぎ",0],["s08-002","システム監視",0],["s08-003","ジョブ管理",0],["s08-004","バックアップ",0],["s08-005","キャパシティ管理",0],["s08-006","インシデント管理",0],["s08-007","障害管理",0],["s08-008","問題管理",0],["s08-009","問い合わせ管理",0],["s08-010","変更要求（CR）",0],["s08-011","影響分析",0],["s08-012","変更管理",0],["s08-013","構成管理（CM）",0],["s08-014","パッチ適用",0],["s08-015","脆弱性対応",0],["s08-016","改修・改善",0],["s08-017","緊急改修（Hotfix）",0],["s08-018","回帰テスト",0],["s08-019","定期レビュー",0],["s08-020","運用報告",0]],"P9":[["s09-001","プロジェクト完了判定",1],["s09-002","成果物引渡し",0],["s09-003","運用引継ぎ完了確認",0],["s09-004","完了報告",0],["s09-005","契約終了手続き",0],["s09-006","振り返り（レトロスペクティブ）",0],["s09-007","ナレッジ移管",0],["s09-008","ドキュメント整備",0],["s09-009","アーカイブ",0],["s09-010","解散・クローズ",0]],"PX-DL":[["xdl-001","要求定義書",0],["xdl-002","要件定義書",0],["xdl-003","基本設計書",0],["xdl-004","詳細設計書",0],["xdl-005","プログラム仕様書",0],["xdl-006","テスト仕様書",0],["xdl-007","テスト結果報告書",0],["xdl-008","移行手順書",0],["xdl-009","運用手順書",0],["xdl-010","システム構成図",0],["xdl-011","DB定義書",0],["xdl-012","画面定義書",0],["xdl-013","帳票定義書",0],["xdl-014","API仕様書",0],["xdl-015","インターフェース仕様書",0],["xdl-016","セキュリティ設計書",0],["xdl-017","運用設計書",0],["xdl-018","移行設計書",0]],"PX-MG":[["xmg-001","プロジェクト計画管理",0],["xmg-002","進捗管理",0],["xmg-003","課題管理",0],["xmg-004","リスク管理",0],["xmg-005","変更管理",0],["xmg-006","構成管理",0],["xmg-007","品質管理",0],["xmg-008","成果物管理",0],["xmg-009","レビュー管理",0],["xmg-010","コミュニケーション管理",0],["xmg-011","ステークホルダー管理",0]],"PX-RV":[["xrv-001","要件定義レビュー",0],["xrv-002","基本設計レビュー",0],["xrv-003","詳細設計レビュー",0],["xrv-004","単体テストレビュー",0],["xrv-005","結合テストレビュー",0],["xrv-006","システムテストレビュー",0],["xrv-007","受入テストレビュー",0],["xrv-008","リリース判定（Go/No-Go）",1],["xrv-009","検収",1],["xrv-010","プロジェクト完了レビュー",0]],"PX-TT":[["xtt-001","単体試験（UT）",0],["xtt-002","結合試験（IT）",0],["xtt-003","システム試験（ST）",0],["xtt-004","受入試験（UAT）",0],["xtt-005","性能試験（PT）",0],["xtt-006","負荷試験",0],["xtt-007","ストレス試験",0],["xtt-008","セキュリティ試験",0],["xtt-009","障害試験",0],["xtt-010","復旧試験",0],["xtt-011","バックアップ・リストア試験",0],["xtt-012","運用試験",0],["xtt-013","回帰試験",0],["xtt-014","ユーザビリティ試験",0]]};
+    var STATUS = { 's01-014': 'done', 's01-020': 'done', 's02-001': 'done', 's02-003': 'backlog', 's02-004': 'done', 's02-005': 'review', 's02-015': 'done', 's03-003': 'review', 's03-007': 'done', 's03-009': 'doing', 's03-020': 'todo', 's04-002': 'doing', 's04-003': 'todo', 's04-004': 'backlog', 's04-014': 'todo', 's05-001': 'archived', 's05-002': 'doing', 's05-006': 'done', 's05-008': 'done', 's05-009': 'review', 's06-ut-002': 'doing', 's06-ut-003': 'backlog', 's06-it-003': 'backlog', 'xmg-002': 'doing', 'xmg-004': 'todo', 'xrv-002': 'review', 'xdl-003': 'doing' };
+    var SC = { none: ['#FFFFFF', '#E5E7EB', '#6B7280', '未建卡'], backlog: ['#F3F4F6', '#D1D5DB', '#374151', 'Backlog'], todo: ['#E0E7FF', '#A5B4FC', '#3730A3', '待执行'], doing: ['#DBEAFE', '#1D4ED8', '#1E3A8A', '进行中'], review: ['#FEF3C7', '#F59E0B', '#78350F', '评审'], done: ['#D1FAE5', '#34D399', '#065F46', '完成'], archived: ['#F3F4F6', '#E5E7EB', '#9CA3AF', '归档'] };
+    var RW = 250, ROWH = 22;
+    var R = [
+      ['P1', '超上游', '超上流', 40, 70, 'design'], ['P2', '需求定义', '要件定義', 140, 300, 'design'], ['P3', '基本设计', '基本設計', 240, 530, 'design'], ['P4', '详细设计', '詳細設計', 340, 760, 'design'],
+      ['P5', '实现', '実装', 450, 990, 'build'], ['P6.1', '单元测试', '単体テスト', 720, 990, 'test'], ['P6.2', '集成测试', '結合テスト', 830, 760, 'test'], ['P6.3', '系统测试', 'システムテスト', 930, 530, 'test'], ['P6.4', '验收测试', '受入テスト', 1030, 300, 'test'],
+      ['P7', '迁移发布', '移行・リリース', 1050, 70, 'ops'], ['P8', '运维保守', '運用・保守', 790, 70, 'ops'], ['P9', '终结', '終結', 530, 70, 'ops'],
+      ['PX-MG', '管理', 'マネジメント', 40, 1230, 'cross'], ['PX-RV', '审查', 'レビュー', 350, 1230, 'cross'], ['PX-TT', '测试型', 'テスト型', 660, 1230, 'cross'], ['PX-DL', '交付物', '成果物', 970, 1230, 'cross']
+    ];
+    var TINT = { design: ['#F5F8FF', '#C7D2FE'], build: ['#EEF2FF', '#818CF8'], test: ['#F2FBF6', '#A7F3D0'], ops: ['#FFF8F1', '#FED7AA'], cross: ['#F7F7F6', '#E5E7EB'] };
+    var boxH = function (n) { return 40 + Math.ceil(n / 3) * ROWH; };
+    var mid = {};
+    var regions = R.map(function (r) {
+      var list = CAT[r[0]]; var h = boxH(list.length); var w = r[5] === 'cross' ? 300 : RW;
+      mid[r[0]] = [r[3] + w / 2, r[4] + h / 2, r[3], r[3] + w, r[4]];
+      var built = list.filter(function (k) { return STATUS[k[0]]; }).length;
+      var t = TINT[r[5]]; var oi = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6.1', 'P6.2', 'P6.3', 'P6.4', 'P7', 'P8', 'P9'].indexOf(r[0]); var ipaNow = replay && s.layer === 'ipa' && oi === s.step; var ipaDim = replay && s.layer === 'ipa' && oi > s.step;
+      return { code: r[0], zh: r[1], ja: r[2], progress: built + ' / ' + list.length,
+        style: abs(r[3], r[4], w) + '; padding: 8px; border-radius: 10px; background: ' + t[0] + '; border: 1px solid ' + t[1] + '; z-index: 1; transition: opacity 0.4s, box-shadow 0.4s' + (ipaNow ? '; box-shadow: 0 0 0 4px #1D4ED8' : '') + (ipaDim ? '; opacity: 0.35' : ''),
+        chips: list.map(function (k) { var st = STATUS[k[0]] || 'none'; var c = SC[st]; var on = s.chip === k[0];
+          return { name: k[1], tip: 'ipa-' + k[0] + ' ' + k[1] + ' · ' + c[3] + (k[2] ? ' · 人工闸门' : ''),
+            pick: function () { self.setState({ chip: k[0] }); },
+            style: 'height: 19px; padding: 0 4px; border-radius: 4px; font-size: 10px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: ' + c[0] + '; color: ' + c[2] + '; border: 1px solid ' + (on ? '#111827' : c[1]) + (k[2] ? '; border-left: 3px solid #D97706' : '') + (st === 'archived' ? '; text-decoration: line-through' : '') };
+        }) };
+    });
+    var order = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6.1', 'P6.2', 'P6.3', 'P6.4', 'P7', 'P8', 'P9'];
+    var vPath = order.map(function (k) { return mid[k][0] + ',' + mid[k][1]; }).join(' ');
+    var PAIRS = [['P2', 'P6.4', '需求 ↔ 验收'], ['P3', 'P6.3', '基本设计 ↔ 系统测试'], ['P4', 'P6.2', '详细设计 ↔ 集成测试'], ['P5', 'P6.1', '实现 ↔ 单元测试']];
+    var pairLines = PAIRS.map(function (p) { var y = mid[p[0]][4] + 20; return { x1: mid[p[0]][3], x2: mid[p[1]][2], y: y }; });
+    var pairLabels = PAIRS.map(function (p) { var y = mid[p[0]][4] + 6; var x = (mid[p[0]][3] + mid[p[1]][2]) / 2 - 60;
+      return { text: p[2], style: abs(x, y, 120) + '; text-align: center; font-size: 10px; color: #4338CA; background: #FAFAF8; z-index: 1' }; });
+    var zones = [
+      ['设计（左翼）', 40, 40, '#4338CA'], ['测试（右翼）', 930, 270, '#047857'], ['发布 · 运维 · 终结', 530, 40, '#C2410C'], ['横断工程（贯穿全程）', 40, 1200, '#6B7280']
+    ].map(function (z) { return { label: z[0], color: z[3], style: abs(z[1], z[2], 220) + '; z-index: 1' }; });
+    var legend = ['none', 'backlog', 'todo', 'doing', 'review', 'done', 'archived'].map(function (k) { var c = SC[k]; return { label: c[3], sw: 'width: 12px; height: 10px; border-radius: 3px; background: ' + c[0] + '; border: 1px solid ' + c[1] }; });
+    var chipSel = null;
+    if (s.chip) { var ph = null, nm = ''; Object.keys(CAT).forEach(function (p) { CAT[p].forEach(function (k) { if (k[0] === s.chip) { ph = p; nm = k[1]; } }); });
+      var stx = STATUS[s.chip] || 'none'; chipSel = { id: s.chip, name: nm, phase: ph, state: stx === 'none' ? '还没有任务卡，可在任务页建卡' : '任务卡状态：' + SC[stx][3] }; }
+
+    var CN = [
+      ['n1', 30, 70, 'trigger', '任务状态变化', '触发器', 'T', [['监听', '当前 Branch 任务卡'], ['变为', '评审']], [], '1 条'],
+      ['n2', 240, 70, 'action', '读取任务卡', '动作', 'R', [['ID', '{{ $json.task }}'], ['字段', 'IPA, Worktree']], [''], '1 条'],
+      ['n3', 450, 70, 'agent', 'Agent 执行验证', 'Agent', 'A', [['Agent', 'Agent A'], ['命令', 'cargo test -p …']], [''], '41 通过 · 1 失败'],
+      ['n4', 660, 70, 'logic', '条件', '逻辑', '?', [['判断', '{{ $json.failed }} == 0']], ['是', '否'], '走「否」'],
+      ['n5', 640, 300, 'logic', '人工审批', '逻辑', '!', [['审批人', 'Ulysses'], ['超时', '24 小时']], [''], '待审批'],
+      ['n6', 640, 500, 'action', '推进任务卡', '动作', 'R', [['目标', '完成']], [''], '未执行'],
+      ['n7', 380, 300, 'code', '代码节点', 'JavaScript', '{}', [['脚本', 'items.map(i => …)']], [''], '1 条'],
+      ['n8', 380, 500, 'action', '发送通知', '动作', 'N', [['到', '收件箱 · Ulysses'], ['内容', '{{ $json.cases }}']], [''], '1 条']
+    ];
+    var KC = { trigger: '#F59E0B', action: '#1D4ED8', agent: '#7C3AED', logic: '#6B7280', code: '#059669' };
+    var NW = 190, NH = 100;
+    var np = {}; CN.forEach(function (n) { np[n[0]] = n; });
+    var outPt = function (id, idx, total) { var n = np[id]; var y = total > 1 ? n[2] + 60 + 34 + idx * 32 : n[2] + 60 + 50; return [n[1] + NW, y]; };
+    var inPt = function (id) { var n = np[id]; return [n[1], n[2] + 60 + 50]; };
+    var EDG = [['n1', 0, 1, 'n2'], ['n2', 0, 1, 'n3'], ['n3', 0, 1, 'n4'], ['n4', 0, 2, 'n5'], ['n5', 0, 1, 'n6'], ['n4', 1, 2, 'n7'], ['n7', 0, 1, 'n8']];
+    var bez = function (a, b) { var dx = Math.max(60, Math.abs(b[0] - a[0]) / 2); return 'M' + a[0] + ' ' + a[1] + ' C' + (a[0] + dx) + ' ' + a[1] + ' ' + (b[0] - dx) + ' ' + b[1] + ' ' + b[0] + ' ' + b[1]; };
+    var EXEC = ['n1', 'n2', 'n3', 'n4', 'n7', 'n8', 'n5', 'n6'];
+    var codeReplay = replay && s.layer === 'code';
+    var ranNode = function (id) { return !codeReplay ? s.ran : EXEC.indexOf(id) <= s.step; };
+    var codeEdges = EDG.map(function (e) { var lit = codeReplay ? (EXEC.indexOf(e[0]) < s.step && EXEC.indexOf(e[3]) <= s.step) : s.ran; return { d: bez(outPt(e[0], e[1], e[2]), inPt(e[3])), color: lit ? '#10B981' : '#9CA3AF' }; });
+    var edgeLabels = EDG.map(function (e) { var a = outPt(e[0], e[1], e[2]), b = inPt(e[3]); var n = np[e[0]];
+      return { text: s.ran ? n[9] : '', style: abs((a[0] + b[0]) / 2 - 30, (a[1] + b[1]) / 2 - 18, 60) + '; text-align: center; font-size: 10px; color: #047857' + (s.ran ? '; background: #ECFDF5; border-radius: 4px' : '') }; });
+    var codeNodes = CN.map(function (n) {
+      var on = s.sel === n[0] || (codeReplay && EXEC[s.step] === n[0]); var c = KC[n[3]]; var outs = n[8];
+      var run = n[9]; var bad = run.indexOf('失败') >= 0 || run.indexOf('否') >= 0;
+      return { title: n[4], kind: n[5], icon: n[6], selected: on, hasIn: n[3] !== 'trigger', isEnd: n[0] === 'n6' || n[0] === 'n8',
+        badge: 'flex: 0 0 auto; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #FFFFFF; background: ' + c,
+        params: n[7].map(function (p) { return { k: p[0], v: p[1] }; }),
+        outs: (outs.length ? outs : ['']).map(function (lab, i) { var y = outs.length > 1 ? 34 + i * 32 : 50;
+          return { label: lab, dot: 'position: absolute; right: -7px; top: ' + (y - 6) + 'px; width: 12px; height: 12px; border-radius: 50%; background: ' + c + '; border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px ' + c,
+            labelStyle: 'position: absolute; right: 10px; top: ' + (y - 8) + 'px; font-size: 10px; color: #6B7280' }; }),
+        hasRun: ranNode(n[0]), run: run, runColor: bad ? '#B45309' : '#047857',
+        pick: function () { self.setState({ sel: n[0] }); },
+        style: abs(n[1], n[2] + 60, NW) + '; min-height: ' + NH + 'px; background: #FFFFFF; border-radius: 8px; border: ' + (on ? '2px solid #1D4ED8' : '1px solid #D1D5DB') + '; border-top: 3px solid ' + c + '; z-index: 2' };
+    });
+    var INSP = {
+      n1: [[['监听对象', '当前 Branch 的任务卡'], ['状态变为', '评审']], '—', [], '{ "task": "T-142", "from": "进行中", "to": "评审" }'],
+      n2: [[['任务卡 ID', '{{ $json.task }}'], ['包含字段', 'IPA 流程, Worktree, 子任务']], '任务状态变化', [['task', 'T-142'], ['from', '进行中'], ['to', '评审']], '{ "skill": "ipa-s05-002", "worktree": "wt-relation-bfs" }'],
+      n3: [[['Agent', 'Agent A（Worker）'], ['命令', 'cargo test -p domain-relation'], ['资源预算', '10 分钟 · 继承 Run 预算']], '读取任务卡', [['skill', 'ipa-s05-002'], ['worktree', 'wt-relation-bfs'], ['subtasks', '3']], '{ "passed": 41, "failed": 1,\n  "cases": ["bfs::self_loop"] }'],
+      n4: [[['判断', '{{ $json.failed }} == 0']], 'Agent 执行验证', [['passed', '41'], ['failed', '1'], ['cases', '[1]']], '{ "branch": "否" }'],
+      n5: [[['审批人', 'Ulysses'], ['超时', '24 小时后提醒']], '条件 · 是', [['passed', '41']], '{ "status": "待审批" }'],
+      n6: [[['任务卡', '{{ $trigger.task }}'], ['目标状态', '完成']], '人工审批', [['approved', 'true']], '未执行'],
+      n7: [[['语言', 'JavaScript（沙箱）'], ['脚本', 'return items.map(i => i.cases)']], '条件 · 否', [['failed', '1'], ['cases', '[1]']], '[ "bfs::self_loop" ]'],
+      n8: [[['发送到', '收件箱 · Ulysses'], ['内容', '{{ $json.cases }} 未通过']], '代码节点', [['cases', '[1]']], '{ "sent": true }']
+    };
+    var ins = INSP[s.sel] || INSP.n3; var nn = np[s.sel] || np.n3;
+    var tabSt = function (on) { return 'flex: 1 1 0; border: 0; border-radius: 5px; height: 26px; ' + (on ? 'background: #FFFFFF; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB' : 'background: transparent; color: #4B5563'); };
+    var ROOMS = [
+      ['T-131', 'BFS 基础实现', 60, 80, 'clear'], ['T-142', 'BFS 环检测', 300, 80, 'battle'], ['T-143', '关系权重', 540, 80, 'boss'],
+      ['T-151', 'BFS 单测规格', 300, 290, 'battle'], ['T-150', '环检测边界用例', 540, 290, 'locked'], ['T-152', '结果分页', 60, 290, 'locked'], ['T-160', '集成环境', 780, 290, 'locked']
+    ];
+    var RS = { clear: ['已通关', '#ECFDF5', '#065F46', '#A7F3D0', '#F0FDF4'], battle: ['战斗中', '#FEF2F2', '#991B1B', '#FCA5A5', '#FFFFFF'], boss: ['Boss · 评审闸门', '#FFFBEB', '#92400E', '#FCD34D', '#FFFBEB'], locked: ['未解锁', '#F3F4F6', '#6B7280', '#E5E7EB', '#F9FAFB'] };
+    var rp = {}; ROOMS.forEach(function (r) { rp[r[0]] = [r[2] + 80, r[3] + 45]; });
+    var COR = [['T-131', 'T-142'], ['T-142', 'T-143'], ['T-131', 'T-152'], ['T-142', 'T-151'], ['T-151', 'T-150'], ['T-143', 'T-150'], ['T-150', 'T-160']];
+    var GPATH = ['T-131', 'T-142', 'T-142', 'T-142', 'T-143', 'T-143'];
+    var GNARR = ['Agent B 从已通关的 T-131 出发', '进入 T-142：遇到 1 个敌人（bfs::self_loop 失败）', '发动技能「回边判定」，敌人被击败', 'T-142 通关，获得 120 XP，升到 Lv 7', '前往 T-143：评审闸门 Boss，需要人工审批', '等待 Ulysses 审批后通关'];
+    var gameReplay = replay && s.layer === 'game';
+    var bPos = gameReplay ? rp[GPATH[s.step]] : rp['T-142'];
+    var HEROES = { B: ['Agent B', 'B', '#7C3AED', 6, '工程师', [['生命', 82, '#EF4444'], ['法力（Token 预算）', 61, '#3B82F6'], ['经验', 74, '#F59E0B']], '回边判定 · 测试先行 · 重构', '无'], A: ['Agent A', 'A', '#059669', 5, '测试员', [['生命', 95, '#EF4444'], ['法力（Token 预算）', 40, '#3B82F6'], ['经验', 30, '#F59E0B']], '边界用例 · 回归', '失败后冷却 30 秒'] };
+    var heroPos = { B: bPos, A: rp['T-151'] };
+    var hh = HEROES[s.hero];
+    var gameBits = {
+      corridors: COR.map(function (c) { var a = rp[c[0]], b = rp[c[1]]; var locked = ROOMS.filter(function (r) { return r[0] === c[1]; })[0][4] === 'locked'; return { x1: a[0], y1: a[1], x2: b[0], y2: b[1], color: locked ? '#E5E7EB' : '#C7D2FE' }; }),
+      rooms: ROOMS.map(function (r) { var st = RS[r[4]]; var en = r[4] === 'battle' ? (gameReplay && r[0] === 'T-142' && s.step >= 2 ? 0 : 1) : 0;
+        return { id: r[0], title: r[1], tag: st[0], tagBg: st[1], tagFg: st[2], enemies: en ? [{ tip: '失败用例' }] : [], loot: r[4] === 'clear' ? '已获得 120 XP' : (r[4] === 'locked' ? '前置关卡未完成' : ''),
+          style: abs(r[2], r[3], 160) + '; min-height: 90px; padding: 10px; border-radius: 10px; background: ' + st[4] + '; border: 2px solid ' + st[3] + '; z-index: 1' }; }),
+      heroes: ['B', 'A'].map(function (k) { var h = HEROES[k]; var p = heroPos[k]; var on = s.hero === k;
+        return { initial: h[1], label: h[0], hp: h[5][0][1] + '%', pick: function () { self.setState({ hero: k }); },
+          style: 'position: absolute; left: ' + (p[0] + (k === 'A' ? 30 : 46)) + 'px; top: ' + (p[1] + 8) + 'px; width: 28px; height: 28px; border-radius: 6px; padding: 0; border: 2px solid ' + (on ? '#111827' : '#FFFFFF') + '; background: ' + h[2] + '; z-index: 3; transition: left 0.6s, top 0.6s' }; }),
+      hero: { name: hh[0], initial: hh[1], level: hh[3] + (gameReplay && s.step >= 3 && s.hero === 'B' ? 1 : 0), cls: hh[4], skills: hh[6], cooldown: hh[7],
+        avatar: 'width: 32px; height: 32px; border-radius: 6px; background: ' + hh[2] + '; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700',
+        bars: hh[5].map(function (b) { return { k: b[0], pct: b[1] + '%', text: b[1] + ' / 100', color: b[2] }; }) },
+      daily: [['完成 1 张任务卡', true, 50], ['击败 3 个失败用例', false, 80], ['参与 1 次评审', false, 40]].map(function (d) { return { t: d[0], done: d[1], xp: d[2] }; }),
+      board: [['1', 'Agent B', '1240'], ['2', 'Agent A', '980'], ['3', 'Ulysses', '620']].map(function (b) { return { rank: b[0], name: b[1], score: b[2] }; })
+    };
+    var STEPS_N = { graph: 17, ipa: 12, code: 8, board: 5, game: 6 }[s.layer];
+    var narr = '点击「播放演示」：LangGraph 根据当前状态规划演示步骤，并逐步讲解';
+    if (replay) {
+      if (s.layer === 'graph') { var cc2 = C[s.step]; narr = LANES[cc2[1]][0] + '：' + cc2[4] + (MERGE[cc2[0]] ? '（合并提交）' : ''); }
+      if (s.layer === 'ipa') { var ph2 = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6.1', 'P6.2', 'P6.3', 'P6.4', 'P7', 'P8', 'P9'][s.step]; var lst = CAT[ph2]; narr = ph2 + '：已建卡 ' + lst.filter(function (k) { return STATUS[k[0]]; }).length + ' / ' + lst.length; }
+      if (s.layer === 'code') { var nn2 = np[EXEC[s.step]]; narr = '执行「' + nn2[4] + '」→ ' + nn2[9]; }
+      if (s.layer === 'board') narr = '回放协作记录：第 ' + (s.step + 1) + ' 张便签';
+      if (s.layer === 'game') narr = GNARR[s.step];
+    }
+    var PIPE = ['感知变化', '规划镜头', '生成步骤', '讲解'];
+    var swOn = s.active;
+    var surfaceH = s.layer === 'ipa' ? 1420 : (s.layer === 'code' ? 780 : 780);
+    return {
+      layers: L.map(function (l) { var on = l[0] === s.layer; return { label: l[1], active: on, pick: function () { self.setState({ layer: l[0], playing: false, step: -1, sub: 0 }); },
+        style: 'border: 0; border-radius: 6px; height: 30px; padding: 0 12px; font-size: 12px; ' + (on ? 'background: #FFFFFF; color: #111827; font-weight: 600; box-shadow: 0 0 0 1px #E5E7EB' : 'background: transparent; color: #4B5563') }; }),
+      layerHint: L.filter(function (l) { return l[0] === s.layer; })[0][2],
+      isBoard: s.layer === 'board', isGraph: s.layer === 'graph', isIpa: s.layer === 'ipa', isCode: s.layer === 'code',
+      showDrawTools: s.layer === 'board',
+      surfaceStyle: 'position: relative; flex: 1 1 auto; min-width: 0; min-height: ' + surfaceH + 'px; overflow: hidden; background-color: #FAFAF8; background-image: radial-gradient(#D6D5CF 1px, transparent 1px); background-size: 20px 20px',
+      zoomText: s.layer === 'ipa' ? '70%' : '100%',
+      tools: TOOLS.map(function (t) { var on = s.tool === t[0]; return { icon: t[1], label: t[2], active: on, pick: function () { self.setState({ tool: t[0] }); },
+        style: 'width: 34px; height: 34px; border: 0; border-radius: 6px; font-size: 15px; background: ' + (on ? '#EEF2FF; color: #1D4ED8' : 'transparent; color: #374151') }; }),
+      boardNodes: boardNodes, isGame: s.layer === 'game',
+      corridors: gameBits.corridors, rooms: gameBits.rooms, heroes: gameBits.heroes, hero: gameBits.hero, daily: gameBits.daily, board: gameBits.board,
+      togglePlay: function () { if (s.playing) self.setState({ playing: false }); else self.setState({ playing: true, step: (s.step >= 0 && s.step < STEPS_N - 1) ? s.step : 0, sub: 0 }); },
+      playLabel: s.playing ? '⏸ 暂停' : (s.step >= 0 ? '▶ 重新播放' : '▶ 播放演示'),
+      pipeline: PIPE.map(function (p, i) { var on = s.playing && s.sub === i; var done = replay && (!s.playing || s.sub > i);
+        return { label: p, style: 'font-size: 10px; padding: 2px 6px; border-radius: 4px; transition: background 0.2s; ' + (on ? 'background: #1D4ED8; color: #FFFFFF' : (done ? 'background: #DBEAFE; color: #1E3A8A' : 'background: #F3F4F6; color: #6B7280')) }; }),
+      progressPct: (replay ? Math.round((s.step + 1) / STEPS_N * 100) : 0) + '%',
+      narration: narr,
+
+      gitPaths: gp, lanes: laneList, commits: commits, heads: heads, cm: cm,
+      regions: regions, vPath: vPath, pairLines: pairLines, pairLabels: pairLabels, zones: zones, legend: legend,
+      hasChipSel: !!chipSel, chipSel: chipSel || { id: '', name: '', phase: '', state: '' }, clearChip: function () { self.setState({ chip: null }); },
+      palette: [['触发器', ['任务状态变化', 'Git 推送', '定时', 'Webhook', '手动'], '#F59E0B'], ['动作', ['读取 / 更新任务卡', 'Agent 执行', '调用 MCP 工具', 'HTTP 请求', '发送通知'], '#1D4ED8'], ['逻辑', ['条件', '循环', '合并', '等待', '人工审批'], '#6B7280'], ['数据与代码', ['字段映射', '代码节点 JS', '代码节点 Python', '子流程'], '#059669']].map(function (g) {
+        return { label: g[0], items: g[1].map(function (i) { return { label: i, dot: 'flex: 0 0 auto; width: 8px; height: 8px; border-radius: 2px; background: ' + g[2] }; }) }; }),
+      codeNodes: codeNodes, codeEdges: codeEdges, edgeLabels: edgeLabels,
+      runFlow: function () { self.setState({ ran: true }); },
+      flowActive: swOn, toggleFlow: function () { self.setState({ active: !s.active }); },
+      flowSwitchStyle: 'position: relative; width: 36px; height: 20px; border-radius: 10px; border: 0; padding: 0; background: ' + (swOn ? '#059669' : '#D1D5DB'),
+      flowKnobStyle: 'position: absolute; top: 3px; left: ' + (swOn ? '19px' : '3px') + '; width: 14px; height: 14px; border-radius: 50%; background: #FFFFFF',
+      flowStatus: (swOn ? '已启用' : '已停用') + (s.ran ? ' · 刚刚测试运行' : ''),
+      inspTabs: [['params', '参数'], ['input', '输入'], ['output', '输出']].map(function (t) { var on = s.insTab === t[0]; return { label: t[1], active: on, style: tabSt(on), pick: function () { self.setState({ insTab: t[0] }); } }; }),
+      inspParams: s.insTab === 'params', inspInput: s.insTab === 'input', inspOutput: s.insTab === 'output',
+      insp: { title: nn[4], kind: nn[5], fields: ins[0].map(function (f) { return { label: f[0], value: f[1] }; }), upstream: ins[1],
+        inFields: ins[2].map(function (f) { return { k: f[0], v: f[1] }; }), output: ins[3], count: s.ran ? '运行结果' : '上次运行结果' },
+      exprSample: '{{ $json.task }}'
+    };
+  }
+}
+</script>
+</body>
+</html>

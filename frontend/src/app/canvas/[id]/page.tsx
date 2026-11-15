@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6c2037b250c96183d29b946862eedf25c12e55d4091b7a76b106e7345b37b4b3
+@cypher schema=1 source_sha256=e6811b10f719a9045657149d30ab97d74d07c46031d4b9003d1518b4c3f78aa9
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -34,8 +34,9 @@ import { CanvasView } from "@/components/CanvasView";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
 import { AgentViewPage } from "@/app/(app)/agent-view/page";
 import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
+import { GitCanvas } from "../components/GitCanvas";
 
-const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图", "流程"] as const;
+const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图", "流程", "Git 画布"] as const;
 
 export default function CanvasDetailPage() {
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("画布");
@@ -49,6 +50,7 @@ export default function CanvasDetailPage() {
       agent: "Agent 画布",
       relation: "关系图",
       flow: "流程",
+      git: "Git 画布",
     };
     if (tab && map[tab]) setActiveTab(map[tab]);
   }, []);
@@ -151,6 +153,12 @@ export default function CanvasDetailPage() {
         return (
           <div className="h-full overflow-y-auto" data-testid="canvas-tab-flow">
             <WorkflowBuilder />
+          </div>
+        );
+      case "Git 画布":
+        return (
+          <div className="h-full overflow-hidden" data-testid="canvas-tab-git">
+            <GitCanvas />
           </div>
         );
       default:
