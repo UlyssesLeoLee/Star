@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f595caf252c2d6d79cf113cb5e72d5693827529ccdd20fa4869fece45e01294d
+@cypher schema=1 source_sha256=e8104eb24ec79e60db54157666e757ee04da7e0eb37dabb4eac6f75afb736b00
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -36,6 +36,9 @@ import {
   Check,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { IdentityPanel, ProfilePanel, PermissionPanel, TenantPanel } from "@/components/settings/IdentityPanels";
+import { IntegrationPanels } from "@/components/settings/IntegrationPanels";
+import { ModDirectory } from "@/components/settings/ModDirectory";
 
 interface NavItem {
   id: string;
@@ -249,7 +252,18 @@ function SettingsInner() {
           {activeId === "mcp" ? (
             <McpPanel />
           ) : activeId === "mod" ? (
-            <ModPanel />
+            <ModDirectory />
+          ) : activeId === "identity" ? (
+            <IdentityPanel />
+          ) : activeId === "profile" ? (
+            <ProfilePanel />
+          ) : activeId === "permission" ? (
+            <PermissionPanel />
+          ) : activeId === "tenant" ? (
+            <TenantPanel />
+          ) : activeId === "scm" || activeId === "automation" || activeId === "webhooks" ||
+            activeId === "skills" || activeId === "plugins" || activeId === "hooks" || activeId === "flags" ? (
+            <IntegrationPanels active={activeId} />
           ) : (
             <StubPanel
               id={activeId}

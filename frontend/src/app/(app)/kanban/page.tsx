@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=035c8680148ae8cb8fbd23302558d7f97a73fca7cb2bd0859e149feb7e8f93a1
+@cypher schema=1 source_sha256=428ad1fcc9fc29ab8378bcbcc041804a13796b6d2946c769f5517fb087c6b5d7
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -39,6 +39,7 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
+import { IdeFileWorkspace } from "@/components/ide/IdeFileWorkspace";
 import { GanttView } from "@/components/gantt";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
@@ -366,6 +367,12 @@ export default function KanbanPage() {
 
         {activeView === "按文件开卡" && (
           <section data-testid="kanban-file-cards" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+            {/* IDE1.0 编辑内核工作区 (per 2026-11-15: 文件编辑相关页面体现 IDE1.0 功能) */}
+            <div className="mb-4" data-testid="kanban-ide-workspace">
+              <IdeFileWorkspace files={nemaTasks.map((task) => ({
+                id: task.id, filePath: task.filePath, editors: task.editors, workItemId: task.workItemId,
+              }))} />
+            </div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-ink">文件即任务 · .nema 侧车</h2>
               <Link href="/nema" className="text-xs text-accent hover:underline flex items-center gap-1">

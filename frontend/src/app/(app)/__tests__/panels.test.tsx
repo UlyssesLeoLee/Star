@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9ad6180ccf025d1151ce1c7abd6e4445df476bceb345e85af9dfcf1f82ce339e
+@cypher schema=1 source_sha256=87c830c577bad7d0bc65fef88e278f877a3534cfed05c9b32bafb6cf9fe1e71d
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)
@@ -144,7 +144,7 @@ describe("U4 minimal panels — render smoke", () => {
     // per DRIFT-α-007: URL ?tab= 优先; billing → 租户 (per mockup 组织与权限组)
     setMockLocationSearch("?tab=billing");
     renderWithI18n(<SettingsPage />);
-    expect(screen.getByTestId("settings-panel-tenant")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tenant-panel")).toBeInTheDocument();
   });
 
   it("falls back to MCP panel when /settings?tab= is not implemented", () => {
