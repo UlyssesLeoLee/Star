@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1da3969ac23e854814b5682435359c666767144f896ca1a9ea0ee3f3445a6057
+@cypher schema=1 source_sha256=5e43c781adbf9ce45ae402ca18cae1de453a8b40c8933579e35bcfb7d680324f
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -66,7 +66,8 @@ export function RightChatRail() {
     <div
       data-testid="right-chat-rail"
       className={clsx(
-        "shrink-0 border-l-2 border-line bg-bg-card/95 backdrop-blur-xl flex flex-col h-full transition-all duration-200",
+        // per 2026-11-15 用户发令: 右侧聊天栏顶格 (fixed top-0 顶到视口最顶, 不被 header 挤压)
+        "fixed top-0 right-0 z-40 h-screen border-l-2 border-line bg-bg-card/95 backdrop-blur-xl flex flex-col transition-all duration-200",
         open ? "w-80" : "w-14",
       )}
     >

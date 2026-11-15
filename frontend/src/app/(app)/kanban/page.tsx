@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c3947a273daf44697aa4f45867a92481deb064be16c9d87942c02ff8dc02d1df
+@cypher schema=1 source_sha256=ed236fb318eb15cdb4d05d4a6e7c5fee722b134b887ad6f47ff28791639f9c15
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
@@ -332,7 +332,7 @@ export default function KanbanPage() {
                 按文件开卡
               </button>
             </div>
-            <SprintBoardView />
+            <SprintBoardView onSelect={(id) => setDrawerMode({ kind: "view", workItemId: id })} />
           </section>
         )}
 
@@ -343,7 +343,7 @@ export default function KanbanPage() {
               workItems={workItems}
               identities={identities}
               onTransition={transitionWorkItem}
-              onWorkItemClick={(id) => router.push(`/work-item/${id}`)}
+              onWorkItemClick={(wi) => setDrawerMode({ kind: "view", workItemId: wi.id })}
               onRequestNewWorkItem={(status) => setDrawerMode({ kind: "new", defaultStatus: status })}
               onAddColumn={addBoardColumn}
               onRemoveColumn={removeBoardColumn}
@@ -359,7 +359,7 @@ export default function KanbanPage() {
               projectId={projectId}
               tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
               reporterId={project?.owner_id}
-              onOpenTaskCard={(workItemId) => router.push(`/work-item/${workItemId}`)}
+              onOpenTaskCard={(workItemId) => setDrawerMode({ kind: "view", workItemId })}
             />
           </section>
         )}
@@ -388,7 +388,7 @@ export default function KanbanPage() {
                         type="button"
                         onClick={() => {
                           const wid = openNemaAsStarTask(task.id);
-                          if (wid) router.push(`/work-item/${wid}`);
+                          if (wid) setDrawerMode({ kind: "view", workItemId: wid });
                         }}
                         className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft flex items-center gap-1"
                       >
