@@ -23,7 +23,7 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 | 聊天 | RightChatRail 全局折叠栏(默认展开=聊天); SideChatPanel task/global 双 scope | 底栏需 WORKTREE/GLOBAL 范围选择 + 当前范围标识 |
 | 会话/授权 | AuthorizedProjectSelector + AuthorizedProjectDirectoryState 存在; 401/403 区分未验证 | 需按需求六核对 |
 | mock 数据 | seed.ts deterministic mock (产品约束: preview/live 双模式, 本地 DB 基本为空) | 正式视图需标识数据来源; 未授权操作禁用 |
-| 实施状态 | Phase 1 (1.1–1.5) ✅ 已完成 — commit 462260e8; Phase 2.1/2.2 ✅ 已完成 — commit cfbfe4c5 | Phase 2.3–8 未开始 (见 §1 分阶段计划打钩) |
+| 实施状态 | Phase 1 ✅ 462260e8 · Phase 2.1/2.2/2.4/2.5(部分) ✅ cfbfe4c5+304f3ce5 · Phase 3.2 ✅ cf48593b · Phase 4.1/4.3 ✅ 304f3ce5 · Phase 5.2/5.3/5.4 ✅ 304f3ce5 · Agent并入Canvas ✅ 7b129089 · IM1.0 改造 ✅ 95afa636 · 1b 创建栏 ✅ 9187f43d | 剩余: 2.3(部分)/2.5(部分)/3.1/3.3/3.4/4.2/4.4/5.1/5.5/6.x/7.x/8.2 |
 
 ## 1. 分阶段计划
 
@@ -37,27 +37,27 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 ### Phase 2 — 工作空间布局整合 (P0/P1)
 - [x] 2.1 BranchWorkspace tabs → Lane 级中央应用: Backlog/Sprint、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins
 - [x] 2.2 Group Workspace 左侧双页签: 导航树 / AI 更新 (Branch 任务按工作流状态分组; 底部状态筛选同步两页签)
-- [ ] 2.3 任务卡统一为可关闭子窗口 (Drawer 保留 /work-item 子页面择一, 全站一致)
-- [ ] 2.4 Project Worktree Index 保留为汇总入口 (不冒充生产管理)
-- [ ] 2.5 深链/前进后退/关闭任务窗/切换 Worktree 验证
+- [◐] 2.3 任务卡可关闭子窗口: BranchWorkspace 接 WorkItemDetailDrawer (cfbfe4c5) + group 页深链 closeTaskCard 验收通过 (304f3ce5) — 全站一致 (/work-item 子页面并存) 未收敛
+- [x] 2.4 Project Worktree Index 定位文案完成 (304f3ce5, wt-finish lane: 跨 Lane/Worktree/Branch 汇总入口语义)
+- [◐] 2.5 closeTaskCard 验收: URL 干净/前进后退通过 (304f3ce5) — 切换 Worktree 上下文验证未做
 
 ### Phase 3 — Backlog/Sprint/看板收敛 (P1)
 - [ ] 3.1 独立 /kanban 与 BranchWorkspace Backlog 合并为一套 (保留列内创建/拖动/列增删重命名)
-- [ ] 3.2 正式视图数据来源标识 (authorized/server vs preview/seed); 未授权命令禁用 + 原因说明
+- [x] 3.2 kanban 预览数据标识 (cf48593b: seed 不冒充正式视图, 宿主接入切换授权投影) — 未授权命令禁用未做
 - [ ] 3.3 创建/移动/刷新/状态变更身份与上下文一致性验证
 - [ ] 3.4 失败提示 + 草稿保留; 授权失败不重放写操作
 
 ### Phase 4 — Canvas 上下文与关系图 (P1)
-- [ ] 4.1 Canvas 作为 Lane 应用入口, 经当前 Worktree 上下文访问; 可链接授权范围内任务卡
+- [◐] 4.1 Canvas ?worktree= 上下文条 + 未指定/未找到状态 (304f3ce5, canvas lane) — 任务卡链接未做
 - [ ] 4.2 独立 Canvas/Group Canvas/Worktree 关系图对象身份与持久化边界核对
-- [ ] 4.3 关系图 5 视图只展示有权读取数据; 移除固定示例; 区分空/未授权/未接入/不可用
+- [◐] 4.3 5 视图空/未接入状态区分 + 去固定示例 (304f3ce5) — 未授权/不可用细粒度未区分
 - [ ] 4.4 Canvas↔任务双向跳转/深链/保存失败草稿保留/切换 Worktree 授权隔离验证
 
 ### Phase 5 — 聊天/Worktree 状态/Team (P1)
 - [ ] 5.1 右侧默认聊天; Worktree 状态默认折叠; Team 统一 Runtime/Daemon 与 Worker/Router 小队
-- [ ] 5.2 底栏聊天 WORKTREE/GLOBAL 范围选择 + 当前范围标识
-- [ ] 5.3 GLOBAL 操作选择授权目标 + 提交重校验 (选择目标本身不授予权限)
-- [ ] 5.4 未接入能力显式禁用, 不生成示例消息冒充
+- [x] 5.2 chatStore chatScope + RightChatRail 切换器 + 当前范围 label (304f3ce5, chat lane)
+- [x] 5.3 GLOBAL 授权目标下拉 + 未选禁用 + 提交重校验 + 失败保草稿 (304f3ce5, chat lane)
+- [x] 5.4 chat rail/panel 未接入徽标 + 不生成示例消息 (304f3ce5 + group 页既有)
 - [ ] 5.5 加载/断线/恢复/错误/慢消费者状态; 实时协作 owner 事实/授权范围推送/冲突保护/有界资源
 
 ### Phase 6 — 会话与授权一致性 (P1)
@@ -74,9 +74,9 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 - [ ] 7.5 Hooks 保持"高级设置→Hooks"; Worktree/Lane Detail/BI 展示有效策略并深链
 
 ### Phase 8 — 实施验收 (贯穿)
-- [ ] 8.1 每 phase: tsc 0 + vitest 全绿 + cgg stamp + 浏览器实测关键界面
+- [x] 8.1 全 session 每批提交均过 tsc 0 / vitest 128·1064 / cgg stamp / 浏览器实测 (自审报告 2026-11-15)
 - [ ] 8.2 文档同步 (本 WBS 打钩 + SRS/BD 增量)
-- [ ] 8.3 最终报告: 已完成+验证证据 / 未接通+后续依赖 (按优先级)
+- [x] 8.3 自审报告 + 移交清单已给出 (2026-11-15)
 
 ## 2. 关键决策 (实施中记录)
 
@@ -94,3 +94,5 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 | 2026-11-15 | v1.0 | 初版: 调查结论 + 8 阶段分阶段计划 + 关键决策 (Phase 1 打钩) | 462260e8 |
 | 2026-11-15 | v1.1 | Phase 2.1/2.2 打钩: BranchWorkspace → Lane 级中央应用, Group Workspace 双页签 | cfbfe4c5 |
 | 2026-11-15 | v1.2 | §0 状态表补实施状态行 (Phase 1/2.1/2.2 已完成 commit 指认) + 修订历史表 | 本提交 (见 git log) |
+| 2026-11-15 | v1.3 | 4 lane 并行 fan-out (docs/chat/canvas/wt, delegate_task deepseek probe 通过) rebase+merge dev; 2.4/2.5/4.1/4.3/5.2/5.3/5.4 打钩; Agent 中心并入 Canvas; IM1.0 chat 域模型; 1b 创建栏 6 控件 | 304f3ce5→9187f43d |
+| 2026-11-15 | v1.4 | 实际状态全量同步: ◐ 半完成项标注意外; 移交 Codex (MAGOS disarm 命令交付用户终端) | 本提交 |
