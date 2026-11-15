@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2ca0cc80335cff1d3652718c8c2a71898887e4f04b132d392d3be1045256583a
+@cypher schema=1 source_sha256=6c2037b250c96183d29b946862eedf25c12e55d4091b7a76b106e7345b37b4b3
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
@@ -33,8 +33,9 @@ import { useStore } from "@/lib/store";
 import { CanvasView } from "@/components/CanvasView";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
 import { AgentViewPage } from "@/app/(app)/agent-view/page";
+import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
 
-const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图"] as const;
+const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图", "流程"] as const;
 
 export default function CanvasDetailPage() {
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("画布");
@@ -47,6 +48,7 @@ export default function CanvasDetailPage() {
       board: "画布",
       agent: "Agent 画布",
       relation: "关系图",
+      flow: "流程",
     };
     if (tab && map[tab]) setActiveTab(map[tab]);
   }, []);
@@ -133,8 +135,7 @@ export default function CanvasDetailPage() {
       case "关系图":
         return (
           <div className="h-full overflow-y-auto p-4" data-testid="canvas-tab-relation">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs text-ink-dim">租户关系图 (RelationshipView)</span>
+            <div className="mb-3 flex items-center justify-end">
               <a
                 href="/canvas/worktree-graph"
                 data-testid="canvas-relation-open-wtg"
@@ -144,6 +145,12 @@ export default function CanvasDetailPage() {
               </a>
             </div>
             <RelationshipView tenantId={relationTenantId} />
+          </div>
+        );
+      case "流程":
+        return (
+          <div className="h-full overflow-y-auto" data-testid="canvas-tab-flow">
+            <WorkflowBuilder />
           </div>
         );
       default:

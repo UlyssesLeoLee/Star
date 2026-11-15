@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c679165db2c0c41175f17041714212ce468a9536ec14f9d0279e7bcc64f45a3f
+@cypher schema=1 source_sha256=88dca54bb97873b8eb7028d0251090ac9cd5ac2f72d1833576c5bbed2ae447f3
 MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
@@ -246,7 +246,8 @@ function AgentViewContent({ variant }: {
   const { agent } = resolution;
   return (
     <div className="w-full h-[calc(100vh-5rem)] flex flex-col">
-      {/* Header */}
+      {/* Header (per 2026-11-15: agent 信息行只在 Agent 中心渲染 — canvas 画布内不显示) */}
+      {variant !== "canvas-only" && (
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="text-sm font-semibold shrink-0" data-testid="agent-view-title">Agent</div>
@@ -272,18 +273,13 @@ function AgentViewContent({ variant }: {
           </a>
         </div>
       </div>
+      )}
 
       {/* Agent workspace views */}
       {variant !== "canvas-only" && (
         <div className="border-b-2 border-black bg-[var(--cel-surface-card, var(--color-surface-2))] px-6 py-2.5 flex items-center gap-2.5 shadow-soft" data-testid="view-mode-tabs">
           <span className="mr-1 text-[10px] font-mono font-bold text-ink-mute uppercase tracking-widest">Agent 中心</span>
-          <button
-            data-testid="view-mode-workflow"
-            onClick={() => handleViewModeChange("workflow")}
-            className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 shadow-soft ${viewMode === "workflow" ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"}`}
-          >
-            <Workflow size={13} /> Workflow 工作流
-          </button>
+          {/* Workflow 低代码流程 = 无限画布类 → 已作为 canvas 标签页 (per 2026-11-15) */}
           <button
             data-testid="view-mode-settings"
             onClick={() => handleViewModeChange("settings")}
