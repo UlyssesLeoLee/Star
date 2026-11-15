@@ -234,7 +234,14 @@ export const useNavStore = create<NavState>()(
       // scope 切换: main ↔ project (per 2026-09-03 12:36 JST 拍板)
       setSidebarScope: (scope) => set({ sidebarScope: scope }),
       // selectedProjectId setter (per 2026-09-03 12:36 JST 从 ProjectsClient 提升)
-      setSelectedProjectId: (id) => set({ selectedProjectId: id }),
+      setSelectedProjectId: (id) =>
+        set((s) => ({
+          selectedProjectId: id,
+          // per 2026-11-15: 切换 Project 清空下级上下文, 防残留 (Lane/Worktree/Branch 属于旧项目)
+          ...(s.selectedProjectId !== id
+            ? { selectedLaneId: "", selectedWorktreeId: "", selectedBranch: "" }
+            : {}),
+        })),
       setLaneContext: (laneId, worktreeId, branch) =>
         set({ selectedLaneId: laneId, selectedWorktreeId: worktreeId, selectedBranch: branch }),
 

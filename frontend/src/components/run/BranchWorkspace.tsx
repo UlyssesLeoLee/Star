@@ -125,7 +125,11 @@ export function BranchWorkspace({ worktreeId, branch, projectId, laneId }: {
       <div role="tabpanel" aria-label={labels[active] ?? active} className="mt-4">
         {active === "backlog-sprint" && (
           <div data-testid="lane-app-backlog-sprint" className="max-h-[480px] overflow-y-auto">
-            <SprintBoardView onSelect={(id) => setDrawer({ kind: "view", workItemId: id })} />
+            <SprintBoardView
+              worktreeId={worktreeId}
+              projectId={projectId}
+              onSelect={(id) => setDrawer({ kind: "view", workItemId: id })}
+            />
           </div>
         )}
 

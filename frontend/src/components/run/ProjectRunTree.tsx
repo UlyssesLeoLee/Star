@@ -179,9 +179,7 @@ function FallbackProjectRunTree() {
               <ul className="ml-3 border-l border-line/60 pl-1">
                 {lanes.filter((l) => l.project_id === project.id).map((lane) => {
                   const laneSel = selectedLaneId === lane.id;
-                  const laneWts = laneWorktrees.filter(
-                    (wt) => wt.lane_id === lane.id || (wt.lane_id === undefined && lane.id === "lane-001"),
-                  );
+                  const laneWts = laneWorktrees.filter((wt) => wt.lane_id === lane.id);
                   return (
                     <li key={lane.id} aria-level={2}>
                       <button
@@ -222,7 +220,41 @@ function FallbackProjectRunTree() {
                     </li>
                   );
                 })}
-                {lanes.filter((l) => l.project_id === project.id).length === 0 && (
+                {(() => {
+                  const uncat = laneWorktrees.filter((wt) => wt.lane_id === undefined);
+                  if (uncat.length === 0) return null;
+                  return (
+                    <li key="uncat" aria-level={2}>
+                      <span className="flex w-full items-center gap-1 rounded py-0.5 pl-3 pr-1 text-left text-[10px] text-ink-mute">
+                        <Layers size={11} className="shrink-0" />
+                        <span className="truncate">{t.runDirectory.fallbackLane}</span>
+                        <span className="ml-auto font-mono">{uncat.length}</span>
+                      </span>
+                      {uncat.map((wt) => (
+                        <li key={wt.id} className="ml-2">
+                          <div className="flex items-center gap-1">
+                            <button type="button" aria-expanded={Boolean(expandedWorktrees[wt.id])} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
+                              onClick={() => toggleWorktree(wt.id)}>
+                              {expandedWorktrees[wt.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            </button>
+                            <Link role="treeitem" aria-level={3} aria-selected={selectedWorktreeId === wt.id}
+                              href={`/worktree?project_id=${encodeURIComponent(project.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                              prefetch={false}
+                              onNavigate={() => selectWorktree("", wt.id, wt.branch)}
+                              className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selectedWorktreeId === wt.id ? "bg-accent/15 text-accent" : ""}`}>
+                              <GitBranch size={11} className="shrink-0" />
+                              <span className="min-w-0">
+                                <span className="block truncate text-[11px]">{wt.name}</span>
+                                <span className="block truncate text-[9px] text-ink-mute">Worktree · {wt.branch}</span>
+                              </span>
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </li>
+                  );
+                })()}
+                {lanes.filter((l) => l.project_id === project.id).length === 0 && laneWorktrees.filter((wt) => wt.lane_id === undefined).length === 0 && (
                   <li className="flex items-center gap-1 py-0.5 pl-3 text-[10px] text-ink-mute" aria-level={2}>
                     <Layers size={11} className="shrink-0" />
                     <span className="truncate">{t.runDirectory.fallbackLane}</span>

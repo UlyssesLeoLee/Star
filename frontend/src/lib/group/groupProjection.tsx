@@ -80,7 +80,11 @@ export function WorktreeGroupApiProvider({
     () => {
       if (!sessionKey.trim() || sessionKey.length > 256 || /[\u0000-\u001f\u007f]/.test(sessionKey)) return null;
       return new WorktreeGroupApiClient(getAccessToken, fetcher ?? fetch, baseUrl, (error) => {
-        setInvalidatedSession({ sessionKey, message: error.message });
+        // per 2026-11-15: 代际守卫 — 回调里用当前闭包 sessionKey 登记, 消费者侧
+        // (invalidatedSession?.sessionKey === sessionKey) 已保证旧代际迟到 401 不覆盖新会话
+        setInvalidatedSession((prev) =>
+          prev && prev.sessionKey === sessionKey ? prev : { sessionKey, message: error.message },
+        );
       });
     },
     [getAccessToken, baseUrl, fetcher, sessionKey],

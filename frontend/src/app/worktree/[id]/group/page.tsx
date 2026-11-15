@@ -704,8 +704,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     setRightPanelOpen(window.matchMedia("(min-width: 1536px)").matches);
   }, []);
   const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>("all");
-  // 短搜索 (per 2026-11-15: 单行顶栏 + 短搜索)
-  const [quickSearch, setQuickSearch] = useState("");
+
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [worktreeDetailsOpen, setWorktreeDetailsOpen] = useState(false);
   const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
@@ -2713,15 +2712,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
 
         <div className="flex min-h-0 min-w-0 flex-col">
           <nav aria-label="LANE 应用" className="flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-bg-card/70 px-3 scrollbar-none" data-testid="group-app-navigation">
-            <input
-              type="search"
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
-              placeholder="搜索任务 / 应用…"
-              aria-label="短搜索"
-              data-testid="group-quick-search"
-              className="mr-1 h-7 w-40 shrink-0 rounded-md border border-line bg-bg-soft px-2 text-[11px] text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none"
-            />
+
             {visibleGroupApps.map((app) => {
               const Icon = app.icon;
               const active = currentApp === app.id;

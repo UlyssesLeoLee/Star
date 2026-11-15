@@ -488,9 +488,18 @@ function CompleteSprintDialog({ open, sprint, onClose, onComplete }: { open: boo
 // =====================================================================
 // 主组件
 // =====================================================================
-export function SprintBoardView({ onSelect }: { onSelect?: (id: string) => void }) {
+export function SprintBoardView({ onSelect, worktreeId, projectId }: {
+  onSelect?: (id: string) => void;
+  /** per 2026-11-15: Worktree 隔离 — 传入则只显示该 worktree 的任务/冲刺 */
+  worktreeId?: string;
+  projectId?: string;
+}) {
   const sprints = useStore((s) => s.sprints);
-  const workItems = useStore((s) => s.workItems);
+  const allWorkItems = useStore((s) => s.workItems);
+  // per 2026-11-15: Worktree 隔离 (未传 worktreeId = 全局视图, 保持旧行为)
+  const workItems = worktreeId
+    ? allWorkItems.filter((w) => w.worktree_id === worktreeId)
+    : allWorkItems;
   const identities = useStore((s) => s.identities);
   const createSprint = useStore((s) => s.createSprint);
   const startSprint = useStore((s) => s.startSprint);
