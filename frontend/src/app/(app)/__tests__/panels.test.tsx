@@ -23,6 +23,8 @@ MERGE (self)-[:DEFINES]->(suite)
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { http, HttpResponse } from "msw";
+import { server } from "@/mocks/server";
 
 // next/navigation mock — AppRouterContext 避免 import 真实 next
 // per DRIFT-α-007 修复验证: settings/page.tsx 现直接从 searchParams 派生 tab
@@ -84,16 +86,25 @@ describe("U4 minimal panels — render smoke", () => {
     cleanup();
   });
 
-  it("renders /agents without error", () => {
+  it("renders /agents without error", async () => {
+    // per 2026-11-17 接真实 Agent 运行时: 测试环境强制后端不可达
+    // (HttpResponse.error → 网络错误), 避免依赖本机 8081/3000 是否在跑
+    server.use(
+      http.get("/api/v1/agents", () => HttpResponse.error()),
+      http.get("/api/v1/argo/nodes", () => HttpResponse.error()),
+    );
     renderWithI18n(<AgentsPage />);
     expect(screen.getByTestId("agents-page")).toBeInTheDocument();
     // v0.6: zh-CN 下 page title "Agent 总览"
     expect(screen.getByText("Agent 总览")).toBeInTheDocument();
-    // 5 mock 行
-    expect(screen.getByTestId("agent-row-ag-001")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-row-ag-005")).toBeInTheDocument();
-    // P3 占位
+    // 诚实未接入态, 不再渲染 5 条 mock 行 (主列表 + Argo CLI 两处未接入提示)
+    const disconnected = await screen.findAllByTestId("status-notice-disconnected");
+    expect(disconnected.length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("agent-row-ag-001")).toBeNull();
+    expect(screen.queryByTestId("agent-row-ag-005")).toBeNull();
+    // P3 占位 (通信流, 带未接入标注)
     expect(screen.getByTestId("live-activity-placeholder")).toBeInTheDocument();
+    expect(screen.getByTestId("agents-comms-placeholder")).toBeInTheDocument();
   });
 
   it("renders /analytics without error (per 2026-11-14 参考 UI: 3 子 tab + KPI + IPA 阶段进度)", () => {

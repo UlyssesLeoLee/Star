@@ -758,4 +758,26 @@ export interface Dictionary {
     fromActor: string;              // "来自 {name}"
     errorDetailLabel: string;       // "原因"
   };
+  /** v0.13 (2026-11-17 Agent 中心接真实运行时 API) 新增: agentCenter 三态 + 动作文案 */
+  agentCenter: {
+    loadingTitle: string;            // "加载中"
+    loadingHint: string;
+    disconnectedTitle: string;       // "未接入 — 真实 Agent 运行时不可达"
+    disconnectedHint: string;        // 不可达时给用户的下一步提示
+    unauthorizedTitle: string;       // "未授权 — Agent 运行时拒绝访问"
+    unauthorizedHint: string;
+    loadFailedTitle: string;         // "加载失败"
+    loadFailedHint: string;
+    emptyTitle: string;              // "暂无 agent"
+    emptyHint: string;
+    retry: string;                   // "重试"
+    argoUnavailable: string;         // "Argo CLI 未接入"
+    dataNoteLabel: string;           // "数据源说明"
+    actionsDisabledHint: string;     // 运行时未接入时按钮禁用说明
+    syncResult: string;              // "已从 Agent 运行时同步 {count} 个 agent"
+    verifyOk: string;                // "运行时健康检查通过 (HTTP 200)"
+    verifyFailed: string;            // "运行时健康检查未通过 (HTTP {status})"
+    verifyUnreachable: string;       // "运行时健康检查不可达: {reason}"
+    commsPlaceholder: string;        // 通信流占位标注
+  };
 }

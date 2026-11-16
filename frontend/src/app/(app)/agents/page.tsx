@@ -1,30 +1,57 @@
 "use client";
 
-// @cypher schema=1 source_sha256=5ca344de6a64e7cd97bac26beedc3b91a0066cb26293a970187324144c1bd5f3
+// @cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 // MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
 // MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
+// MERGE (agentsApi:File {path:"frontend/src/lib/agents/agentsApi.ts"})
+// MERGE (statusNotice:File {path:"frontend/src/components/status/StatusNotice.tsx"})
 // MERGE (shader:File {path:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx"})
 // MERGE (palette:Type {id:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx::CelPalette"})
 // MERGE (self)-[:DEFINES]->(page)
+// MERGE (self)-[:IMPORTS]->(agentsApi)
+// MERGE (self)-[:IMPORTS]->(statusNotice)
 // MERGE (self)-[:IMPORTS]->(shader)
+// MERGE (page)-[:CALLS]->(agentsApi)
 // MERGE (page)-[:USES_TYPE]->(palette)
 // @endcypher
 
 // =====================================================================
 // /agents — Tactical Agent Command Hub (战术机关与自律代理人控制台)
 // =====================================================================
-// 全面应用 3渲2 (3D-to-2D NPR Cel-Shaded) 艺术级日漫科技美学:
-//   1. 实时 WebGL 3D 渲染台 (Three.js + GLSL NPR 着色器)
-//   2. 战术 3D 触觉按钮 (CelButton3D) 与机械开关 (CelToggle3D, CelBeacon3D)
-//   3. 墨线阶梯卡片、HUD 标签、Swiss 8pt 栅格与米勒定律三区信息聚合
+// 2026-11-17 清 seed/mock 纪律 (per 用户发令 "确保平台内每一个功能都完善"):
+//   数据源 = 真实 Agent 运行时 (star-api-rest, 同源代理 /api/v1/* → 127.0.0.1:8081):
+//     - 初始态 = 加载中 (不再预填 MOCK_AGENTS_FALLBACK)
+//     - 成功 → 渲染真实 agent (运行时自带数据源说明原样展示)
+//     - 空 → 诚实空态 "暂无 agent"
+//     - 失败/不可达 → StatusNotice "未接入 — 真实 Agent 运行时不可达",
+//       绝不回落 mock 内容; 401/403 → "未授权"
+//     - Argo CLI (GET /api/v1/argo/nodes supported_cli) 同理: 不可达时明确
+//       显示 "Argo CLI 未接入", 不假装本地 mock 兜底
+//   操作按钮 (SYNC WORKTREE / RUN VERIFY) = 真实动作:
+//     SYNC → 重新从运行时拉取 agent 花名册; RUN VERIFY → ping /api/v1/health
+//     展示真实结果; 运行时未接入时按钮禁用 + 原因说明
+//   全面应用 3渲2 (3D-to-2D NPR Cel-Shaded) 艺术级日漫科技美学:
+//     实时 WebGL 3D 渲染台 (Three.js + GLSL NPR 着色器)、战术 3D 触觉按钮
+//     (CelButton3D) 与机械开关 (CelToggle3D, CelBeacon3D)、墨线阶梯卡片、
+//     HUD 标签、Swiss 8pt 栅格与米勒定律三区信息聚合
 // =====================================================================
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
-import { Bot, Activity, Cpu, Sparkles, Terminal } from "lucide-react";
-import { MOCK_AGENTS_FALLBACK } from "@/mocks/data";
-import type { AgentRow } from "@/mocks/schemas/agent";
+import { Bot, RefreshCw } from "lucide-react";
+import {
+  listAgents,
+  listArgoCli,
+  pingRuntimeHealth,
+  AgentsApiError,
+  type AgentCenterRow,
+} from "@/lib/agents/agentsApi";
+import {
+  StatusNotice,
+  inferNoticeState,
+  type NoticeState,
+} from "@/components/status/StatusNotice";
 import { useTranslation } from "@/lib/i18n";
 import { AnimeCelShaderCanvas, CelPalette } from "@/components/effects/AnimeCelShaderCanvas";
 import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
@@ -36,46 +63,155 @@ import {
 } from "@/components/effects/Cel3DUI";
 import { CelCard3D } from "@/components/effects/CelCard3D";
 
+type AgentsPhase = "loading" | "ready" | "error";
+
+/** AgentsApiError.code → 诚实三态 (确定性映射, 不依赖错误文本) */
+function noticeStateForError(err: unknown): NoticeState {
+  if (err instanceof AgentsApiError) {
+    if (err.code === "network_error") return "disconnected";
+    if (err.code === "unauthorized") return "unauthorized";
+    if (err.code === "http_error" && err.status !== null && err.status >= 500) {
+      return "disconnected";
+    }
+    return "failed";
+  }
+  return inferNoticeState(err);
+}
+
 export default function AgentsPage() {
-  // 后端门面: Argo 支持的 CLI (per WBS W2)
-  const [supportedCli, setSupportedCli] = useState<string[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/v1/argo/nodes")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (alive && j?.data?.supported_cli) setSupportedCli(j.data.supported_cli);
-      })
-      .catch(() => { /* 后端不可达: 保留本地 mock */ });
-    return () => { alive = false; };
-  }, []);
-  const { t } = useTranslation();
-  const [agents, setAgents] = useState<ReadonlyArray<AgentRow>>(MOCK_AGENTS_FALLBACK);
+  const { t, tx } = useTranslation();
+
+  // ── 真实运行时 agent 花名册 ──────────────────────────────────────
+  const [rows, setRows] = useState<AgentCenterRow[]>([]);
+  const [phase, setPhase] = useState<AgentsPhase>("loading");
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [dataNote, setDataNote] = useState<string | null>(null);
+
+  // ── Argo CLI (后端门面 GET /api/v1/argo/nodes) ────────────────────
+  const [argoCli, setArgoCli] = useState<string[] | null>(null);
+  const [argoError, setArgoError] = useState<unknown>(null);
+
+  // ── 操作按钮 (真实动作 + 结果展示) ───────────────────────────────
+  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  // ── 3渲2 视觉状态 ────────────────────────────────────────────────
   const [celPalette, setCelPalette] = useState<CelPalette>("crimson");
   const [celBands, setCelBands] = useState<number>(3);
   const [autoSagaGuard, setAutoSagaGuard] = useState(true);
   const [idempotentLock, setIdempotentLock] = useState(true);
   const [dispatchMode, setDispatchMode] = useState(0);
 
-  useEffect(() => {
-    fetch("/api/agents")
-      .then((r) => r.json())
-      .then((data: ReadonlyArray<AgentRow>) => setAgents(data))
-      .catch(() => {
-        /* keep FALLBACK (per §4 #1 缺标, 避免 UX 退化) */
-      });
+  /** 从真实运行时拉取 agent 列表; 返回 rows (失败返回 null, 已置 error 态) */
+  const loadAgents = useCallback(async (): Promise<AgentCenterRow[] | null> => {
+    setPhase("loading");
+    setLoadError(null);
+    try {
+      const { rows: next, note } = await listAgents();
+      setRows(next);
+      setDataNote(note);
+      setPhase("ready");
+      return next;
+    } catch (err) {
+      setRows([]);
+      setLoadError(err);
+      setPhase("error");
+      return null;
+    }
   }, []);
 
-  const active = agents.filter((a) => a.status === "active" || a.status === "in_progress").length;
+  useEffect(() => {
+    void loadAgents();
+  }, [loadAgents]);
+
+  useEffect(() => {
+    let alive = true;
+    listArgoCli()
+      .then((cli) => {
+        if (!alive) return;
+        setArgoCli(cli);
+        setArgoError(null);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        // 诚实: 不可达时不假装本地 mock 兜底, 明确显示未接入
+        setArgoCli(null);
+        setArgoError(err);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ── 真实动作: SYNC = 重新拉取花名册; VERIFY = ping /api/v1/health ──
+  const runSync = useCallback(async () => {
+    setActionResult(null);
+    setActionBusy(true);
+    const loaded = await loadAgents();
+    setActionBusy(false);
+    if (loaded !== null) {
+      setActionResult(tx(t.agentCenter.syncResult, { count: String(loaded.length) }));
+    }
+  }, [loadAgents, t.agentCenter.syncResult, tx]);
+
+  const runVerify = useCallback(async () => {
+    setActionResult(null);
+    setActionBusy(true);
+    try {
+      const health = await pingRuntimeHealth();
+      setActionResult(
+        health.ok
+          ? t.agentCenter.verifyOk
+          : tx(t.agentCenter.verifyFailed, { status: String(health.status) }),
+      );
+    } catch (err) {
+      setActionResult(
+        tx(t.agentCenter.verifyUnreachable, {
+          reason: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  }, [t.agentCenter.verifyFailed, t.agentCenter.verifyOk, t.agentCenter.verifyUnreachable, tx]);
+
+  // ── 派生统计 (真实行驱动) ────────────────────────────────────────
+  const active = rows.filter((a) => a.status === "running").length;
+  const paused = rows.filter((a) => a.status === "paused" || a.status === "stopped").length;
+  const failed = rows.filter((a) => a.status === "failed").length;
+
+  // ── 诚实三态映射 (加载中 / 未接入 / 未授权 / 失败 / 空) ──────────
+  let notice: { state: NoticeState; title: string; hint: string } | null = null;
+  if (phase === "loading") {
+    notice = { state: "loading", title: t.agentCenter.loadingTitle, hint: t.agentCenter.loadingHint };
+  } else if (phase === "error") {
+    const inferred = noticeStateForError(loadError);
+    if (inferred === "unauthorized") {
+      notice = { state: "unauthorized", title: t.agentCenter.unauthorizedTitle, hint: t.agentCenter.unauthorizedHint };
+    } else if (inferred === "disconnected") {
+      notice = { state: "disconnected", title: t.agentCenter.disconnectedTitle, hint: t.agentCenter.disconnectedHint };
+    } else {
+      notice = { state: "failed", title: t.agentCenter.loadFailedTitle, hint: t.agentCenter.loadFailedHint };
+    }
+  } else if (rows.length === 0) {
+    notice = { state: "empty", title: t.agentCenter.emptyTitle, hint: t.agentCenter.emptyHint };
+  }
+
+  const actionsReachable = phase === "ready";
 
   return (
     <div className="max-w-7xl mx-auto space-y-6" data-testid="agents-page">
-      {supportedCli && (
+      {argoCli !== null && (
         <div data-testid="agents-cli-badge" className="mb-3 flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
           <span className="text-ink-mute">Argo CLI 支持:</span>
-          {supportedCli.map((c) => (
+          {argoCli.map((c) => (
             <span key={c} className="px-1.5 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent">{c}</span>
           ))}
+        </div>
+      )}
+      {argoError !== null && (
+        <div data-testid="agents-argo-unavailable" className="mb-3">
+          <StatusNotice state="disconnected" compact title={t.agentCenter.argoUnavailable} />
         </div>
       )}
       <PageHeader
@@ -85,19 +221,19 @@ export default function AgentsPage() {
         count={`${active} active`}
       />
 
-      {/* KPI Stats Deck (3渲2 触觉物理卡片) */}
+      {/* KPI Stats Deck (3渲2 触觉物理卡片, 真实运行时行驱动) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <CelCard3D className="h-full">
-          <Stat label="Total Agents" value={agents.length} hint="全域代理人注册" tone="info" />
+          <Stat label="Total Agents" value={rows.length} hint="全域代理人注册" tone="info" />
         </CelCard3D>
         <CelCard3D className="h-full">
           <Stat label="Active Nodes" value={active} hint="并发执行中" tone="ok" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Standby / Paused" value={agents.filter((a) => a.status === "paused").length} tone="warn" />
+          <Stat label="Standby / Paused" value={paused} tone="warn" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Failed / Blocked" value={agents.filter((a) => a.status === "failed").length} tone="err" />
+          <Stat label="Failed / Blocked" value={failed} tone="err" />
         </CelCard3D>
       </div>
 
@@ -105,44 +241,70 @@ export default function AgentsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: Agent Sessions Table & Protocols (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Agent Sessions Table */}
+          {/* Agent Sessions Table — 真实运行时数据 (per 2026-11-17 清 mock) */}
           <div className="card">
             <SectionTitle
               action={
                 <div className="flex items-center gap-2">
                   <span className="anime-hud-tag">DEC-008</span>
-                  <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">5 SESSIONS</span>
+                  <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">{rows.length} SESSIONS</span>
                 </div>
               }
             >
               Agent Sessions 〔実行セッション一覧〕
             </SectionTitle>
 
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Role</th>
-                  <th>Last Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map((a) => (
-                  <tr key={a.id} data-testid={`agent-row-${a.id}`} className="transition-colors">
-                    <td className="font-mono text-xs text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">{a.id}</td>
-                    <td className="font-bold text-sm text-[var(--cel-text-primary, var(--color-text))] flex items-center gap-2">
-                      <span className="size-2 bg-[var(--cel-crimson, var(--err-DEFAULT))] border border-black rotate-45" />
-                      {a.name}
-                    </td>
-                    <td><StatusPill value={a.status} size="xs" /></td>
-                    <td className="text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] font-mono">{a.role}</td>
-                    <td className="font-mono text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">{a.last_active}</td>
+            {dataNote !== null && rows.length > 0 && (
+              <div
+                data-testid="agents-data-note"
+                className="mb-2 flex items-center gap-1.5 rounded border border-warn/30 bg-warn/5 px-2 py-1 text-[10px] font-mono text-warn"
+              >
+                {t.agentCenter.dataNoteLabel}: {dataNote}
+              </div>
+            )}
+
+            {notice !== null ? (
+              /* 加载中 / 未接入 / 未授权 / 失败 / 空 — 诚实展示, 绝不回落 mock */
+              <div data-testid="agents-notice-wrap" className="py-4 space-y-2">
+                <StatusNotice state={notice.state} title={notice.title} hint={notice.hint} />
+                {phase === "error" && (
+                  <button
+                    type="button"
+                    data-testid="agents-retry"
+                    onClick={() => void loadAgents()}
+                    className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
+                  >
+                    <RefreshCw size={12} /> {t.agentCenter.retry}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Started At</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((a) => (
+                    <tr key={a.id} data-testid={`agent-row-${a.id}`} className="transition-colors">
+                      <td className="font-mono text-xs text-[var(--cel-cyan, var(--accent-DEFAULT))] font-bold">{a.id}</td>
+                      <td className="font-bold text-sm text-[var(--cel-text-primary, var(--color-text))] flex items-center gap-2">
+                        <span className="size-2 bg-[var(--cel-crimson, var(--err-DEFAULT))] border border-black rotate-45" />
+                        {a.name}
+                      </td>
+                      <td><StatusPill value={a.status} size="xs" /></td>
+                      <td className="text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] font-mono">{a.role}</td>
+                      <td className="font-mono text-xs text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">{a.started_at ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Tactical 3D Mechanical Protocols */}
@@ -190,9 +352,20 @@ export default function AgentsPage() {
             </div>
           </div>
 
-          {/* Live Activity Feed — Styled with Manga Comms Bubble */}
+          {/* Live Activity Feed — 占位演示 (诚实标注, 不冒充真实通信流) */}
           <div className="card" data-testid="live-activity-placeholder">
-            <SectionTitle>Comms Stream 〔通信ログ・指令ストリーム〕</SectionTitle>
+            <SectionTitle
+              action={
+                <span
+                  data-testid="agents-comms-placeholder"
+                  className="text-[10px] font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
+                >
+                  {t.agentCenter.commsPlaceholder}
+                </span>
+              }
+            >
+              Comms Stream 〔通信ログ・指令ストリーム〕
+            </SectionTitle>
             <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage, var(--color-surface))] shadow-soft text-sm space-y-2.5">
               <div className="flex items-center justify-between border-b border-black pb-1.5 text-xs font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">
                 <span className="text-[var(--cel-crimson, var(--err-DEFAULT))] font-bold">// TACTICAL SPEECH STREAM</span>
@@ -339,24 +512,42 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            {/* Quick 3D Tactile Action Buttons */}
+            {/* Quick 3D Tactile Action Buttons — 真实动作 (per 2026-11-17) */}
             <div className="mt-4 pt-3 border-t-2 border-black flex flex-col gap-2 items-center">
               <CelButton3D
                 label="01 // SYNC WORKTREE"
-                sublabel="IDEMPOTENT MERGE"
+                sublabel="RELOAD ROSTER FROM RUNTIME"
                 variant="cyan"
+                disabled={!actionsReachable || actionBusy}
                 onClick={() => {
-                  alert("【3D 触觉派发】WORKSPACE 同步完成：代理人工作树状态机校验通过，0 冲突。");
+                  void runSync();
                 }}
               />
               <CelButton3D
                 label="02 // RUN VERIFY"
-                sublabel="CARGO --LIB -J 4"
+                sublabel="PING /API/V1/HEALTH"
                 variant="gold"
+                disabled={!actionsReachable || actionBusy}
                 onClick={() => {
-                  alert("【3D 触觉派发】CARGO 完整守门通过：--workspace --lib -j 4 零错误！");
+                  void runVerify();
                 }}
               />
+              {!actionsReachable && (
+                <span
+                  data-testid="agents-actions-disabled-hint"
+                  className="text-[10px] font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
+                >
+                  {t.agentCenter.actionsDisabledHint}
+                </span>
+              )}
+              {actionResult !== null && (
+                <div
+                  data-testid="agents-action-result"
+                  className="w-full text-center text-[11px] font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] border border-[var(--cel-cyan, var(--accent-DEFAULT))]/40 bg-[var(--cel-cyan, var(--accent-DEFAULT))]/10 px-2 py-1.5 rounded"
+                >
+                  {actionResult}
+                </div>
+              )}
             </div>
           </div>
         </div>
