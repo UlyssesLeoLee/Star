@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3dc373e4c7549702c56f7f304e771266ed4de8eb48c1d0e16fbbda5dd575acc2
+@cypher schema=1 source_sha256=08325aafdcd95276724f475a938e85a4af7fe8ffc0e085f66d3552854abf9f2e
 MERGE (self:File {path:"frontend/src/components/chat/RightChatRail.tsx"})
 MERGE (rail:Symbol {id:"frontend/src/components/chat/RightChatRail.tsx::RightChatRail",kind:"component"})
 MERGE (panel:Symbol {id:"frontend/src/components/chat/SideChatPanel.tsx::SideChatPanel",kind:"component"})
@@ -18,11 +18,12 @@ MERGE (self)-[:IMPORTS]->(panel)
 // =====================================================================
 
 import { useEffect, useState } from "react";
-import { MessageSquare, PanelRightClose, PanelRightOpen, Braces } from "lucide-react";
+import { MessageSquare, PanelRightClose, PanelRightOpen, Braces, MessagesSquare } from "lucide-react";
 import { clsx } from "clsx";
 import { SideChatPanel } from "./SideChatPanel";
 import { useChatStore, CHAT_MODELS, type ChatEffort } from "@/lib/chat/chatStore";
 import { ContextPanel, estimateTokens } from "@/components/agent/ContextPanel";
+import { DmCenterPanel } from "@/components/chat/DmCenterPanel";
 import { useTranslation } from "@/lib/i18n";
 
 export function RightChatRail() {
@@ -32,6 +33,7 @@ export function RightChatRail() {
   const setChatScope = useChatStore((s) => s.setChatScope);
   const activeTopicId = useChatStore((s) => s.activeTopicId);
   const [ctxOpen, setCtxOpen] = useState(false);
+  const [dmOpen, setDmOpen] = useState(false);
   const [ctxCompactState, setCtxCompactState] = useState<"idle" | "compacting" | "done" | "failed">("idle");
 
   const activeTopic = topics.find((tp) => tp.id === activeTopicId) ?? null;
@@ -192,6 +194,27 @@ const [open, setOpen] = useState(false);
               自动模式 {agentSettings.autoMode ? "ON" : "OFF"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* 用户间即时通信 (IM1.0 对齐 — DM/群聊) */}
+      {open && (
+        <div className="shrink-0 border-b border-line bg-bg-card">
+          <button
+            type="button"
+            data-testid="chat-rail-dm-toggle"
+            onClick={() => setDmOpen((v) => !v)}
+            className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[9px] font-semibold text-ink-dim hover:text-accent"
+          >
+            <MessagesSquare size={11} />
+            即时通信
+            <span className="ml-auto text-[8px] text-ink-mute">{dmOpen ? "收起" : "展开"}</span>
+          </button>
+          {dmOpen && (
+            <div className="max-h-80 overflow-hidden border-t border-line" data-testid="chat-rail-dm-panel">
+              <DmCenterPanel />
+            </div>
+          )}
         </div>
       )}
 
