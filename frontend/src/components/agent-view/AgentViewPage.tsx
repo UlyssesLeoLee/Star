@@ -1,6 +1,6 @@
 /*
-@cypher schema=1 source_sha256=b5cb2c7260cd2a0b10ea0a895805b678fedae3910bdd8207424d6987f2b0a040
-MERGE (self:File {path:"frontend/src/app/(app)/agent-view/page.tsx"})
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"frontend/src/components/agent-view/AgentViewPage.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})
 MERGE (agentCanvasTypes:File {path:"frontend/src/lib/agent-view/types.ts"})
@@ -12,6 +12,7 @@ MERGE (agentSettingsTab:File {path:"frontend/src/components/agent/AgentSettingsT
 MERGE (pageHeader:File {path:"frontend/src/components/PageHeader.tsx"})
 MERGE (store:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentRelationships:File {path:"frontend/src/app/(app)/agent-relationships/AgentViewTab.tsx"})
+MERGE (workflowBuilder:File {path:"frontend/src/components/agent-workflow/WorkflowBuilder.tsx"})
 MERGE (i18n:File {path:"frontend/src/lib/i18n/index.ts"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
@@ -28,7 +29,9 @@ MERGE (self)-[:IMPORTS]->(agentSettingsTab)
 MERGE (self)-[:IMPORTS]->(pageHeader)
 MERGE (self)-[:IMPORTS]->(store)
 MERGE (self)-[:IMPORTS]->(agentRelationships)
+MERGE (self)-[:IMPORTS]->(workflowBuilder)
 MERGE (self)-[:IMPORTS]->(i18n)
+MERGE (self)-[:DEFINES]->(agentViewPage)
 MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
 @endcypher
 */
@@ -37,7 +40,9 @@ MERGE (agentViewPage)-[:CALLS]->(agentKindDisplayLabel)
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 
 // =====================================================================
-// /agent-view — Agent 工作区画布、关系和配置视图
+// AgentViewPage — Agent 工作区画布、关系和配置视图
+// (per 2026-11-16: /agent-view 路由页删除, 组件迁至 components/agent-view/,
+//  Canvas「Agent 画布」标签以 canvas-only 变体复用)
 // =====================================================================
 // Agent、Worktree、Task 和关系视图复用当前共享 store 数据。
 // =====================================================================
@@ -65,8 +70,8 @@ import {
   commit as commitStep, canUndo, canRedo,
   type AnnotationHistoryState,
 } from "@/lib/agent-view/annotationHistory";
-import { AgentCanvasView } from "@/components/agent-view/AgentCanvasView";
-import { AgentFilter } from "@/components/agent-view/AgentFilter";
+import { AgentCanvasView } from "./AgentCanvasView";
+import { AgentFilter } from "./AgentFilter";
 import { AgentSettingsTab } from "@/components/agent/AgentSettingsTab";
 import { PageHeader } from "@/components/PageHeader";
 import { Bot, AlertTriangle, Maximize2, LayoutDashboard, Settings, Network, Workflow } from "lucide-react";
@@ -423,15 +428,4 @@ export function AgentViewPage({ variant }: {
       <AgentViewContent variant={variant} />
     </Suspense>
   );
-}
-
-/**
- * /agent-view 路由页 (per 2026-11-15 用户发令: Agent 中心界面不要了 —
- *   无限画布类 (agent 关系图等) 全部合并进 canvas 界面)
- *   AgentViewPage 组件本身保留 — canvas「Agent 画布」tab 仍复用其 canvas-only 变体
- */
-import { redirect } from "next/navigation";
-
-export default function AgentViewRoutePage() {
-  redirect("/canvas/canvas-001?tab=relation");
 }

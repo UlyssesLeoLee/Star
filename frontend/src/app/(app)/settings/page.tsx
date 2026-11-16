@@ -1,8 +1,11 @@
 /*
-@cypher schema=1 source_sha256=bc97454f1542cc9b2c0cfcfac4860d53ef74463747bf8cac910304204c44e3d9
+@cypher schema=1 source_sha256=dc949fdbc278f1ffad5ef74402f44aae7bb57d05be76adec9c2fc53c5c8cecac
 MERGE (self:File {path:"frontend/src/app/(app)/settings/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::SettingsPage",kind:"component"})
+MERGE (hooksSettingsPanel:Symbol {id:"frontend/src/components/settings/HooksSettingsPanel.tsx::HooksSettingsPanel",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(hooksSettingsPanel)
+MERGE (page)-[:CALLS]->(hooksSettingsPanel)
 @endcypher
 */
 // =====================================================================
@@ -41,6 +44,9 @@ import { IdentityPanel, ProfilePanel, PermissionPanel, TenantPanel } from "@/com
 import { IntegrationPanels } from "@/components/settings/IntegrationPanels";
 import { ModDirectory } from "@/components/settings/ModDirectory";
 import { MemorySettingsPanel } from "@/components/settings/MemorySettingsPanel";
+import { HooksSettingsPanel } from "@/components/settings/HooksSettingsPanel";
+import { McpSettingsPanel } from "@/components/settings/McpSettingsPanel";
+import { SkillsSettingsPanel } from "@/components/settings/SkillsSettingsPanel";
 
 interface NavItem {
   id: string;
@@ -109,58 +115,7 @@ const MCP_SERVERS = [
   { name: "Sentry", auth: "Token", verified: "错误事件与发布追踪", kind: "官方 · 7 个工具", connected: false },
 ];
 
-function McpPanel() {
-  const [source, setSource] = useState<"official" | "custom">("official");
-  return (
-    <div data-testid="settings-panel-mcp">
-      <h2 className="text-base font-bold text-ink">MCP 服务器</h2>
-      <p className="text-xs text-ink-dim mt-1">官方目录一键安装，或自定义接入任意 MCP 服务器（原 /integration）</p>
 
-      <div className="mt-3 flex gap-1 border-b border-line">
-        {(["official", "custom"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSource(s)}
-            className={clsx(
-              "px-3 py-2 text-sm border-b-2 -mb-px",
-              source === s ? "border-accent text-accent font-semibold" : "border-transparent text-ink-dim",
-            )}
-          >
-            {s === "official" ? "官方目录" : "自定义"}
-          </button>
-        ))}
-      </div>
-
-      <ul className="mt-3 grid gap-2">
-        {MCP_SERVERS.map((srv) => (
-          <li key={srv.name} data-testid={`settings-mcp-${srv.name}`} className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-line bg-bg-card">
-            <div className="size-9 rounded-lg bg-accent/15 grid place-items-center text-accent shrink-0">
-              <Server size={15} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-ink">{srv.name}</span>
-                <span className="text-[10px] text-ink-mute">{srv.kind}</span>
-                {srv.connected && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-ok/10 text-ok font-semibold flex items-center gap-0.5">
-                    <Check size={10} /> 已连接
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-ink-dim mt-0.5">
-                {srv.verified} · <span className="font-mono">{srv.auth}</span>
-              </div>
-            </div>
-            <button type="button" className={clsx("text-xs px-2.5 py-1.5 rounded-lg", srv.connected ? "border border-line text-ink-dim" : "bg-accent text-white hover:bg-accent-soft")}>
-              {srv.connected ? "管理" : "安装"}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 function StubPanel({ id, label, realHref }: { id: string; label: string; realHref?: string }) {
   return (
@@ -259,7 +214,7 @@ function SettingsInner() {
           </div>
 
           {activeId === "mcp" ? (
-            <McpPanel />
+            <McpSettingsPanel />
           ) : activeId === "mod" ? (
             <ModDirectory />
           ) : activeId === "identity" ? (
@@ -272,8 +227,12 @@ function SettingsInner() {
             <TenantPanel />
           ) : activeId === "memory" ? (
             <MemorySettingsPanel projects={useStore((s) => s.projects)} />
+          ) : activeId === "hooks" ? (
+            <HooksSettingsPanel />
+          ) : activeId === "skills" ? (
+            <SkillsSettingsPanel />
           ) : activeId === "scm" || activeId === "automation" || activeId === "webhooks" ||
-            activeId === "skills" || activeId === "plugins" || activeId === "hooks" || activeId === "flags" ? (
+            activeId === "plugins" || activeId === "flags" ? (
             <IntegrationPanels active={activeId} />
           ) : (
             <StubPanel

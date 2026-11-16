@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=8a8f6bfdb3af7571c46ce88cdee3f344d96cf74167b7d1efded0dc919099ea4e
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -350,13 +350,15 @@ export const ALL_MODULES: ModuleDefinition[] = [
   {
     // Per 2026-09-05 11:25 JST 用户发令: 无限画布形式的 agent 视图, 自动选
     // 当前工作 agent, 关联 worktree + work-items (跟 kanban / worktree 共享 store)
+    // per 2026-11-16: /agent-view 路由删除 (redirect 移入 legacy 表) —
+    //   入口改为 Canvas「Agent 画布」标签 (?tab=agent)
     id: "agent-view",
     label: "Agent View",
     code: "AV",
-    href: "/agent-view",
+    href: "/canvas/canvas-001?tab=agent",
     category: "agent",
     categoryLabel: "Worktree / Agent",
-    description: "Agent 中心 (非无限画布: 工作流/设置) — Agent 无限画布在 Canvas 的 Agent 画布选项卡 (per 2026-11-15)",
+    description: "Canvas「Agent 画布」标签入口 (Agent 拓扑无限画布, per 2026-11-16 /agent-view 路由删除)",
     icon: Bot,
   },
   {
