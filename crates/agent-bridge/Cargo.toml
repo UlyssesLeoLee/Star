@@ -24,12 +24,9 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 futures-util = { workspace = true }
 
 graph-core = { path = "../graph-core" }
-git-adapter = { path = "../git-adapter" }
-git-observer = { path = "../git-observer" }
 
 [dev-dependencies]
 tokio = { workspace = true }

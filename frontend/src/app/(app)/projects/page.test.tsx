@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=99675dfe2ab3911cef8e3077a7c24b557c2ec607cf2a4f297d50c36d1e11402b
+@cypher schema=1 source_sha256=58b705473a0a6d3aa2bbdc735c7414a4a6ce2b0860286c3d661c00061440e539
 MERGE (self:File {path:"frontend/src/app/(app)/projects/page.test.tsx"})
 @endcypher
 */
@@ -22,27 +22,60 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
+// per 2026-11-16 清 seed/mock 显示入口: ProjectsClient 用 Group API 会话判定宿主接入 —
+// 测试默认模拟"宿主已接入" (既有用例断言 seed fixture 渲染),
+// 无宿主用例切换 client=null 验证诚实未接入态。
+const groupMockState = vi.hoisted(() => ({
+  client: null as unknown,
+  status: "unavailable" as "unavailable" | "ready" | "invalidated",
+}));
+
+vi.mock("@/lib/group/groupProjection", () => ({
+  useWorktreeGroupApi: () => groupMockState.client,
+  useWorktreeGroupSessionState: () => ({ status: groupMockState.status }),
+}));
+
 import ProjectsClient from "./ProjectsClient";
 import { I18nProvider } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
+import * as seed from "@/lib/seed";
 
 // per 2026-08-31 i18n 补缺口: PageHeader / Sidebar / AppHeader 等含 useTranslation() 必须包 I18nProvider
 function renderWithI18n(ui: ReactNode) {
   return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
 }
 
+// per 2026-11-16 store 初始 state 改为诚实空状态 (不喂 seed 兜底) —
+// 本文件用例断言 seed fixture 渲染, beforeEach 显式注入 (pattern 同 sprint/page.test.tsx)。
+function resetStore() {
+  if (typeof window !== "undefined") {
+    window.localStorage.clear();
+  }
+  useStore.setState({
+    projects: seed.projects,
+    workItems: seed.workItems,
+    sprints: seed.sprints,
+    milestones: seed.milestones,
+    board: seed.board,
+    identities: seed.identities,
+    workspaces: seed.workspaces,
+    canvases: seed.canvases,
+    worktrees: seed.worktrees,
+    relations: seed.relations,
+    agentSessions: seed.agentSessions,
+    changeSets: seed.changeSets,
+    repositories: seed.repositories,
+    pullRequests: seed.pullRequests,
+  } as never);
+}
+
 describe("ProjectsPage", () => {
   beforeEach(() => {
     cleanup();
-    if (typeof window !== "undefined") {
-      window.localStorage.clear();
-    }
-    // 重置 store 状态 (persist 持久化可能带入其他测试的状态)
-    useStore.setState((s) => ({
-      ...s,
-      workItems: s.workItems,
-      board: s.board,
-    }));
+    // 默认模拟宿主已接入 (per 2026-11-16: 既有用例断言 seed fixture 渲染)
+    groupMockState.client = {};
+    groupMockState.status = "ready";
+    resetStore();
   });
 
   it("renders project switcher + 5 tabs by default", () => {
@@ -191,5 +224,32 @@ describe("ProjectsPage", () => {
     );
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
     expect(screen.queryByTestId("projects-kanban-tab")).toBeNull();
+  });
+
+  // =====================================================================
+  // per 2026-11-16 清 seed/mock 显示入口: 无宿主会话 (网页预览模式) 时
+  // Kanban/Backlog 不渲染本地 seed 任务卡, 改诚实未接入态 + 预览模式徽标。
+  // =====================================================================
+
+  it("无宿主会话: Kanban tab 显示诚实未接入态, 不渲染 seed 任务卡", () => {
+    groupMockState.client = null;
+    groupMockState.status = "unavailable";
+    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    // 预览模式诚实徽标 + 未接入 StatusNotice + 看板诚实提示
+    expect(screen.getByTestId("projects-data-source")).toBeTruthy();
+    expect(screen.getByTestId("kanban-unavailable")).toBeTruthy();
+    expect(screen.getByTestId("status-notice-disconnected")).toBeTruthy();
+    expect(screen.getByTestId("kanban-preview-hint")).toBeTruthy();
+    // seed 看板不渲染
+    expect(screen.queryByTestId("kanban-board")).toBeNull();
+  });
+
+  it("无宿主会话: Backlog tab 显示诚实未接入态, 不渲染 seed 任务列表", () => {
+    groupMockState.client = null;
+    groupMockState.status = "unavailable";
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
+    expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
+    expect(screen.getByTestId("status-notice-disconnected")).toBeTruthy();
+    expect(screen.queryByTestId("backlog-item")).toBeNull();
   });
 });

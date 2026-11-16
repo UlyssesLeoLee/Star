@@ -20,10 +20,6 @@ path = "src/lib.rs"
 [dependencies]
 # 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
 wasm-bindgen = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde-wasm-bindgen = { workspace = true }
-thiserror = { workspace = true }
 
 # 复用现有 layout-engine crate (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
 layout-engine = { path = "../layout-engine" }

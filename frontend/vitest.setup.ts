@@ -100,6 +100,67 @@ if (typeof HTMLCanvasElement !== "undefined") {
   };
 }
 
+// =====================================================================
+// .nema WASM codec 加载 (per 2026-11-16 用户明确: .nema 是自创文件格式,
+//   CI 门禁必须正确理解它 — 不能把它当"外来依赖缺失"跳过)
+//
+// 背景: nema.ts 的 loadNemaWasm() 用
+//   new URL("./wasm/nema_codec_wasm_bg.wasm", import.meta.url)
+//   + fetch() 读取字节 → mod.initSync({ module }) 做真解析 (非 JS fallback)。
+//   vitest (jsdom) 下没有 dev server, 该相对 URL 的 fetch 会被 MSW 接管后
+//   失败 (ECONNRESET) → 落 JS fallback → profile 相关断言全红。
+//
+// 修法: 在 MSW 层给 .wasm 路径加 handler, 返回仓库内真实 wasm 字节,
+//   initSync 仍走真解析路径 → 测的是真 codec, 不是 mock。
+//   (守门 #25 v25: 集成测试不发真 HTTP — 这里是本地文件字节, 非网络)
+// =====================================================================
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { http, HttpResponse } from "msw";
+
+const NEMA_WASM_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "src/lib/nema/wasm/nema_codec_wasm_bg.wasm",
+);
+
+let nemaWasmBytes: Uint8Array | null = null;
+function loadNemaWasmBytes(): Uint8Array {
+  if (!nemaWasmBytes) {
+    nemaWasmBytes = new Uint8Array(readFileSync(NEMA_WASM_PATH));
+  }
+  return nemaWasmBytes;
+}
+
+server.use(
+  http.get("*/nema_codec_wasm_bg.wasm", () => {
+    const bytes = loadNemaWasmBytes();
+    return HttpResponse.bytes(bytes, {
+      headers: { "content-type": "application/wasm" },
+    });
+  }),
+);
+
+// ---------------------------------------------------------------------
+// file:// 协议不走 MSW — nema.ts 用 import.meta.url 解析 wasm 路径,
+//   vitest (node/jsdom) 下得到 file:///... → undici fetch 不支持该协议
+//   (ECONNRESET)。此处在 fetch 层兜底: file:// → 读本地真实字节并返回。
+//   字节是真的, initSync 真解析 — 不是 mock。
+// ---------------------------------------------------------------------
+const originalFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (raw.startsWith("file://")) {
+    const filePath = fileURLToPath(raw);
+    const bytes = new Uint8Array(readFileSync(filePath));
+    return new Response(bytes.slice().buffer, {
+      status: 200,
+      headers: { "content-type": "application/wasm" },
+    });
+  }
+  return originalFetch(input as RequestInfo, init);
+}) as typeof fetch;
+
 beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

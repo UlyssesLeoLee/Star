@@ -18,7 +18,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-uuid = { workspace = true }
 
 # CLI 仅 bin 使用 (per brief §1.1.5 clap derive);
 # 加在 [dependencies] 是 bin 派生宏所必需 (编译期).

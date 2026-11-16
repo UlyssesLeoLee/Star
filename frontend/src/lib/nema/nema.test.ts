@@ -88,16 +88,16 @@ describe(".NEMA 文件即任务规则", () => {
     useNemaStore.setState({ nemaTasks: [] });
   });
 
-  it("编辑者 < 2 不产生 .nema (共同编辑才触发)", () => {
-    const entry = useNemaStore
+  it("编辑者 < 2 不产生 .nema (共同编辑才触发)", async () => {
+    const entry = await useNemaStore
       .getState()
       .registerSharedFile({ filePath: "a.md", title: "Solo", editors: ["alice"] });
     expect(entry).toBeNull();
     expect(useNemaStore.getState().nemaTasks.length).toBe(0);
   });
 
-  it("编辑者 ≥ 2 自动产生 .nema 侧车", () => {
-    const entry = useNemaStore.getState().registerSharedFile({
+  it("编辑者 ≥ 2 自动产生 .nema 侧车", async () => {
+    const entry = await useNemaStore.getState().registerSharedFile({
       filePath: "docs/shared.md",
       title: "SharedDoc",
       editors: ["alice", "bob"],
@@ -108,11 +108,11 @@ describe(".NEMA 文件即任务规则", () => {
     expect(useNemaStore.getState().nemaTasks.length).toBe(1);
   });
 
-  it("同 path 重复登记幂等复用 (不产生第二条)", () => {
-    const first = useNemaStore
+  it("同 path 重复登记幂等复用 (不产生第二条)", async () => {
+    const first = await useNemaStore
       .getState()
       .registerSharedFile({ filePath: "x.md", title: "X", editors: ["a", "b"] });
-    const second = useNemaStore
+    const second = await useNemaStore
       .getState()
       .registerSharedFile({ filePath: "x.md", title: "X", editors: ["a", "b", "c"] });
     expect(second?.id).toBe(first?.id);
@@ -120,8 +120,8 @@ describe(".NEMA 文件即任务规则", () => {
     expect(useNemaStore.getState().nemaTasks.length).toBe(1);
   });
 
-  it("打开为 Star 任务: 创建 WorkItem 并绑定", () => {
-    const entry = useNemaStore.getState().registerSharedFile({
+  it("打开为 Star 任务: 创建 WorkItem 并绑定", async () => {
+    const entry = await useNemaStore.getState().registerSharedFile({
       filePath: "docs/task.md",
       title: "TaskFile",
       editors: ["a", "b"],

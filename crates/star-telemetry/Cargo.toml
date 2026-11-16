@@ -19,10 +19,8 @@ description = "STAR Token Telemetry (Phase G.9) — token 计量 + Prometheus �
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 async-trait = { workspace = true }
 
 [lints]

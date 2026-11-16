@@ -1,8 +1,22 @@
 /*
-@cypher schema=1 source_sha256=73c0342afd4fe93465efe8a3c428fb9b9f5999c2bc3d70e6a52149aeff3f1e5e
+@cypher schema=1 source_sha256=3dd208b3e4a4f50eb16cfb582487f1fb2fc659a7fc5a38649547d73b242d0433
 MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::NemaPage",kind:"component"})
+MERGE (load_profiles:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::loadInterpreterProfiles",kind:"effect"})
+MERGE (format_preview:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::formatProfilePreview",kind:"effect"})
+MERGE (nema:File {path:"frontend/src/lib/nema/nema.ts"})
+MERGE (store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
+MERGE (watcher:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
 MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(nema)
+MERGE (self)-[:IMPORTS]->(store)
+MERGE (self)-[:IMPORTS]->(watcher)
+MERGE (page)-[:CALLS]->(load_profiles)
+MERGE (page)-[:CALLS]->(format_preview)
+MERGE (page)-[:CALLS]->(store)
+MERGE (page)-[:CALLS]->(watcher)
+MERGE (load_profiles)-[:CALLS]->(nema)
+MERGE (format_preview)-[:CALLS]->(nema)
 @endcypher
 */
 // =====================================================================
@@ -13,7 +27,7 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileCode2,
@@ -31,6 +45,14 @@ import {
 import { clsx } from "clsx";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { useNemaWatcher } from "@/lib/nema/nemaWatcher";
+import {
+  listNemaInterpreterProfilesWasm,
+  loadNemaWasm,
+  nemaDocumentForSharedFile,
+  NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  serializeNemaWithProfileWasm,
+  type NemaInterpreterProfile,
+} from "@/lib/nema/nema";
 import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 
 const PIPELINE = ["① 路由拆分", "② 并行编辑", "③ 语义合并", "④ 生成代码", "⑤ 验证"] as const;
@@ -45,22 +67,6 @@ const CODE_FILES = [
 const DOC_FILES = [
   { name: "relation-detail-design.md", people: 2, kind: "doc" },
   { name: "单测清单.sheet", people: 1, kind: "sheet" },
-];
-
-const NEMA_LINES = [
-  { tag: "1", cls: "text-err", text: "!NEMAT1" },
-  { tag: "2", cls: "text-accent", text: "?1 REV 3" },
-  { tag: "3", cls: "text-ink", text: "BFS 环检测" },
-  { tag: "4", cls: "text-ink", text: "防止遍历死循环" },
-  { tag: "5", cls: "text-ink", text: "访问集 + 路径栈判回边", who: "Agent A1" },
-  { tag: "6", cls: "text-ink", text: "Agent A1, Agent A2, 林" },
-  { tag: "7", cls: "text-accent", text: "\\2 REV 2" },
-  { tag: "8", cls: "text-ink-dim", text: "# 子任务 状态 负责人" },
-  { tag: "9", cls: "text-ink", text: "回边判定 完成 A1", who: "Agent A1" },
-  { tag: "10", cls: "text-ink", text: "环路径输出 进行中 A2", who: "Agent A2" },
-  { tag: "11", cls: "text-ink", text: "深度上限 待定 林", who: "林" },
-  { tag: "12", cls: "text-accent", text: "\\>3 REV 1" },
-  { tag: "13", cls: "text-ink", text: "bfs>calls>graph 邻接查询" },
 ];
 
 const CODE_LINES = [
@@ -85,12 +91,66 @@ export default function NemaPage() {
   const [filePath, setFilePath] = useState("");
   const [title, setTitle] = useState("");
   const [editorsText, setEditorsText] = useState("");
+  const [profiles, setProfiles] = useState<NemaInterpreterProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState<NemaInterpreterProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      if (!(await loadNemaWasm())) throw new Error("Rust NEMA interpreter could not be loaded");
+      const installed = await listNemaInterpreterProfilesWasm();
+      if (!active) return;
+      setProfiles(installed);
+      setSelectedProfile(
+        installed.find((profile) => profile.grammar_revision === NEMA_DEFAULT_NEW_DOCUMENT_REVISION) ?? null,
+      );
+      if (!installed.some((profile) => profile.grammar_revision === NEMA_DEFAULT_NEW_DOCUMENT_REVISION)) {
+        setProfileError(`未安装默认语法 profile: ${NEMA_DEFAULT_NEW_DOCUMENT_REVISION}`);
+      }
+    })().catch((error: unknown) => {
+      if (active) setProfileError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProfile) {
+      setPreviewSource("");
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const document = nemaDocumentForSharedFile(
+        {
+          filePath: "src/graph/bfs.rs",
+          title: "BFS 环检测",
+          editors: ["Agent A1", "Agent A2", "林"],
+          purpose: "防止遍历死循环",
+          method: "访问集 + 路径栈判回边",
+          environment: "Worktree",
+        },
+        new Date("2026-11-15T08:00:00.000Z"),
+      );
+      const source = await serializeNemaWithProfileWasm(document, selectedProfile);
+      if (active) setPreviewSource(source);
+    })().catch((error: unknown) => {
+      if (active) setProfileError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, [selectedProfile]);
 
   // ---- 真实功能接线 ----
   const nemaTasks = useNemaStore((s) => s.nemaTasks);
   const registerSharedFile = useNemaStore((s) => s.registerSharedFile);
   const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
-  const nemaWatcher = useNemaWatcher([""]);
+  const nemaWatcher = useNemaWatcher([""], undefined, selectedProfile);
+  const nemaLines = previewSource.split(/\r?\n/).filter(Boolean).map((text, index) => ({
+    tag: String(index + 1),
+    cls: text.trimStart().startsWith("\\") ? "text-accent" : "text-ink",
+    text,
+  }));
 
   const taskRows = nemaTasks.filter((x) => x.workItemId).map((x) => ({
     id: x.workItemId ?? x.id,
@@ -113,14 +173,19 @@ export default function NemaPage() {
     .filter((x) => /\.(md|sheet)$/i.test(x.filePath))
     .map((x) => ({ name: x.filePath.split("/").pop() ?? x.filePath, people: x.editors.length, task: x }));
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const editors = editorsText.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean);
-    if (!filePath.trim() || editors.length === 0) return;
-    registerSharedFile({ filePath: filePath.trim(), title: title.trim(), editors });
-    setShowForm(false);
-    setFilePath("");
-    setTitle("");
-    setEditorsText("");
+    if (!filePath.trim() || editors.length === 0 || !selectedProfile) return;
+    try {
+      await registerSharedFile({ filePath: filePath.trim(), title: title.trim(), editors }, selectedProfile);
+      setShowForm(false);
+      setFilePath("");
+      setTitle("");
+      setEditorsText("");
+      setProfileError(null);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   return (
@@ -205,8 +270,8 @@ export default function NemaPage() {
                       <button
                         type="button"
                         data-testid={`nema-open-task-${f.name}`}
-                        onClick={() => {
-                          const wid = openNemaAsStarTask(f.task.id);
+                        onClick={async () => {
+                          const wid = await openNemaAsStarTask(f.task.id);
                           if (wid) router.push(`/work-item/${wid}`);
                         }}
                         className="text-[10px] text-accent hover:underline"
@@ -249,19 +314,41 @@ export default function NemaPage() {
                 <span className="text-xs font-semibold text-accent">注册共享文件（共同编辑 ≥2 人）</span>
                 <button type="button" onClick={() => setShowForm(false)} className="text-ink-mute hover:text-ink-dim"><X size={12} /></button>
               </div>
+              <label className="block space-y-1 text-[11px] text-ink-dim">
+                <span>解释器语法版本（新导入文件也使用此版本；已登记文件保持原 profile）</span>
+                <select
+                  aria-label="NEMA interpreter profile"
+                  value={selectedProfile?.grammar_revision ?? ""}
+                  onChange={(event) => setSelectedProfile(profiles.find((profile) => profile.grammar_revision === event.target.value) ?? null)}
+                  className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs font-mono"
+                >
+                  <option value="" disabled>选择已安装的 Rust profile</option>
+                  {profiles.map((profile) => (
+                    <option key={`${profile.plugin_id}:${profile.plugin_version}:${profile.grammar_revision}`} value={profile.grammar_revision}>
+                      {profile.grammar_revision} · {profile.plugin_id}@{profile.plugin_version}
+                    </option>
+                  ))}
+                </select>
+                {profileError && <span role="status" className="block text-err">{profileError}</span>}
+              </label>
               <LocalFolderBrowser onPickFile={(p) => setFilePath(p)} />
               <input value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder="文件路径 (e.g. src/graph/bfs.rs)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs font-mono" />
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="任务标题 (可选)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs" />
               <input value={editorsText} onChange={(e) => setEditorsText(e.target.value)} placeholder="编辑者 (逗号分隔, e.g. 林, Agent A1)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs" />
-              <button type="button" onClick={handleRegister} className="w-full text-xs py-1.5 rounded-lg bg-accent text-white hover:bg-accent-soft">
+              <button type="button" onClick={handleRegister} disabled={!selectedProfile} className="w-full text-xs py-1.5 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50">
                 注册并生成 .nema
               </button>
             </div>
           )}
 
           <div data-testid="nema-watcher-status" className="text-[10px] text-ink-mute font-mono">
-            {nemaWatcher.watching ? "● 文件监听中 (轮询 .nema 变化 → 任务回写)" : "○ 文件监听未启动"}
+            {nemaWatcher.watching
+              ? `● 文件监听中 · ${selectedProfile?.grammar_revision ?? "profile unavailable"}`
+              : profileError ?? "○ 正在加载 Rust NEMA interpreter profile"}
           </div>
+          {nemaWatcher.lastResult?.errors.slice(0, 3).map((error) => (
+            <div key={error} role="status" className="text-[10px] text-err font-mono truncate">{error}</div>
+          ))}
 
           <p className="text-[11px] text-ink-dim leading-relaxed bg-bg rounded-lg p-2.5 border border-line">
             每个文件可配 .nema 侧车。多人和多个 Agent 优先在 .nema 上并行编辑，汇总后再生成代码。
@@ -295,14 +382,15 @@ export default function NemaPage() {
           <section data-testid="nema-spec" className="bg-bg-card rounded-xl border border-line shadow-soft overflow-hidden">
             <header className="px-3 py-2.5 border-b border-line flex items-center justify-between">
               <span className="font-mono text-xs font-semibold text-ink">bfs.rs.nema</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent font-semibold">权威规约 · REV 3</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent font-semibold">
+                Rust profile · {selectedProfile?.grammar_revision ?? "loading"}
+              </span>
             </header>
             <div className="font-mono text-xs leading-relaxed">
-              {NEMA_LINES.map((line, i) => (
+              {nemaLines.map((line, i) => (
                 <div key={i} className={clsx("flex gap-3 px-3 py-0.5 hover:bg-bg-soft/60", line.cls)}>
                   <span className="w-6 text-right text-ink-mute select-none shrink-0">{line.tag}</span>
                   <span className="flex-1 whitespace-pre-wrap break-all">{line.text}</span>
-                  {line.who && <span className="text-[10px] text-ink-mute shrink-0 self-center">{line.who}</span>}
                 </div>
               ))}
             </div>

@@ -90,24 +90,24 @@ Worktree (git worktree)
 
 **核心原则**：左导航 (Sidebar) 是**结构性骨架层**，优先级高于任何内容面板。底部终端 / dock 面板 / 抽屉可以滑动到导航下方，但**绝不允许**绘制在导航之上。
 
-#### 0.5.1 当前代码现状 (git 实证)
+#### 0.5.1 当前代码现状 (代码实证, 2026-11-16)
 
 | 位置 | 现状 | 问题 |
 |------|------|------|
-| `frontend/src/app/layout.tsx:71-90` | `flex min-h-screen` → `Sidebar` 与内容列是 **flex 兄弟节点**，流式布局不重叠 | ✅ 根层正确 |
-| `frontend/src/components/Sidebar.tsx:135` | `sticky top-0 h-screen ... z-20` | ⚠️ `z-20` **低于**多数浮层，导航会被 `z-40/z-50` 覆盖 |
-| `frontend/src/app/layout.tsx:76-83` | 内容列 `relative h-100dvh overflow-y-auto`，**无 z-index** | ⚠️ 无显式层级，靠 DOM 顺序兜底 |
-| `frontend/src/app/worktree/[id]/group/page.tsx:3002` | `group-chat-bar` = `fixed ... z-40 md:left-[17rem] md:right-5` | 🔴 用**硬编码 `17rem`** 手工绕开导航 |
+| `frontend/src/app/layout.tsx:76-78` | `flex min-h-screen` → `Sidebar` 与内容列是 **flex 兄弟节点**，流式布局不重叠 | ✅ 根层正确 |
+| `frontend/src/components/Sidebar.tsx:118` | `sticky top-0 h-screen ... z-40` | ✅ 已为 `z-40`，高于内容级 dock (L3 `z-[35]`)，与 §0.5.2 一致 |
+| `frontend/src/app/layout.tsx:80-88` | 内容列 `relative`，**无 z-index**；高度与滚动由内联 style `height: 100dvh; overflowY: auto` 设置 | ⚠️ 无显式层级，靠 DOM 顺序兜底 |
+| `frontend/src/app/worktree/[id]/group/page.tsx:3399` | `group-chat-bar` = `fixed bottom-3 left-[calc(var(--sidebar-w,256px)_+_232px)] z-[55]`（`2xl` 下偏移为 252px；`right` 随右侧面板为 `348px`（`2xl` 为 `356px`）/ `52px`） | ⚠️ 左边界已改读 `var(--sidebar-w)`，`17rem` 魔法数字已移除；但 `232px` / `252px` 偏移仍为硬编码，INV-LAYOUT-03 仅部分满足；`z-[55]` 未登记在 §0.5.2 层级表中 |
 
-**根因**：`position: fixed` **逃逸 flex 流**，以 viewport 为定位基准，因此天然会横跨侧栏区域。当前不重叠不是因为架构正确，而是靠 `md:left-[17rem]` 这个魔法数字**恰好**挡住了。
+**根因**：`position: fixed` **逃逸 flex 流**，以 viewport 为定位基准，因此天然会横跨侧栏区域。当前 `group-chat-bar` 不横跨侧栏，是因为其左边界 = `var(--sidebar-w)` + 232px，依赖偏移量与侧栏宽度保持同步，而不是因为 fixed 定位本身受到约束。
 
-**`17rem` 硬编码的三重脆弱性**（`SIDEBAR_WIDTH = { expanded: "w-64"(256px/16rem), collapsed: "w-16"(64px/4rem) }`）：
+**`group-chat-bar` 左边界的残留风险**（`--sidebar-w` 取值见 `globals.css`：展开 256px、折叠 64px、`<768px` 为 0px）：
 
-| 侧栏状态 | 实际宽度 | `md:left-[17rem]` | 结果 |
+| 场景 | `--sidebar-w` | 左边界 (`left`) | 结果 |
 |---------|---------|-----------------|------|
-| 展开 | 256px (16rem) | 272px | 16px 空隙 ✅ 勉强正确 |
-| 折叠 | 64px (4rem) | 272px | **208px 死区** 🔴 浪费横向空间 |
-| 改宽度 | 任意 | 272px | 🔴 需同步改 3+ 处魔法数字 |
+| 展开 | 256px | 488px（`2xl` 为 508px） | 与侧栏右缘保持 232px 的固定偏移；侧栏改宽度时随变量同步 ✅ |
+| 折叠 | 64px | 296px（`2xl` 为 316px） | 随变量同步收缩 ✅ |
+| `<768px` | 0px | 232px | 侧栏不渲染，但偏移仍为 232px，左侧留出空白；代码中未见移动端覆盖，需在 `<768px` 实测确认 ⚠️ |
 
 #### 0.5.2 层级表 (z-index 分层契约)
 
@@ -116,7 +116,7 @@ Worktree (git worktree)
 | L0 背景 | `z-0` | `AppShell` ambient glow (`pointer-events-none`) | 永不接收指针事件 |
 | L1 内容 | `z-10` | `<main>` 内容列 + 页面主体 | 主滚动容器 |
 | L2 顶栏 | `z-30` | `AppHeader` (`sticky top-0`) | 横向通栏，可覆盖内容 |
-| **L3 底部 dock** | **`z-[35]`** | **FileSession 终端面板 / 底部面板** | 🔴 **必须 `left: var(--sidebar-w)`；被侧栏覆盖** |
+| **L3 底部 dock** | **`z-[35]`** | **FileSession 终端面板 / 底部面板**（当前代码中尚无使用 `z-[35]` 的元素） | 🔴 **必须 `left: var(--sidebar-w)`；被侧栏覆盖** |
 | **L4 侧栏** | **`z-40`** | **`Sidebar`** | 🔴 **垂直通栏，任何内容都不得覆盖** |
 | L5 抽屉 | `z-50` | 详情抽屉 / Modal（仅移动端全屏） | 移动端遮罩；桌面端不跨导航 |
 | L6 浮层 | `z-50` | `CommandBar` / ContextMenu / Popover | 临时浮层，Esc 关闭 |
@@ -144,7 +144,7 @@ Worktree (git worktree)
 ```
 
 ```tsx
-/* Sidebar.tsx — 从 z-20 提到 z-40，成为结构性骨架层 */
+/* Sidebar.tsx — z-40，结构性骨架层 */
 <aside className="... sticky top-0 h-screen z-40 ..." />
 
 /* 底部 dock 终端 — 尊重侧栏宽度，被侧栏覆盖 */

@@ -17,7 +17,6 @@ description = "STAR PostgreSQL Adapter (F-05b v0.37 立新工作项, 跨 session
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 # PostgreSQL 驱动 (workspace 已有, 共享)

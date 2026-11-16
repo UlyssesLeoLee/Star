@@ -19,15 +19,12 @@ path = "src/lib.rs"
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
 
 graph-core = { path = "../graph-core" }
-git-adapter = { path = "../git-adapter" }
 
 [dev-dependencies]
 tokio = { workspace = true }

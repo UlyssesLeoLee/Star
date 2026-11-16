@@ -85,8 +85,6 @@ async-stream = { version = "0.3", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# async-trait + thiserror (跟根 [workspace.dependencies] 一致)
-async-trait = "0.1"
 thiserror = "1"
 
 # ID / 时间 (跟根 [workspace.dependencies] 一致)
@@ -97,10 +95,7 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 # 守门 #1 禁回溯叙事: 0 改根 Cargo.toml [workspace] members 任何行 (bff 是新独立 workspace, 不需要注册)
 # 守门 #11 缺标比错标: star-context / canvas-collab / arg-bridge / api 4 path 依赖, 0 重复加
 # 注: crates/api package name = "api" (非 "star-api"), crates/arg-bridge package name = "star-arg-bridge" (per root Cargo.toml)
-star-context = { path = "../crates/star-context" }
 canvas-collab = { path = "../crates/canvas-collab" }
-star-arg-bridge = { path = "../crates/arg-bridge" }
-api = { path = "../crates/api" }
 
 # ULYS-57.4 (2026-09-17) 3 新增 path 依赖 (仅 worktree_canvas feature 用)
 # 守门 #11: 0 重复加 [workspace.dependencies] (graph-core/git-adapter/git-observer 是新 crate, per 57.1 T1+T2)

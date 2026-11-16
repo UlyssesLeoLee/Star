@@ -20,14 +20,12 @@ path = "src/lib.rs"
 # 守门 #11 缺标比错标: 所有依赖全部来自 [workspace.dependencies] 现存 0 重复
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 # wasm32 目标下 tokio 只需 sync (RwLock), full 的 net/time 会带 mio (wasm 不编译)
 # per WBS 10.1.5: workspace 继承的 features 是并集 (无法移除 full), 故独立声明
 tokio = { version = "1.40", default-features = false, features = ["sync"] }
-tracing = { workspace = true }
 
 # wasm32 目标: uuid v4 随机源用 js (getrandom), per WBS 10.1.5
 [target.'cfg(target_arch = "wasm32")'.dependencies]

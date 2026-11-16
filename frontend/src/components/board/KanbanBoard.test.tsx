@@ -324,4 +324,62 @@ describe("KanbanBoard", () => {
     expect(onTransition).toHaveBeenCalledTimes(1);
     expect(onTransition).toHaveBeenCalledWith("wi-W1", "review");
   });
+
+  // =====================================================================
+  // 诚实未接入/未授权态 (per 2026-11-16 清 seed/mock 显示入口):
+  // unavailableState 非空时不渲染本地 seed 任务卡, 改渲染 StatusNotice +
+  // 预览模式诚实提示
+  // =====================================================================
+
+  // ---- Test 9: unavailableState=disconnected — 渲染 StatusNotice, 不渲染列/卡片 ----
+  it("unavailableState 非空时渲染 StatusNotice + 预览提示, 不渲染列/卡片", () => {
+    renderWithI18n(
+      <KanbanBoard
+        board={mockBoard}
+        workItems={mockWorkItems}
+        identities={mockIdentities}
+        onTransition={vi.fn()}
+        unavailableState="disconnected"
+      />,
+    );
+
+    expect(screen.getByTestId("kanban-unavailable")).toBeTruthy();
+    expect(screen.getByTestId("status-notice-disconnected")).toBeTruthy();
+    expect(screen.getByTestId("kanban-preview-hint")).toBeTruthy();
+    // seed 列/卡片不渲染 (不当真任务)
+    expect(screen.queryByTestId("kanban-board")).toBeNull();
+    expect(screen.queryByTestId("kanban-card-wi-1")).toBeNull();
+  });
+
+  // ---- Test 10: unavailableState=unauthorized — 未授权态 ----
+  it("unavailableState=unauthorized 时显示未授权 StatusNotice", () => {
+    renderWithI18n(
+      <KanbanBoard
+        board={mockBoard}
+        workItems={mockWorkItems}
+        identities={mockIdentities}
+        onTransition={vi.fn()}
+        unavailableState="unauthorized"
+      />,
+    );
+
+    expect(screen.getByTestId("status-notice-unauthorized")).toBeTruthy();
+    expect(screen.getByText(/未授权 — 看板数据不可用/)).toBeTruthy();
+  });
+
+  // ---- Test 11: 默认 (不传 unavailableState) 保持旧渲染行为 ----
+  it("不传 unavailableState 时沿用旧渲染 (列 + 卡片)", () => {
+    renderWithI18n(
+      <KanbanBoard
+        board={mockBoard}
+        workItems={mockWorkItems}
+        identities={mockIdentities}
+        onTransition={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("kanban-board")).toBeTruthy();
+    expect(screen.getByTestId("kanban-card-wi-1")).toBeTruthy();
+    expect(screen.queryByTestId("kanban-unavailable")).toBeNull();
+  });
 });

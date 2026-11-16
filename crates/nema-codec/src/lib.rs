@@ -1,3 +1,16 @@
+/*
+@cypher schema=1 source_sha256=20b48071898dc2cde82352ead1327b5ab0bbbe6ded65c1d927d8b579d5a2e7b4
+MERGE (self:File {path:"crates/nema-codec/src/lib.rs"})
+MERGE (strict_file:File {path:"crates/nema-codec/src/strict.rs"})
+MERGE (plugin_file:File {path:"crates/nema-codec/src/interpreter_plugin.rs"})
+MERGE (strict_module:Symbol {id:"crates/nema-codec/src/lib.rs::strict",kind:"module"})
+MERGE (plugin_module:Symbol {id:"crates/nema-codec/src/lib.rs::interpreter_plugin",kind:"module"})
+MERGE (self)-[:DEFINES]->(strict_module)
+MERGE (self)-[:DEFINES]->(plugin_module)
+MERGE (self)-[:IMPORTS]->(strict_file)
+MERGE (self)-[:IMPORTS]->(plugin_file)
+@endcypher
+*/
 // =====================================================================
 // 移植自 IDE1.0 (E:\IDE1.0, HEAD a200e5d)
 //   源文件: crates/nema-codec/src/lib.rs (sha256 前缀 1a71ad20b81a161c)
@@ -20,6 +33,10 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 pub mod interpreter;
+/// Exact-profile dispatch for built-in and isolated NEMA interpreter plugins.
+pub mod interpreter_plugin;
+/// Versioned, lossless grammar snapshots used by the NEMA interpreter adapters.
+pub mod strict;
 pub use interpreter::*;
 
 /// 最大源码/传输字节上限 (16 MiB)

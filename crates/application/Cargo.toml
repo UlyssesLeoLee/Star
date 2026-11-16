@@ -18,7 +18,6 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }

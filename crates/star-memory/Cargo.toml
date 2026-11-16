@@ -21,10 +21,8 @@ description = "STAR Memory Store (Phase G.6) — 短/长期 memory 分层, W 短
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 async-trait = { workspace = true }
 
 [lints]

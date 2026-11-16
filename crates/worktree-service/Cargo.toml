@@ -35,7 +35,6 @@ sqlx = { workspace = true, optional = true }
 # 单向依赖: worktree-service → graph-core + git-adapter + git-observer + worktree-shared-dir
 graph-core = { path = "../graph-core" }
 git-adapter = { path = "../git-adapter" }
-git-observer = { path = "../git-observer" }
 worktree-shared-dir = { path = "../worktree-shared-dir" }
 
 [features]

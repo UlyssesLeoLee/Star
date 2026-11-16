@@ -20,11 +20,8 @@ path = "src/lib.rs"
 # 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 async-trait = { workspace = true }
-regex = { workspace = true }
 uuid = { workspace = true }
-tracing = { workspace = true }
 
 # 跨 crate 引用: graph-core 提供 HumanState (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
 # 单向依赖: query-engine → graph-core

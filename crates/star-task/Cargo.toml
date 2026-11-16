@@ -15,13 +15,9 @@ description = "Star Task Lifecycle abstraction with a seven-state machine, revie
 [dependencies]
 # workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
 serde = { workspace = true }
-serde_json = { workspace = true }
 shared-task = { path = "../shared-task" }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
-star-registry = { path = "../star-registry" }
 
 [dev-dependencies]
 criterion = { workspace = true }

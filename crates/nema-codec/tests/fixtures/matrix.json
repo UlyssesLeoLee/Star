@@ -1,0 +1,2941 @@
+{
+  "matrix_sha256": "0e1ae91167227f595f7586fa2174b19cb0eab4458c72e00c5790de770130f7b3",
+  "parser_sha256": "88ed46594a2f8af6e2f735f3aa3b68fab42e88cae0a809defc66f8c05cb80891",
+  "cases": [
+    {
+      "id": "table-001",
+      "status": "valid",
+      "source": " \\1 1\nA B",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-002",
+      "status": "valid",
+      "source": " \\123 7\nA B",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 123,
+          "revision": 7,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-003",
+      "status": "error",
+      "source": " \\0 1\nA B"
+    },
+    {
+      "id": "table-004",
+      "status": "error",
+      "source": " \\01 1\nA B"
+    },
+    {
+      "id": "table-005",
+      "status": "error",
+      "source": "  \\1 1\nA B"
+    },
+    {
+      "id": "table-006",
+      "status": "error",
+      "source": " \\1\nA B"
+    },
+    {
+      "id": "table-007",
+      "status": "valid",
+      "source": " \\1 1\n\\# Name Status\nClaude Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\# Name Status",
+            "Claude Ready"
+          ],
+          "columns": [
+            "Name",
+            "Status"
+          ],
+          "records": [
+            {
+              "values": [
+                "Claude",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": true,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-008",
+      "status": "valid",
+      "source": " \\1 1\n\\# Name\nClaude",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\# Name",
+            "Claude"
+          ],
+          "columns": [
+            "Name"
+          ],
+          "records": [
+            {
+              "values": [
+                "Claude"
+              ]
+            }
+          ],
+          "explicit": true,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-009",
+      "status": "valid",
+      "source": " \\1 1\n\\# Full\\ Name Status\nClaude Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\# Full\\ Name Status",
+            "Claude Ready"
+          ],
+          "columns": [
+            "Full Name",
+            "Status"
+          ],
+          "records": [
+            {
+              "values": [
+                "Claude",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": true,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-010",
+      "status": "error",
+      "source": " \\1 1\n\\# Name Name\nClaude Ready"
+    },
+    {
+      "id": "table-011",
+      "status": "error",
+      "source": " \\1 1\n\\# Name \\e\nA B"
+    },
+    {
+      "id": "table-012",
+      "status": "error",
+      "source": " \\1 1\nA B\n\\# Name Status"
+    },
+    {
+      "id": "table-013",
+      "status": "valid",
+      "source": " \\1 1\nA",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A"
+          ],
+          "columns": [
+            "column1"
+          ],
+          "records": [
+            {
+              "values": [
+                "A"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-014",
+      "status": "valid",
+      "source": " \\1 1\nA B",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-015",
+      "status": "valid",
+      "source": " \\1 1\n~ Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "~ Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                null,
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-016",
+      "status": "valid",
+      "source": " \\1 1\n\\e Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\e Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-017",
+      "status": "valid",
+      "source": " \\1 1\n\\_ Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\_ Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-018",
+      "status": "valid",
+      "source": " \\1 1\n\\_ \\_ \\_",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\_ \\_ \\_"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-019",
+      "status": "error",
+      "source": " \\1 1\nA B\nC D E"
+    },
+    {
+      "id": "table-020",
+      "status": "valid",
+      "source": " \\1 1\n\\%3",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\%3"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [],
+          "explicit": false,
+          "declared_width": 3
+        }
+      ]
+    },
+    {
+      "id": "table-021",
+      "status": "valid",
+      "source": " \\1 1\n\\%3\n\\_ \\_ Active",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\%3",
+            "\\_ \\_ Active"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                "Active"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": 3
+        }
+      ]
+    },
+    {
+      "id": "table-022",
+      "status": "error",
+      "source": " \\1 1\n\\%2\nA B C"
+    },
+    {
+      "id": "table-023",
+      "status": "error",
+      "source": " \\1 1\n\\%0"
+    },
+    {
+      "id": "table-024",
+      "status": "error",
+      "source": " \\1 1\n\\%2\n\\%3\nA B"
+    },
+    {
+      "id": "table-025",
+      "status": "valid",
+      "source": " \\1 1\nClaude Ready\nCodex Running",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "Claude Ready",
+            "Codex Running"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "Claude",
+                "Ready"
+              ]
+            },
+            {
+              "values": [
+                "Codex",
+                "Running"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-026",
+      "status": "valid",
+      "source": " \\1 1\nA ~ C",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A ~ C"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                null,
+                "C"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-027",
+      "status": "valid",
+      "source": " \\1 1\nA \\e C",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\e C"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "",
+                "C"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-028",
+      "status": "valid",
+      "source": " \\1 1\nA \\_ C",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\_ C"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                {
+                  "type": "missing"
+                },
+                "C"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-029",
+      "status": "error",
+      "source": " \\1 1\nA  B"
+    },
+    {
+      "id": "table-030",
+      "status": "error",
+      "source": " \\1 1\nA B "
+    },
+    {
+      "id": "table-031",
+      "status": "valid",
+      "source": " \\1 1\nNew\\ York Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "New\\ York Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "New York",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-032",
+      "status": "valid",
+      "source": " \\1 1\nA Ready\n Retrying",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A Ready",
+            " Retrying"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "ReadyRetrying"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-033",
+      "status": "valid",
+      "source": " \\1 1\nA B C\n  HTTP401",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B C",
+            "  HTTP401"
+          ],
+          "columns": [
+            "column1",
+            "column2",
+            "column3"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "CHTTP401"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-034",
+      "status": "error",
+      "source": " \\1 1\n Retrying"
+    },
+    {
+      "id": "table-035",
+      "status": "error",
+      "source": " \\1 1\nA ~\n Retry"
+    },
+    {
+      "id": "table-036",
+      "status": "error",
+      "source": " \\1 1\nA \\_\n Retry"
+    },
+    {
+      "id": "table-037",
+      "status": "valid",
+      "source": " \\1 1\nA \\e\n Retry",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\e",
+            " Retry"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "Retry"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "table-038",
+      "status": "error",
+      "source": " \\1 1\nA B\n  Retry"
+    },
+    {
+      "id": "5w1h-039",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-040",
+      "status": "valid",
+      "source": " \\?2 3\nBuildLogin",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 3,
+          "rows": [
+            "BuildLogin"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-041",
+      "status": "valid",
+      "source": " \\?2 1\nReady?",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "Ready?"
+          ],
+          "records": [
+            {
+              "values": [
+                "Ready?",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-042",
+      "status": "error",
+      "source": " \\? 1\nBuildLogin"
+    },
+    {
+      "id": "5w1h-043",
+      "status": "error",
+      "source": "  \\?2 1\nBuildLogin"
+    },
+    {
+      "id": "5w1h-044",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin PreventLeak VerifyToken AuthAgent OnRequest API",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin PreventLeak VerifyToken AuthAgent OnRequest API"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                "PreventLeak",
+                "VerifyToken",
+                "AuthAgent",
+                "OnRequest",
+                "API"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-045",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-046",
+      "status": "valid",
+      "source": " \\?2 1\n~ Why How",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "~ Why How"
+          ],
+          "records": [
+            {
+              "values": [
+                null,
+                "Why",
+                "How",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-047",
+      "status": "valid",
+      "source": " \\?2 1\n\\_ \\_ VerifyToken",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "\\_ \\_ VerifyToken"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                "VerifyToken",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-048",
+      "status": "valid",
+      "source": " \\?2 1\n\\_ \\_ \\_ \\_ \\_ API",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "\\_ \\_ \\_ \\_ \\_ API"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                "API"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-049",
+      "status": "valid",
+      "source": " \\?2 1\n~ ~ ~ ~ ~ ~",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "~ ~ ~ ~ ~ ~"
+          ],
+          "records": [
+            {
+              "values": [
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-050",
+      "status": "valid",
+      "source": " \\?2 1\n\\_ \\_ \\_ \\_ \\_ \\_",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "\\_ \\_ \\_ \\_ \\_ \\_"
+          ],
+          "records": [
+            {
+              "values": [
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-051",
+      "status": "error",
+      "source": " \\?2 1\nA B C D E F G"
+    },
+    {
+      "id": "5w1h-052",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin ReduceRisk\n PreventLeak",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin ReduceRisk",
+            " PreventLeak"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                "ReduceRiskPreventLeak",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-053",
+      "status": "valid",
+      "source": " \\?2 1\nA B C\n  RetryOnTimeout",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "A B C",
+            "  RetryOnTimeout"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "CRetryOnTimeout",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-054",
+      "status": "valid",
+      "source": " \\?2 1\nA B C D\n   Reviewer",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "A B C D",
+            "   Reviewer"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "C",
+                "DReviewer",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-055",
+      "status": "valid",
+      "source": " \\?2 1\nA B C D E\n    OnFailure",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "A B C D E",
+            "    OnFailure"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "C",
+                "D",
+                "EOnFailure",
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-056",
+      "status": "valid",
+      "source": " \\?2 1\nA B C D E F\n     AuthService",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "A B C D E F",
+            "     AuthService"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "FAuthService"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-057",
+      "status": "error",
+      "source": " \\?2 1\n ReduceRisk"
+    },
+    {
+      "id": "5w1h-058",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin\nMoreDetail",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin",
+            "MoreDetail"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            },
+            {
+              "values": [
+                "MoreDetail",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5w1h-059",
+      "status": "error",
+      "source": " \\?2 1\nA ~ C\n Retrying"
+    },
+    {
+      "id": "graph-060",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B Reads",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A>X>B Reads"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                "Reads"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-061",
+      "status": "valid",
+      "source": " \\>52 4\nA API",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 52,
+          "revision": 4,
+          "rows": [
+            "A API"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-062",
+      "status": "valid",
+      "source": " \\>3 1\nA API",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-063",
+      "status": "error",
+      "source": " \\> 1\nA API"
+    },
+    {
+      "id": "graph-064",
+      "status": "valid",
+      "source": " \\>3 1\nA LoginAPI",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A LoginAPI"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "LoginAPI"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-065",
+      "status": "valid",
+      "source": " \\>3 1\nA LoginAPI Authentication",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A LoginAPI Authentication"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "LoginAPI",
+                "Authentication"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-066",
+      "status": "valid",
+      "source": " \\>3 1\nAuthService LoginAPI",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "AuthService LoginAPI"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "AuthService",
+              "values": [
+                "AuthService",
+                "LoginAPI"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-067",
+      "status": "valid",
+      "source": " \\>3 1\nA \\e",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A \\e"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                ""
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-068",
+      "status": "error",
+      "source": " \\>3 1\nA"
+    },
+    {
+      "id": "graph-069",
+      "status": "error",
+      "source": " \\>3 1\nA API\nA Other"
+    },
+    {
+      "id": "graph-070",
+      "status": "error",
+      "source": " \\>3 1\nA\\ B LoginAPI"
+    },
+    {
+      "id": "graph-071",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B Reads",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A>X>B Reads"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                "Reads"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-072",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA<X<B Responds",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A<X<B Responds"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "B",
+              "to": "A",
+              "operator": "<",
+              "values": [
+                "A<X<B",
+                "Responds"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-073",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA=X=B Shares",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A=X=B Shares"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": "=",
+              "values": [
+                "A=X=B",
+                "Shares"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-074",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nA>X>A Retry",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "A>X>A Retry"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "A",
+              "operator": ">",
+              "values": [
+                "A>X>A",
+                "Retry"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-075",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B Reads\nA>Y>B Writes",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A>X>B Reads",
+            "A>Y>B Writes"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                "Reads"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "Y",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>Y>B",
+                "Writes"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-076",
+      "status": "error",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B Reads\nB>X>A Writes"
+    },
+    {
+      "id": "graph-077",
+      "status": "error",
+      "source": " \\>3 1\nA API\nA>X>B Reads"
+    },
+    {
+      "id": "graph-078",
+      "status": "valid",
+      "source": " \\>3 1\nA>X>B Reads\nA API\nB Store",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A>X>B Reads",
+            "A API",
+            "B Store"
+          ],
+          "records": [
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                "Reads"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-079",
+      "status": "error",
+      "source": " \\>3 1\nB Store\n>X>B Reads"
+    },
+    {
+      "id": "graph-080",
+      "status": "error",
+      "source": " \\>3 1\nA API\nA>X> Reads"
+    },
+    {
+      "id": "graph-081",
+      "status": "error",
+      "source": " \\>3 1\nA API\nB Store\nA>>B Reads"
+    },
+    {
+      "id": "graph-082",
+      "status": "error",
+      "source": " \\>3 1\nA API\nB Store\nA>X<B Reads"
+    },
+    {
+      "id": "graph-083",
+      "status": "error",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B>Y>C"
+    },
+    {
+      "id": "graph-084",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B \\e",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A>X>B \\e"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                ""
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-085",
+      "status": "valid",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B ~",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API",
+            "B Store",
+            "A>X>B ~"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            },
+            {
+              "kind": "node",
+              "id": "B",
+              "values": [
+                "B",
+                "Store"
+              ]
+            },
+            {
+              "kind": "edge",
+              "id": "X",
+              "from": "A",
+              "to": "B",
+              "operator": ">",
+              "values": [
+                "A>X>B",
+                null
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-086",
+      "status": "error",
+      "source": " \\>3 1\nA API\nB Store\nA>X>B"
+    },
+    {
+      "id": "graph-087",
+      "status": "valid",
+      "source": " \\>3 1\nA API Auth\n MoreInfo",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API Auth",
+            " MoreInfo"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API",
+                "AuthMoreInfo"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-088",
+      "status": "valid",
+      "source": " \\>3 1\nA API Auth\n  HTTP401",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API Auth",
+            "  HTTP401"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API",
+                "Auth",
+                "HTTP401"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-089",
+      "status": "valid",
+      "source": " \\>3 1\nA API Auth\n   RetryOnce",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API Auth",
+            "   RetryOnce"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API",
+                "Auth",
+                {
+                  "type": "missing"
+                },
+                "RetryOnce"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-090",
+      "status": "error",
+      "source": " \\>3 1\n MoreInfo\nA API"
+    },
+    {
+      "id": "graph-091",
+      "status": "valid",
+      "source": " \\>3 1\nA API \\e\n Details",
+      "expected": [
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API \\e",
+            " Details"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API",
+                "Details"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "graph-092",
+      "status": "error",
+      "source": " \\>3 1\nA API ~\n Details"
+    },
+    {
+      "id": "graph-093",
+      "status": "error",
+      "source": " \\>3 1\nA API\n \\>4 1\n Details"
+    },
+    {
+      "id": "common-094",
+      "status": "valid",
+      "source": " \\1 1\nA ~",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A ~"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                null
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-095",
+      "status": "valid",
+      "source": " \\1 1\nA \\e",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\e"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                ""
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-096",
+      "status": "valid",
+      "source": " \\1 1\nA \\_",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\_"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-097",
+      "status": "valid",
+      "source": " \\1 1\nA \\~",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A \\~"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "~"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-098",
+      "status": "valid",
+      "source": " \\?2 1\n~",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "~"
+          ],
+          "records": [
+            {
+              "values": [
+                null,
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-099",
+      "status": "valid",
+      "source": " \\?2 1\n\\~",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "\\~"
+          ],
+          "records": [
+            {
+              "values": [
+                "~",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-100",
+      "status": "valid",
+      "source": " \\1 1\nNew\\ York Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "New\\ York Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "New York",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-101",
+      "status": "valid",
+      "source": " \\1 1\nNew\\ \\ York Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "New\\ \\ York Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "New  York",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-102",
+      "status": "valid",
+      "source": " \\1 1\nC:\\\\Tools Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "C:\\\\Tools Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "C:\\Tools",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-103",
+      "status": "error",
+      "source": " \\1 1\nA\\"
+    },
+    {
+      "id": "common-104",
+      "status": "error",
+      "source": " \\1 1\nA\\q B"
+    },
+    {
+      "id": "common-105",
+      "status": "valid",
+      "source": " \\?2 1\nReady\\?",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "Ready\\?"
+          ],
+          "records": [
+            {
+              "values": [
+                "Ready?",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-106",
+      "status": "valid",
+      "source": " \\?2 1\nReady?",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "Ready?"
+          ],
+          "records": [
+            {
+              "values": [
+                "Ready?",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-107",
+      "status": "valid",
+      "source": " \\1 1\nA\\>B Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A\\>B Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A>B",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-108",
+      "status": "valid",
+      "source": " \\1 1\nA\\<B Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A\\<B Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A<B",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-109",
+      "status": "valid",
+      "source": " \\1 1\nA\\=B Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A\\=B Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A=B",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-110",
+      "status": "valid",
+      "source": " \\1 1\n\\~ Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "\\~ Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "~",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-111",
+      "status": "valid",
+      "source": " \\1 1\nHello\\nWorld Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "Hello\\nWorld Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "Hello\nWorld",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-112",
+      "status": "valid",
+      "source": " \\1 1\nA\\rB Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A\\rB Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A\rB",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-113",
+      "status": "valid",
+      "source": " \\1 1\nA\\tB Ready",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A\\tB Ready"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A\tB",
+                "Ready"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-114",
+      "status": "error",
+      "source": " \\1 1\nA\tB"
+    },
+    {
+      "id": "common-115",
+      "status": "error",
+      "source": " \\1 1\nA　B"
+    },
+    {
+      "id": "common-116",
+      "status": "valid",
+      "source": " \\1 1\nA B\n \\?2 1\nBuildLogin\n \\>3 1\nA API",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        },
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "mode": "graph",
+          "id": 3,
+          "revision": 1,
+          "rows": [
+            "A API"
+          ],
+          "records": [
+            {
+              "kind": "node",
+              "id": "A",
+              "values": [
+                "A",
+                "API"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-117",
+      "status": "valid",
+      "source": " \\1 1\nA B",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-118",
+      "status": "valid",
+      "source": " \\1 1\nA B\n",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-119",
+      "status": "error",
+      "source": " \\1 1\nA B\r\n"
+    },
+    {
+      "id": "common-120",
+      "status": "valid",
+      "source": " \\1 1\nA B\n\nC D",
+      "expected": [
+        {
+          "mode": "table",
+          "id": 1,
+          "revision": 1,
+          "rows": [
+            "A B",
+            "C D"
+          ],
+          "columns": [
+            "column1",
+            "column2"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B"
+              ]
+            },
+            {
+              "values": [
+                "C",
+                "D"
+              ]
+            }
+          ],
+          "explicit": false,
+          "declared_width": null
+        }
+      ]
+    },
+    {
+      "id": "common-121",
+      "status": "error",
+      "source": "A B"
+    },
+    {
+      "id": "common-122",
+      "status": "error",
+      "source": " \\1 1\nA B\n \\>1 1\nA API"
+    },
+    {
+      "id": "common-136",
+      "status": "valid",
+      "source": " \\?2 1\nBuildLogin\nMoreInfo",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "BuildLogin",
+            "MoreInfo"
+          ],
+          "records": [
+            {
+              "values": [
+                "BuildLogin",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            },
+            {
+              "values": [
+                "MoreInfo",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "common-137",
+      "status": "error",
+      "source": " \\>3 1\nA LoginAPI\nMoreInfo"
+    },
+    {
+      "id": "common-138",
+      "status": "error",
+      "source": " \\?2 1\nA B C\n  More Detail"
+    },
+    {
+      "id": "common-139",
+      "status": "valid",
+      "source": " \\?2 1\nA B C\n  New\\ Method",
+      "expected": [
+        {
+          "mode": "5w1h",
+          "id": 2,
+          "revision": 1,
+          "rows": [
+            "A B C",
+            "  New\\ Method"
+          ],
+          "records": [
+            {
+              "values": [
+                "A",
+                "B",
+                "CNew Method",
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                },
+                {
+                  "type": "missing"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

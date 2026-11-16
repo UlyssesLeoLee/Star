@@ -1,4 +1,6 @@
 [package]
+# 2026-11-16 (per cargo-deny 实跑一致化): 补 publish = false, 本仓 crate 无 crates.io 发布意图。
+publish = false
 name = "physis-wasm"
 version = "0.1.0"
 edition = "2021"

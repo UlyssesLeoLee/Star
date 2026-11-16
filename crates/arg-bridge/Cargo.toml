@@ -20,7 +20,6 @@ chrono = { workspace = true }
 tracing = { workspace = true }
 sled = { workspace = true }
 thiserror = { workspace = true }
-async-trait = { workspace = true }
 uuid = { workspace = true }
 
 [lints]

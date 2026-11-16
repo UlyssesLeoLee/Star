@@ -27,7 +27,6 @@ uuid = { workspace = true }
 clap = { version = "4.5", features = ["derive"] }
 # ULYS-218.2 / FR-ORCA-009 CLI: 调 backend StartFromPicker + GitProvider
 tokio = { workspace = true }
-async-trait = { workspace = true }
 # 跨 crate: FR-ORCA-009 CLI 调 backend StartFromPicker (per ULYS-218 PR #107 ship)
 worktree-shared-dir = { path = "../worktree-shared-dir" }
 # 跨 crate: RealStartFromPicker 通过 GitProvider 列 branches / 取 HEAD

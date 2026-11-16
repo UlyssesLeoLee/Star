@@ -38,8 +38,6 @@ axum = "0.8"
 # HTTP client (F-02 真实 LLM 通道, OpenAI/Anthropic)
 reqwest = { workspace = true }
 
-# 凭证加密 (F-02 LLM API key 走 star-credential KMS, 守门 #5 v2)
-star-credential = { path = "../star-credential" }
 
 # Async trait for ops_ai::AiChannel
 async-trait = { workspace = true }

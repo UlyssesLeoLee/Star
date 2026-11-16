@@ -1,27 +1,94 @@
 /*
-@cypher schema=1 source_sha256=cb0eb2717f0a6321ebdff315a0bb9ad2cb38c45c13c600f8e07132b0110718df
+@cypher schema=1 source_sha256=5f90e6b00014eec735f62fbe0be582f8da7522ffd11e9c2049c086a8a471f3ca
 MERGE (self:File {path:"frontend/src/lib/nema/nema.ts"})
 MERGE (parse:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNema",kind:"function"})
 MERGE (serialize:Symbol {id:"frontend/src/lib/nema/nema.ts::serializeNema",kind:"function"})
 MERGE (gen:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaDocumentForSharedFile",kind:"function"})
 MERGE (types:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaDocument",kind:"type"})
+MERGE (profile:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaInterpreterProfile",kind:"type"})
+MERGE (strict_document:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaStrictDocument",kind:"type"})
+MERGE (codec_document:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecDocument",kind:"type"})
+MERGE (render_result:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecRenderResult",kind:"type"})
+MERGE (codec_span:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecTextSpan",kind:"type"})
+MERGE (codec_atom:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecAtomChunk",kind:"type"})
+MERGE (codec_chunk:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecSemanticChunk",kind:"type"})
+MERGE (codec_mode:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecDomainMode",kind:"type"})
+MERGE (codec_edge:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecGraphEdge",kind:"type"})
+MERGE (codec_record:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecRecord",kind:"type"})
+MERGE (codec_domain:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecDomain",kind:"type"})
+MERGE (render_domain:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaCodecRenderedDomain",kind:"type"})
+MERGE (strict_id:Symbol {id:"frontend/src/lib/nema/nema.ts::strictId",kind:"function"})
+MERGE (task_number:Symbol {id:"frontend/src/lib/nema/nema.ts::taskNumber",kind:"function"})
+MERGE (strict_cell:Symbol {id:"frontend/src/lib/nema/nema.ts::strictCell",kind:"function"})
+MERGE (strict_cell_text:Symbol {id:"frontend/src/lib/nema/nema.ts::strictCellText",kind:"function"})
+MERGE (to_strict:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaDocumentToStrictDocument",kind:"function"})
+MERGE (from_strict:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaDocumentFromStrictDocument",kind:"function"})
+MERGE (task_view:Symbol {id:"frontend/src/lib/nema/nema.ts::taskViewFromDocument",kind:"function"})
+MERGE (strict_task_view:Symbol {id:"frontend/src/lib/nema/nema.ts::taskViewFromStrictDocument",kind:"function"})
+MERGE (list_profiles:Symbol {id:"frontend/src/lib/nema/nema.ts::listNemaInterpreterProfilesWasm",kind:"function"})
+MERGE (get_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::getNemaInterpreterProfileWasm",kind:"function"})
+MERGE (parse_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNemaWithProfileWasm",kind:"function"})
+MERGE (format_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::formatNemaWithProfileWasm",kind:"function"})
+MERGE (serialize_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::serializeNemaWithProfileWasm",kind:"function"})
+MERGE (parse_legacy:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNemaWasm",kind:"function"})
+MERGE (render_legacy:Symbol {id:"frontend/src/lib/nema/nema.ts::renderViewWasm",kind:"function"})
 MERGE (self)-[:DEFINES]->(parse)
 MERGE (self)-[:DEFINES]->(serialize)
 MERGE (self)-[:DEFINES]->(gen)
 MERGE (self)-[:DEFINES]->(types)
+MERGE (self)-[:DEFINES]->(profile)
+MERGE (self)-[:DEFINES]->(strict_document)
+MERGE (self)-[:DEFINES]->(codec_document)
+MERGE (self)-[:DEFINES]->(render_result)
+MERGE (self)-[:DEFINES]->(codec_span)
+MERGE (self)-[:DEFINES]->(codec_atom)
+MERGE (self)-[:DEFINES]->(codec_chunk)
+MERGE (self)-[:DEFINES]->(codec_mode)
+MERGE (self)-[:DEFINES]->(codec_edge)
+MERGE (self)-[:DEFINES]->(codec_record)
+MERGE (self)-[:DEFINES]->(codec_domain)
+MERGE (self)-[:DEFINES]->(render_domain)
+MERGE (self)-[:DEFINES]->(strict_id)
+MERGE (self)-[:DEFINES]->(task_number)
+MERGE (self)-[:DEFINES]->(strict_cell)
+MERGE (self)-[:DEFINES]->(strict_cell_text)
+MERGE (self)-[:DEFINES]->(to_strict)
+MERGE (self)-[:DEFINES]->(from_strict)
+MERGE (self)-[:DEFINES]->(task_view)
+MERGE (self)-[:DEFINES]->(strict_task_view)
+MERGE (self)-[:DEFINES]->(list_profiles)
+MERGE (self)-[:DEFINES]->(get_profile)
+MERGE (self)-[:DEFINES]->(parse_profile)
+MERGE (self)-[:DEFINES]->(format_profile)
+MERGE (self)-[:DEFINES]->(serialize_profile)
+MERGE (self)-[:DEFINES]->(parse_legacy)
+MERGE (self)-[:DEFINES]->(render_legacy)
+MERGE (list_profiles)-[:CALLS]->(parse_profile)
+MERGE (get_profile)-[:CALLS]->(list_profiles)
+MERGE (to_strict)-[:USES_TYPE]->(strict_document)
+MERGE (to_strict)-[:CALLS]->(strict_id)
+MERGE (to_strict)-[:CALLS]->(strict_cell)
+MERGE (from_strict)-[:USES_TYPE]->(strict_document)
+MERGE (from_strict)-[:CALLS]->(task_number)
+MERGE (from_strict)-[:CALLS]->(strict_cell_text)
+MERGE (task_view)-[:USES_TYPE]->(types)
+MERGE (strict_task_view)-[:USES_TYPE]->(strict_document)
+MERGE (strict_task_view)-[:CALLS]->(strict_cell_text)
+MERGE (serialize_profile)-[:CALLS]->(to_strict)
+MERGE (serialize_profile)-[:CALLS]->(format_profile)
+MERGE (parse_legacy)-[:USES_TYPE]->(codec_document)
+MERGE (render_legacy)-[:USES_TYPE]->(render_result)
 @endcypher
 */
 // =====================================================================
-// .NEMA 格式核心 — 文件即任务架构 (per 2026-11-11 用户发令)
-// 语法对齐 https://nema-sigma.vercel.app/ 的 .NEMA 规范子集:
-//   \!NEMAT1            transport 头 (v1)
-//   \?<id> REV <n>      5W1H 节 (What Why How Who When Where 六列)
-//   \<id> REV <n>       Table 节 (\# 列名行 + 数据行, ~ = 显式 null)
-//   \><id> REV <n>      Graph 节 (A Name Desc 节点 / A>X>B Label Desc 边)
-//   前导 N 空格          续写第 N 列 (X_N 续写语义)
+// NEMA UI task projection and legacy format compatibility helpers.
+// New profile-aware source parsing/formatting is owned by the Rust codec and
+// selected by the exact interpreter profile persisted with each new entry.
 // =====================================================================
 
 export const NEMA_TRANSPORT_HEADER = "\\!NEMAT1";
+/** Explicit default for newly created documents; old files retain their pinned revision. */
+export const NEMA_DEFAULT_NEW_DOCUMENT_REVISION = "matrix-2026-11-15";
 
 export interface NemaTableSection {
   mode: "table";
@@ -58,6 +125,262 @@ export interface NemaDocument {
   sections: NemaSection[];
 }
 
+/** Immutable identity for one Rust NEMA interpreter and grammar snapshot. */
+export interface NemaInterpreterProfile {
+  format_id: "nema";
+  plugin_id: string;
+  grammar_revision: string;
+  plugin_version: string;
+  abi_version: number;
+  ast_schema_version: number;
+  grammar_source_sha256: string;
+  artifact_sha256: string;
+}
+
+export type NemaStrictCell =
+  | { kind: "value"; value: string }
+  | { kind: "null" }
+  | { kind: "empty" }
+  | { kind: "missing" };
+
+export type NemaStrictMode = "table" | "five_w_one_h" | "graph";
+
+export interface NemaStrictDomain {
+  mode: NemaStrictMode;
+  /** Decimal strings preserve Rust u64 identities through JavaScript JSON. */
+  id: string;
+  revision: string;
+  columns: string[] | null;
+  explicit_header: boolean;
+  declared_width: number | null;
+  records: NemaStrictCell[][];
+}
+
+/** Rust's lossless AST. The strict profile APIs keep all four cell states. */
+export interface NemaStrictDocument {
+  domains: NemaStrictDomain[];
+}
+
+function strictId(value: number): string {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error("NEMA domain IDs and revisions must be positive safe integers in the task view");
+  }
+  return String(value);
+}
+
+function taskNumber(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || String(parsed) !== value) {
+    throw new Error(`NEMA identifier ${value} cannot be represented by the task view`);
+  }
+  return parsed;
+}
+
+function strictCell(value: string | null | undefined): NemaStrictCell {
+  if (value === null) return { kind: "null" };
+  if (value === undefined) return { kind: "missing" };
+  if (value.length === 0) return { kind: "empty" };
+  return { kind: "value", value };
+}
+
+function strictCellText(cell: NemaStrictCell): string | null | undefined {
+  switch (cell.kind) {
+    case "value": return cell.value;
+    case "null": return null;
+    case "empty": return "";
+    case "missing": return undefined;
+  }
+}
+
+/** Converts the task view model to the Rust-owned, lossless profile AST. */
+export function nemaDocumentToStrictDocument(document: NemaDocument): NemaStrictDocument {
+  return {
+    domains: document.sections.map((section) => {
+      const identity = { id: strictId(section.id), revision: strictId(section.revision) };
+      if (section.mode === "5w1h") {
+        return {
+          ...identity,
+          mode: "five_w_one_h",
+          columns: null,
+          explicit_header: false,
+          declared_width: null,
+          records: [[section.what, section.why, section.how, section.who, section.when, section.where].map(strictCell)],
+        };
+      }
+      if (section.mode === "table") {
+        return {
+          ...identity,
+          mode: "table",
+          columns: [...section.columns],
+          explicit_header: true,
+          declared_width: null,
+          records: section.rows.map((row) =>
+            section.columns.map((_, index) => strictCell(index < row.length ? row[index] : undefined)),
+          ),
+        };
+      }
+
+      const records: NemaStrictCell[][] = section.nodes.map((node) => [
+        strictCell(node.id), strictCell(node.name), strictCell(node.description),
+      ]);
+      for (const edge of section.edges) {
+        const token = `${edge.from}${edge.operator}${edge.id}${edge.operator}${edge.to}`;
+        records.push([strictCell(token), strictCell(edge.label), strictCell(edge.description)]);
+      }
+      return {
+        ...identity,
+        mode: "graph",
+        columns: null,
+        explicit_header: false,
+        declared_width: null,
+        records,
+      };
+    }),
+  };
+}
+
+/** Builds a lossy task-view projection; the original profile AST remains authoritative. */
+export function nemaDocumentFromStrictDocument(document: NemaStrictDocument): NemaDocument {
+  const sections: NemaSection[] = [];
+  for (const domain of document.domains) {
+    const id = taskNumber(domain.id);
+    const revision = taskNumber(domain.revision);
+    if (domain.mode === "five_w_one_h") {
+      const row = domain.records[0] ?? [];
+      const field = (index: number) => strictCellText(row[index] ?? { kind: "missing" }) ?? "";
+      sections.push({
+        mode: "5w1h", id, revision,
+        what: field(0), why: field(1), how: field(2), who: field(3), when: field(4), where: field(5),
+      });
+      continue;
+    }
+    if (domain.mode === "table") {
+      const columns = domain.columns ?? [];
+      const rows = domain.records.map((row) =>
+        columns.map((_, index) => strictCellText(row[index] ?? { kind: "missing" }) ?? null),
+      );
+      sections.push({ mode: "table", id, revision, columns, rows });
+      continue;
+    }
+
+    const nodes: NemaGraphSection["nodes"] = [];
+    const edges: NemaGraphSection["edges"] = [];
+    for (const row of domain.records) {
+      const token = strictCellText(row[0] ?? { kind: "missing" });
+      if (!token) throw new Error("NEMA graph records require a nonempty graph token");
+      const edge = /^([A-Za-z][A-Za-z0-9_.:-]*)([><=])([A-Za-z][A-Za-z0-9_.:-]*)([><=])([A-Za-z][A-Za-z0-9_.:-]*)$/.exec(token);
+      if (edge && edge[2] === edge[4]) {
+        edges.push({
+          from: edge[1], id: edge[3], to: edge[5], operator: edge[2] as ">" | "<" | "=",
+          label: strictCellText(row[1] ?? { kind: "missing" }) ?? "",
+          description: strictCellText(row[2] ?? { kind: "missing" }) ?? "",
+        });
+      } else {
+        nodes.push({
+          id: token,
+          name: strictCellText(row[1] ?? { kind: "missing" }) ?? token,
+          description: strictCellText(row[2] ?? { kind: "missing" }) ?? "",
+        });
+      }
+    }
+    sections.push({ mode: "graph", id, revision, nodes, edges });
+  }
+  return { transport: NEMA_TRANSPORT_HEADER, sections };
+}
+
+export interface NemaCodecTextSpan {
+  start_byte: number;
+  end_byte: number;
+  line: number;
+  column: number;
+}
+
+export interface NemaCodecAtomChunk {
+  text: string;
+  opaque_dict_index: number | null;
+}
+
+export interface NemaCodecSemanticChunk {
+  raw: string;
+  span: NemaCodecTextSpan;
+  atoms: NemaCodecAtomChunk[];
+}
+
+export type NemaCodecDomainMode = "table" | "5w1h" | "graph";
+
+export interface NemaCodecGraphEdge {
+  id: string;
+  from: string;
+  to: string;
+  direction: "directed" | "undirected";
+  raw_operator: string;
+}
+
+export interface NemaCodecRecord {
+  span: NemaCodecTextSpan;
+  cells: NemaCodecSemanticChunk[][];
+  explicit_tail_empty: boolean;
+  graph_node_id: string | null;
+  graph_edge: NemaCodecGraphEdge | null;
+}
+
+export interface NemaCodecDomain {
+  id: string;
+  revision: number;
+  mode: NemaCodecDomainMode;
+  header_span: NemaCodecTextSpan;
+  explicit_header: boolean;
+  explicit_header_span: NemaCodecTextSpan | null;
+  columns: string[];
+  records: NemaCodecRecord[];
+  is_v12: boolean;
+}
+
+/** Legacy codec AST returned by `parseNema`; use the profile API for strict grammar ASTs. */
+export interface NemaCodecDocument {
+  span: NemaCodecTextSpan;
+  dictionary: string[];
+  dictionary_spans: NemaCodecTextSpan[];
+  domains: NemaCodecDomain[];
+}
+
+export type NemaCodecRenderedDomain =
+  | {
+      id: string;
+      revision: number;
+      mode: "5w1h";
+      fields: Record<"What" | "Why" | "How" | "Who" | "When" | "Where", string>;
+    }
+  | {
+      id: string;
+      revision: number;
+      mode: "table";
+      columns: string[];
+      records: Array<Record<string, string>>;
+    }
+  | {
+      id: string;
+      revision: number;
+      mode: "graph";
+      nodes: Array<{ id: string; name: string; description: string; extensions?: Record<string, string> }>;
+      edges: Array<{
+        id: string;
+        source: string;
+        target: string;
+        direction: string;
+        name: string;
+        description: string;
+        extensions?: Record<string, string>;
+      }>;
+    };
+
+export interface NemaCodecRenderResult {
+  view: NemaCodecRenderedDomain[];
+  revision: number;
+  hash: string;
+  explicit_header: boolean;
+}
+
 /** 拆 token: 字段由单空格分隔; \空格 转义字面空格; ~ 为显式 null。 */
 function splitRow(raw: string): Array<string | null> {
   const tokens: string[] = [];
@@ -92,7 +415,7 @@ function escapeToken(value: string | null): string {
     .replace(/ /g, "\\ ");
 }
 
-/** 解析 .NEMA 源码 (规范子集)。 */
+/** Legacy TypeScript parser for persisted pre-profile task entries. */
 export function parseNema(source: string): NemaDocument {
   const lines = source.split(/\r?\n/);
   const sections: NemaSection[] = [];
@@ -224,7 +547,7 @@ export function parseNema(source: string): NemaDocument {
   return { transport, sections };
 }
 
-/** 序列化 .NEMA 文档 (规范子集)。 */
+/** Legacy TypeScript serializer retained for old stored entries and their compatibility tests. */
 export function serializeNema(doc: NemaDocument): string {
   const out: string[] = [];
   const header = doc.transport || NEMA_TRANSPORT_HEADER;
@@ -297,8 +620,7 @@ export function nemaDocumentForSharedFile(input: SharedFileInput, now: Date = ne
   return { transport: NEMA_TRANSPORT_HEADER, sections: [five, meta] };
 }
 
-/** 从 .nema 文档提取任务视图字段 (打开为 Star 任务用)。 */
-export function taskViewFromDocument(doc: NemaDocument): {
+export interface NemaTaskView {
   title: string;
   what: string;
   why: string;
@@ -307,7 +629,10 @@ export function taskViewFromDocument(doc: NemaDocument): {
   when: string;
   where: string;
   filePath: string;
-} {
+}
+
+/** 从 legacy/task view 文档提取字段。 */
+export function taskViewFromDocument(doc: NemaDocument): NemaTaskView {
   const five = doc.sections.find((s): s is Nema5W1HSection => s.mode === "5w1h");
   const table = doc.sections.find((s): s is NemaTableSection => s.mode === "table");
   let filePath = "";
@@ -324,6 +649,34 @@ export function taskViewFromDocument(doc: NemaDocument): {
     who: (five?.who ?? "").split(",").filter(Boolean),
     when: five?.when || "",
     where: five?.where || "",
+    filePath,
+  };
+}
+
+/** Extracts task fields directly from the Rust AST without narrowing u64 IDs to JS numbers. */
+export function taskViewFromStrictDocument(doc: NemaStrictDocument): NemaTaskView {
+  const five = doc.domains.find((domain) => domain.mode === "five_w_one_h");
+  const row = five?.records[0] ?? [];
+  const text = (cell: NemaStrictCell | undefined): string =>
+    cell?.kind === "value" ? cell.value : "";
+  const table = doc.domains.find((domain) => domain.mode === "table");
+  const fileColumn = table?.columns?.indexOf("Field") ?? -1;
+  const valueColumn = table?.columns?.indexOf("Value") ?? -1;
+  let filePath = "";
+  if (table && fileColumn >= 0 && valueColumn >= 0) {
+    for (const record of table.records) {
+      if (text(record[fileColumn]) === "file") filePath = text(record[valueColumn]);
+    }
+  }
+  const what = text(row[0]);
+  return {
+    title: what || "NEMA Task",
+    what,
+    why: text(row[1]),
+    how: text(row[2]),
+    who: text(row[3]).split(",").filter(Boolean),
+    when: text(row[4]),
+    where: text(row[5]),
     filePath,
   };
 }
@@ -356,16 +709,63 @@ export function loadNemaWasm(): Promise<boolean> {
   return wasmReady.then(() => true).catch(() => false);
 }
 
-/** 用 Rust wasm 解析 NEMA (返回 JS 版同构文档; 失败抛错由调用方回退) */
-export async function parseNemaWasm(source: string): Promise<NemaDocument> {
+/** Parses through the legacy Rust codec and returns its actual span-preserving AST shape. */
+export async function parseNemaWasm(source: string): Promise<NemaCodecDocument> {
   const mod = await wasmReady;
   if (!mod) throw new Error("wasm not loaded");
-  return JSON.parse(mod.parseNema(source)) as NemaDocument;
+  return JSON.parse(mod.parseNema(source)) as NemaCodecDocument;
 }
 
-/** 用 Rust wasm 渲染视图摘要 (views/overview 计数) */
-export async function renderViewWasm(source: string): Promise<{ total: number; by_kind: Record<string, number> }> {
+/** Returns the legacy Rust renderer's structured view and metadata. */
+export async function renderViewWasm(source: string): Promise<NemaCodecRenderResult> {
   const mod = await wasmReady;
   if (!mod) throw new Error("wasm not loaded");
-  return JSON.parse(mod.renderView(source)) as { total: number; by_kind: Record<string, number> };
+  return JSON.parse(mod.renderView(source)) as NemaCodecRenderResult;
+}
+
+/** Lists Rust interpreter profiles. The caller must pin one; no latest lookup exists. */
+export async function listNemaInterpreterProfilesWasm(): Promise<NemaInterpreterProfile[]> {
+  const mod = await wasmReady;
+  if (!mod) throw new Error("wasm not loaded");
+  return JSON.parse(mod.listNemaInterpreterProfiles()) as NemaInterpreterProfile[];
+}
+
+/** Selects a pinned revision by exact identity; it never resolves a moving `latest` alias. */
+export async function getNemaInterpreterProfileWasm(
+  grammarRevision: string,
+): Promise<NemaInterpreterProfile> {
+  const profiles = await listNemaInterpreterProfilesWasm();
+  const profile = profiles.find((candidate) => candidate.grammar_revision === grammarRevision);
+  if (!profile) throw new Error(`NEMA interpreter profile is not installed: ${grammarRevision}`);
+  return profile;
+}
+
+/** Parses with the exact Rust interpreter profile selected by the caller. */
+export async function parseNemaWithProfileWasm(
+  source: string,
+  profile: NemaInterpreterProfile,
+): Promise<NemaStrictDocument> {
+  const mod = await wasmReady;
+  if (!mod) throw new Error("wasm not loaded");
+  return JSON.parse(
+    mod.parseNemaWithProfile(JSON.stringify(profile), source),
+  ) as NemaStrictDocument;
+}
+
+/** Formats through Rust and rejects output that fails same-profile round-trip validation. */
+export async function formatNemaWithProfileWasm(
+  document: NemaStrictDocument,
+  profile: NemaInterpreterProfile,
+): Promise<string> {
+  const mod = await wasmReady;
+  if (!mod) throw new Error("wasm not loaded");
+  return mod.formatNemaWithProfile(JSON.stringify(profile), JSON.stringify(document));
+}
+
+/** Formats the UI task projection through the selected native Rust interpreter profile. */
+export async function serializeNemaWithProfileWasm(
+  document: NemaDocument,
+  profile: NemaInterpreterProfile,
+): Promise<string> {
+  return formatNemaWithProfileWasm(nemaDocumentToStrictDocument(document), profile);
 }

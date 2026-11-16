@@ -18,12 +18,9 @@ description = "STAR Tenant Quota (Phase G.5) â€” compute / storage / LLM token é
 
 [dependencies]
 serde = { workspace = true }
-serde_json = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 async-trait = { workspace = true }
 
 [lints]

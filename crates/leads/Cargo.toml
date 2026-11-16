@@ -14,7 +14,6 @@ description = "5 角色 Rust 化 (per plan-032 R10 line 150-155 + DD-SHARED-TASK
 
 [dependencies]
 serde = { workspace = true }
-thiserror = { workspace = true }
 
 [lints]
 workspace = true

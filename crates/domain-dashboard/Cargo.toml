@@ -21,9 +21,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-async-trait = { workspace = true }
-tracing = { workspace = true }
 
-star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }

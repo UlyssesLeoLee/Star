@@ -1,8 +1,81 @@
+/*
+@cypher schema=1 source_sha256=702019b2e4b48b96b31a94e9838ae80d9cb66e38901413c8ab222939cd3f5fe9
+MERGE (self:File {path:"frontend/src/lib/nema/wasm/nema_codec_wasm.js"})
+MERGE (format:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::formatNemaWithProfile",kind:"function"})
+MERGE (profiles:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::listNemaInterpreterProfiles",kind:"function"})
+MERGE (parse:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::parseNema",kind:"function"})
+MERGE (parse_profile:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::parseNemaWithProfile",kind:"function"})
+MERGE (render:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::renderView",kind:"function"})
+MERGE (self)-[:DEFINES]->(format)
+MERGE (self)-[:DEFINES]->(profiles)
+MERGE (self)-[:DEFINES]->(parse)
+MERGE (self)-[:DEFINES]->(parse_profile)
+MERGE (self)-[:DEFINES]->(render)
+@endcypher
+*/
 /* @ts-self-types="./nema_codec_wasm.d.ts" */
 
 /**
- * 解析 .nema 源码 → NemaDocument JSON 字符串。
- * 前端: JSON.parse(parseNema(src)) 后按 nema.ts 的 NemaDocument 类型消费。
+ * Formats a strict NEMA document and verifies it reparses under the same profile.
+ * @param {string} profile_json
+ * @param {string} document_json
+ * @returns {string}
+ */
+export function formatNemaWithProfile(profile_json, document_json) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        let ptr0, len0, ptr1, len1;
+        try {
+            ptr0 = passStringToWasm0(profile_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passStringToWasm0(document_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len1 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.formatNemaWithProfile(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * Lists bundled Rust interpreter profiles. Callers must select one explicitly.
+ * @returns {string}
+ */
+export function listNemaInterpreterProfiles() {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ret = wasm.listNemaInterpreterProfiles();
+        var ptr1 = ret[0];
+        var len1 = ret[1];
+        if (ret[3]) {
+            ptr1 = 0; len1 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred2_0 = ptr1;
+        deferred2_1 = len1;
+        return getStringFromWasm0(ptr1, len1);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * 解析 `.nema` 源码并返回 Rust 权威 AST JSON（保留 spans、字典和语义块）。
  * @param {string} source
  * @returns {string}
  */
@@ -24,6 +97,42 @@ export function parseNema(source) {
         return getStringFromWasm0(ptr2, len2);
     } finally {
         wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * Parses `.nema` source using the caller's exact, pinned interpreter profile.
+ * @param {string} profile_json
+ * @param {string} source
+ * @returns {string}
+ */
+export function parseNemaWithProfile(profile_json, source) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        let ptr0, len0, ptr1, len1;
+        try {
+            ptr0 = passStringToWasm0(profile_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passStringToWasm0(source, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len1 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 1, 1); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.parseNemaWithProfile(ptr0, len0, ptr1, len1);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
     }
 }
 
@@ -59,6 +168,9 @@ function __wbg_get_imports() {
         __wbg_Error_208446807d0d1e30: function(arg0, arg1) {
             const ret = Error(getStringFromWasm0(arg0, arg1));
             return ret;
+        },
+        __wbg___wbindgen_throw_4c88d8bf264fd984: function(arg0, arg1) {
+            throw new Error(getStringFromWasm0(arg0, arg1));
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;

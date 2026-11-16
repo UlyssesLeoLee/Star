@@ -1,14 +1,19 @@
 /*
-@cypher schema=1 source_sha256=8e44be908b8684567f3c2057af0281e48f4633f40eb6e5c3e0268748159c8980
+@cypher schema=1 source_sha256=4b94582667a5a1a69f52f7c35d3d4ac7c80a689943c521d8a103d1d60dedc5c6
 MERGE (self:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
 MERGE (scan:Function {name:"nemaWatcher::scanNemaFiles",language:"typescript"})
 MERGE (hook:Function {name:"nemaWatcher::useNemaWatcher",language:"typescript"})
 MERGE (api:File {path:"frontend/src/lib/localFiles.ts"})
 MERGE (store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
+MERGE (sync:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::syncNemaSource",kind:"function"})
+MERGE (profile:Symbol {id:"frontend/src/lib/nema/nema.ts::NemaInterpreterProfile",kind:"type"})
 MERGE (self)-[:DEFINES]->(scan)
 MERGE (self)-[:DEFINES]->(hook)
 MERGE (self)-[:IMPORTS]->(api)
 MERGE (self)-[:IMPORTS]->(store)
+MERGE (scan)-[:CALLS]->(sync)
+MERGE (scan)-[:USES_TYPE]->(profile)
+MERGE (hook)-[:CALLS]->(scan)
 @endcypher
 */
 // =====================================================================
@@ -21,6 +26,7 @@ MERGE (self)-[:IMPORTS]->(store)
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isLocalMode, listWorkspaceFiles, readWorkspaceFile } from "@/lib/localFiles";
 import { useNemaStore } from "./nemaStore";
+import type { NemaInterpreterProfile } from "./nema";
 
 export interface NemaScanResult {
   /** 扫描到的 .nema 文件数 */
@@ -36,7 +42,10 @@ export interface NemaScanResult {
 }
 
 /** 单次扫描: 列目录 → 筛 .nema → 读内容 → sync (导入/更新/回写)。 */
-export async function scanNemaFiles(roots: string[] = [""]): Promise<NemaScanResult> {
+export async function scanNemaFiles(
+  roots: string[] = [""],
+  importProfile?: NemaInterpreterProfile | null,
+): Promise<NemaScanResult> {
   const result: NemaScanResult = {
     scanned: 0,
     imported: 0,
@@ -68,9 +77,13 @@ export async function scanNemaFiles(roots: string[] = [""]): Promise<NemaScanRes
         if (read.error) result.errors.push(`${nemaPath}: ${read.error}`);
         continue;
       }
-      const synced = await store.syncNemaSource(nemaPath, read.body.text);
-      if (synced.action === "imported") result.imported += 1;
-      else if (synced.action === "updated") result.updated += 1;
+      try {
+        const synced = await store.syncNemaSource(nemaPath, read.body.text, importProfile ?? undefined);
+        if (synced.action === "imported") result.imported += 1;
+        else if (synced.action === "updated") result.updated += 1;
+      } catch (error) {
+        result.errors.push(`${nemaPath}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
   return result;
@@ -92,19 +105,23 @@ const DEFAULT_INTERVAL_MS = 20_000;
  * 轮询式 .nema 监听 hook (per WBS 8.4.4)。
  * 本地模式 + 提供 roots 时启动定时扫描; 非本地模式不启动。
  */
-export function useNemaWatcher(roots: string[] = [""], intervalMs = DEFAULT_INTERVAL_MS): NemaWatcherState {
+export function useNemaWatcher(
+  roots: string[] = [""],
+  intervalMs = DEFAULT_INTERVAL_MS,
+  importProfile?: NemaInterpreterProfile | null,
+): NemaWatcherState {
   const [lastResult, setLastResult] = useState<NemaScanResult | null>(null);
   const [lastScanAt, setLastScanAt] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const rootsKey = roots.join("|");
 
   const scanNow = useCallback(async () => {
-    const result = await scanNemaFiles(roots);
+    const result = await scanNemaFiles(roots, importProfile);
     setLastResult(result);
     setLastScanAt(Date.now());
-  }, [rootsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rootsKey, importProfile]);
 
-  const watching = isLocalMode() && roots.length > 0;
+  const watching = isLocalMode() && roots.length > 0 && importProfile != null;
 
   useEffect(() => {
     if (!watching) return;

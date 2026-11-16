@@ -14,11 +14,9 @@ description = "Star L0 dispatch TaskQueue business layer (per ADR-0048 D41 + SRS
 
 [dependencies]
 serde = { workspace = true }
-serde_json = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

@@ -30,13 +30,11 @@ async-trait = { workspace = true }
 tokio = { workspace = true }
 # axum 0.8 WebSocket HTTP server (per ULYS-222 P1-C handler.rs + ULYS-232 P1-E demo_server)
 axum = { workspace = true }
-# tokio-stream for broadcast::Receiver Stream impl (per crates/api/arg/sse_hub 同款)
-tokio-stream = { workspace = true }
 # P1-E demo_server bin needs tracing-subscriber for tracing init (per AC-6 observability)
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { workspace = true }
 # ULYS-220 P1-A Persistence: rusqlite bundled SQLite WAL (per cli_session_registry / star-taskqueue 同款)
-rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

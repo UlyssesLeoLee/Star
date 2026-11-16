@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bff27d3cfa9f20cc81d8db851255a2723c3075d46f166de77be8486ee40860da
+@cypher schema=1 source_sha256=1e43324d87fd928dc427362964de5a6e68993673be178c042d091cdf297095a5
 MERGE (self:File {path:"frontend/src/app/(app)/layout.tsx"})
 @endcypher
 */
@@ -20,7 +20,9 @@ import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 
 // 无限画布类页面 — 跳过 main 的 padding/max-width (per fullBleed 设计)
-const FULL_BLEED_PREFIXES = ["/agent-view"];
+// per 2026-11-16: /agent-view 路由删除 (并入 canvas, canvas 自带 layout) —
+//   fullBleed 前缀列表清空, 常量保留以便后续无限画布页接入
+const FULL_BLEED_PREFIXES: string[] = [];
 // 工作区全高页面 — 自适应宽高 (per 2026-11-14 用户反馈 "大范围空隙"):
 // 内容自管 padding + h-full 撑满, 不走 max-w-[1440px]/px-py 容器
 const WORKSPACE_FULL_HEIGHT_PREFIXES = [
