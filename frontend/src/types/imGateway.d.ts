@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=b26b0c7ca9d46cf05dfb15a006257e77d1d65a6d7328bf81a33b955511f46c09
+MERGE (self:File {path:"frontend/src/types/imGateway.d.ts"})
+@endcypher
+*/
 // =====================================================================
 // imGateway 模块契约占位 (sibling 任务将落地 frontend/src/lib/chat/imGateway.ts)
 //
