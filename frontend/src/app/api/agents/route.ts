@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=3f1d880e4c44369718d9168d138cd52828f038e020e7f301b8c48dd1d9825e7d
 MERGE (self:File {path:"frontend/src/app/api/agents/route.ts"})
 MERGE (r:Symbol {id:"frontend/src/app/api/agents/route.ts::Route",kind:"route"})
 MERGE (backend:ExternalService {name:"star-api-rest"})

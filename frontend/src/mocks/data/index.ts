@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=221198a62c7eb2034ea7c599f0ce31d259b8f283c6107e5e07621181261fb464
 MERGE (self:File {path:"frontend/src/mocks/data/index.ts"})
 MERGE (agents:File {path:"frontend/src/mocks/data/agents.ts"})
 MERGE (inbox:File {path:"frontend/src/mocks/data/inbox.ts"})

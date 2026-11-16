@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=c045d3a5b5d0db1e931e26f7f9d6afc2a978a7ffe51afeed6b5305b9a7dc5be1
 MERGE (self:File {path:"frontend/src/app/(app)/inbox/__tests__/inbox.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/inbox/__tests__/inbox.test.tsx::inbox 真实通知 API",kind:"suite"})
 MERGE (page:File {path:"frontend/src/app/(app)/inbox/page.tsx"})

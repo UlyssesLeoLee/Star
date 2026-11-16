@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=573eae41346d9fef9cdb81413f984b43684fe0158b74bafe6c4bf6a9ea7e99b5
+@cypher schema=1 source_sha256=beb13ab0b05abbdea3e09bf221888825b156855bc4993f465acb373600ad2cd2
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_router",kind:"function"})
 MERGE (oauthRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
@@ -154,6 +154,8 @@ pub fn build_router() -> Router {
         .nest("/runtime", routes::runtime::router())
         .nest("/terminal", routes::terminal::router())
         .nest("/im", routes::im::router())
+        .nest("/notifications", routes::notifications::router())
+        .nest("/comments", routes::notifications::comments_router())
         // ── 6+3 Webhook 管理端点 (per spec §2.3) ───────────────────────
         .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
         .route(
@@ -316,6 +318,8 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .nest("/runtime", routes::runtime::router())
                 .nest("/terminal", routes::terminal::router())
                 .nest("/im", routes::im::router())
+                .nest("/notifications", routes::notifications::router())
+                .nest("/comments", routes::notifications::comments_router())
                 .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
                 .route(
                     "/webhooks/endpoints",

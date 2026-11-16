@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=1dc93ae74825996793c94dfa7c8e8747c7f405611513146ae397d774d74770d8
 MERGE (self:File {path:"frontend/src/mocks/data/agents.ts"})
 MERGE (agents:Symbol {id:"frontend/src/mocks/data/agents.ts::MOCK_AGENTS",kind:"constant"})
 MERGE (row:Type {id:"frontend/src/mocks/schemas/agent.ts::AgentRow"})

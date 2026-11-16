@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=db8707058e4fe89fc5b72f1debe15edb11e31f01e0f8a4e8d59b61f81e26896f
 MERGE (self:File {path:"frontend/src/lib/agents/agentsApi.ts"})
 MERGE (backend:ExternalService {name:"star-api-rest"})
 MERGE (listAgents:Symbol {id:"frontend/src/lib/agents/agentsApi.ts::listAgents",kind:"function"})

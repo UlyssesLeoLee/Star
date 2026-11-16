@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=9d4fa023b234cb4f7703e99e1c398f5a1dfa2b1d4a1144eccc87f170f69715f2
 MERGE (self:File {path:"frontend/src/app/api/notifications/[id]/route.ts"})
 MERGE (r:Symbol {id:"frontend/src/app/api/notifications/[id]/route.ts::Route",kind:"route"})
 MERGE (self)-[:DEFINES]->(r)

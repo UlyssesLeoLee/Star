@@ -1,6 +1,6 @@
 "use client";
 
-// @cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+// @cypher schema=1 source_sha256=047e5f9773fccbb551d2297a15f575d78ad91170bcea356a8e4ed00b0da3e1c0
 // MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
 // MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
 // MERGE (agentsApi:File {path:"frontend/src/lib/agents/agentsApi.ts"})

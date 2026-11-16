@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=18834762b9ce3f0123aabe3f03734594f88837b1fb86f1cc357aaf6083054766
 MERGE (self:File {path:"crates/star-api-rest/tests/notifications_endpoints.rs"})
 MERGE (suite:Symbol {id:"crates/star-api-rest/tests/notifications_endpoints.rs::notifications endpoints suite",kind:"test_suite"})
 MERGE (listNotifs:Symbol {id:"crates/star-api-rest/src/routes/notifications.rs::list_notifications",kind:"function"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=5c7324e3a683433437dc7529ee202bf0f1e1d9eb600c94229bbc1875585e5ea0
 MERGE (self:File {path:"frontend/src/app/(app)/inbox/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/inbox/page.tsx::InboxPage",kind:"component"})
 MERGE (notifApi:File {path:"frontend/src/lib/notifications/notificationsApi.ts"})

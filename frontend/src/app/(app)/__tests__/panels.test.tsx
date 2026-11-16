@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=59d230b081bc588d99e6c9d291e2ef3e244e0303d091d9ba7b60bb9af7f4b247
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)

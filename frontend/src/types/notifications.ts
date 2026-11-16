@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=0dceb8fb25413b2073a4e1bc4a98ca10bb2ed7ce5eae6654285ed034c56f4fe7
 MERGE (self:File {path:"frontend/src/types/notifications.ts"})
 MERGE (notification:Type {id:"frontend/src/types/notifications.ts::Notification",kind:"interface"})
 MERGE (comment:Type {id:"frontend/src/types/notifications.ts::Comment",kind:"interface"})

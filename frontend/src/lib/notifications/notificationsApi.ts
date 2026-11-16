@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=cd3ceb3b16153c352b9bbac60f42b29e4751a8f434250519777cf42349b2521c
 MERGE (self:File {path:"frontend/src/lib/notifications/notificationsApi.ts"})
 MERGE (realMode:File {path:"frontend/src/mocks/real-mode.ts"})
 MERGE (notifTypes:File {path:"frontend/src/types/notifications.ts"})

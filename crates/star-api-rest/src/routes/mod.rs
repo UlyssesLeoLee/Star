@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=45b34c3597e4da4d021445fbc6f4705833afdafc499691743971e721728b5ba3
+@cypher schema=1 source_sha256=445171aaf64fbd2c67a40b96f6dff920b1cb2568e82e7f3b0b362182efe4bb65
 MERGE (self:File {path:"crates/star-api-rest/src/routes/mod.rs"})
 MERGE (integrations:File {path:"crates/star-api-rest/src/routes/integrations.rs"})
 MERGE (memory:File {path:"crates/star-api-rest/src/routes/memory.rs"})
@@ -41,6 +41,7 @@ pub mod im;
 pub mod integrations;
 pub mod memory;
 pub mod merge_requests;
+pub mod notifications;
 pub mod pipelines;
 pub mod reviews;
 pub mod runtime;
