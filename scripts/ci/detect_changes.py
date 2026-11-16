@@ -13,7 +13,7 @@ Usage (CI):   BASE_SHA=<sha> HEAD_SHA=<sha> EVENT_NAME=<event> detect_changes.py
 Usage (test): detect_changes.py --files path1 path2 ...
 """
 
-# @cypher schema=1
+# @cypher schema=1 source_sha256=c3586fd1f92f07b7ed04f8718d3269ccc46130c0b31e84cf662dd56e11eb1433
 # MERGE (self:File {path:"scripts/ci/detect_changes.py"})
 # MERGE (areas:Config {id:"scripts/ci/detect_changes.py::AREAS",name:"rust/bff/frontend/desktop/docs/workflows"})
 # MERGE (shared:Config {id:"scripts/ci/detect_changes.py::_SHARED_RUST",name:"files that affect every Rust build"})
@@ -46,7 +46,7 @@ import os
 import subprocess
 import sys
 
-AREAS = ("rust", "bff", "frontend", "desktop", "docs", "workflows")
+AREAS = ("rust", "bff", "frontend", "desktop", "docs", "workflows", "nema")
 
 # Files whose change can affect the CI definition itself or every Rust build.
 _SHARED_RUST = (
@@ -91,6 +91,17 @@ PATTERNS: dict[str, tuple[str, ...]] = {
         "scripts/ci/*",
     ),
     "workflows": (".github/*", "scripts/ci/*"),
+    # .nema 是本项目自创的文件格式 (per 2026-11-16 用户发令) — 它的语法、
+    # 解释器 profile 和浏览器端 wasm 产物都要走专属门禁。
+    "nema": (
+        "crates/nema-codec/*",
+        "crates/nema-codec-wasm/*",
+        "frontend/src/lib/nema/*",
+        "frontend/src/app/*/nema/*",
+        "frontend/src/components/nema/*",
+        "scripts/ci/nema_codec_gate.py",
+        ".github/workflows/ci.yml",
+    ),
 }
 
 

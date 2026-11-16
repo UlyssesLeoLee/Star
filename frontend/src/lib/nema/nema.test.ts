@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=838dbc7504a31b89804df1e050ae31cafad1a650ef4654337ac9bd77bb89c5ed
+@cypher schema=1 source_sha256=9455b560c037e8249c7a3dffef28d246f7f65454f0ff791b088305f36b0aa399
 MERGE (self:File {path:"frontend/src/lib/nema/nema.test.ts"})
 MERGE (roundtrip:Symbol {id:"frontend/src/lib/nema/nema.test.ts::serialize_parse_roundtrip",kind:"test"})
 MERGE (autogen:Symbol {id:"frontend/src/lib/nema/nema.test.ts::nema_auto_generation_requires_shared_editors",kind:"test"})
@@ -15,8 +15,26 @@ import {
   serializeNema,
   nemaDocumentForSharedFile,
   taskViewFromDocument,
+  listNemaInterpreterProfilesWasm,
+  parseNemaWithProfileWasm,
   NEMA_TRANSPORT_HEADER,
+  NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  type NemaInterpreterProfile,
 } from "./nema";
+
+/**
+ * 新建 .nema 侧车走 Rust 解释器 profile (strict v2 语法), 不用 legacy transport 头。
+ * legacy 的 "\!NEMAT1" 头属于旧 codec (parse_source) — 严格 profile 的语法里没有它,
+ * 混用会导致 Rust 侧 "body before domain" 解析失败。
+ */
+async function defaultProfile(): Promise<NemaInterpreterProfile> {
+  const installed = await listNemaInterpreterProfilesWasm();
+  const profile = installed.find(
+    (candidate) => candidate.grammar_revision === NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  );
+  if (!profile) throw new Error(`profile not installed: ${NEMA_DEFAULT_NEW_DOCUMENT_REVISION}`);
+  return profile;
+}
 import { useNemaStore } from "./nemaStore";
 
 describe(".NEMA 格式 — 序列化/解析往返", () => {
@@ -96,7 +114,8 @@ describe(".NEMA 文件即任务规则", () => {
     expect(useNemaStore.getState().nemaTasks.length).toBe(0);
   });
 
-  it("编辑者 ≥ 2 自动产生 .nema 侧车", async () => {
+  it("编辑者 ≥ 2 自动产生 .nema 侧车 (Rust 解释器 profile 输出)", async () => {
+    const profile = await defaultProfile();
     const entry = await useNemaStore.getState().registerSharedFile({
       filePath: "docs/shared.md",
       title: "SharedDoc",
@@ -104,7 +123,16 @@ describe(".NEMA 文件即任务规则", () => {
     });
     expect(entry).not.toBeNull();
     expect(entry?.nemaPath).toBe("docs/shared.md.nema");
-    expect(entry?.source.startsWith(NEMA_TRANSPORT_HEADER)).toBe(true);
+    // 新文档由 Rust strict profile 规范化输出 (不是 legacy transport 头)
+    expect(entry?.source.startsWith(NEMA_TRANSPORT_HEADER)).toBe(false);
+    expect(entry?.source.startsWith(" \\?1 1")).toBe(true);
+    expect(entry?.interpreterProfile?.grammar_revision).toBe(
+      NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+    );
+    // 同一 profile 重解析必须还原同一份 AST (canonical round-trip)
+    const reparsed = await parseNemaWithProfileWasm(entry!.source, profile);
+    expect(reparsed.domains.length).toBe(2);
+    expect(reparsed.domains[0].mode).toBe("five_w_one_h");
     expect(useNemaStore.getState().nemaTasks.length).toBe(1);
   });
 
@@ -127,13 +155,13 @@ describe(".NEMA 文件即任务规则", () => {
       editors: ["a", "b"],
     });
     expect(entry).not.toBeNull();
-    const workItemId = useNemaStore.getState().openNemaAsStarTask(entry!.id);
+    const workItemId = await useNemaStore.getState().openNemaAsStarTask(entry!.id);
     expect(workItemId).toBeTruthy();
     // 绑定已回填
     const bound = useNemaStore.getState().nemaTasks.find((t) => t.id === entry!.id);
     expect(bound?.workItemId).toBe(workItemId);
     // 再次打开幂等 (不重复创建)
-    const again = useNemaStore.getState().openNemaAsStarTask(entry!.id);
+    const again = await useNemaStore.getState().openNemaAsStarTask(entry!.id);
     expect(again).toBe(workItemId);
   });
 });

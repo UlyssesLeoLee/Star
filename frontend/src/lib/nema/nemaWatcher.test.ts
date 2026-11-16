@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2a5e9d1e934b496b6e25bfd67511f54ef383d8403d0121ddde54053520105ea6
+@cypher schema=1 source_sha256=9d3d196428edfc251bd5a95bc91f95cf5526b0581b8d1f11aa7be91b44e0971a
 MERGE (self:File {path:"frontend/src/lib/nema/nemaWatcher.test.ts"})
 MERGE (suite:Symbol {id:"frontend/src/lib/nema/nemaWatcher.test.ts::nemaWatcher",kind:"suite"})
 MERGE (watcher:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
@@ -96,7 +96,8 @@ describe("nemaWatcher (WBS 8.4.4)", () => {
     mockApi({ "notes.nema": SAMPLE_NEMA });
     await scanNemaFiles([""]);
     const entry = useNemaStore.getState().nemaTasks[0];
-    const workItemId = useNemaStore.getState().openNemaAsStarTask(entry.id);
+    // openNemaAsStarTask 是异步的 (要过 Rust 解释器)
+    const workItemId = await useNemaStore.getState().openNemaAsStarTask(entry.id);
     expect(workItemId).toBeTruthy();
 
     mockApi({ "notes.nema": SAMPLE_NEMA_V2 });

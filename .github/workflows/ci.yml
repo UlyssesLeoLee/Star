@@ -60,6 +60,7 @@ jobs:
       desktop: ${{ steps.detect.outputs.desktop }}
       docs: ${{ steps.detect.outputs.docs }}
       workflows: ${{ steps.detect.outputs.workflows }}
+      nema: ${{ steps.detect.outputs.nema }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,6 +134,48 @@ jobs:
         # 未加 -D warnings: 既有 600+ missing_docs 等 warning 尚未清零。
         # deny 级 lint (clippy::correctness 等) 本身就是 error, 仍会让本步骤失败。
         run: cargo clippy --workspace --exclude star-desktop --all-targets -j 4
+
+  # ─────────────────────────────────────────────────────────────
+  # .nema — 自创文件格式的专属门禁 (per 2026-11-16 用户发令)
+  #
+  # .nema 不是外来依赖, 是本项目自创的文件格式。它有一套自己的契约:
+  #   - 语法由 crates/nema-codec/src/strict.rs 定义 (Rust 是唯一真相源)
+  #   - 每个解释器 profile pin 一个 artifact_sha256 (= sha256(strict.rs)),
+  #     保证一个 .nema 文件的含义永久唯一
+  #   - 浏览器实际跑的是 frontend/src/lib/nema/wasm/ 里的 .wasm 构建产物
+  #   - 126 条语法一致性用例在 crates/nema-codec/tests/ (集成测试)
+  #
+  # 这个 job 解决三件之前没有任何门禁覆盖的事:
+  #   1. cargo test --workspace --lib 只编 lib target → tests/ 下的
+  #      profile_conformance / matrix_64_combinations 从来没在 CI 里跑过
+  #   2. 改了 strict.rs 没重建 .wasm → 浏览器跑旧解释器, Rust 测试跑新源码
+  #   3. 提交的 .wasm 被改动/损坏 → 没有任何完整性检查
+  # ─────────────────────────────────────────────────────────────
+  nema-ci:
+    name: NEMA format (grammar / interpreter / wasm artifact)
+    needs: changes
+    if: needs.changes.outputs.nema == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      - name: Grammar conformance matrix (integration tests)
+        # 这些是 tests/ 下的集成测试 — --workspace --lib 不会跑它们, 必须显式跑。
+        run: cargo test -p nema-codec --tests -j 4
+
+      - name: NEMA codec gate (digest / matrix / wasm artifact)
+        run: python3 scripts/ci/nema_codec_gate.py --all
 
   rust-test-workspace:
     name: Rust workspace tests
@@ -466,6 +509,7 @@ jobs:
       - desktop-rust
       - e2e-integration
       - frontend-ci
+      - nema-ci
       - workflow-lint
       - markdownlint
     runs-on: ubuntu-24.04

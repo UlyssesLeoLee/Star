@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7f601b45913d63d89c8c867453b12ab1ca37bf91173474e83987ac0844137c47
+@cypher schema=1 source_sha256=6d06b61bae042ded623760577b333b8ad5697df510ad254b5863399241efad3f
 MERGE (self:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::useNemaStore",kind:"hook"})
 MERGE (register:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::registerSharedFile",kind:"function"})
@@ -50,8 +50,10 @@ import {
   parseNema,
   parseNemaWasm,
   parseNemaWithProfileWasm,
+  listNemaInterpreterProfilesWasm,
   loadNemaWasm,
   serializeNemaWithProfileWasm,
+  NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
   type NemaDocument,
   type NemaInterpreterProfile,
   type NemaTaskView,
@@ -72,12 +74,61 @@ async function parseNemaSmart(source: string): Promise<NemaDocument> {
   return parseNema(source);
 }
 
-/** Pinned entries always use their exact Rust interpreter; no profile fallback is allowed. */
-async function parseNemaEntryView(source: string, profile?: NemaInterpreterProfile): Promise<NemaTaskView> {
+/** True when the source parses cleanly under the pinned strict profile. */
+async function isStrictProfileSource(
+  source: string,
+  profile: NemaInterpreterProfile,
+): Promise<boolean> {
+  try {
+    await parseNemaWithProfileWasm(source, profile);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves the installed interpreter profile for NEW documents.
+ *
+ * Per 2026-11-16: .nema 是自创文件格式, 新文档的语法版本由
+ * NEMA_DEFAULT_NEW_DOCUMENT_REVISION 唯一确定 — 不允许"latest"这种浮动别名。
+ * 调用方可以显式 pin 一个 profile; 不 pin 时用这个默认 revision。
+ */
+async function resolveDefaultNemaProfile(): Promise<NemaInterpreterProfile> {
+  if (!(await loadNemaWasm())) throw new Error("Rust NEMA interpreter is unavailable");
+  const installed = await listNemaInterpreterProfilesWasm();
+  const profile = installed.find(
+    (candidate) => candidate.grammar_revision === NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  );
+  if (!profile) {
+    throw new Error(`NEMA interpreter profile is not installed: ${NEMA_DEFAULT_NEW_DOCUMENT_REVISION}`);
+  }
+  return profile;
+}
+
+/**
+ * Pinned entries always use their exact Rust interpreter; no profile fallback is allowed.
+ *
+ * `allowLegacyFallback` 只给"首次导入磁盘文件"用:
+ *   .nema 是自创格式, 早期版本用 legacy transport 头 ("\!NEMAT1") + "\?1 REV 1" 域头,
+ *   strict v2 语法里没有那个 transport 头。磁盘上的旧文件必须仍能打开,
+ *   所以导入路径先试 strict profile, 失败再落到 legacy 投影 (并在 entry 上标记)。
+ *   已 pin 的条目 (更新/回写路径) 不允许 fallback — 那会悄悄换解释器。
+ */
+async function parseNemaEntryView(
+  source: string,
+  profile?: NemaInterpreterProfile,
+  allowLegacyFallback = false,
+): Promise<NemaTaskView> {
   if (!profile) return taskViewFromDocument(await parseNemaSmart(source));
   if (!(await loadNemaWasm())) throw new Error("Rust NEMA interpreter is unavailable");
-  const strict = await parseNemaWithProfileWasm(source, profile);
-  return taskViewFromStrictDocument(strict);
+  try {
+    const strict = await parseNemaWithProfileWasm(source, profile);
+    return taskViewFromStrictDocument(strict);
+  } catch (error) {
+    if (!allowLegacyFallback) throw error;
+    return taskViewFromDocument(await parseNemaSmart(source));
+  }
 }
 import { useStore as useMainStore } from "@/lib/store";
 import type { WorkItemDocument } from "@/types/ids";
@@ -94,6 +145,12 @@ export interface NemaTaskEntry {
   source: string;
   /** Grammar and interpreter identity pinned at import/create time; absent only on legacy entries. */
   interpreterProfile?: NemaInterpreterProfile;
+  /**
+   * true = 该文件用的是 legacy transport 头格式 ("\!NEMAT1" + "\?N REV N"),
+   * strict v2 语法解析不了 (它是早期版本的 .nema 侧车)。
+   * 这种条目永远留在 legacy 投影上 — 不被静默升级成 strict 文档。
+   */
+  legacyFormat?: boolean;
   /** 打开为 Star 任务后绑定的 work item id */
   workItemId?: string;
   created_at: string;
@@ -110,7 +167,7 @@ interface NemaState {
     purpose?: string;
     method?: string;
     environment?: string;
-  }, profile: NemaInterpreterProfile) => Promise<NemaTaskEntry | null>;
+  }, profile?: NemaInterpreterProfile) => Promise<NemaTaskEntry | null>;
   /** 打开 .nema 为 Star 任务: 创建 WorkItem 并回填绑定。 */
   openNemaAsStarTask: (nemaId: string) => Promise<string | null>;
   /** 移除 .nema 任务记录。 */
@@ -158,7 +215,9 @@ export const useNemaStore = create<NemaState>()(
           return null;
         }
         const existing = get().nemaTasks.find((t) => t.filePath === input.filePath);
-        const pinnedProfile = existing?.interpreterProfile ?? profile;
+        // 已存在的条目保持它 pin 的 profile (不漂移); 新条目用调用方 pin 的,
+        // 未 pin 时用 NEMA_DEFAULT_NEW_DOCUMENT_REVISION 唯一确定。
+        const pinnedProfile = existing?.interpreterProfile ?? profile ?? await resolveDefaultNemaProfile();
         const now = new Date().toISOString();
         const doc = nemaDocumentForSharedFile({ ...input }, new Date(now));
         const source = await serializeNemaWithProfileWasm(doc, pinnedProfile);
@@ -197,7 +256,11 @@ export const useNemaStore = create<NemaState>()(
         if (!entry) return null;
         if (entry.workItemId) return entry.workItemId;
 
-        const view = await parseNemaEntryView(entry.source, entry.interpreterProfile);
+        const view = await parseNemaEntryView(
+          entry.source,
+          entry.interpreterProfile,
+          entry.legacyFormat === true,
+        );
         // 跨 store 创建 WorkItem (main store), 文档关联 .nema 侧车 + 源文件
         const main = useMainStore.getState();
         const documents: WorkItemDocument[] = [
@@ -240,7 +303,10 @@ export const useNemaStore = create<NemaState>()(
       },
 
       importNemaSource: async (nemaPath, source, profile) => {
-        const view = await parseNemaEntryView(source, profile);
+        // 首次导入磁盘文件: 允许 legacy transport 头格式 (旧版 .nema 侧车)
+        const view = await parseNemaEntryView(source, profile, true);
+        // 判定这个文件到底是 strict 还是 legacy — 决定后续更新路径能否 fallback
+        const legacyFormat = !profile ? true : !(await isStrictProfileSource(source, profile));
         const id = makeId("nema");
         const entry: NemaTaskEntry = {
           id,
@@ -250,6 +316,7 @@ export const useNemaStore = create<NemaState>()(
           editors: view.who,
           source,
           interpreterProfile: profile,
+          legacyFormat,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -267,7 +334,11 @@ export const useNemaStore = create<NemaState>()(
         if (existing.source === source) {
           return { action: "unchanged" as const, entry: existing };
         }
-        const view = await parseNemaEntryView(source, existing.interpreterProfile);
+        const view = await parseNemaEntryView(
+          source,
+          existing.interpreterProfile,
+          existing.legacyFormat === true,
+        );
         const now = new Date().toISOString();
         const updated: NemaTaskEntry = {
           ...existing,

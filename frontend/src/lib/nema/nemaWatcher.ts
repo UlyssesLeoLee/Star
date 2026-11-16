@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=4b94582667a5a1a69f52f7c35d3d4ac7c80a689943c521d8a103d1d60dedc5c6
+@cypher schema=1 source_sha256=dcd216f29b1b9383f7927c4231cc2d2077a8f28aebbc937c889982b52e0878f2
 MERGE (self:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
 MERGE (scan:Function {name:"nemaWatcher::scanNemaFiles",language:"typescript"})
 MERGE (hook:Function {name:"nemaWatcher::useNemaWatcher",language:"typescript"})
@@ -26,7 +26,12 @@ MERGE (hook)-[:CALLS]->(scan)
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isLocalMode, listWorkspaceFiles, readWorkspaceFile } from "@/lib/localFiles";
 import { useNemaStore } from "./nemaStore";
-import type { NemaInterpreterProfile } from "./nema";
+import {
+  listNemaInterpreterProfilesWasm,
+  loadNemaWasm,
+  NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  type NemaInterpreterProfile,
+} from "./nema";
 
 export interface NemaScanResult {
   /** 扫描到的 .nema 文件数 */
@@ -39,6 +44,27 @@ export interface NemaScanResult {
   backendUnavailable: boolean;
   /** 扫描错误 */
   errors: string[];
+}
+
+/**
+ * Resolves the interpreter profile used to import disk .nema files.
+ *
+ * .nema 是自创文件格式: 语法版本由 grammar_revision 唯一确定, 没有 "latest"。
+ * 调用方可以显式 pin; 不 pin 时用 NEMA_DEFAULT_NEW_DOCUMENT_REVISION。
+ * 解析不了 (wasm 不可用 / profile 未安装) → 返回 null, 扫描如实报告不导入,
+ * 绝不静默用错解释器。
+ */
+async function resolveImportProfile(
+  explicit?: NemaInterpreterProfile | null,
+): Promise<NemaInterpreterProfile | null> {
+  if (explicit) return explicit;
+  if (!(await loadNemaWasm())) return null;
+  const installed = await listNemaInterpreterProfilesWasm();
+  return (
+    installed.find(
+      (candidate) => candidate.grammar_revision === NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+    ) ?? null
+  );
 }
 
 /** 单次扫描: 列目录 → 筛 .nema → 读内容 → sync (导入/更新/回写)。 */
@@ -58,6 +84,15 @@ export async function scanNemaFiles(
     return result;
   }
   const store = useNemaStore.getState();
+  // 解析导入用的解释器 profile (不 pin 时用默认 grammar revision)
+  let profile: NemaInterpreterProfile | null = null;
+  try {
+    profile = await resolveImportProfile(importProfile);
+  } catch (error) {
+    result.errors.push(
+      `profile: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   for (const root of roots) {
     const list = await listWorkspaceFiles(root);
@@ -78,7 +113,7 @@ export async function scanNemaFiles(
         continue;
       }
       try {
-        const synced = await store.syncNemaSource(nemaPath, read.body.text, importProfile ?? undefined);
+        const synced = await store.syncNemaSource(nemaPath, read.body.text, profile ?? undefined);
         if (synced.action === "imported") result.imported += 1;
         else if (synced.action === "updated") result.updated += 1;
       } catch (error) {
