@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=141eee8f3657d1ae2714de1e5cae5f89078f2ecf71d1ded247fd5f842a090c0b
+@cypher schema=1 source_sha256=6e526b912d04e1c39587aabd6e3d75d1702b29cae95527a0a6f7d6110b3a85cb
 MERGE (self:File {path:"frontend/src/lib/redirects.shim.cjs"})
 @endcypher
 */
@@ -10,7 +10,7 @@ MERGE (self:File {path:"frontend/src/lib/redirects.shim.cjs"})
 // require() to obtain the canonical redirect list without TypeScript
 // compile-time overhead at Next.js config load.
 //
-// The 27 entries below MUST stay in sync with src/lib/redirects.ts.
+// The 20 entries below MUST stay in sync with src/lib/redirects.ts.
 // The vitest spec at e2e/redirects.spec.ts imports the .ts version
 // and asserts count + specific entries are identical, so any drift
 // between the two surfaces will fail the test suite.
@@ -43,14 +43,10 @@ const LEGACY_REDIRECTS = [
   { source: "/issues", destination: "/sprint?view=sprint", permanent: false },
   { source: "/work-item", destination: "/sprint?view=list", permanent: false },
 
-  // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
-  { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  // /agent-view: no redirect — Agent 中心独立页 (非无限画布) 直接可达 (2026-11-15)
-  { source: "/validation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/automation", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/development", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/local-runtime", destination: "/canvas/canvas-001?tab=agent", permanent: false },
+  // ── Agent 中心 sink 已删除 (per 2026-11-16 用户发令 10 条第 4 条) ──
+  //   /agent /agents /agent-view /validation /automation /development
+  //   /local-runtime 不再 307 固定指向 canvas-001, 由 /canvas 入口页
+  //   按当前 Worktree / Lane 上下文动态解析 (与 src/lib/redirects.ts 同步).
 
   // ── /inbox sink ─────────────────────────────────────────────────────
   { source: "/notification", destination: "/inbox", permanent: false },

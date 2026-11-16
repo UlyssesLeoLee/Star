@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a5893236883af73aa495ad9f67270e525f35aaa6bb0fd757f2836e37e5bf8404
+@cypher schema=1 source_sha256=a9fbab1e22440c56b5e885f9a3b0adc0c1274074d525574bff6a83a28dad710f
 MERGE (self:File {path:"frontend/src/components/team/TeamPanel.test.tsx"})
 MERGE (panel:File {path:"frontend/src/components/team/TeamPanel.tsx"})
 MERGE (api:File {path:"frontend/src/components/team/runtimeApi.ts"})
@@ -24,6 +24,8 @@ MERGE (self)-[:TESTS]->(api)
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { TeamPanel } from "./TeamPanel";
+import { useStore } from "@/lib/store";
+import { localRuntimes as seedLocalRuntimes } from "@/lib/seed";
 
 // ---- fetch mock 工具 --------------------------------------------------
 
@@ -86,6 +88,8 @@ const API_RUNTIMES_FIXTURE = {
 
 describe("TeamPanel", () => {
   beforeEach(() => {
+    // store 初始态已是诚实空态 (per 2026-11-16 seed 清除) → 测试显式注入 fixture
+    useStore.setState({ localRuntimes: seedLocalRuntimes as never });
     // 默认: 后端不可达 → 组件走降级路径 (确定性, 不依赖真实网络)
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("backend unreachable (test)")));
   });

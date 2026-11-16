@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1f90ff31a2bdf9311a15c2c6e38e0c5c7f26927c00f8b205b994964ce2898a15
+@cypher schema=1 source_sha256=9c464ca208b812920c77471e7947ff1d4188b079fc918738fda8365aaffcbf7f
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -9,18 +9,23 @@ MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 // Single source of truth for legacy routes redirected to consolidated app
 // routes. /worktree is an active Project Worktree Index route, not a redirect.
 //
-// 22 domain routes are absorbed into 6 new panel routes (27 total
+// 20 domain routes are absorbed into 4 new panel routes (20 total
 // entries because /workspace has both an exact-match and a /:id
 // path-param variant for deep links):
 //   /inbox      ← notification / comment / audit / feedback / search / context
-//   /issues     ← work-item
+//   /sprint     ← work-item
 //   /projects   ← project / workspace / board / planning / scm / collaboration
-//                 / workflow / canvas (with id) / relation
-//   /agents     ← agent / validation / automation / development / local-runtime
+//                 / relation
 //   /settings   ← tenant / identity / permission / integration
 //
+//   /canvas/:id 是画布本体路由, 不在 redirect 列表 (per 2026-09-04 canvas e2e
+//   守门 prerequisite); per 2026-11-16 用户发令 10 条第 4 条, agent 7 路由
+//   (/agent /agents /agent-view /validation /automation /development
+//   /local-runtime) 不再固定指向 canvas-001, 由 /canvas 入口页
+//   (src/app/canvas/page.tsx) 按当前 Worktree / Lane 上下文动态解析。
+//
 // Notes:
-//   - We keep the path-param variants (/workspace/:id, /canvas/:id) so deep
+//   - We keep the path-param variants (/workspace/:id) so deep
 //     links from emails, docs and old bookmarks survive the migration.
 //   - The root path / is NOT in this list — its redirect is handled by
 //     app/page.tsx (redirect → /inbox) so it can be unit-tested at the
@@ -91,32 +96,11 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     permanent: false,
   },
 
-  // ── Agent 中心 sink (per 2026-11-15 用户拍板: Agent 中心所有无限画布并入 Canvas —
-  //     /agent-view 独立页关闭, 全部 307 → canvas Agent 画布标签 ?tab=agent) ──
-  { source: "/agent", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  { source: "/agents", destination: "/canvas/canvas-001?tab=agent", permanent: false },
-  // /agent-view 无 redirect (per 2026-11-15: Agent 中心恢复独立页 — 只放非无限画布 workflow/settings;
-  // 无限画布 (Agent 拓扑) 在 canvas 选项卡内 canvas-only)
-  {
-    source: "/validation",
-    destination: "/canvas/canvas-001?tab=agent",
-    permanent: false,
-  },
-  {
-    source: "/automation",
-    destination: "/canvas/canvas-001?tab=agent",
-    permanent: false,
-  },
-  {
-    source: "/development",
-    destination: "/canvas/canvas-001?tab=agent",
-    permanent: false,
-  },
-  {
-    source: "/local-runtime",
-    destination: "/canvas/canvas-001?tab=agent",
-    permanent: false,
-  },
+  // ── Agent 中心 sink 已删除 (per 2026-11-16 用户发令 10 条第 4 条) ──
+  //   /agent /agents /agent-view /validation /automation /development
+  //   /local-runtime 不再 307 固定指向 canvas-001 — /canvas 入口
+  //   (src/app/canvas/page.tsx) 按当前 Worktree / Lane 上下文动态解析画布,
+  //   旧书签直接访问 /canvas 由入口页承载; 画布本体仍走 /canvas/:id。
 
   // ── /inbox sink ─────────────────────────────────────────────────────
   { source: "/notification", destination: "/inbox", permanent: false },

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=022cee31b91da9ef0972860bf07a3d674ae6c3cf5a5f32df5bdb3a6e76c4364b
+@cypher schema=1 source_sha256=deac2b996fc32d3e58f5ea4f0f85231e630dc036cf504715b6499fcd9e05a09c
 MERGE (self:File {path:"frontend/src/lib/store.ts"})
 MERGE (agentSettings:File {path:"frontend/src/lib/agent/settings.ts"})
 MERGE (self)-[:IMPORTS]->(agentSettings)
@@ -20,7 +20,6 @@ MERGE (self)-[:IMPORTS]->(agentSettings)
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import * as seed from "./seed";
 import type {
   Worktree, WorktreeStatus,
   AgentSession, AgentStatus,
@@ -34,6 +33,14 @@ import type {
   Project,
   RefactorRound, RefactorCard, RefactorColumn, RefactorBoardConfig, RefactorStatus,
   Uuid,
+  // 原 seed 兜底字段的具体类型 (seed 不再进 store 初始值)
+  Tenant, Identity, Workspace, Comment,
+  PermissionScheme, PermissionRule, Workflow,
+  ContextPacket, ContextDecision, ValidationCase,
+  LocalRuntime, Repository, SearchHit, SavedSearch,
+  Integration, PresenceCursor, Whiteboard,
+  Sprint, Milestone, BurndownPoint,
+  Lane, Relation, AuditEvent, AutomationRule,
 } from "@/types/ids";
 import type { AgentSettings } from "@/lib/agent/settings";
 import { createInitialAgentSettings } from "@/lib/agent/settings";
@@ -68,7 +75,7 @@ import { REFACTOR_FALLBACK_STATUS } from "@/types/ids";
 //   3. 不存在的 status (workItems 有但 board.columns 没有) — 不自动加列;
 //      由 KanbanBoard 端"列 = 状态映射"的渲染决定是否显示游离 wi
 //      (这里只保证 *已存在列* 的 work_item_ids 跟 workItems.status 一致)
-//   4. 兜底列缺失时也不自动补 — 因为兜底列在 addBoardColumn/seed 阶段保证存在
+//   4. 兜底列缺失时也不自动补 — 兜底列由 addBoardColumn 显式创建 (初始为空板)
 // =====================================================================
 const reconcileBoard = (
   workItems: WorkItem[],
@@ -135,42 +142,42 @@ interface StoreState {
   // read accessors (immutable from outside)
   /** 当前 store 关联的 tenant id (per 2026-09-07 17:30 JST Mavis 临时代签, sprint 创建等需要 tenant 上下文时回退用) */
   tenantId?: string;
-  tenants: typeof seed.tenants;
-  projects: typeof seed.projects;
-  identities: typeof seed.identities;
-  workspaces: typeof seed.workspaces;
+  tenants: Tenant[];
+  projects: Project[];
+  identities: Identity[];
+  workspaces: Workspace[];
   workItems: WorkItem[];
-  comments: typeof seed.comments;
-  permissionSchemes: typeof seed.permissionSchemes;
-  permissionRules: typeof seed.permissionRules;
-  workflows: typeof seed.workflows;
+  comments: Comment[];
+  permissionSchemes: PermissionScheme[];
+  permissionRules: PermissionRule[];
+  workflows: Workflow[];
   changeSets: ChangeSet[];
   worktrees: Worktree[];
   agentSessions: AgentSession[];
   feedbacks: Feedback[];
-  contextPackets: typeof seed.contextPackets;
-  contextDecisions: typeof seed.contextDecisions;
-  validationCases: typeof seed.validationCases;
-  localRuntimes: typeof seed.localRuntimes;
-  repositories: typeof seed.repositories;
+  contextPackets: ContextPacket[];
+  contextDecisions: ContextDecision[];
+  validationCases: ValidationCase[];
+  localRuntimes: LocalRuntime[];
+  repositories: Repository[];
   pullRequests: PullRequest[];
   notifications: Notification[];
-  searchHits: typeof seed.searchHits;
-  savedSearches: typeof seed.savedSearches;
-  integrations: typeof seed.integrations;
-  presenceCursors: typeof seed.presenceCursors;
-  whiteboards: typeof seed.whiteboards;
+  searchHits: SearchHit[];
+  savedSearches: SavedSearch[];
+  integrations: Integration[];
+  presenceCursors: PresenceCursor[];
+  whiteboards: Whiteboard[];
   canvases: Canvas[];
   canvasElements: CanvasElement[];   // 故意大字段 — 不持久化
   canvasConnectors: CanvasConnector[];
-  sprints: typeof seed.sprints;
-  milestones: typeof seed.milestones;
-  burndownSeries: typeof seed.burndownSeries;
-  board: typeof seed.board;
-  lanes: typeof seed.lanes;
-  relations: typeof seed.relations;
-  auditEvents: typeof seed.auditEvents;
-  automationRules: typeof seed.automationRules;
+  sprints: Sprint[];
+  milestones: Milestone[];
+  burndownSeries: BurndownPoint[];
+  board: Board;
+  lanes: Lane[];
+  relations: Relation[];
+  auditEvents: AuditEvent[];
+  automationRules: AutomationRule[];
 
   // ── Refactor Sweep (per 2026-09-02 10:41 JST 拍板, docs/frontend/design/refactor-sweep-design.md) ──
   /** 全局所有 refactor rounds (active + 历史) */
@@ -383,49 +390,51 @@ interface StoreState {
 }
 
 // =====================================================================
-// 初始 state factory — 每次 store create 都重置成 seed
-// (per zustand persist 模式: 把 create((set) => state) 抽出来)
+// 初始 state factory — 全部空初始值 (诚实空状态)
+//   未授权 / 未接入 / 空数据一律以空数组/空对象呈现, 不再喂 seed 兜底;
+//   真实数据由后端查询或用户显式操作注入, 页面层已有对应空状态渲染。
 // =====================================================================
 const initialState = (set: any, get?: any): StoreState => ({
   // 默认 tenant 上下文: 由后端 session 注入, 未注入时回退 "tenant-default"
   // (per 2026-09-07 17:30 JST Mavis 临时代签, 跟 5 域 Lead 默认 fallback 一致)
   tenantId: undefined,
-  tenants: seed.tenants,
-  projects: seed.projects,
-  identities: seed.identities,
-  workspaces: seed.workspaces,
-  workItems: seed.workItems,
-  comments: seed.comments,
-  permissionSchemes: seed.permissionSchemes,
-  permissionRules: seed.permissionRules,
-  workflows: seed.workflows,
-  changeSets: seed.changeSets,
-  worktrees: seed.worktrees,
-  agentSessions: seed.agentSessions,
-  feedbacks: seed.feedbacks,
-  contextPackets: seed.contextPackets,
-  contextDecisions: seed.contextDecisions,
-  validationCases: seed.validationCases,
-  localRuntimes: seed.localRuntimes,
-  repositories: seed.repositories,
-  pullRequests: seed.pullRequests,
-  notifications: seed.notifications,
-  searchHits: seed.searchHits,
-  savedSearches: seed.savedSearches,
-  integrations: seed.integrations,
-  presenceCursors: seed.presenceCursors,
-  whiteboards: seed.whiteboards,
-  canvases: seed.canvases,
-  canvasElements: seed.canvasElements,
-  canvasConnectors: seed.canvasConnectors,
-  sprints: seed.sprints,
-  milestones: seed.milestones,
-  burndownSeries: seed.burndownSeries,
-  board: seed.board,
-  lanes: seed.lanes,
-  relations: seed.relations,
-  auditEvents: seed.auditEvents,
-  automationRules: seed.automationRules,
+  tenants: [],
+  projects: [],
+  identities: [],
+  workspaces: [],
+  workItems: [],
+  comments: [],
+  permissionSchemes: [],
+  permissionRules: [],
+  workflows: [],
+  changeSets: [],
+  worktrees: [],
+  agentSessions: [],
+  feedbacks: [],
+  contextPackets: [],
+  contextDecisions: [],
+  validationCases: [],
+  localRuntimes: [],
+  repositories: [],
+  pullRequests: [],
+  notifications: [],
+  searchHits: [],
+  savedSearches: [],
+  integrations: [],
+  presenceCursors: [],
+  whiteboards: [],
+  canvases: [],
+  canvasElements: [],
+  canvasConnectors: [],
+  sprints: [],
+  milestones: [],
+  burndownSeries: [],
+  // 看板: 未接入/未选项目时为空板 (空 id + 空列); 列由 addBoardColumn/addWorkItem 按需创建
+  board: { id: "", tenant_id: "", project_id: "", name: "", columns: [] },
+  lanes: [],
+  relations: [],
+  auditEvents: [],
+  automationRules: [],
 
   // Refactor Sweep (per 2026-09-02 10:41 JST 拍板)
   //   - 初始空数组, 由 ensureRefactorBoardConfig / openRefactorRound 首次调用时 lazy init
@@ -522,7 +531,7 @@ const initialState = (set: any, get?: any): StoreState => ({
 
   // 新增 work-item (per 2026-08-31 11:56 JST Ulysses 拍板)
   // 上下文: 客户端 zustand store 还没接后端, key/id 由 store 本地生成.
-  //   - id: crypto.randomUUID() 或基于 seed wi 计数 fallback (SSR-safe)
+  //   - id: crypto.randomUUID() 或时间戳 fallback (SSR-safe, 不再依赖 seed wi 计数)
   //   - key: PHYSIS-N+ (按当前项目现有 max N+1 推; 不同项目共用 store 暂按 tenant 简化 PHYSIS)
   addWorkItem: (input) => {
     const newId = input.id

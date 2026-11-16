@@ -1,6 +1,12 @@
 /*
-@cypher schema=1 source_sha256=d8a28c53197a235adc433e15ba02b135576f4701dce4c6d54350584ffd25ca1e
+@cypher schema=1 source_sha256=467a25e615a5611c8ba54e5e3afb4ae8de7d2c79a1c35266bcad956f18333abb
 MERGE (self:File {path:"frontend/src/components/board/KanbanBoard.tsx"})
+MERGE (board:Symbol {id:"frontend/src/components/board/KanbanBoard.tsx::KanbanBoard",kind:"component"})
+MERGE (statusNoticeFile:File {path:"frontend/src/components/status/StatusNotice.tsx"})
+MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
+MERGE (self)-[:DEFINES]->(board)
+MERGE (self)-[:IMPORTS]->(statusNoticeFile)
+MERGE (board)-[:CALLS]->(statusNotice)
 @endcypher
 */
 "use client";
@@ -14,6 +20,9 @@ MERGE (self:File {path:"frontend/src/components/board/KanbanBoard.tsx"})
 //   3. drop zone 高亮 (蓝边 2px + bg-accent/10) when dropTarget === status
 //   4. WIP limit 超限显示 (per seed.ts wip_limit 字段)
 //   5. 管理 dragging 状态, 让被拖卡片 opacity 0.5
+//   6. 无授权数据诚实态 (per 2026-11-16 清 seed/mock 显示入口): unavailableState
+//      非空时不渲染列/卡片/拖动/创建按钮, 改渲染 StatusNotice (未授权/未接入/空数据)
+//      + 预览模式诚实提示; 本地 seed 任务卡不作为任务事实展示
 //
 // 状态:
 //   - dropTarget: 当前鼠标悬浮的列
@@ -34,6 +43,7 @@ import { useState, useCallback, useMemo } from "react";
 import { clsx } from "clsx";
 import { KanbanCard } from "./KanbanCard";
 import { StatusPill } from "@/components/StatusPill";
+import { StatusNotice } from "@/components/status/StatusNotice";
 import { Tooltip } from "@/components/ui/tooltip";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
@@ -81,7 +91,32 @@ export interface KanbanBoardProps {
   // 架构查看器 (per ADR-0041) → 父组件弹 ArchGraphModal
   // 透传到 KanbanCard 的 🕸 Arch icon 按钮
   onArchClick?: (workItem: WorkItem) => void;
+  /** 无授权数据诚实态 (per 2026-11-16 清 seed/mock 显示入口):
+   *  非空时不渲染本地 seed 任务卡 (不当真任务), 改渲染 StatusNotice +
+   *  预览模式诚实提示; undefined = 沿用旧行为 (测试/其他调用方)。 */
+  unavailableState?: KanbanUnavailableState | null;
 }
+
+/** 看板无授权数据的诚实态三选一 (per 2026-11-16 清 seed/mock 显示入口):
+ *  - unauthorized: Group API 会话 401/失效 (宿主已装配但未授权)
+ *  - disconnected: 宿主数据通道未装配 (网页预览模式)
+ *  - empty: 宿主已接入但无授权任务数据 */
+export type KanbanUnavailableState = "empty" | "unauthorized" | "disconnected";
+
+const UNAVAILABLE_COPY: Record<KanbanUnavailableState, { title: string; hint: string }> = {
+  unauthorized: {
+    title: "未授权 — 看板数据不可用",
+    hint: "当前会话未获授权读取服务端任务数据。请在宿主会话中重新授权后刷新, 本地 seed 数据不作为任务事实展示。",
+  },
+  disconnected: {
+    title: "未接入 — 看板数据通道不可用",
+    hint: "当前会话未装配宿主数据通道 (网页预览模式)。本地 seed 数据不作为任务事实展示, 宿主会话接入后自动切换为授权投影。",
+  },
+  empty: {
+    title: "暂无任务数据",
+    hint: "当前没有可显示的授权任务数据。请调整筛选条件, 或等待宿主会话接入后由授权投影填充。",
+  },
+};
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
 
@@ -102,6 +137,7 @@ export function KanbanBoard({
   onWorkItemClick,
   nextStepStatus,
   onArchClick,
+  unavailableState,
 }: KanbanBoardProps) {
   const { t, tx } = useTranslation();
   const fallbackLabel = useStatusLabel("workItem", "todo");
@@ -223,6 +259,25 @@ export function KanbanBoard({
     const next = candidates.find((s) => !used.has(s)) ?? "blocked";
     onAddColumn?.(next);
   };
+
+  // 无授权数据诚实态 (per 2026-11-16 清 seed/mock 显示入口):
+  // 未授权/未接入/空数据时不渲染本地 seed 任务卡 (不当真任务),
+  // 改渲染 StatusNotice + 预览模式诚实提示; 宿主会话接入后自动切换授权投影。
+  if (unavailableState) {
+    const copy = UNAVAILABLE_COPY[unavailableState];
+    return (
+      <div data-testid="kanban-unavailable" className="space-y-3">
+        <StatusNotice state={unavailableState} title={copy.title} hint={copy.hint} />
+        <div
+          data-testid="kanban-preview-hint"
+          className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn"
+        >
+          <span className="size-1.5 rounded-full bg-warn" />
+          预览数据模式 — 当前看板展示本地 seed 数据, 非授权服务端任务事实。宿主会话接入后自动切换为授权投影。
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

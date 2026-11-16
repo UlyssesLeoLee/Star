@@ -1,12 +1,22 @@
 /*
-@cypher schema=1 source_sha256=42566058a132a0ca494ec46559ada0dcad5fe98bc91789fbc85510b32c40efa1
+@cypher schema=1 source_sha256=18245106cf25e884a649b2aef09a6b15dbd60068259433dde809f0cd96d61c50
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (nema_store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (open_nema:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::openNemaAsStarTask",kind:"function"})
+MERGE (groupProjection:File {path:"frontend/src/lib/group/groupProjection.tsx"})
+MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
+MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
+MERGE (statusNoticeFile:File {path:"frontend/src/components/status/StatusNotice.tsx"})
+MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(nema_store)
+MERGE (self)-[:IMPORTS]->(groupProjection)
+MERGE (self)-[:IMPORTS]->(statusNoticeFile)
 MERGE (page)-[:CALLS]->(open_nema)
+MERGE (page)-[:CALLS]->(groupApiHook)
+MERGE (page)-[:CALLS]->(sessionStateHook)
+MERGE (page)-[:CALLS]->(statusNotice)
 @endcypher
 */
 // =====================================================================
@@ -50,6 +60,8 @@ import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowB
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { KANBAN_COLUMNS } from "@/mocks/data/kanban";
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
+import { StatusNotice } from "@/components/status/StatusNotice";
+import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 
 const VIEW_TABS = ["Sprint", "任务看板", "IPA 流程图", "按文件开卡", "时间线", "日历"] as const;
 type ViewTab = (typeof VIEW_TABS)[number];
@@ -83,9 +95,21 @@ export default function KanbanPage() {
   const workflows = useStore((s) => s.workflows);
   const addWorkItem = useStore((s) => s.addWorkItem);
 
+  // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
+  // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → 任务看板不渲染
+  // 本地 seed 任务卡, 创建/移动等写操作禁用; 401 信号来自
+  // useWorktreeGroupSessionState() (status === "invalidated")。
+  const groupApi = useWorktreeGroupApi();
+  const groupSession = useWorktreeGroupSessionState();
+  const unauthorized = groupSession.status === "invalidated";
+  const hostConnected = groupApi !== null;
+  const createDisabled = unauthorized || !hostConnected;
+
   const handleCreateTaskCard = async () => {
     const title = draftTitle.trim();
     if (!title) return;
+    // 未接入/未授权: 禁止写本地 seed (per 2026-11-16, 本地 seed 不冒充正式任务)
+    if (createDisabled) return;
     try {
       addWorkItem({
         tenant_id: "tn-001",
@@ -239,14 +263,16 @@ export default function KanbanPage() {
             placeholder="新任务卡标题"
             aria-label="新任务卡标题"
             data-testid="kanban-create-title"
-            className="h-8 flex-1 min-w-[180px] rounded-lg border border-line bg-bg-soft px-2.5 text-xs focus:border-accent focus:outline-none"
+            disabled={createDisabled}
+            className="h-8 flex-1 min-w-[180px] rounded-lg border border-line bg-bg-soft px-2.5 text-xs focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <select
             value={draftIpaFlow}
             onChange={(e) => setDraftIpaFlow(e.target.value)}
             aria-label="IPA 流程"
             data-testid="kanban-create-ipa"
-            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+            disabled={createDisabled}
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs disabled:opacity-50"
           >
             <option value="">IPA：不关联 IPA</option>
             {ipaFlows.map((f) => (
@@ -258,7 +284,8 @@ export default function KanbanPage() {
             onChange={(e) => setDraftWorkflow(e.target.value)}
             aria-label="工作流"
             data-testid="kanban-create-workflow"
-            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+            disabled={createDisabled}
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs disabled:opacity-50"
           >
             <option value="">不关联工作流</option>
             {workflows.map((wf) => (
@@ -270,7 +297,8 @@ export default function KanbanPage() {
             onChange={(e) => setDraftFile(e.target.value)}
             aria-label="关联文件"
             data-testid="kanban-create-file"
-            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+            disabled={createDisabled}
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs disabled:opacity-50"
           >
             <option value="">文件：无</option>
             {nemaTasks.slice(0, 6).map((nt) => (
@@ -283,7 +311,8 @@ export default function KanbanPage() {
             onChange={(e) => setDraftPoints(e.target.value)}
             aria-label="估点"
             data-testid="kanban-create-points"
-            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs"
+            disabled={createDisabled}
+            className="h-8 rounded-lg border border-line bg-bg-soft px-2 text-xs disabled:opacity-50"
           >
             {["1", "3", "5", "8"].map((p) => (
               <option key={p} value={p}>{p} 点</option>
@@ -292,7 +321,7 @@ export default function KanbanPage() {
           <button
             type="button"
             onClick={() => void handleCreateTaskCard()}
-            disabled={!draftTitle.trim()}
+            disabled={createDisabled || !draftTitle.trim()}
             data-testid="kanban-create-submit"
             className="h-8 px-4 rounded-lg text-white text-xs font-semibold hover:bg-accent-soft disabled:opacity-50 flex items-center gap-1"
             style={{ backgroundColor: "var(--accent-DEFAULT, #1D4ED8)" }}
@@ -300,6 +329,17 @@ export default function KanbanPage() {
             开卡
           </button>
         </div>
+
+        {/* 创建/移动禁用诚实说明 (per 2026-11-16 清 seed/mock: 无授权数据不写入本地 seed) */}
+        {createDisabled && (
+          <div
+            data-testid="kanban-create-disabled-hint"
+            className="flex items-center gap-1.5 text-[11px] text-warn"
+          >
+            <span className="size-1.5 rounded-full bg-warn" />
+            未接入授权会话 — 创建与移动操作已禁用 (本地 seed 数据不作为任务事实写入)。宿主会话接入后自动恢复。
+          </div>
+        )}
 
         {/* 生命周期条 (真实 board.columns) */}
         <div data-testid="kanban-lifecycle" className="flex items-center gap-2 text-[11px] text-ink-dim flex-wrap">
@@ -337,7 +377,27 @@ export default function KanbanPage() {
                 按文件开卡
               </button>
             </div>
-            <SprintBoardView onSelect={(id) => setDrawerMode({ kind: "view", workItemId: id })} />
+            {/* Sprint 视图诚实态 (per 2026-11-16 清 seed/mock): sprints 取 store 真实数据,
+                无则空态; 未授权时不渲染 seed sprints (不当真 Sprint 记录) */}
+            {unauthorized ? (
+              <div data-testid="kanban-sprint-unauthorized">
+                <StatusNotice
+                  state="unauthorized"
+                  title="未授权 — Sprint 数据不可用"
+                  hint="当前会话未获授权读取服务端 Sprint 数据。请在宿主会话中重新授权后刷新, 本地 seed 数据不作为任务事实展示。"
+                />
+              </div>
+            ) : sprints.length === 0 ? (
+              <div data-testid="kanban-sprint-empty">
+                <StatusNotice
+                  state="empty"
+                  title="暂无 Sprint 数据"
+                  hint="当前没有可显示的 Sprint。请在宿主会话接入后由授权投影填充, 或调整项目选择。"
+                />
+              </div>
+            ) : (
+              <SprintBoardView onSelect={(id) => setDrawerMode({ kind: "view", workItemId: id })} />
+            )}
           </section>
         )}
 
@@ -354,6 +414,16 @@ export default function KanbanPage() {
               onRemoveColumn={removeBoardColumn}
               onRenameColumn={renameBoardColumn}
               onReorderColumns={reorderBoardColumns}
+              // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入/空数据不渲染本地 seed 任务卡
+              unavailableState={
+                unauthorized
+                  ? "unauthorized"
+                  : !hostConnected
+                    ? "disconnected"
+                    : workItems.length === 0
+                      ? "empty"
+                      : null
+              }
             />
           </section>
         )}

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c966f8c60ba63d2214c41dca9f9aab31dd68267d2c698cde129dcecf5ff53fb3
+@cypher schema=1 source_sha256=c5d2fe6b923fb63e672773575bfe5cfebee4207563763d21f5a3e035df3eea7b
 MERGE (self:File {path:"frontend/src/components/CanvasView.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/CanvasView.test.tsx::CanvasViewPorts",kind:"suite"})
 MERGE (view:File {path:"frontend/src/components/CanvasView.tsx"})
@@ -8,7 +8,7 @@ MERGE (self)-[:DEFINES]->(suite)
 MERGE (suite)-[:TESTS]->(view)
 @endcypher
 */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { CanvasView } from "@/components/CanvasView";
@@ -27,6 +27,11 @@ function renderWithI18n(ui: ReactNode) {
 }
 
 describe("CanvasView 自由画笔 (per 2026-10-01 OOB 恢复丢失的画笔功能)", () => {
+  // store 初始态已是诚实空态 (per 2026-11-16 seed 清除) → 测试显式注入 worktrees fixture
+  beforeEach(() => {
+    useStore.setState({ worktrees: [{ id: "wt-001", tenant_id: "t-1", project_id: "p-1", lane_id: "lane-001", name: "wt-worktree-sm", branch: "feat/worktree-sm", base_branch: "main", status: "active", local_runtime_id: "lr-001", agent_session_id: "ag-001", pr_id: "pr-001", lock_version: 1, last_event_at: "2026-11-16T09:00:00Z", created_at: "2026-11-16T08:00:00Z" }] as never });
+  });
+
   it("A. 默认 toolbar 含 brush 按钮", () => {
     renderWithI18n(<CanvasView canvas={baseCanvas} elements={[]} connectors={[]} onCreateElement={() => undefined} />);
     expect(screen.getByTestId("canvas-tool-brush")).toBeTruthy();

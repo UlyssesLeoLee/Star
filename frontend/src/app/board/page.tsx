@@ -1,6 +1,14 @@
 /*
-@cypher schema=1 source_sha256=c20f4b1c4bb41a8487de551c6010366da1feab138d56250c010db90ef1307c07
+@cypher schema=1 source_sha256=976cf72fc9c26344fec78df192851e91bed4497d8b621092c04923d92893f9a5
 MERGE (self:File {path:"frontend/src/app/board/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/board/page.tsx::BoardPage",kind:"component"})
+MERGE (groupProjection:File {path:"frontend/src/lib/group/groupProjection.tsx"})
+MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
+MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
+MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(groupProjection)
+MERGE (page)-[:CALLS]->(groupApiHook)
+MERGE (page)-[:CALLS]->(sessionStateHook)
 @endcypher
 */
 "use client";
@@ -37,6 +45,8 @@ import { useBoardSync, type BoardSyncChange } from "@/hooks/useBoardSync";
 import { SquareKanban as KanbanIcon, RefreshCw, X } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
+import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
+import type { KanbanUnavailableState } from "@/components/board/KanbanBoard";
 
 // 状态机下一步: todo→in_progress, in_progress→review, review→done; blocked/wontfix/done 终止
 const NEXT_STATUS: Partial<Record<WorkItemStatus, WorkItemStatus>> = {
@@ -51,6 +61,16 @@ export default function BoardPage() {
   const workItems = useStore((s) => s.workItems);
   const identities = useStore((s) => s.identities);
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
+
+  // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
+  // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → 看板不渲染
+  // 本地 seed 任务卡 (不当真任务), 改诚实未接入/未授权/空数据态;
+  // 401 信号来自 useWorktreeGroupSessionState() (status === "invalidated"),
+  // 判定顺序: unauthorized 先于 disconnected (401 时 provider 同时置空 client)。
+  const groupApi = useWorktreeGroupApi();
+  const groupSession = useWorktreeGroupSessionState();
+  const unauthorized = groupSession.status === "invalidated";
+  const hostConnected = groupApi !== null;
 
   // ---- filter state (本地上下文, 不持久化, W5 加 store persist 后再补) ----
   const [filter, setFilter] = useState<KanbanFiltersValue>({
@@ -73,7 +93,8 @@ export default function BoardPage() {
   useBoardSync({
     projectId: board.project_id,
     intervalMs: 2000,
-    enabled: true,
+    // 未接入/未授权时不做假同步轮询 (per 2026-11-16: 本地 seed 不冒充他人会话改动)
+    enabled: hostConnected && !unauthorized,
     onRemoteChange: (changes: BoardSyncChange[]) => {
       const summary = changes
         .map((c) => `${c.work_item_id}: ${c.from_status}→${c.to_status} by ${c.changed_by}`)
@@ -107,6 +128,16 @@ export default function BoardPage() {
     }).length,
     [allIds, workItemById, filterFn],
   );
+
+  // ---- 看板诚实态 (per 2026-11-16 清 seed/mock 显示入口):
+  // 未授权 > 未接入 > 空数据 > 正常渲染; 本地 seed 任务卡不作为任务事实展示
+  const unavailableState: KanbanUnavailableState | null = unauthorized
+    ? "unauthorized"
+    : !hostConnected
+      ? "disconnected"
+      : allIds.length === 0
+        ? "empty"
+        : null;
 
   // ---- 拖动 transition 处理 ----
   // per 2026-08-31 11:24 JST Ulysses 拍板: workItems.status 为主源;
@@ -170,8 +201,23 @@ export default function BoardPage() {
         subtitle="Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。"
         icon={<KanbanIcon className="text-accent" size={20} />}
         track="E"
-        count={`${board.columns.reduce((s, c) => s + c.work_item_ids.length, 0)} cards`}
+        count={
+          unauthorized
+            ? "未授权"
+            : !hostConnected
+              ? "预览模式 (seed)"
+              : `${board.columns.reduce((s, c) => s + c.work_item_ids.length, 0)} cards`
+        }
       />
+
+      {/* 数据来源标识 (per 2026-11-16: 预览/seed 数据不得冒充正式管理视图, 诚实说明) */}
+      <div
+        data-testid="board-data-source"
+        className="mb-3 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn"
+      >
+        <span className="size-1.5 rounded-full bg-warn" />
+        预览数据模式 — 当前看板展示本地 seed 数据, 非授权服务端任务事实。宿主会话接入后自动切换为授权投影。
+      </div>
 
       <KanbanFilters
         value={filter}
@@ -188,6 +234,7 @@ export default function BoardPage() {
         onTransition={handleTransition}
         filter={filterFn}
         nextStepStatus={nextStepStatus}
+        unavailableState={unavailableState}
       />
 
       {/* 本地 sync toast (per 已知缺口 #3: W5 接管 Toaster 前, 自实现) */}

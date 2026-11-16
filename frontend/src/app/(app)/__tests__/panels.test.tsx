@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=87c830c577bad7d0bc65fef88e278f877a3534cfed05c9b32bafb6cf9fe1e71d
+@cypher schema=1 source_sha256=e12249ddbe8e359cb728a1ba6e1f15f95b3630c62e123d13930f302e9d8f8fa4
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)
@@ -128,9 +128,10 @@ describe("U4 minimal panels — render smoke", () => {
     expect(screen.getByTestId("settings-nav-mcp")).toBeInTheDocument();
     expect(screen.getByTestId("settings-nav-dev-mode")).toBeInTheDocument();
     // 默认面板 = MCP 服务器 (mockup 主区)
-    expect(screen.getByTestId("settings-panel-mcp")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-servers-panel")).toBeInTheDocument();
     // MCP 服务器卡片 (官方目录)
-    expect(screen.getByTestId("settings-mcp-GitHub")).toBeInTheDocument();
+    // MCP 面板已重做为 McpSettingsPanel (用户可管理), seed server 列表不再渲染
+    expect(screen.getByTestId("mcp-servers-panel")).toBeInTheDocument();
   });
 
   it("deep-links /settings?tab=apikeys to 凭据与 API Key panel", () => {
@@ -151,6 +152,6 @@ describe("U4 minimal panels — render smoke", () => {
     // 未实装/未知 tab → 默认 MCP 面板 (不崩溃)
     setMockLocationSearch("?tab=permissions");
     renderWithI18n(<SettingsPage />);
-    expect(screen.getByTestId("settings-panel-mcp")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-servers-panel")).toBeInTheDocument();
   });
 });

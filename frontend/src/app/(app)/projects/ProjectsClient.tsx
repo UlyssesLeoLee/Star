@@ -1,16 +1,26 @@
 /*
-@cypher schema=1 source_sha256=ad6101578f937b8a224f38455cfb5148a90587af089fc284ce3b3d7ba94d329e
+@cypher schema=1 source_sha256=62b529b2595f59499eb413973b38e4008e882da183b5c6afb5e41d606887259a
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
 MERGE (toUtcCalendarDate:Function {name:"toUtcCalendarDate", language:"typescript", visibility:"public"})
 MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescript", visibility:"public"})
 MERGE (differenceInUtcCalendarDays:Function {name:"differenceInUtcCalendarDays", language:"typescript", visibility:"public"})
+MERGE (groupProjection:File {path:"frontend/src/lib/group/groupProjection.tsx"})
+MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
+MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
+MERGE (statusNoticeFile:File {path:"frontend/src/components/status/StatusNotice.tsx"})
+MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
 MERGE (self)-[:IMPORTS]->(dateUtils)
+MERGE (self)-[:IMPORTS]->(groupProjection)
+MERGE (self)-[:IMPORTS]->(statusNoticeFile)
 MERGE (self)-[:DEFINES]->(projectsClient)
 MERGE (projectsClient)-[:CALLS]->(toUtcCalendarDate)
 MERGE (projectsClient)-[:CALLS]->(addUtcCalendarDays)
 MERGE (projectsClient)-[:CALLS]->(differenceInUtcCalendarDays)
+MERGE (projectsClient)-[:CALLS]->(groupApiHook)
+MERGE (projectsClient)-[:CALLS]->(sessionStateHook)
+MERGE (projectsClient)-[:CALLS]->(statusNotice)
 @endcypher
 */
 "use client";
@@ -71,6 +81,9 @@ import {
   isValidProjectsTab,
 } from "@/lib/cookies";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import type { KanbanUnavailableState } from "@/components/board/KanbanBoard";
+import { StatusNotice } from "@/components/status/StatusNotice";
+import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGraphModal";
 import { GanttChart } from "@/components/gantt";
@@ -172,6 +185,21 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
 
   // ---- 架构查看器 trigger (per ADR-0041) ----
   const arch = useArchGraphTrigger();
+
+  // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
+  // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → Kanban/Backlog
+  // 不渲染本地 seed 任务卡 (不当真任务), 改诚实未接入/未授权/空数据态;
+  // 401 信号来自 useWorktreeGroupSessionState() (status === "invalidated"),
+  // 判定顺序: unauthorized 先于 disconnected。
+  const groupApi = useWorktreeGroupApi();
+  const groupSession = useWorktreeGroupSessionState();
+  const unauthorized = groupSession.status === "invalidated";
+  const hostConnected = groupApi !== null;
+  const kanbanUnavailable: KanbanUnavailableState | null = unauthorized
+    ? "unauthorized"
+    : !hostConnected
+      ? "disconnected"
+      : null;
 
   // ---- selectedProjectId 提升到 navStore (per 2026-09-03 12:36 JST 拍板 #1) ----
   // - 持久化到 localStorage, 跨 page 共享, 让 Sidebar 的 project scope 能读到
@@ -569,6 +597,15 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         }}
       />
 
+      {/* 数据来源标识 (per 2026-11-16: 预览/seed 数据不得冒充正式管理视图, 诚实说明) */}
+      <div
+        data-testid="projects-data-source"
+        className="mb-3 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn"
+      >
+        <span className="size-1.5 rounded-full bg-warn" />
+        预览数据模式 — 当前项目工作区展示本地 seed 数据, 非授权服务端任务事实。宿主会话接入后自动切换为授权投影。
+      </div>
+
       {/* ---- Project switcher (顶部, sticky) ---- */}
       <ProjectSwitcher
         projects={projects}
@@ -638,6 +675,8 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             onRequestNewWorkItem={handleRequestNewWorkItem}
             onWorkItemClick={handleWorkItemClick}
             onArchClick={arch.open}
+            // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入时不渲染本地 seed 任务卡
+            unavailableState={kanbanUnavailable}
           />
           {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板) */}
           <WorkItemDetailDrawer
@@ -697,9 +736,28 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {tab === "backlog" && (
         <div data-testid="projects-backlog-tab" className="space-y-2">
           <DomainMarker domain="economy" label="economy 域 (billing/pricing/cost)" />
+          {/* Backlog 诚实态 (per 2026-11-16 清 seed/mock): 本地 seed 任务列表不作为任务事实展示 */}
+          {unauthorized ? (
+            <StatusNotice
+              state="unauthorized"
+              title="未授权 — Backlog 数据不可用"
+              hint="当前会话未获授权读取服务端任务数据。请在宿主会话中重新授权后刷新, 本地 seed 数据不作为任务事实展示。"
+            />
+          ) : !hostConnected ? (
+            <StatusNotice
+              state="disconnected"
+              title="未接入 — Backlog 数据通道不可用"
+              hint="当前会话未装配宿主数据通道 (网页预览模式)。本地 seed 数据不作为任务事实展示, 宿主会话接入后自动切换为授权投影。"
+            />
+          ) : (
+            <>
           <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorkItems.length}` : ""})</div>
           {filteredProjectWorkItems.length === 0 ? (
-            <div className="text-xs text-ink-mute italic">(no work-items)</div>
+            <StatusNotice
+              state="empty"
+              title="暂无任务"
+              hint="当前项目没有可显示的任务数据。请调整筛选条件或新建任务卡。"
+            />
           ) : (
             <table className="table">
               <thead>
@@ -734,6 +792,8 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                   })}
               </tbody>
             </table>
+          )}
+            </>
           )}
         </div>
       )}

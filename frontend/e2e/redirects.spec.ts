@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=122c7a609a331bda842a93b1465ffc4ddbc4991774d1a3d5d5b07908c3b0530b
+MERGE (self:File {path:"frontend/e2e/redirects.spec.ts"})
+MERGE (redirects:File {path:"frontend/src/lib/redirects.ts"})
+MERGE (shim:File {path:"frontend/src/lib/redirects.shim.cjs"})
+MERGE (legacyRedirects:Symbol {id:"frontend/src/lib/redirects.ts::LEGACY_REDIRECTS",kind:"const"})
+MERGE (self)-[:IMPORTS]->(redirects)
+MERGE (self)-[:IMPORTS]->(shim)
+MERGE (self)-[:TESTS]->(legacyRedirects)
+@endcypher
+*/
 // =====================================================================
 // frontend/e2e/redirects.spec.ts — U5 (multica-style route consolidation)
 //
@@ -49,11 +60,12 @@ const findRedirect = (source: string) => {
   return undefined;
 };
 
-describe("redirects: legacy 22 routes → 6 panels", () => {
-  it("contains 26 entries (9 projects-sink + 2 issues/sprint-sink + 6 agent-sink + 6 inbox-sink + 4 settings-sink)", () => {
+describe("redirects: legacy 20 routes → 4 panels", () => {
+  it("contains 20 entries (8 projects-sink + 2 issues/sprint-sink + 6 inbox-sink + 4 settings-sink)", () => {
     // /worktree is not redirected because it is the Project Worktree Index route.
-    // Total: 9 project routes + 2 sprint routes + 7 agent routes + 6 inbox routes + 4 settings routes.
-    expect(LEGACY_REDIRECTS.length).toBe(26);
+    // per 2026-11-16 10 条第 4 条: agent-sink 7 routes removed (不再固定指向 canvas-001).
+    // Total: 8 project routes + 2 sprint routes + 6 inbox routes + 4 settings routes.
+    expect(LEGACY_REDIRECTS.length).toBe(20);
   });
 
   it("/workspace → /projects (case 1)", () => {
@@ -93,6 +105,20 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r).toBeUndefined();
   });
 
+  it("/agent /agents /agent-view /validation /automation /development /local-runtime 不再指向 canvas-001 (per 2026-11-16 10 条第 4 条: /canvas 入口按 Worktree/Lane 上下文解析)", () => {
+    for (const src of [
+      "/agent",
+      "/agents",
+      "/agent-view",
+      "/validation",
+      "/automation",
+      "/development",
+      "/local-runtime",
+    ]) {
+      expect(findRedirect(src), `${src} should not be redirected`).toBeUndefined();
+    }
+  });
+
   it("/workspace/:id → /projects/:id (case 7, path-param variant)", () => {
     // The destination stored in next.config.js is a TEMPLATE ("/projects/:id"),
     // not the resolved value. Next.js substitutes :id at request time. So
@@ -127,15 +153,12 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     });
   });
 
-  it("every destination targets one of the 6 new panel routes", () => {
+  it("every destination targets one of the 4 new panel routes", () => {
     const PANEL_PREFIXES = [
       "/inbox",
       "/sprint",
       "/projects",
-      "/agents",
-      // per 2026-11-15: Agent 中心并入 Canvas — /agent-view 等全部 → /canvas/canvas-001?tab=agent
       "/settings",
-      "/canvas", // per 2026-11-14: workflow/context/relation/collaboration 并入 canvas 标签
     ];
     for (const r of LEGACY_REDIRECTS) {
       const ok = PANEL_PREFIXES.some(
@@ -159,7 +182,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     }
   });
 
-  it("all 26 entries use 307 (permanent: false) for client-friendly nav", () => {
+  it("all 20 entries use 307 (permanent: false) for client-friendly nav", () => {
     for (const r of LEGACY_REDIRECTS) {
       expect(r.permanent, `${r.source} should not be permanent`).toBe(false);
     }

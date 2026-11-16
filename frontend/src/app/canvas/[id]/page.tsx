@@ -1,14 +1,21 @@
 /*
-@cypher schema=1 source_sha256=e6811b10f719a9045657149d30ab97d74d07c46031d4b9003d1518b4c3f78aa9
+@cypher schema=1 source_sha256=f6db98c4313b4243ae0177af771bc8a1c063fc7bcd4427c344379a1b4ffa22e5
 MERGE (self:File {path:"frontend/src/app/canvas/[id]/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/canvas/[id]/page.tsx::CanvasDetailPage",kind:"component"})
 MERGE (canvasView:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
 MERGE (relationshipView:Symbol {id:"frontend/src/app/(app)/agent-relationships/view/RelationshipView.tsx::RelationshipView",kind:"component"})
-MERGE (agentViewPage:Symbol {id:"frontend/src/app/(app)/agent-view/page.tsx::AgentViewPage",kind:"component"})
+MERGE (agentViewPage:Symbol {id:"frontend/src/components/agent-view/AgentViewPage.tsx::AgentViewPage",kind:"component"})
+MERGE (scopeSelector:Symbol {id:"frontend/src/components/canvas/CanvasScopeSelector.tsx::CanvasScopeSelector",kind:"component"})
+MERGE (navStore:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
+MERGE (createCanvasLocal:Symbol {id:"frontend/src/lib/canvas-entry.ts::createCanvasLocal",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(canvasView)
 MERGE (self)-[:IMPORTS]->(relationshipView)
 MERGE (self)-[:IMPORTS]->(agentViewPage)
+MERGE (self)-[:IMPORTS]->(scopeSelector)
+MERGE (self)-[:IMPORTS]->(createCanvasLocal)
+MERGE (page)-[:CALLS]->(navStore)
+MERGE (page)-[:CALLS]->(createCanvasLocal)
 @endcypher
 */
 "use client";
@@ -25,20 +32,29 @@ MERGE (self)-[:IMPORTS]->(agentViewPage)
 //   通过 ?worktree=<id> 深链携带当前 Worktree 上下文, 顶部渲染上下文条.
 // 2026-11-15 (per TASK-ulys-canvas-fine): 关系图 tab RelationshipView
 //   tenantId 去固定值, 接 store.projects[0].tenant_id.
+// 2026-11-16 (per Canvas 范围选择器需求, 10 条第 4 条): 顶部三级范围选择器
+//   (Project → Lane → Worktree, 读写 navStore) + BI/Plugins/Workflow 入口
+//   (点击读 navStore 范围传后端做权限复验, 接入点见下方注释).
+// 2026-11-16 (per 10 条第 4 条): 画布按路由 id 取用 (不再 fallback
+//   seed.canvases[0]); 找不到画布时渲染未接入状态 + 新建画布按钮.
 // =====================================================================
 
-import { Suspense, useEffect, useState } from "react";
-import { GitBranch, Network } from "lucide-react";
+import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { GitBranch, Network, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CanvasView } from "@/components/CanvasView";
 import { RelationshipView } from "@/app/(app)/agent-relationships/view/RelationshipView";
-import { AgentViewPage } from "@/app/(app)/agent-view/page";
+import { AgentViewPage } from "@/components/agent-view/AgentViewPage";
 import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
 import { GitCanvas } from "../components/GitCanvas";
+import { CanvasScopeSelector, type CanvasScope } from "@/components/canvas/CanvasScopeSelector";
+import { useNavStore } from "@/lib/nav/navStore";
+import { createCanvasLocal } from "@/lib/canvas-entry";
 
 const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图", "流程", "Git 画布"] as const;
 
-export default function CanvasDetailPage() {
+export default function CanvasDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("画布");
 
   // ?tab= 深链 (per 2026-11-15 Agent 中心并入: /agent-view → ?tab=agent)
@@ -60,7 +76,9 @@ export default function CanvasDetailPage() {
   const workItems = useStore((s) => s.workItems);
   const worktrees = useStore((s) => s.worktrees);
   const projects = useStore((s) => s.projects);
-  const canvas = canvases[0];
+  // 画布按路由 id 取用 (per 2026-11-16 10 条第 4 条: 不再 fallback seed.canvases[0]);
+  // 找不到 → 画布 tab 渲染未接入状态 + 新建画布按钮 (本地创建, 写 store)
+  const canvas = canvases.find((c) => c.id === id);
 
   // 关系图 tenant 动态化 (per TASK-ulys-canvas-fine):
   //   RelationshipView.tenantId 语义 = RLS 13 類 tenant id (非 project id,
@@ -70,20 +88,70 @@ export default function CanvasDetailPage() {
   const relationTenantId = projects[0]?.tenant_id;
 
   // ===================================================================
-  // Worktree 上下文 (per TASK-ulys-canvas-ctx):
-  //   ?worktree=<id> 深链 → 顶部上下文条. client-only 解析
-  //   (不用 useSearchParams — dev 下与页面级 Suspense 组合会产生
-  //   双份 DOM 渲染, 同 kanban ?view= 模式), 数据源 useStore worktrees.
+  // Canvas 范围 (Project → Lane → Worktree, per 2026-11-16 范围选择器需求):
+  //   - 顶部 CanvasScopeSelector 读写 navStore (selectedProjectId /
+  //     selectedLaneId / selectedWorktreeId), onChange 触发画布重新加载
+  //   - ?worktree=<id> 深链 (per TASK-ulys-canvas-ctx) → 同步进 navStore
+  //     (client-only 解析, 不用 useSearchParams — dev 下与页面级 Suspense
+  //     组合会产生双份 DOM, 同 kanban ?view= 模式), 数据源 useStore worktrees
   // ===================================================================
-  const [worktreeCtxId, setWorktreeCtxId] = useState<string | null>(null);
+  const [canvasReloadKey, setCanvasReloadKey] = useState(0);
+  const [scopeSyncError, setScopeSyncError] = useState<string | null>(null);
+  const [scopeNotice, setScopeNotice] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const wt = new URLSearchParams(window.location.search).get("worktree");
-    setWorktreeCtxId(wt);
+    if (!wt) return;
+    const match = useStore.getState().worktrees.find((w) => w.id === wt);
+    if (!match) {
+      setScopeSyncError(wt);
+      return;
+    }
+    const nav = useNavStore.getState();
+    nav.setSelectedProjectId(match.project_id);
+    nav.setLaneContext(match.lane_id ?? "", match.id, match.branch);
   }, []);
-  const ctxWorktree = worktreeCtxId
-    ? worktrees.find((w) => w.id === worktreeCtxId)
-    : undefined;
+  const handleScopeChange = useCallback((scope: CanvasScope) => {
+    setScopeSyncError(null);
+    // 画布数据按新范围重新加载 (本地预览: 数据源为 store;
+    //   按 Worktree 隔离的授权画布投影接入后, 此处替换为按 scope 重拉)
+    setCanvasReloadKey((k) => k + 1);
+    setScopeNotice(
+      scope.worktreeId
+        ? `范围已切换: project=${scope.projectId} lane=${scope.laneId} worktree=${scope.worktreeId} (画布已重新加载)`
+        : `范围已切换: project=${scope.projectId}${scope.laneId ? ` lane=${scope.laneId}` : ""} (尚未指定 Worktree)`,
+    );
+  }, []);
+
+  // ===================================================================
+  // BI / Plugins / Workflow 入口 (per 2026-11-16 范围选择器需求):
+  //   点击时读取 navStore 当前选中范围 → 传给后端做权限复验。
+  //   ── 后端接入点 (授权投影接入后替换 TODO) ─────────────────────
+  //     POST /api/v1/canvas/{canvas.id}/entries/{entry}/open
+  //       body: { scope: { project_id, lane_id, worktree_id } }
+  //     后端按 RLS (tenant/project/lane/worktree) 校验后返回授权 URL
+  //     或数据; 未授权返回 403, 前端渲染拒绝态 (不打开入口)。
+  //   ── 本地预览行为 (无后端) ─────────────────────────────────────
+  //     workflow: 直接切"流程"tab; bi/plugins: 仅展示已读取的范围提示。
+  // ===================================================================
+  const openScopedEntry = useCallback(
+    (entry: "bi" | "plugins" | "workflow") => {
+      const nav = useNavStore.getState();
+      const scope = {
+        project_id: nav.selectedProjectId,
+        lane_id: nav.selectedLaneId,
+        worktree_id: nav.selectedWorktreeId,
+      };
+      // TODO(backend): await fetch(`/api/v1/canvas/${canvas?.id}/entries/${entry}/open`,
+      //   { method: "POST", headers: { "Content-Type": "application/json" },
+      //     body: JSON.stringify({ scope }) }) → 按授权结果跳转/渲染拒绝态
+      setScopeNotice(
+        `${entry.toUpperCase()} 入口 · 已按范围 project=${scope.project_id || "-"} lane=${scope.lane_id || "-"} worktree=${scope.worktree_id || "-"} 请求后端权限复验 (本地预览未接入后端)`,
+      );
+      if (entry === "workflow") setActiveTab("流程");
+    },
+    [canvas?.id],
+  );
 
   const renderCanvasContent = () => {
     switch (activeTab) {
@@ -122,8 +190,23 @@ export default function CanvasDetailPage() {
                 }}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-ink-mute text-sm">
-                无可用画布 (seed canvas-001 未加载)
+              <div
+                className="h-full flex flex-col items-center justify-center gap-3"
+                data-testid="canvas-unbound"
+              >
+                <p className="text-sm text-ink-mute" data-testid="canvas-unbound-hint">
+                  画布未接入 — 找不到 {id} 对应的画布 (不再回退 seed 默认画布)
+                </p>
+                <button
+                  type="button"
+                  data-testid="canvas-unbound-create"
+                  onClick={() =>
+                    createCanvasLocal({ id, title: `画布 ${id}`, ref_kind: "free" })
+                  }
+                  className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+                >
+                  <Plus size={14} /> 新建画布
+                </button>
               </div>
             )}
           </div>
@@ -168,49 +251,60 @@ export default function CanvasDetailPage() {
 
   return (
     <div className="flex h-full flex-col bg-bg" data-testid="canvas-detail-page">
-      {/* Worktree 上下文条 (per TASK-ulys-canvas-ctx: ?worktree=<id> 深链) */}
+      {/* Canvas 范围条 (per 2026-11-16: 三级范围选择器 + BI/Plugins/Workflow 权限复验入口) */}
       <div
-        className="flex items-center gap-2 border-b border-line bg-bg-card px-3 py-1.5"
+        className="flex flex-wrap items-center gap-2 border-b border-line bg-bg-card px-3 py-1.5"
         data-testid="canvas-worktree-context"
       >
         <GitBranch size={13} className="shrink-0 text-accent" />
-        {ctxWorktree ? (
-          <>
-            <span className="text-xs font-semibold text-ink">{ctxWorktree.name}</span>
-            <span className="font-mono text-[10px] text-ink-mute">{ctxWorktree.branch}</span>
-            <span className="rounded border border-line bg-bg-soft px-1.5 py-0.5 font-mono text-[9px] text-ink-dim">
-              {ctxWorktree.status}
-            </span>
-            <span className="ml-auto flex items-center gap-2">
-              <span
-                data-testid="canvas-worktree-data-scope"
-                title="画布元素按 canvas_id 加载; 按 Worktree 隔离的画布投影接入后, 此处切换为授权数据"
-                className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
-              >
-                数据未按 Worktree 隔离 (画布投影待接入)
-              </span>
-              <span className="font-mono text-[9px] text-ink-mute">
-                Worktree 上下文 · {ctxWorktree.id}
-              </span>
-            </span>
-          </>
-        ) : worktreeCtxId ? (
-          <span
-            className="text-xs text-warn"
-            data-testid="canvas-worktree-context-missing"
-          >
-            Worktree 上下文未找到 / 未授权读取: {worktreeCtxId}
-          </span>
-        ) : (
-          <span
-            className="text-xs text-ink-mute"
-            data-testid="canvas-worktree-context-unspecified"
-          >
-            未指定 Worktree 上下文 — 通过 ?worktree=&lt;id&gt; 深链携带当前 Worktree
-            (关系图按此上下文授权读取)
+        <CanvasScopeSelector onScopeChange={handleScopeChange} />
+        <span
+          data-testid="canvas-worktree-data-scope"
+          title="画布元素按 canvas_id 加载; 按 Worktree 隔离的画布投影接入后, 此处切换为授权数据"
+          className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
+        >
+          数据未按 Worktree 隔离 (画布投影待接入)
+        </span>
+        {scopeSyncError && (
+          <span className="text-xs text-warn" data-testid="canvas-worktree-context-missing">
+            Worktree 上下文未找到 / 未授权读取: {scopeSyncError}
           </span>
         )}
+        <span className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            data-testid="canvas-entry-bi"
+            onClick={() => openScopedEntry("bi")}
+            className="rounded border border-line bg-bg-soft px-2 py-0.5 text-[11px] text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            BI
+          </button>
+          <button
+            type="button"
+            data-testid="canvas-entry-plugins"
+            onClick={() => openScopedEntry("plugins")}
+            className="rounded border border-line bg-bg-soft px-2 py-0.5 text-[11px] text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            Plugins
+          </button>
+          <button
+            type="button"
+            data-testid="canvas-entry-workflow"
+            onClick={() => openScopedEntry("workflow")}
+            className="rounded border border-line bg-bg-soft px-2 py-0.5 text-[11px] text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            Workflow
+          </button>
+        </span>
       </div>
+      {scopeNotice && (
+        <div
+          data-testid="canvas-entry-scope-notice"
+          className="border-b border-line bg-bg-soft px-3 py-1 font-mono text-[10px] text-ink-mute"
+        >
+          {scopeNotice}
+        </div>
+      )}
 
       {/* 无限画布标签切换 (无三选一, 直接呈现) */}
       <div className="flex items-center gap-1 border-b border-line bg-bg-card px-3" data-testid="canvas-merged-tabs">
@@ -231,7 +325,7 @@ export default function CanvasDetailPage() {
         ))}
       </div>
 
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden" key={canvasReloadKey}>
         <Suspense fallback={null}>{renderCanvasContent()}</Suspense>
       </main>
     </div>
