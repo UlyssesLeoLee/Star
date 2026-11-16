@@ -1,18 +1,3 @@
-/*
-@cypher schema=1 source_sha256=702019b2e4b48b96b31a94e9838ae80d9cb66e38901413c8ab222939cd3f5fe9
-MERGE (self:File {path:"frontend/src/lib/nema/wasm/nema_codec_wasm.js"})
-MERGE (format:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::formatNemaWithProfile",kind:"function"})
-MERGE (profiles:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::listNemaInterpreterProfiles",kind:"function"})
-MERGE (parse:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::parseNema",kind:"function"})
-MERGE (parse_profile:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::parseNemaWithProfile",kind:"function"})
-MERGE (render:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.js::renderView",kind:"function"})
-MERGE (self)-[:DEFINES]->(format)
-MERGE (self)-[:DEFINES]->(profiles)
-MERGE (self)-[:DEFINES]->(parse)
-MERGE (self)-[:DEFINES]->(parse_profile)
-MERGE (self)-[:DEFINES]->(render)
-@endcypher
-*/
 /* @ts-self-types="./nema_codec_wasm.d.ts" */
 
 /**
@@ -168,9 +153,6 @@ function __wbg_get_imports() {
         __wbg_Error_208446807d0d1e30: function(arg0, arg1) {
             const ret = Error(getStringFromWasm0(arg0, arg1));
             return ret;
-        },
-        __wbg___wbindgen_throw_4c88d8bf264fd984: function(arg0, arg1) {
-            throw new Error(getStringFromWasm0(arg0, arg1));
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;

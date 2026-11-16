@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=a54ed838e760e98c413801d88caa96f8e23808659ce799c84bc76adcf257e409
+@cypher schema=1 source_sha256=8ed921e73e7b0984440dafab788d8e4b4d3b42d9df4711db3ff6a5335f7376f2
 MERGE (self:File {path:"crates/nema-codec/src/interpreter_plugin.rs"})
 MERGE (lib:File {path:"crates/nema-codec/src/strict.rs"})
 MERGE (profile:Type {id:"crates/nema-codec/src/interpreter_plugin.rs::InterpreterProfile"})
@@ -117,8 +117,19 @@ pub const NEMA_STRICT_V1_GRAMMAR_SHA256: &str =
     "0e1ae91167227f595f7586fa2174b19cb0eab4458c72e00c5790de770130f7b3";
 pub const NEMA_STRICT_V2_GRAMMAR_SHA256: &str =
     "ec274eda324c8fc88edc88a4bbc5afe3b508d4b4ca953ead173809aca6ae058a";
+/// SHA-256 of `src/strict.rs` — the interpreter source artifact this registry
+/// pins in every profile's `artifact_sha256`.
+///
+/// Canonical form: the file's bytes with LF line endings. A source checkout is
+/// CRLF on Windows and LF on Linux, so a digest over the raw working-copy bytes
+/// would differ per platform — the same .nema file would then carry two
+/// different interpreter identities depending on who compiled it. The digest
+/// therefore always describes the LF-normalized source.
+///
+/// `scripts/ci/nema_codec_gate.py` recomputes this value and fails CI when the
+/// constant drifts from the actual file.
 const NEMA_STRICT_PLUGIN_SOURCE_SHA256: &str =
-    "4ae855e1da4c595d0d146183c304bee966c5fb2f34a846fd0da3d224d7311707";
+    "26d013170793c25e902684afc6986a95173a15193ad89529f9643bac9fa7e5a3";
 
 /// Exact interpreter identity persisted with a workspace or import operation.
 ///

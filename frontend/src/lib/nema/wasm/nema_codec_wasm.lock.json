@@ -1,15 +1,15 @@
 {
   "_comment": "Pins the committed .nema codec artifact. Regenerate with `python3 scripts/ci/nema_codec_gate.py --write-lock` after an intentional rebuild of crates/nema-codec-wasm.",
-  "artifact_sha256": "50675d8d7533fd446048ad7176e296f349133e5dbfe21dd1269c251ac90ff169",
-  "interpreter_source_sha256": "4ae855e1da4c595d0d146183c304bee966c5fb2f34a846fd0da3d224d7311707",
+  "artifact_sha256": "6665366faf7425b5835274d11ad54e7d906832d22ea046867efe0556e1799618",
+  "interpreter_source_sha256": "26d013170793c25e902684afc6986a95173a15193ad89529f9643bac9fa7e5a3",
   "profiles": [
     {
       "grammar_revision": "matrix-2026-11-10",
-      "artifact_sha256": "4ae855e1da4c595d0d146183c304bee966c5fb2f34a846fd0da3d224d7311707"
+      "artifact_sha256": "26d013170793c25e902684afc6986a95173a15193ad89529f9643bac9fa7e5a3"
     },
     {
       "grammar_revision": "matrix-2026-11-15",
-      "artifact_sha256": "4ae855e1da4c595d0d146183c304bee966c5fb2f34a846fd0da3d224d7311707"
+      "artifact_sha256": "26d013170793c25e902684afc6986a95173a15193ad89529f9643bac9fa7e5a3"
     }
   ]
 }

@@ -1,18 +1,3 @@
-/*
-@cypher schema=1 source_sha256=dc0b7c60601d27c0b28c14ef8e4ae51159a41d9893934923012f371fed05f39b
-MERGE (self:File {path:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts"})
-MERGE (format:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts::formatNemaWithProfile",kind:"function"})
-MERGE (profiles:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts::listNemaInterpreterProfiles",kind:"function"})
-MERGE (parse:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts::parseNema",kind:"function"})
-MERGE (parse_profile:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts::parseNemaWithProfile",kind:"function"})
-MERGE (render:Symbol {id:"frontend/src/lib/nema/wasm/nema_codec_wasm.d.ts::renderView",kind:"function"})
-MERGE (self)-[:DECLARES]->(format)
-MERGE (self)-[:DECLARES]->(profiles)
-MERGE (self)-[:DECLARES]->(parse)
-MERGE (self)-[:DECLARES]->(parse_profile)
-MERGE (self)-[:DECLARES]->(render)
-@endcypher
-*/
 /* tslint:disable */
 /* eslint-disable */
 

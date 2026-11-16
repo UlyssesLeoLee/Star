@@ -1,4 +1,4 @@
-# @cypher schema=1 source_sha256=0b931135bdfb4e502ee767ba9c1f17706222ce76265fbc90552dbbdb7e2849fb
+# @cypher schema=1 source_sha256=7a9aa8caa0b3f2f41c0557a30fc3eea97e822f24b03294cd249e7210e103ad2f
 # MERGE (self:File {path:"scripts/ci/nema_codec_gate.py"})
 # MERGE (digest:Symbol {id:"scripts/ci/nema_codec_gate.py::check_digest",kind:"function"})
 # MERGE (artifact:Symbol {id:"scripts/ci/nema_codec_gate.py::check_artifact",kind:"function"})
@@ -86,7 +86,25 @@ LOCK_FILE = REPO_ROOT / "frontend" / "src" / "lib" / "nema" / "wasm" / "nema_cod
 
 
 def _sha256(path: Path) -> str:
+    """Digest the file bytes exactly as stored.
+
+    For the interpreter artifact this MUST be the raw bytes: the digest is
+    embedded in the compiled wasm and in the registry, so it has to describe
+    the file that was actually compiled.
+    """
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _sha256_normalized(path: Path) -> str:
+    """Digest the file with line endings normalized to LF.
+
+    Source files are checked out with CRLF on Windows and LF on Linux, so a
+    digest computed over raw bytes differs per platform. The interpreter
+    registry pins a digest that must be stable across both — the Rust side
+    computes it over the *source text*, not the checkout's line endings.
+    """
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def check_digest() -> int:
@@ -95,7 +113,7 @@ def check_digest() -> int:
         print(f"::error::missing Rust source: {STRICT_RS} or {PLUGIN_RS}")
         return 2
 
-    actual = _sha256(STRICT_RS)
+    actual = _sha256_normalized(STRICT_RS)
     plugin_text = PLUGIN_RS.read_text(encoding="utf-8")
 
     # NEMA_STRICT_PLUGIN_SOURCE_SHA256 is the digest the registry publishes as
@@ -219,7 +237,7 @@ def check_artifact() -> int:
         print("::error::committed codec publishes no interpreter profiles")
         return 1
 
-    current = _sha256(STRICT_RS)
+    current = _sha256_normalized(STRICT_RS)
     stale = []
     for profile in profiles:
         artifact = profile.get("artifact_sha256")
@@ -276,7 +294,7 @@ def write_lock() -> int:
             "intentional rebuild of crates/nema-codec-wasm."
         ),
         "artifact_sha256": _sha256(COMMITTED_WASM),
-        "interpreter_source_sha256": _sha256(STRICT_RS),
+        "interpreter_source_sha256": _sha256_normalized(STRICT_RS),
         "profiles": [
             {
                 "grammar_revision": p.get("grammar_revision"),
