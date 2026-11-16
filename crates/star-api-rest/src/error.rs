@@ -1,6 +1,8 @@
 /*
-@cypher schema=1 source_sha256=993e78e60391664efaf53765546579919021adf2f3f34178db06c1e88272fd28
+@cypher schema=1 source_sha256=3fac6262830f7a41ac5936a375531411c7591ae03d5c5955f2d4b963b4a01034
 MERGE (self:File {path:"crates/star-api-rest/src/error.rs"})
+MERGE (terr:Type {id:"crates/terminal-stack/src/persistence.rs::TerminalStackPersistenceError",kind:"enum"})
+MERGE (self)-[:USES_TYPE]->(terr)
 @endcypher
 */
 // SPDX-License-Identifier: MIT OR Apache-2.0
@@ -675,6 +677,68 @@ impl From<star_memory::MemoryError> for RestError {
     }
 }
 
+/// `domain_local_runtime::RuntimeError` → `RestError` (per 2026-11-16 routes/runtime.rs 接线)
+impl From<domain_local_runtime::RuntimeError> for RestError {
+    fn from(e: domain_local_runtime::RuntimeError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_local_runtime::RuntimeError::NotFound(_) => {
+                ("RUNTIME_NOT_FOUND", "Validation", false)
+            }
+            domain_local_runtime::RuntimeError::PermissionDenied => {
+                ("RUNTIME_PERMISSION_DENIED", "Policy", false)
+            }
+            domain_local_runtime::RuntimeError::CrossTenantDenied(_, _) => {
+                ("RUNTIME_CROSS_TENANT_DENIED", "Policy", false)
+            }
+            domain_local_runtime::RuntimeError::InvalidState(_) => {
+                ("RUNTIME_INVALID_STATE", "Validation", false)
+            }
+            domain_local_runtime::RuntimeError::Conflict(_) => {
+                ("RUNTIME_CONFLICT", "External", false)
+            }
+            domain_local_runtime::RuntimeError::Internal(_) => {
+                ("RUNTIME_INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("runtime: {e}"),
+            source_module: "domain-local-runtime".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the runtime id + tenant + device ((tenant,user,device) 注册唯一, per INV-RT-01/05)".to_string(),
+        }
+    }
+}
+
+/// `terminal_stack::persistence::TerminalStackPersistenceError` → `RestError`
+/// (per 2026-11-16 routes/terminal.rs 接线)
+impl From<terminal_stack::persistence::TerminalStackPersistenceError> for RestError {
+    fn from(e: terminal_stack::persistence::TerminalStackPersistenceError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            terminal_stack::persistence::TerminalStackPersistenceError::PaneNotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "NotFound", false)
+            }
+            terminal_stack::persistence::TerminalStackPersistenceError::InvalidUuid { .. }
+            | terminal_stack::persistence::TerminalStackPersistenceError::InvalidSource(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            terminal_stack::persistence::TerminalStackPersistenceError::Sqlite(_)
+            | terminal_stack::persistence::TerminalStackPersistenceError::Json(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("terminal-stack: {e}"),
+            source_module: "terminal-stack".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the pane_id (create via POST /api/v1/terminal/pane first)".to_string(),
+        }
+    }
+}
+
 // =====================================================================
 // ULYS-218.3 [P1-F] worktree-shared-dir errors → RestError
 // `SharedDirError` (6-field, per worktree-shared-dir/src/error.rs) covers
@@ -778,11 +842,13 @@ impl IntoResponse for RestError {
             | "TENANT_NOT_FOUND"
             | "IDENTITY_NOT_FOUND"
             | "PERMISSION_NOT_FOUND"
-            | "PROJECT_NOT_FOUND" => StatusCode::NOT_FOUND,
+            | "PROJECT_NOT_FOUND"
+            | "RUNTIME_NOT_FOUND" => StatusCode::NOT_FOUND,
             "BATCH_UNAUTHENTICATED" => StatusCode::UNAUTHORIZED,
             "POLICY_DENIED" | "FB_PERMISSION_DENIED" | "AGENT_WORKTREE_MISMATCH" => {
                 StatusCode::FORBIDDEN
             }
+            "RUNTIME_PERMISSION_DENIED" | "RUNTIME_CROSS_TENANT_DENIED" => StatusCode::FORBIDDEN,
             "WORKTREE_CONFLICT"
             | "INTEGRATION_CONFLICT"
             | "COMMENT_CONFLICT"
@@ -800,7 +866,8 @@ impl IntoResponse for RestError {
             | "IDENTITY_DEVICE_REVOKED"
             | "PERMISSION_CONFLICT"
             | "PROJECT_CONFLICT"
-            | "PROJECT_SLUG_EXISTS" => StatusCode::CONFLICT,
+            | "PROJECT_SLUG_EXISTS"
+            | "RUNTIME_CONFLICT" => StatusCode::CONFLICT,
             "BATCH_NODE_TIMEOUT" => StatusCode::REQUEST_TIMEOUT,
             "BATCH_ENGINE_OVERLOADED" => StatusCode::SERVICE_UNAVAILABLE,
             "FB_INVALID_STATE_TRANSITION"
@@ -823,11 +890,13 @@ impl IntoResponse for RestError {
             | "TENANT_INVALID_STATE"
             | "IDENTITY_INCOMPLETE_BINDING"
             | "PERMISSION_INVALID_RULE"
-            | "PROJECT_INVALID_STATE" => StatusCode::UNPROCESSABLE_ENTITY,
+            | "PROJECT_INVALID_STATE"
+            | "RUNTIME_INVALID_STATE" => StatusCode::UNPROCESSABLE_ENTITY,
             "INTERNAL"
             | "BATCH_NODE_EXECUTION_FAILED"
             | "BATCH_WORKER_LEASE_LOST"
-            | "BATCH_DATABASE_ERROR" => StatusCode::INTERNAL_SERVER_ERROR,
+            | "BATCH_DATABASE_ERROR"
+            | "RUNTIME_INTERNAL" => StatusCode::INTERNAL_SERVER_ERROR,
             "BATCH_NOT_IMPLEMENTED" => StatusCode::NOT_IMPLEMENTED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };

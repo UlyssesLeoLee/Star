@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=19b969af39e2785bfb7025079584b08ecb36bcce5148ce90bf945892635d5ac2
+@cypher schema=1 source_sha256=bec5c6a18a1563444c2ec9c8a38559a9ce5e6278bc6ef34acf83caa3c2e53873
 MERGE (self:File {path:"crates/sandboxd/src/config.rs"})
 @endcypher
 */
@@ -252,7 +252,7 @@ impl SandboxdConfig {
     pub fn from_yaml(path: &Path) -> Result<Self, SandboxdError> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| SandboxdError::Internal(format!("read config {}: {e}", path.display())))?;
-        let config: SandboxdConfig = serde_yaml_ng::from_str(&content)
+        let config: SandboxdConfig = serde_saphyr::from_str(&content)
             .map_err(|e| SandboxdError::Internal(format!("parse config: {e}")))?;
         config.validate()?;
         Ok(config)

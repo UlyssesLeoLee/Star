@@ -1,11 +1,15 @@
 /*
-@cypher schema=1 source_sha256=ac03a2814c9467b78a0338abbcfaaddd59d1957e281ca39148f7d3b9367c12b5
+@cypher schema=1 source_sha256=47d613032f867dc2362ce150d472689780774a8c9b0be7a4919253f19eb34641
 MERGE (self:File {path:"frontend/src/components/board/WorkItemDetailDrawer.tsx"})
 MERGE (agentTypes:File {path:"frontend/src/lib/agent/types.ts"})
 MERGE (agentKindDisplayLabel:Function {name:"agentKindDisplayLabel", language:"typescript", visibility:"public"})
 MERGE (workItemDetailDrawer:Function {name:"WorkItemDetailDrawer", language:"typescript", visibility:"public"})
 MERGE (self)-[:IMPORTS]->(agentTypes)
 MERGE (workItemDetailDrawer)-[:CALLS]->(agentKindDisplayLabel)
+MERGE (terminalHookFile:File {path:"frontend/src/hooks/useTerminalStackWs.ts"})
+MERGE (useTerminalStackWs:Function {name:"useTerminalStackWs", language:"typescript", visibility:"public"})
+MERGE (terminalHookFile)-[:DEFINES]->(useTerminalStackWs)
+MERGE (workItemDetailDrawer)-[:CALLS]->(useTerminalStackWs)
 @endcypher
 */
 "use client";
@@ -60,6 +64,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
+import { useTerminalStackWs } from "@/hooks/useTerminalStackWs";
 import { searchIpaSkills } from "@/lib/ipa-skills/search";
 import { IPA_SKILL_BY_ID } from "@/lib/ipa-skills/catalog";
 import type {
@@ -122,6 +127,11 @@ export function WorkItemDetailDrawer({
   const [newFileSubTaskTitle, setNewFileSubTaskTitle] = useState("");
   const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
   const [ipaQuery, setIpaQuery] = useState("");
+
+  // ---- CLI 面板接真实 terminal REST (per 2026-11-16 用户发令: star-api-rest pane 接线) ----
+  // sessionId=null → 由 REST createPane 建 pane; 后端不可达自动回退 preview (mode 标注),
+  // 只加调用不重构: 命令文本经 writeLine append 到终端滚动缓冲。
+  const { writeLine } = useTerminalStackWs({ sessionId: null });
 
   // ---- view 模式: 当前 workItem ----
   const currentWi = useMemo<WorkItem | null>(() => {
@@ -962,6 +972,9 @@ export function WorkItemDetailDrawer({
               taskId={currentWi?.id ?? ""}
               taskKey={currentWi?.key ?? ""}
               onSubmitCommand={(cmd) => {
+                // 命令文本 append 到 CLI 终端滚动缓冲 (star-api-rest writeLine;
+                // 失败自动回退 preview, mode='error' 诚实标注 — 只加调用不重构)
+                void writeLine(cmd);
                 const topicId = useChatStore.getState().openTopicForTask(currentWi?.id ?? "", currentWi?.title ?? "");
                 useChatStore.getState().reply(topicId, "Ulysses", "human", cmd);
               }}

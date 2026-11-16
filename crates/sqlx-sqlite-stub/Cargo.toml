@@ -1,0 +1,42 @@
+[package]
+# ⚠️ 说明 (2026-11-16, per License Gate 修复):
+#
+# 本 crate 是 crates-io `sqlx-sqlite 0.8.6` 的**无依赖 stub**, 经根 Cargo.toml 的
+# `[patch.crates-io]` 顶替原包参与解析。目的:
+#
+# 1. sqlx 0.8.6 / sqlx-macros-core 0.8.6 把 `sqlx-sqlite` 声明为 optional 依赖并
+#    钉死 `libsqlite3-sys =0.30.1` (RUSTSEC-2026-0459: 其 bundled SQLite < 3.54
+#    受影响)。本 workspace 全量 grep 证实**没有任何成员启用 sqlx 的 sqlite feature**
+#    (cargo tree -i sqlx-sqlite -e all --target all = 空), 即该依赖从不参与编译。
+# 2. 但它仍被写入 Cargo.lock, 导致与 rusqlite 0.41 (libsqlite3-sys 0.39, 已修复)
+#    产生 cargo `links = "sqlite3"` 唯一性冲突 —— 解析直接失败, 且 0.30.1 留在
+#    lock 中会让 cargo-deny/cargo-audit 持续命中 RUSTSEC-2026-0459。
+# 3. 用无依赖 stub 顶替后, sqlx-sqlite 从闭包中消失, 两条阻碍同时解除。
+#
+# 契约: 若未来任何代码启用 sqlx 的 `sqlite`/`all-databases` feature, 本 stub 会以
+# 编译错误 (空 lib) 明确告警 —— 届时应升级 sqlx 至其 sqlite 子 crate 接受
+# libsqlite3-sys >= 0.39 的版本, 或另行评估 SQLite 访问方案, 而不是恢复原包。
+publish = false
+name = "sqlx-sqlite"
+version = "0.8.6"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "No-dependency stub replacing crates-io sqlx-sqlite 0.8.6 (inactive optional dep of sqlx 0.8.6); see root Cargo.toml [patch.crates-io]."
+
+[dependencies]
+
+[features]
+# 与上游 sqlx-sqlite 0.8.6 同名空 feature, 保证解析期 feature 引用合法。
+# 任何成员启用 sqlite 后端时, 这些空 feature 不会提供实现 → 编译期显式失败。
+any = []
+bundled = []
+chrono = []
+json = []
+migrate = []
+offline = []
+preupdate-hook = []
+regexp = []
+time = []
+unbundled = []
+uuid = []
+load-extension = []

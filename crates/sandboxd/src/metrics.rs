@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=39149464ce8e45f17e213645783dabf5db88c93e5ffb4a0911de8b0a5e03a49f
+@cypher schema=1 source_sha256=889942c32b47aab2b5fdd36aa3af0eba908da5d8a801148858eba72d4d8e0f48
 MERGE (self:File {path:"crates/sandboxd/src/metrics.rs"})
 @endcypher
 */
@@ -19,7 +19,7 @@ MERGE (self:File {path:"crates/sandboxd/src/metrics.rs"})
 //! | `sandboxd_rpc_duration_seconds` | histogram | rpc=create_session/run_command/destroy_session/stream_logs |
 //!
 //! scrape endpoint: `GET /metrics` (跟 /healthz 同 axum 进程, per FR-6.1)。
-//! 复用 `prometheus` crate 0.13 (per BD §0 选型), star-telemetry 的 PrometheusExporter
+//! 复用 `prometheus` crate 0.14 (per BD §0 选型; 0.14 移除 protobuf 后端, per RUSTSEC-2024-0437), star-telemetry 的 PrometheusExporter
 //! 为 token 专用指标, 不适合挂载 sandboxd 指标 (per D-9 派生标注)。
 
 use prometheus::{

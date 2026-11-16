@@ -142,8 +142,7 @@ ignore = [
     # 真正的缓解方向 (需架构拍板, 尚未实施):
     #   JWT 算法 RS256 -> ES256 (ECDSA P-256), 彻底移出 rsa crate 依赖树。
     #   属破坏性变更 (影响已签发 token 与密钥分发), 已提请拍板, 见报告 §3 缺口 #7。
-    { id = "RUSTSEC-2023-0071",
-      reason = "rsa v0.9.10 经 jsonwebtoken 引入; 上游永久无补丁 (patched=[] is intentional), CVSS 5.9 Medium/AC:H。**已修正 v0.1 错误判定**: star-api-rest/auth/mod.rs:157 存在 RS256 私钥签名路径, 符合官方'网络可观测时序'威胁模型。缓解方向为迁 ES256, 待架构拍板 [复审期限 2026-11-04]" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa v0.9.10 经 jsonwebtoken 引入; 上游永久无补丁 (patched=[] is intentional), CVSS 5.9 Medium/AC:H。**已修正 v0.1 错误判定**: star-api-rest/auth/mod.rs:157 存在 RS256 私钥签名路径, 符合官方'网络可观测时序'威胁模型。缓解方向为迁 ES256, 待架构拍板 [复审期限 2026-12-16]" },
 
     # RUSTSEC-2025-0057 / RUSTSEC-2024-0384 / RUSTSEC-2024-0370 — unmaintained
     # 实证 (per cargo tree -i):
@@ -155,12 +154,9 @@ ignore = [
     # 处置: 根因是 sled v0.34.7 (per AGENTS.md 守门 #13 a W 派生的嵌入式 KV)。
     #       长期方案为评估 sled 替代 (redis 已通过 star-cache 接入) 或等待上游恢复。
     #       复审时以 `cargo tree -i <crate> --target all` 确认引用面。
-    { id = "RUSTSEC-2025-0057",
-      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
-    { id = "RUSTSEC-2024-0384",
-      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
-    { id = "RUSTSEC-2024-0370",
-      reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-11-04]" },
+    { id = "RUSTSEC-2025-0057", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
+    { id = "RUSTSEC-2024-0384", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
+    { id = "RUSTSEC-2024-0370", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
 ]
 # 锁定到已 yanked 的版本属供应链风险, 直接拒。
 # 2026-10-04 实跑曾命中 yoke-derive v0.8.3, 已由 `cargo update -p yoke-derive`

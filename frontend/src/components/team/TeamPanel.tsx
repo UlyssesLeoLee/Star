@@ -1,6 +1,23 @@
 /*
-@cypher schema=1 source_sha256=e0c7f97f442c694467943db3214d6375f55b394c942e7a4b62b25245492ec5ea
+@cypher schema=1 source_sha256=6321559a3245d755b79532e169e8334f0ac5e2ad86b892e037600ecbbc3bb44e
 MERGE (self:File {path:"frontend/src/components/team/TeamPanel.tsx"})
+MERGE (teamPanel:Function {name:"TeamPanel",type:"function",language:"tsx",visibility:"public",complexity:"complex"})
+MERGE (fetchRuntimeList:Function {name:"fetchRuntimeList",type:"function",language:"typescript",visibility:"exported",complexity:"moderate"})
+MERGE (registerRuntime:Function {name:"registerRuntime",type:"function",language:"typescript",visibility:"exported",complexity:"simple"})
+MERGE (sendHeartbeat:Function {name:"sendHeartbeat",type:"function",language:"typescript",visibility:"exported",complexity:"simple"})
+MERGE (localRuntime:Type {id:"frontend/src/types/ids.ts::LocalRuntime",kind:"interface"})
+MERGE (runtimeStatus:Type {id:"frontend/src/types/ids.ts::RuntimeStatus",kind:"type"})
+MERGE (useStore:Symbol {id:"frontend/src/lib/store.ts::useStore",kind:"function"})
+MERGE (self)-[:DEFINES]->(teamPanel)
+MERGE (self)-[:IMPORTS]->(fetchRuntimeList)
+MERGE (self)-[:IMPORTS]->(registerRuntime)
+MERGE (self)-[:IMPORTS]->(sendHeartbeat)
+MERGE (teamPanel)-[:CALLS]->(fetchRuntimeList)
+MERGE (teamPanel)-[:CALLS]->(registerRuntime)
+MERGE (teamPanel)-[:CALLS]->(sendHeartbeat)
+MERGE (teamPanel)-[:CALLS]->(useStore)
+MERGE (self)-[:USES_TYPE]->(localRuntime)
+MERGE (self)-[:USES_TYPE]->(runtimeStatus)
 @endcypher
 */
 "use client";
@@ -9,21 +26,29 @@ MERGE (self:File {path:"frontend/src/components/team/TeamPanel.tsx"})
 // TeamPanel — group 页右栏 Team tab 内容 (运行时与 Agent 小队管理)
 // =====================================================================
 // 职责:
-//   1. Runtime / Daemon 管理区: 数据来自 store 内现有 daemon 相关集合
-//      store.localRuntimes (seed 预览), 每行 = 名称 / 状态徽标 / 租约到期 /
-//      操作按钮 启动·停止·重启
+//   1. Runtime / Daemon 管理区:
+//      - 挂载时 GET /api/v1/runtime (runtimeApi.fetchRuntimeList) 拉真实列表;
+//        成功 → 用 API 数据渲染, 移除该区 "预览数据" / 行尾 "未接入" 徽标,
+//        启用 注册 / 心跳 动作;
+//        失败/超时 → 保留 store.localRuntimes seed 预览 + "未接入" 徽标,
+//        全部动作保持禁用 (诚实原则 per 缺标比错标: 不生成演示执行状态
+//        冒充真实记录)。
+//      - 注册 (POST /api/v1/runtime/register) 与心跳
+//        (POST /api/v1/runtime/{id}/heartbeat) 成功后刷新列表;
+//        启动 / 停止 / 重启仍禁用 (宿主控制通道未接) + title 原因。
 //   2. Worker / Router 小队区: store 无小队集合, 渲染本地 TEAM_SQUAD_PREVIEW
-//      常量 (预览数据, 宿主 daemon 投影接入后替换)
-//   3. 诚实标注 (per 缺标比错标): 控制通道未接入时全部动作按钮 disabled
-//      + title 原因 + 行尾 "未接入" 徽标; 不生成演示执行状态冒充真实记录
+//      常量 (预览数据, 宿主 daemon 投影接入后替换)。
 // =====================================================================
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
   ArrowUpRight,
   Bot,
   Cpu,
   Play,
+  Plus,
   RotateCw,
   Square,
   UserMinus,
@@ -32,9 +57,11 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { LocalRuntime, RuntimeStatus } from "@/types/ids";
+import { fetchRuntimeList, registerRuntime, sendHeartbeat } from "./runtimeApi";
 
 type RuntimeAction = "start" | "stop" | "restart";
 type SquadAction = "assign" | "recall";
+type ApiState = "connecting" | "connected" | "unreachable";
 
 interface TeamSquadRow {
   id: string;
@@ -73,10 +100,75 @@ const RUNTIME_STATUS_META: Record<RuntimeStatus, { label: string; cls: string }>
 // 动作按钮未接入原因 (宿主控制通道就绪后接线真实命令并解除禁用)
 const RUNTIME_ACTION_REASON = "宿主 daemon 控制通道未接入";
 const SQUAD_ACTION_REASON = "宿主小队调度通道未接入";
+// star-api-rest 不可达时的降级原因 (注册 / 心跳同样禁用)
+const RUNTIME_API_UNREACHABLE_REASON = "star-api-rest 不可达 (预览数据, 未接入)";
 
 export function TeamPanel() {
-  // store 内现有 daemon 相关集合 = localRuntimes (seed 预览数据)
-  const runtimes = useStore((s) => s.localRuntimes);
+  const storeRuntimes = useStore((s) => s.localRuntimes);
+
+  // liveRuntimes === null 表示 API 列表尚未到达 (连接中/失败), 此时降级到 store 预览
+  const [liveRuntimes, setLiveRuntimes] = useState<LocalRuntime[] | null>(null);
+  const [apiState, setApiState] = useState<ApiState>("connecting");
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const connected = apiState === "connected";
+  const runtimes = connected && liveRuntimes !== null ? liveRuntimes : storeRuntimes;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRuntimeList()
+      .then((list) => {
+        if (cancelled) return;
+        setLiveRuntimes(list);
+        setApiState("connected");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // 降级: 保留 store 预览数据 + 未接入徽标 + 动作禁用 (诚实原则)
+        setApiState("unreachable");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refreshList = useCallback(async () => {
+    const list = await fetchRuntimeList();
+    setLiveRuntimes(list);
+    setApiState("connected");
+  }, []);
+
+  const handleRegister = useCallback(async () => {
+    if (busyAction) return;
+    setBusyAction("register");
+    setActionError(null);
+    try {
+      await registerRuntime();
+      await refreshList();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [busyAction, refreshList]);
+
+  const handleHeartbeat = useCallback(
+    async (id: string) => {
+      if (busyAction) return;
+      setBusyAction(`heartbeat:${id}`);
+      setActionError(null);
+      try {
+        await sendHeartbeat(id);
+        await refreshList();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [busyAction, refreshList],
+  );
 
   return (
     <div data-testid="team-panel" className="space-y-3">
@@ -88,19 +180,44 @@ export function TeamPanel() {
             Runtime / Daemon 与 Worker / Router 小队统一在团队管理；控制通道未接入前只读展示。
           </p>
         </div>
-        <span
-          className="shrink-0 rounded border border-warning/30 px-1.5 py-0.5 text-[8px] text-warning"
-          title="当前展示本地 seed 预览数据, 非授权服务端运行时事实; 宿主 daemon 投影接入后替换"
-        >
-          预览数据
-        </span>
+        {!connected && (
+          <span
+            className="shrink-0 rounded border border-warning/30 px-1.5 py-0.5 text-[8px] text-warning"
+            title={
+              apiState === "unreachable"
+                ? "后端 API 不可达 (GET /api/v1/runtime), 当前展示本地 seed 预览数据, 非授权服务端运行时事实; 接入前动作保持禁用"
+                : "当前展示本地 seed 预览数据, 正在尝试接入 star-api-rest; 接入成功后替换为真实数据"
+            }
+          >
+            预览数据
+          </span>
+        )}
       </div>
 
       <section aria-label="Runtime / Daemon 管理">
         <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold">
           <Cpu size={13} className="text-accent" />
           Runtime / Daemon
-          <span className="font-normal text-ink-mute">store.localRuntimes · seed 预览</span>
+          <span className="font-normal text-ink-mute">
+            {connected ? "star-api-rest /api/v1/runtime · 实时数据" : "store.localRuntimes · seed 预览"}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            data-testid="team-action-register"
+            onClick={handleRegister}
+            disabled={!connected || busyAction !== null}
+            aria-disabled={!connected || busyAction !== null}
+            title={
+              connected
+                ? "注册当前设备为 Runtime (POST /api/v1/runtime/register) 并刷新列表"
+                : `注册未接入：${RUNTIME_API_UNREACHABLE_REASON}`
+            }
+            className="inline-flex items-center gap-1 rounded border border-accent/50 px-1.5 py-0.5 text-[9px] text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-dim disabled:opacity-60"
+          >
+            <Plus size={10} />
+            注册
+          </button>
         </div>
         <div className="space-y-1.5">
           {runtimes.length === 0 && (
@@ -126,9 +243,11 @@ export function TeamPanel() {
                   <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[8px] ${status.cls}`}>
                     {status.label}
                   </span>
-                  <span className="shrink-0 rounded border border-warning/30 px-1.5 py-0.5 text-[8px] text-warning">
-                    未接入
-                  </span>
+                  {!connected && (
+                    <span className="shrink-0 rounded border border-warning/30 px-1.5 py-0.5 text-[8px] text-warning">
+                      未接入
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <span
@@ -139,6 +258,22 @@ export function TeamPanel() {
                   </span>
                   <span className="flex-1" />
                   <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      data-testid={`team-action-heartbeat-${runtime.id}`}
+                      onClick={() => handleHeartbeat(runtime.id)}
+                      disabled={!connected || busyAction !== null}
+                      aria-disabled={!connected || busyAction !== null}
+                      title={
+                        connected
+                          ? `发送心跳 (POST /api/v1/runtime/${runtime.id}/heartbeat) 并刷新列表`
+                          : `心跳未接入：${RUNTIME_API_UNREACHABLE_REASON}`
+                      }
+                      className="inline-flex items-center gap-1 rounded border border-info/50 px-1.5 py-0.5 text-[9px] text-info hover:bg-info/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-dim disabled:opacity-60"
+                    >
+                      <Activity size={10} />
+                      心跳
+                    </button>
                     {RUNTIME_ACTIONS.map(({ action, label, icon: Icon }) => (
                       <button
                         key={action}
@@ -159,6 +294,14 @@ export function TeamPanel() {
             );
           })}
         </div>
+        {actionError && (
+          <p
+            data-testid="team-runtime-action-error"
+            className="mt-1.5 rounded border border-err/30 bg-err/5 px-2 py-1 text-[8px] text-err"
+          >
+            操作失败：{actionError}（展示数据未变，未生成虚假执行状态）
+          </p>
+        )}
       </section>
 
       <section aria-label="Worker / Router 小队">
@@ -216,7 +359,9 @@ export function TeamPanel() {
       </section>
 
       <p className="rounded border border-dashed border-line px-2 py-1.5 text-[8px] leading-relaxed text-ink-mute">
-        控制通道未接入：启动 / 停止 / 重启 / 分配 / 回收按钮均不可用；接入前不生成演示执行状态，不冒充真实记录。
+        {connected
+          ? "已接入 star-api-rest 数据通道：注册 / 心跳可用；启动 / 停止 / 重启与小队分配 / 回收仍待宿主控制通道接入。"
+          : "控制通道未接入：启动 / 停止 / 重启 / 分配 / 回收按钮均不可用；接入前不生成演示执行状态，不冒充真实记录。"}
       </p>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=239594d11de86b18f396913aa4d6ea0222318924032eb9d48be88cc13b0b0960
+@cypher schema=1 source_sha256=110e6a814b35cc39ae626e0798a357f0a0b455d247d55e020c13a2eb015da6e4
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
-MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
+MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_router",kind:"function"})
+MERGE (oauthRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
 MERGE (deviceRouter:Symbol {id:"crates/star-api-rest/src/auth/oauth/device_enrollment.rs::router",kind:"function"})
 MERGE (memoryFile:File {path:"crates/star-api-rest/src/routes/memory.rs"})
 MERGE (agentsFile:File {path:"crates/star-api-rest/src/routes/agents.rs"})
+MERGE (runtimeFile:File {path:"crates/star-api-rest/src/routes/runtime.rs"})
+MERGE (runtimeRouter:Symbol {id:"crates/star-api-rest/src/routes/runtime.rs::router",kind:"function"})
 MERGE (self)-[:DEFINES]->(router)
-MERGE (router)-[:CALLS]->(deviceRouter)
+MERGE (self)-[:DEFINES]->(oauthRouter)
+MERGE (oauthRouter)-[:CALLS]->(deviceRouter)
 MERGE (self)-[:DECLARES]->(memoryFile)
 MERGE (self)-[:DECLARES]->(agentsFile)
+MERGE (self)-[:DECLARES]->(runtimeFile)
+MERGE (router)-[:CALLS]->(runtimeRouter)
 @endcypher
 */
 //! `crates/star-api-rest` — STAR Developer REST API
@@ -48,6 +54,7 @@ pub mod middleware;
 pub mod rbac;
 pub mod response;
 pub mod routes;
+// Local Runtime HTTP 端点 (domain-local-runtime 接线) — 已注册于 routes/mod.rs (routes::runtime)
 pub mod workspace_files;
 
 use axum::{
@@ -143,6 +150,9 @@ pub fn build_router() -> Router {
         // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
         .nest("/memory", routes::memory::router())
         .nest("/agents", routes::agents::router())
+        // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
+        .nest("/runtime", routes::runtime::router())
+        .nest("/terminal", routes::terminal::router())
         // ── 6+3 Webhook 管理端点 (per spec §2.3) ───────────────────────
         .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
         .route(
@@ -301,6 +311,9 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
                 .nest("/memory", routes::memory::router())
                 .nest("/agents", routes::agents::router())
+                // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
+                .nest("/runtime", routes::runtime::router())
+                .nest("/terminal", routes::terminal::router())
                 .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
                 .route(
                     "/webhooks/endpoints",

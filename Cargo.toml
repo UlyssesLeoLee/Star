@@ -186,7 +186,16 @@ members = [
     # ULYS-228 (ULYS-104.18, 2026-09-29): layout-engine-wasm crate (阶段 1 PoC, wasm-pack cdylib + rlib 双输出, per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P0: pick_algorithm + visual_distance 暴露给浏览器, 复用 crates/layout-engine 纯函数, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #19 v19 0 动 V0.1 任何业务 logic)
     "crates/layout-engine-wasm",
 ]
-exclude = ["target", "crates/platform-messaging-proto"]
+exclude = ["target", "crates/platform-messaging-proto", "crates/sqlx-sqlite-stub"]
+
+# sqlx-sqlite stub (2026-11-16, RUSTSEC-2026-0459 修复的一部分):
+# sqlx 0.8.6 将 sqlx-sqlite 声明为 optional 依赖并钉死 libsqlite3-sys =0.30.1;
+# 本 workspace 无任何成员启用 sqlx 的 sqlite feature (该 optional 依赖从不参与编译),
+# 但它写入 Cargo.lock 后与 rusqlite 0.41 的 libsqlite3-sys 0.39 冲突 (cargo links
+# = "sqlite3" 唯一性约束), 且 0.30.1 留在 lock 会让 cargo-deny 持续命中
+# RUSTSEC-2026-0459。详见 crates/sqlx-sqlite-stub/Cargo.toml 头部说明。
+[patch.crates-io]
+sqlx-sqlite = { path = "crates/sqlx-sqlite-stub" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -218,7 +227,7 @@ tokio-stream = "0.1"
 r2d2 = "0.8"
 # r2d2-memgraph = "0.1"  # TODO: 等 r2d2-memgraph crate 落地后启用 (G-1 完整实装)
 # JWT 鉴权 (per §14.12 IV OAuth2 + JWT 拍板 2026-09-09 19:20 JST)
-jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+jsonwebtoken = { version = "12", features = ["rust_crypto"] }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }

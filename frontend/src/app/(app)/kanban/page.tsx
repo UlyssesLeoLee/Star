@@ -1,8 +1,12 @@
 /*
-@cypher schema=1 source_sha256=428ad1fcc9fc29ab8378bcbcc041804a13796b6d2946c769f5517fb087c6b5d7
+@cypher schema=1 source_sha256=42566058a132a0ca494ec46559ada0dcad5fe98bc91789fbc85510b32c40efa1
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
+MERGE (nema_store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
+MERGE (open_nema:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::openNemaAsStarTask",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:IMPORTS]->(nema_store)
+MERGE (page)-[:CALLS]->(open_nema)
 @endcypher
 */
 // =====================================================================
@@ -393,8 +397,8 @@ export default function KanbanPage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => {
-                          const wid = openNemaAsStarTask(task.id);
+                        onClick={async () => {
+                          const wid = await openNemaAsStarTask(task.id);
                           if (wid) setDrawerMode({ kind: "view", workItemId: wid });
                         }}
                         className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft flex items-center gap-1"

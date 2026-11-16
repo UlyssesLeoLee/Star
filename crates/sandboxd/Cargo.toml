@@ -38,10 +38,13 @@ prost = "0.13"
 axum = { workspace = true }
 
 # Metrics (per FR-6.1, 9 sandboxd 指标)
-prometheus = "0.13"
+# 2026-11-16: 0.13 → 0.14 (RUSTSEC-2024-0437: 0.13 依赖 protobuf 2.x; 0.14 起移除 protobuf 后端)
+prometheus = "0.14"
 
 # Config (per FR-1.1, YAML 配置文件)
-serde_yaml_ng = "0.9"
+# 2026-11-16: serde_yaml_ng → serde-saphyr (RUSTSEC-2024-0449: unsafe-libyaml 已归档无补丁;
+# serde_yaml_ng 仍内嵌 unsafe-libyaml, saphyr 为纯 Rust 实现, 是官方建议替代)
+serde-saphyr = "2.1"
 
 # session 池并发容器 (per DD §2.1 Orchestrator.sessions)
 dashmap = "6"
