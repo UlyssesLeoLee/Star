@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=742b81b5b208d220762ba2527a58f12028115a4c310b55898e6c636b8deabe4f
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -453,7 +453,7 @@ export const zhCN: Dictionary = {
   // 28 page title/subtitle (key = route, e.g. "/notification" "/agent")
   pageTitles: {
     "/": { title: "首页" },
-    "/inbox": { title: "收件箱", subtitle: "通知 / 评论 / 审计 (10 mock; 真实 notification service P3 缺口)" },
+    "/inbox": { title: "收件箱", subtitle: "真实通知中心 — 接入 /api/v1/notifications (未接入时诚实展示)" },
     "/issues": { title: "工作项" },
     "/sprint": { title: "Sprint 视图", subtitle: "Sprint 视图为主, 配合 List 表格 + Tree 层级. 默认打开 Sprint." },
     "/agents": { title: "Agent 总览", subtitle: "agent / agent-session / lease / runtime (5 mock; 真实数据 P3)" },
@@ -831,5 +831,31 @@ export const zhCN: Dictionary = {
   markdownPreview: {
     copy: "复制",
     copied: "已复制",
+  },
+  inbox: {
+    global: "全局",
+    categoryAll: "全部",
+    categoryReview: "评审请求",
+    categoryComment: "评论",
+    categoryNotice: "通知",
+    loadingTitle: "加载中",
+    loadingHint: "正在从真实通知服务拉取通知，请稍候。",
+    disconnectedTitle: "未接入 — 真实通知服务不可用",
+    disconnectedHint: "通知列表无法从真实后端读取。请确认通知服务已启动且 real-mode 已配置；恢复后点击重试。",
+    notConfiguredHint: "真实通知服务未配置 (real-mode 未开启)。设置 localStorage `use_real_api=true` 与 `real_api_base` / `real_api_key`，或配置 NEXT_PUBLIC_USE_REAL_API / NEXT_PUBLIC_API_BASE_URL 后重试。",
+    unauthorizedTitle: "未授权",
+    unauthorizedHint: "通知服务拒绝访问 (401/403)。请检查 real_api_key 是否有效，重新授权后点击重试。",
+    loadFailedTitle: "加载失败",
+    loadFailedHint: "通知服务返回了错误响应。请点击重试；若持续失败，请查看通知服务日志。",
+    emptyTitle: "暂无通知",
+    emptyHint: "真实通知服务已接入，当前没有任何通知。新的评审请求、评论与系统通知会出现在这里。",
+    emptyCategory: "该分类暂无消息",
+    retry: "重试",
+    markRead: "标为已读",
+    markUnread: "标为未读",
+    toggleFailedHint: "已读状态更新失败，已回滚到之前的状态。",
+    openInBranch: "在 Branch 中打开",
+    fromActor: "来自 {name}",
+    errorDetailLabel: "原因",
   },
 };

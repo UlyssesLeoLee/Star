@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e12249ddbe8e359cb728a1ba6e1f15f95b3630c62e123d13930f302e9d8f8fa4
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/app/(app)/__tests__/panels.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/__tests__/panels.test.tsx::U4 minimal panels",kind:"suite"})
 MERGE (self)-[:DEFINES]->(suite)
@@ -109,14 +109,14 @@ describe("U4 minimal panels — render smoke", () => {
     expect(screen.getByText("集成测试")).toBeInTheDocument();
   });
 
-  it("renders /inbox without error", () => {
+  it("renders /inbox without error", async () => {
     renderWithI18n(<InboxPage />);
     expect(screen.getByTestId("inbox-page")).toBeInTheDocument();
     // v0.6 (per 2026-09-05 拍板 C 全 i18n 接管): zh-CN 下 page title "收件箱"
     expect(screen.getByText("收件箱")).toBeInTheDocument();
-    // 10 mock 通知
-    const list = screen.getByTestId("inbox-list");
-    expect(list.querySelectorAll("li[data-testid^='inbox-item-']").length).toBe(10);
+    // per 2026-11-17 接真实后端: real-mode 未开启 → 诚实未接入态, 不再渲染 10 条 mock
+    expect(await screen.findByTestId("status-notice-disconnected")).toBeInTheDocument();
+    expect(screen.queryByTestId("inbox-list")).toBeNull();
   });
 
   it("renders /settings without error (default panel = MCP 服务器, per 2026-11-14 参考 UI)", () => {

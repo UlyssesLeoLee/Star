@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=cb652920e445ed5ffc513b1c9476bc34a130c9542feb2eaf44dd827c9f155ca9
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -730,5 +730,32 @@ export interface Dictionary {
   markdownPreview: {
     copy: string;
     copied: string;
+  };
+  /** v0.13 (2026-11-17 收件箱接真实通知 API) 新增: inbox 三态 (未接入/未授权/空) + 分类 + 操作文案 */
+  inbox: {
+    global: string;                 // 面包屑 "全局"
+    categoryAll: string;            // "全部"
+    categoryReview: string;         // "评审请求"
+    categoryComment: string;        // "评论"
+    categoryNotice: string;         // "通知"
+    loadingTitle: string;           // "加载中"
+    loadingHint: string;
+    disconnectedTitle: string;      // "未接入 — 真实通知服务不可用"
+    disconnectedHint: string;       // 不可达时给用户的下一步提示
+    notConfiguredHint: string;      // real-mode 未开启时的原因说明
+    unauthorizedTitle: string;      // "未授权"
+    unauthorizedHint: string;
+    loadFailedTitle: string;        // "加载失败"
+    loadFailedHint: string;
+    emptyTitle: string;             // "暂无通知"
+    emptyHint: string;
+    emptyCategory: string;          // "该分类暂无消息"
+    retry: string;                  // "重试"
+    markRead: string;               // "标为已读"
+    markUnread: string;             // "标为未读"
+    toggleFailedHint: string;       // 已读切换失败已回滚提示
+    openInBranch: string;           // "在 Branch 中打开"
+    fromActor: string;              // "来自 {name}"
+    errorDetailLabel: string;       // "原因"
   };
 }

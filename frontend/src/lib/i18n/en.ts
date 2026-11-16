@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=312bbd1ec4d0c9e756def73541d15268aaf1c3a8a300b3d4ccac6701bbdbb244
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -440,7 +440,7 @@ export const en: Dictionary = {
   // 28 page title/subtitle (mirror zh-CN shape; English source = registry)
   pageTitles: {
     "/": { title: "Home" },
-    "/inbox": { title: "Inbox", subtitle: "notification / comment / audit (10 mock; real notification service P3 gap)" },
+    "/inbox": { title: "Inbox", subtitle: "Real notification center — /api/v1/notifications (honest unavailable state when disconnected)" },
     "/issues": { title: "Issues" },
     "/sprint": { title: "Sprint", subtitle: "Sprint view as primary + List table + Tree hierarchy. Default opens Sprint." },
     "/agents": { title: "Agents", subtitle: "agent / agent-session / lease / runtime (5 mock rows; real data P3)" },
@@ -816,5 +816,31 @@ export const en: Dictionary = {
   markdownPreview: {
     copy: "Copy",
     copied: "Copied",
+  },
+  inbox: {
+    global: "Global",
+    categoryAll: "All",
+    categoryReview: "Review requests",
+    categoryComment: "Comments",
+    categoryNotice: "Notices",
+    loadingTitle: "Loading",
+    loadingHint: "Fetching notifications from the real notification service, please wait.",
+    disconnectedTitle: "Not connected — real notification service unavailable",
+    disconnectedHint: "The notification list could not be read from the real backend. Make sure the notification service is running and real-mode is configured, then retry.",
+    notConfiguredHint: "The real notification service is not configured (real-mode disabled). Set localStorage `use_real_api=true` with `real_api_base` / `real_api_key`, or configure NEXT_PUBLIC_USE_REAL_API / NEXT_PUBLIC_API_BASE_URL, then retry.",
+    unauthorizedTitle: "Unauthorized",
+    unauthorizedHint: "The notification service denied access (401/403). Check that real_api_key is valid, re-authorize, then retry.",
+    loadFailedTitle: "Load failed",
+    loadFailedHint: "The notification service returned an error response. Click retry; if it keeps failing, check the notification service logs.",
+    emptyTitle: "No notifications",
+    emptyHint: "The real notification service is connected; there are currently no notifications. New review requests, comments and system notices will appear here.",
+    emptyCategory: "No messages in this category",
+    retry: "Retry",
+    markRead: "Mark as read",
+    markUnread: "Mark as unread",
+    toggleFailedHint: "Failed to update the read state; it has been rolled back.",
+    openInBranch: "Open in Branch",
+    fromActor: "From {name}",
+    errorDetailLabel: "Reason",
   },
 };

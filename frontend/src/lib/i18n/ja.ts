@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=741f06c840daafcdc377357263ed66bce012aa9b0bfd49fb734c2536a22ff542
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -441,7 +441,7 @@ export const ja: Dictionary = {
   // 28 page title/subtitle (mirror zh-CN shape; Japanese)
   pageTitles: {
     "/": { title: "ホーム" },
-    "/inbox": { title: "受信箱", subtitle: "通知 / コメント / 監査 (10 mock; 真实 notification service P3 缺口)" },
+    "/inbox": { title: "受信箱", subtitle: "リアル通知センター — /api/v1/notifications (未接続時は正直に表示)" },
     "/issues": { title: "作業項目" },
     "/sprint": { title: "Sprint ビュー", subtitle: "Sprint ビュー为主体、List テーブルと Tree 階層を組み合わせ。デフォルトで Sprint を開く。" },
     "/agents": { title: "Agent 一覧", subtitle: "agent / agent-session / lease / runtime (5 mock; 真实データ P3)" },
@@ -817,5 +817,31 @@ export const ja: Dictionary = {
   markdownPreview: {
     copy: "コピー",
     copied: "コピーしました",
+  },
+  inbox: {
+    global: "グローバル",
+    categoryAll: "すべて",
+    categoryReview: "レビュー依頼",
+    categoryComment: "コメント",
+    categoryNotice: "通知",
+    loadingTitle: "読み込み中",
+    loadingHint: "リアル通知サービスから通知を取得しています。お待ちください。",
+    disconnectedTitle: "未接続 — リアル通知サービス利用不可",
+    disconnectedHint: "通知一覧をリアルバックエンドから読み取れません。通知サービスが起動しており real-mode が設定されているか確認し、再試行してください。",
+    notConfiguredHint: "リアル通知サービスが未設定です (real-mode 無効)。localStorage の `use_real_api=true` と `real_api_base` / `real_api_key`、または NEXT_PUBLIC_USE_REAL_API / NEXT_PUBLIC_API_BASE_URL を設定して再試行してください。",
+    unauthorizedTitle: "未認可",
+    unauthorizedHint: "通知サービスがアクセスを拒否しました (401/403)。real_api_key が有効か確認し、再認可後に再試行してください。",
+    loadFailedTitle: "読み込み失敗",
+    loadFailedHint: "通知サービスがエラー応答を返しました。再試行してください。続く場合は通知サービスのログを確認してください。",
+    emptyTitle: "通知なし",
+    emptyHint: "リアル通知サービスは接続済みですが、現在通知はありません。新しいレビュー依頼・コメント・システム通知はここに表示されます。",
+    emptyCategory: "このカテゴリにメッセージはありません",
+    retry: "再試行",
+    markRead: "既読にする",
+    markUnread: "未読にする",
+    toggleFailedHint: "既読状態の更新に失敗しました。以前の状態にロールバックしました。",
+    openInBranch: "Branch で開く",
+    fromActor: "{name} より",
+    errorDetailLabel: "原因",
   },
 };
