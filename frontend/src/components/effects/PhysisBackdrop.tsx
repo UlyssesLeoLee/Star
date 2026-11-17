@@ -23,6 +23,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useTheme } from "next-themes";
 import { useStore } from "@/lib/store";
+import { readThemeRgb } from "@/lib/theme/themeTokens";
 
 interface PhysisWorldWasm {
   new (gravity: number[]): {
@@ -34,8 +35,18 @@ interface PhysisWorldWasm {
   };
 }
 
-// 节点角色 → 颜色 (GOS 风格: 节点类型色)
-const ROLE_COLOR = { worktree: 0x5ad2ff, task: 0x9c6bff, agent: 0x63e6be } as const;
+// 节点角色 → 颜色 token (per 2026-11-17 主题统一: 从 html.physis CSS token 取色,
+// fallback 为 physis 设计值; 不再硬编码 hex)
+const ROLE_TOKEN = {
+  worktree: "--ok-DEFAULT",      // #5ad2ff 量子青 (physis)
+  task: "--color-secondary",     // #9c6bff 星云紫
+  agent: "--cel-cyan",           // #7c8cff 量子蓝
+} as const;
+const ROLE_FALLBACK: Record<keyof typeof ROLE_TOKEN, [number, number, number]> = {
+  worktree: [0.353, 0.824, 1.0],
+  task: [0.612, 0.42, 1.0],
+  agent: [0.486, 0.549, 1.0],
+};
 
 export function PhysisBackdrop() {
   const { resolvedTheme } = useTheme();
@@ -52,6 +63,9 @@ export function PhysisBackdrop() {
 
     let raf = 0;
     let disposed = false;
+    // a11y (per 2026-11-17 妥善增加): prefers-reduced-motion 时不做物理步进,
+    // 只静态渲染一帧 node-edge 图 (节点仍可见, 无动画/冲击波)
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     let world: InstanceType<PhysisWorldWasm> | null = null;
     const shocks: { x: number; y: number; age: number }[] = [];
     let mouseWorld = { x: 0, y: 0 };
@@ -59,7 +73,7 @@ export function PhysisBackdrop() {
     // --- 构建 node-edge 图 (GOS 图原生: 真实实体 + 关系) ---
     type Node = {
       id: string;
-      role: keyof typeof ROLE_COLOR;
+      role: keyof typeof ROLE_TOKEN;
       label: string;
       seed: [number, number, number];
     };
@@ -116,7 +130,10 @@ export function PhysisBackdrop() {
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
 
-    const cursorLight = new THREE.PointLight(0x8b5cf6, 0, 30);
+    const rgbToHex = (rgb: readonly number[]) =>
+      (Math.round(rgb[0] * 255) << 16) | (Math.round(rgb[1] * 255) << 8) | Math.round(rgb[2] * 255);
+    const cursorLight = new THREE.PointLight(
+      rgbToHex(readThemeRgb("--color-secondary", [0.545, 0.361, 0.965])), 0, 30);
     cursorLight.position.set(0, 0, 5);
     scene.add(cursorLight);
     scene.add(new THREE.AmbientLight(0x8899ff, 0.5));
@@ -129,7 +146,7 @@ export function PhysisBackdrop() {
     const nodeMats: THREE.MeshStandardMaterial[] = [];
     const nodeSeeds = nodes.map((n) => n.seed);
     nodes.forEach((n, i) => {
-      const color = ROLE_COLOR[n.role];
+      const color = rgbToHex(readThemeRgb(ROLE_TOKEN[n.role], ROLE_FALLBACK[n.role]));
       const mat = new THREE.MeshStandardMaterial({
         color,
         emissive: color,
@@ -152,7 +169,9 @@ export function PhysisBackdrop() {
     const edgeLines = edgeGeos.map((g) => {
       const line = new THREE.Line(
         g,
-        new THREE.LineBasicMaterial({ color: 0x7c8cff, transparent: true, opacity: 0.35 }),
+        new THREE.LineBasicMaterial({
+          color: rgbToHex(readThemeRgb("--cel-cyan", [0.486, 0.549, 1.0])),
+          transparent: true, opacity: 0.35 }),
       );
       scene.add(line);
       return line;
@@ -172,6 +191,7 @@ export function PhysisBackdrop() {
         let last = performance.now();
         const tick = () => {
           if (disposed) return;
+          if (reducedMotion) { renderer.render(scene, camera); return; }
           raf = requestAnimationFrame(tick);
           const now = performance.now();
           const dt = Math.min((now - last) / 1000, 0.05);

@@ -18,17 +18,28 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { readThemeRgb } from "@/lib/theme/themeTokens";
 
 export type GasVariant = "rise" | "swirl" | "pulse";
 export type GasColor = "accent" | "info" | "ok" | "warn" | "err";
 
-const COLOR_HEX: Record<GasColor, string> = {
-  accent: "#2f81f7",
-  info:    "#58a6ff",
-  ok:      "#3fb950",
-  warn:    "#d29922",
-  err:     "#f85149",
+// per 2026-11-17 主题统一: 语义色名 → 当前主题 CSS token + fallback。
+// fallback 保留原 GitHub 色板, token 缺失时行为不变; 有 token 时
+// christmas/charisma/shanghai/cel/physis 下粒子自动跟随主题配色。
+const COLOR_SOURCE: Record<GasColor, { token: string; fallback: string }> = {
+  accent: { token: "--color-primary",   fallback: "#2f81f7" },
+  info:   { token: "--color-secondary", fallback: "#58a6ff" },
+  ok:     { token: "--ok-DEFAULT",      fallback: "#3fb950" },
+  warn:   { token: "--warn-DEFAULT",    fallback: "#d29922" },
+  err:    { token: "--err-DEFAULT",     fallback: "#f85149" },
 };
+
+function themeColor(color: GasColor): THREE.Color {
+  const src = COLOR_SOURCE[color];
+  const fb = new THREE.Color(src.fallback);
+  const rgb = readThemeRgb(src.token, [fb.r, fb.g, fb.b]);
+  return new THREE.Color(rgb[0], rgb[1], rgb[2]);
+}
 
 // ---- shader 顶点: 粒子位置 + 大小 ----
 const VERTEX_SHADER = /* glsl */ `
@@ -122,7 +133,7 @@ function ParticleField({ variant, color, density, width, height }: ParticleField
     uVariant: { value: variant === "rise" ? 0 : variant === "swirl" ? 1 : 2 },
     uDensity: { value: density },
     uSize:    { value: Math.min(width, height) * 0.4 },
-    uColor:   { value: new THREE.Color(COLOR_HEX[color]) },
+    uColor:   { value: themeColor(color) },
   }), [variant, density, width, height, color]);
 
   useFrame((_, delta) => {

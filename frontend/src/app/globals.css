@@ -88,7 +88,7 @@ html, body {
 }
 
 /* 1. Light mode (Shōnen Studio): 宣纸底纹 — 极细日式微点网纹增加纸质感 */
-:root:not(.dark):not(.christmas):not(.shanghai):not(.charisma):not(.cel) body,
+:root:not(.dark):not(.christmas):not(.shanghai):not(.charisma):not(.cel):not(.physis) body,
 html.light body {
   background-color: var(--color-surface, #ffffff);
   background-image: radial-gradient(circle, rgba(13, 17, 23, 0.035) 1px, transparent 1px);
@@ -550,6 +550,111 @@ html.light,
   --cel-glint-rim: rgba(0, 85, 255, 0.15);
 }
 
+/* ── 3. CHRISTMAS 圣夜霜雪 (per 2026-11-17 主题统一: 3D/cel 内容跟随主题) ── */
+html.christmas {
+  --cel-bg: #08100b;
+  --cel-surface-card: #122017;
+  --cel-surface-sub: #1a2f23;
+  --cel-surface-stage: #0a1410;
+  --cel-card-ramp: linear-gradient(145deg, #1d3327 0%, #1d3327 35%, #142519 35%, #142519 70%, #0a1410 70%, #0a1410 100%);
+  --cel-crimson: #d42426;
+  --cel-cyan: #f8b229;
+  --cel-gold: #f8b229;
+  --cel-ink: #060b08;
+  --cel-text-primary: #f5f8f5;
+  --cel-text-secondary: #a8c4b0;
+  --cel-screentone-dot: rgba(248, 178, 41, 0.12);
+  --cel-shadow-color: #060b08;
+  --cel-bevel-hi: rgba(248, 178, 41, 0.30);
+  --cel-bevel-lo: rgba(6, 11, 8, 0.85);
+  --cel-glint-color: rgba(255, 245, 235, 0.30);
+  --cel-glint-rim: rgba(248, 178, 41, 0.18);
+}
+
+/* ── 4. CHARISMA 极魅像素 HD-2D (神恩紫罗兰 × 醉梦丝绒红) ── */
+html.charisma {
+  --cel-bg: #0b0914;
+  --cel-surface-card: #171129;
+  --cel-surface-sub: #221a3a;
+  --cel-surface-stage: #0e0a1c;
+  --cel-card-ramp: linear-gradient(145deg, #2a2050 0%, #2a2050 35%, #1d1538 35%, #1d1538 70%, #0e0a1c 70%, #0e0a1c 100%);
+  --cel-crimson: #e11d48;
+  --cel-cyan: #8b5cf6;
+  --cel-gold: #f59e0b;
+  --cel-ink: #050409;
+  --cel-text-primary: #fdf4ff;
+  --cel-text-secondary: #b8a5d6;
+  --cel-screentone-dot: rgba(139, 92, 246, 0.14);
+  --cel-shadow-color: #050409;
+  --cel-bevel-hi: rgba(245, 243, 255, 0.16);
+  --cel-bevel-lo: rgba(5, 4, 9, 0.60);
+  --cel-glint-color: rgba(253, 244, 255, 0.26);
+  --cel-glint-rim: rgba(225, 29, 72, 0.18);
+}
+
+/* ── 5. SHANGHAI 老上海月份牌 (暖象牙宣纸 × 旗袍朱砂 × 翡翠碧玉) ── */
+html.shanghai {
+  --cel-bg: #f6ebcf;
+  --cel-surface-card: #f0e2bd;
+  --cel-surface-sub: #faf3e1;
+  --cel-surface-stage: #e9d9ae;
+  --cel-card-ramp: linear-gradient(145deg, #faf3e1 0%, #faf3e1 38%, #efe0b8 38%, #efe0b8 72%, #dcc691 72%, #dcc691 100%);
+  --cel-crimson: #b8282b;
+  --cel-cyan: #1b5e48;
+  --cel-gold: #c89228;
+  --cel-ink: #221c16;
+  --cel-text-primary: #221c16;
+  --cel-text-secondary: #6b5d4a;
+  --cel-screentone-dot: rgba(184, 40, 43, 0.10);
+  --cel-shadow-color: #7a5a28;
+  --cel-bevel-hi: rgba(255, 251, 240, 0.70);
+  --cel-bevel-lo: rgba(122, 90, 40, 0.25);
+  --cel-glint-color: rgba(255, 251, 240, 0.65);
+  --cel-glint-rim: rgba(200, 146, 40, 0.22);
+}
+
+/* ── 6. CEL 日式经典赛璐璐 (胶片透光底 × EVA蓝 × 活力朱红 × 向日葵黄) ── */
+html.cel {
+  --cel-bg: #f8fafc;
+  --cel-surface-card: #eef2f7;
+  --cel-surface-sub: #ffffff;
+  --cel-surface-stage: #e2e8f0;
+  --cel-card-ramp: linear-gradient(145deg, #ffffff 0%, #ffffff 38%, #e8eef5 38%, #e8eef5 72%, #cbd5e1 72%, #cbd5e1 100%);
+  --cel-crimson: #ea580c;
+  --cel-cyan: #2563eb;
+  --cel-gold: #f59e0b;
+  --cel-ink: #111827;
+  --cel-text-primary: #111827;
+  --cel-text-secondary: #475569;
+  --cel-screentone-dot: rgba(37, 99, 235, 0.10);
+  --cel-shadow-color: #111827;
+  --cel-bevel-hi: rgba(255, 255, 255, 0.80);
+  --cel-bevel-lo: rgba(17, 24, 39, 0.15);
+  --cel-glint-color: rgba(255, 255, 255, 0.75);
+  --cel-glint-rim: rgba(37, 99, 235, 0.15);
+}
+
+/* ── 7. PHYSIS 3D 物理 (深空紫蓝 × 量子青 × 星云紫 × 恒星橙) ── */
+html.physis {
+  --cel-bg: #0b0e1c;
+  --cel-surface-card: #12163a;
+  --cel-surface-sub: #1a1f4d;
+  --cel-surface-stage: #0d1126;
+  --cel-card-ramp: linear-gradient(145deg, #232a63 0%, #232a63 35%, #171c47 35%, #171c47 70%, #0d1126 70%, #0d1126 100%);
+  --cel-crimson: #ff5c7a;
+  --cel-cyan: #7c8cff;
+  --cel-gold: #ffb86b;
+  --cel-ink: #2b3163;
+  --cel-text-primary: #e2e8ff;
+  --cel-text-secondary: #8b93c9;
+  --cel-screentone-dot: rgba(124, 140, 255, 0.14);
+  --cel-shadow-color: #05060f;
+  --cel-bevel-hi: rgba(226, 232, 255, 0.10);
+  --cel-bevel-lo: rgba(5, 6, 15, 0.55);
+  --cel-glint-color: rgba(226, 232, 255, 0.22);
+  --cel-glint-rim: rgba(124, 140, 255, 0.20);
+}
+
 /* 1. Comic Halftone & Screentone Patterns */
 .bg-screentone {
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px);
@@ -557,7 +662,7 @@ html.light,
 }
 
 .bg-screentone-dense {
-  background-image: radial-gradient(rgba(0, 240, 255, 0.12) 1px, transparent 1px);
+  background-image: radial-gradient(var(--cel-screentone-dot, rgba(0, 240, 255, 0.12)) 1px, transparent 1px);
   background-size: 8px 8px;
 }
 
@@ -1577,6 +1682,9 @@ html.physis,
 html.physis body,
 .physis body,
 body.physis {
+  --color-bg: #0b0e1c;
+  --color-text-dim: #aab3e8;
+  --color-text-mute: #6f77ad;
   --color-surface: #0b0e1c;
   --color-surface-2: #12163a;
   --color-surface-elevated: #1a1f4d;

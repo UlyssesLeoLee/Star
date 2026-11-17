@@ -10,6 +10,7 @@ MERGE (self)-[:DEFINES]->(fx)
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { readThemeRgb } from "@/lib/theme/themeTokens";
 
 // ============================================================================
 // 1. ULTRA-LIGHTWEIGHT 3-RENDERED-2 (NPR CEL) SHADER
@@ -87,7 +88,7 @@ const OUTLINE_FRAGMENT = /* glsl */ `
 // ============================================================================
 // 2. PROCEDURAL 3D MESH RIG (~180 POLYGONS)
 // ============================================================================
-export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel";
+export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel" | "physis";
 
 function CoreMesh({
   status,
@@ -106,6 +107,14 @@ function CoreMesh({
   const ringRef = useRef<THREE.Group>(null);
 
   const effectiveTheme = isLight ? "light" : theme;
+
+  // per 2026-11-17 主题统一: 监听 html class 变化, 切主题时重算色板
+  const [themeRev, setThemeRev] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeRev((r) => r + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
 
   const colors = useMemo(() => {
     // ── 0. 日式赛璐璐 (80-90s 经典日漫手绘平涂色与机械墨线) ──
@@ -291,7 +300,28 @@ function CoreMesh({
           outline: new THREE.Color("#000000"),
         };
     }
-  }, [status, effectiveTheme]);
+    // ── 7. 主题 token 覆盖 (per 2026-11-17 主题统一) ──
+    // 非 dark/light 主题: base/keyRim/counterRim/outline 从当前 html.<theme>
+    // 的 --cel-* token 重读, 保证 3D 与 CSS 主题同源; shadow 按 base×0.16 重算。
+    // dark/light 保留上方设计原色 (与原实现逐字节一致)。
+    if (effectiveTheme !== "dark" && effectiveTheme !== "light") {
+      const baseToken = status === "overdrive" ? "--cel-crimson"
+        : status === "warning" ? "--cel-gold" : "--cel-cyan";
+      const base = readThemeRgb(baseToken, [0, 0.941, 1]);
+      const keyRim = readThemeRgb(status === "nominal" ? "--cel-crimson" : "--cel-cyan", [1, 0.094, 0.298]);
+      const counterRim = readThemeRgb("--cel-gold", [1, 0.769, 0]);
+      const outline = readThemeRgb("--cel-ink", [0, 0, 0]);
+      const c = (v: [number, number, number]) => new THREE.Color(v[0], v[1], v[2]);
+      return {
+        base: c(base),
+        shadow: c([base[0] * 0.16, base[1] * 0.16, base[2] * 0.16]),
+        keyRim: c(keyRim),
+        counterRim: c(counterRim),
+        outline: c(outline),
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, effectiveTheme, themeRev]);
 
   const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(0.85, 0), []);
   const ringGeom = useMemo(() => new THREE.TorusGeometry(1.25, 0.05, 8, 24), []);
@@ -403,7 +433,8 @@ export function TacticalCore3D({
         return;
       }
       const cl = document.documentElement.classList;
-      if (cl.contains("cel")) setActiveTheme("cel");
+      if (cl.contains("physis")) setActiveTheme("physis");
+      else if (cl.contains("cel")) setActiveTheme("cel");
       else if (cl.contains("shanghai")) setActiveTheme("shanghai");
       else if (cl.contains("charisma")) setActiveTheme("charisma");
       else if (cl.contains("christmas")) setActiveTheme("christmas");

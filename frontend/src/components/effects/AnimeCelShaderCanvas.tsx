@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { readThemeRgb } from "@/lib/theme/themeTokens";
 
 export type CelPalette =
   | "crimson"
@@ -28,7 +29,7 @@ export type CelPalette =
   | "cel-vermilion"
   | "cel-yellow";
 
-export type ActiveTheme = "dark" | "light" | "charisma" | "christmas" | "shanghai" | "cel";
+export type ActiveTheme = "dark" | "light" | "charisma" | "christmas" | "shanghai" | "cel" | "physis";
 
 export interface AnimeCelShaderProps {
   palette?: CelPalette;
@@ -331,11 +332,66 @@ const PALETTE_CONFIGS: Record<
 };
 
 // ============================================================================
+// 2b. 主题 token 覆盖层 (per 2026-11-17 主题统一)
+// ============================================================================
+// PALETTE_CONFIGS 保留各主题的设计原色 (dark 系完全不变);
+// 非 dark 主题的 palette 在运行时用当前 html.<theme> 的 --cel-* token
+// 覆盖 base/rim/counterRim/outline, 使 3D 内容与 CSS 主题严格同源。
+// shadow 按 base×0.16 重算 (赛璐璐暗阶), highlight 取 --cel-text-primary。
+
+const TOKEN_OVERRIDDEN_THEMES: ReadonlySet<ActiveTheme> = new Set([
+  "christmas", "charisma", "shanghai", "cel", "physis",
+]);
+
+function hexFromRgb(rgb: [number, number, number]): string {
+  const c = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0");
+  return `#${c(rgb[0])}${c(rgb[1])}${c(rgb[2])}`;
+}
+
+/** 读取当前主题 token 并覆盖 palette 的 base/rim/counterRim/outline/shadow/highlight */
+function resolvePaletteWithTokens(palette: CelPalette, theme: ActiveTheme): typeof PALETTE_CONFIGS[CelPalette] {
+  const base0 = PALETTE_CONFIGS[palette];
+  if (!TOKEN_OVERRIDDEN_THEMES.has(theme)) return base0;
+  const baseRgb = readThemeRgb("--cel-cyan", [0, 0.941, 1]);
+  // base 语义: crimson 系 palette 用 --cel-crimson, gold 系用 --cel-gold, 其余 --cel-cyan
+  const baseToken = /crimson|vermilion|noel/.test(palette) ? "--cel-crimson"
+    : /gold|gilt|yellow/.test(palette) ? "--cel-gold"
+    : "--cel-cyan";
+  const base = readThemeRgb(baseToken, baseRgb);
+  const rim = readThemeRgb("--cel-crimson", [1, 0.094, 0.298]);
+  const counterRim = readThemeRgb("--cel-gold", [1, 0.769, 0]);
+  const outline = readThemeRgb("--cel-ink", [0.04, 0.05, 0.08]);
+  const highlight = readThemeRgb("--cel-text-primary", [1, 1, 1]);
+  return {
+    base: hexFromRgb(base),
+    shadow: hexFromRgb([base[0] * 0.16, base[1] * 0.16, base[2] * 0.16]),
+    highlight: hexFromRgb(highlight),
+    rim: hexFromRgb(rim),
+    counterRim: hexFromRgb(counterRim),
+    outline: hexFromRgb(outline),
+  };
+}
+
+/** 监听 html class 变化 (next-themes 切主题), 返回递增版本号触发重渲染 */
+function useThemeRevision(): number {
+  const [rev, setRev] = useState(0);
+  useEffect(() => {
+    const el = document.documentElement;
+    const obs = new MutationObserver(() => setRev((r) => r + 1));
+    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return rev;
+}
+
+// ============================================================================
 // 3. 3D CEL-SHADED MESH RIG WITH INVERTED HULL OUTLINE
 // ============================================================================
 interface CelMeshProps {
   geometry: THREE.BufferGeometry;
   palette: CelPalette;
+  /** 已按当前主题 token 解析的色板 (缺省回退 PALETTE_CONFIGS) */
+  resolvedPalette?: typeof PALETTE_CONFIGS[CelPalette];
   outlineThickness: number;
   bands: number;
   enableHalftone: boolean;
@@ -346,13 +402,14 @@ interface CelMeshProps {
 function CelShadedMesh({
   geometry,
   palette,
+  resolvedPalette,
   outlineThickness,
   bands,
   enableHalftone,
   enableRim,
   lightPos,
 }: CelMeshProps) {
-  const p = PALETTE_CONFIGS[palette];
+  const p = resolvedPalette ?? PALETTE_CONFIGS[palette];
 
   // Surface Uniforms
   const surfaceUniforms = useMemo(
@@ -418,6 +475,7 @@ function CelShadedMesh({
 // ============================================================================
 interface ChronoSceneProps {
   palette: CelPalette;
+  activeTheme: ActiveTheme;
   outlineThickness: number;
   bands: number;
   enableHalftone: boolean;
@@ -427,6 +485,7 @@ interface ChronoSceneProps {
 
 function ChronoScene({
   palette,
+  activeTheme,
   outlineThickness,
   bands,
   enableHalftone,
@@ -440,6 +499,23 @@ function ChronoScene({
 
   const { pointer } = useThree();
   const lightPos = useMemo(() => new THREE.Vector3(5, 5, 5), []);
+
+  // per 2026-11-17 主题统一: 按当前主题 token 解析全部子 mesh 色板;
+  // html class 变化 (切主题) → rev+1 → 重新解析 → uniforms 重建
+  const themeRev = useThemeRevision();
+  const ringPalette: CelPalette = palette === "crimson" ? "gold" : "crimson";
+  const ring2Palette: CelPalette = palette === "cyan" ? "crimson" : "cyan";
+  const resolved = useMemo(
+    () => ({
+      main: resolvePaletteWithTokens(palette, activeTheme),
+      ring: resolvePaletteWithTokens(ringPalette, activeTheme),
+      ring2: resolvePaletteWithTokens(ring2Palette, activeTheme),
+      gold: resolvePaletteWithTokens("gold", activeTheme),
+      cyan: resolvePaletteWithTokens("cyan", activeTheme),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [palette, ringPalette, ring2Palette, activeTheme, themeRev]
+  );
 
   // Procedural Geometries
   const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(1.2, 0), []);
@@ -476,6 +552,7 @@ function ChronoScene({
       <CelShadedMesh
         geometry={coreGeom}
         palette={palette}
+        resolvedPalette={resolved.main}
         outlineThickness={outlineThickness}
         bands={bands}
         enableHalftone={enableHalftone}
@@ -487,7 +564,8 @@ function ChronoScene({
       <group ref={ring1Ref}>
         <CelShadedMesh
           geometry={ringGeom}
-          palette={palette === "crimson" ? "gold" : "crimson"}
+          palette={ringPalette}
+          resolvedPalette={resolved.ring}
           outlineThickness={outlineThickness * 0.75}
           bands={bands}
           enableHalftone={enableHalftone}
@@ -500,7 +578,8 @@ function ChronoScene({
       <group ref={ring2Ref}>
         <CelShadedMesh
           geometry={outerRingGeom}
-          palette={palette === "cyan" ? "crimson" : "cyan"}
+          palette={ring2Palette}
+          resolvedPalette={resolved.ring2}
           outlineThickness={outlineThickness * 0.75}
           bands={bands}
           enableHalftone={enableHalftone}
@@ -524,6 +603,7 @@ function ChronoScene({
               <CelShadedMesh
                 geometry={shardGeom}
                 palette={i % 2 === 0 ? "gold" : "cyan"}
+                resolvedPalette={i % 2 === 0 ? resolved.gold : resolved.cyan}
                 outlineThickness={outlineThickness * 0.7}
                 bands={bands}
                 enableHalftone={false}
@@ -561,7 +641,8 @@ export function AnimeCelShaderCanvas({
 
     const checkTheme = () => {
       const cl = document.documentElement.classList;
-      if (cl.contains("cel")) setActiveTheme("cel");
+      if (cl.contains("physis")) setActiveTheme("physis");
+      else if (cl.contains("cel")) setActiveTheme("cel");
       else if (cl.contains("shanghai")) setActiveTheme("shanghai");
       else if (cl.contains("charisma")) setActiveTheme("charisma");
       else if (cl.contains("christmas")) setActiveTheme("christmas");
@@ -642,6 +723,9 @@ export function AnimeCelShaderCanvas({
           case "cyan":    return "shanghai-jade";
           default:        return "shanghai-gilt";
         }
+      case "physis":
+        // 3D 物理主题: 深空紫蓝 — 走 dark 系 palette 再由 --cel-* token 覆盖
+        return palette;
       case "dark":
       default:
         // 暗夜神格 Neo-Tokyo Cyber Manga: 原始赛博 palette
@@ -671,6 +755,7 @@ export function AnimeCelShaderCanvas({
       >
         <ChronoScene
           palette={activePalette}
+          activeTheme={activeTheme}
           outlineThickness={outlineThickness}
           bands={bands}
           enableHalftone={enableHalftone}

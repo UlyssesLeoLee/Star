@@ -15,10 +15,11 @@
  *   - 使用 useMemo 缓存几何 / 材质
  */
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
 import { MeshTransmissionMaterial, Float, Edges } from "@react-three/drei";
 import * as THREE from "three";
+import { readThemeRgb } from "@/lib/theme/themeTokens";
 
 interface CoreProps {
   hue?: number;
@@ -30,7 +31,15 @@ function FloatingCore({ hue = 220, accentHue = 280 }: CoreProps) {
   const torusRef = useRef<THREE.Mesh>(null);
   const icosaRef = useRef<THREE.Mesh>(null);
 
-  // 读 CSS 变量, 跨主题自适应
+  // 读 CSS 变量, 跨主题自适应; per 2026-11-17 主题统一: 监听 html class
+  // 变化 (next-themes 切主题), 重读 token 而非只在挂载时读一次
+  const [themeRev, setThemeRev] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeRev((r) => r + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+
   const colors = useMemo(() => {
     if (typeof window === "undefined") {
       return { primary: new THREE.Color(`hsl(${hue}, 90%, 60%)`), accent: new THREE.Color(`hsl(${accentHue}, 80%, 60%)`) };
@@ -39,7 +48,8 @@ function FloatingCore({ hue = 220, accentHue = 280 }: CoreProps) {
     const primaryHex = styles.getPropertyValue("--color-primary").trim() || `hsl(${hue}, 90%, 60%)`;
     const accentHex = styles.getPropertyValue("--color-accent-violet").trim() || `hsl(${accentHue}, 80%, 60%)`;
     return { primary: new THREE.Color(primaryHex), accent: new THREE.Color(accentHex) };
-  }, [hue, accentHue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hue, accentHue, themeRev]);
 
   useFrame((state) => {
     if (!groupRef.current) return;
@@ -133,7 +143,11 @@ export default function AnimeCore3D(props: CoreProps) {
         {/* 环境光 — 让玻璃材质有反射 */}
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} intensity={0.8} />
-        <pointLight position={[-5, -3, 3]} intensity={0.4} color={props.accentHue ? "#a855f7" : "#7c3aed"} />
+        <pointLight
+          position={[-5, -3, 3]}
+          intensity={0.4}
+          color={new THREE.Color(...readThemeRgb("--color-accent-violet", [0.486, 0.227, 0.929]))}
+        />
         <FloatingCore {...props} />
       </Canvas>
     </div>

@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { resolveCelTokenPalette, readThemeRgb, type CelTokenPalette } from "@/lib/theme/themeTokens";
 
 // ============================================================================
 // 1. SHARED SHADERS FOR 3D CEL UI PRIMITIVES
@@ -104,37 +105,36 @@ function CelButtonMesh({
 }) {
   const meshRef = useRef<THREE.Group>(null);
 
+  // per 2026-11-17 主题统一: 从当前主题 --cel-* token 取色 (dark fallback = 原 hex)
   const colors = useMemo(() => {
+    const p = (v: CelTokenPalette) => ({
+      base: new THREE.Color(...v.base),
+      shadow: new THREE.Color(...v.shadow),
+      highlight: new THREE.Color(...v.highlight),
+      rim: new THREE.Color(...v.rim),
+    });
     switch (variant) {
       case "cyan":
-        return {
-          base: new THREE.Color("#00f0ff"),
-          shadow: new THREE.Color("#022230"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#ff184c"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-cyan", rimToken: "--cel-crimson",
+          fallback: { base: [0, 0.941, 1], shadow: [0.008, 0.133, 0.188], highlight: [1, 1, 1], rim: [1, 0.094, 0.298] },
+        }));
       case "gold":
-        return {
-          base: new THREE.Color("#ffc400"),
-          shadow: new THREE.Color("#332402"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#00f0ff"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-gold", rimToken: "--cel-cyan",
+          fallback: { base: [1, 0.769, 0], shadow: [0.2, 0.141, 0.008], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
+        }));
       case "stealth":
-        return {
-          base: new THREE.Color("#2a3547"),
-          shadow: new THREE.Color("#0c111c"),
-          highlight: new THREE.Color("#8fa5cc"),
-          rim: new THREE.Color("#00f0ff"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-surface-sub", rimToken: "--cel-cyan", highlightToken: "--cel-text-secondary",
+          fallback: { base: [0.165, 0.208, 0.278], shadow: [0.047, 0.067, 0.11], highlight: [0.561, 0.647, 0.8], rim: [0, 0.941, 1] },
+        }));
       case "crimson":
       default:
-        return {
-          base: new THREE.Color("#ff184c"),
-          shadow: new THREE.Color("#380410"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#00f0ff"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-crimson", rimToken: "--cel-cyan",
+          fallback: { base: [1, 0.094, 0.298], shadow: [0.22, 0.016, 0.063], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
+        }));
     }
   }, [variant]);
 
@@ -145,7 +145,7 @@ function CelButtonMesh({
       uBaseColor: { value: colors.base },
       uShadowColor: { value: colors.shadow },
       uHighlightColor: { value: colors.highlight },
-      uRimColor: { value: focused ? new THREE.Color("#00f0ff") : colors.rim },
+      uRimColor: { value: focused ? new THREE.Color(...readThemeRgb("--cel-cyan", [0, 0.941, 1])) : colors.rim },
       uLightPos: { value: new THREE.Vector3(3, 4, 5) },
       uIsOutline: { value: 0.0 },
       uOutlineOffset: { value: 0.0 },
@@ -228,7 +228,7 @@ export function CelButton3D({
     return (
       <button
         disabled={disabled}
-        className={`px-4 py-2 bg-[#ff184c] text-black font-black text-xs ${className}`}
+        className={`px-4 py-2 bg-[var(--cel-crimson)] text-[var(--cel-ink)] font-black text-xs ${className}`}
       >
         {label}
       </button>
@@ -280,7 +280,7 @@ export function CelButton3D({
 
       {/* Focus Ring Indicator (Anime Chamfered Border) */}
       {focused && (
-        <div className="absolute -inset-1 border-2 border-[#00f0ff] pointer-events-none animate-pulse" />
+        <div className="absolute -inset-1 border-2 border-[var(--cel-cyan)] pointer-events-none animate-pulse" />
       )}
 
       {/* Label layer overlaid on the 3D surface */}
@@ -317,23 +317,36 @@ export interface CelToggle3DProps {
 function CelToggleMesh({ checked, focused }: { checked: boolean; focused: boolean }) {
   const leverRef = useRef<THREE.Group>(null);
 
+  // per 2026-11-17 主题统一: ON = 主题 crimson, OFF = 主题次级面
   const colorsOn = useMemo(
-    () => ({
-      base: new THREE.Color("#ff184c"),
-      shadow: new THREE.Color("#380410"),
-      highlight: new THREE.Color("#ffffff"),
-      rim: new THREE.Color("#00f0ff"),
-    }),
+    () => {
+      const v = resolveCelTokenPalette({
+        baseToken: "--cel-crimson", rimToken: "--cel-cyan",
+        fallback: { base: [1, 0.094, 0.298], shadow: [0.22, 0.016, 0.063], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
+      });
+      return {
+        base: new THREE.Color(...v.base),
+        shadow: new THREE.Color(...v.shadow),
+        highlight: new THREE.Color(...v.highlight),
+        rim: new THREE.Color(...v.rim),
+      };
+    },
     []
   );
 
   const colorsOff = useMemo(
-    () => ({
-      base: new THREE.Color("#1a2233"),
-      shadow: new THREE.Color("#080b12"),
-      highlight: new THREE.Color("#7384a6"),
-      rim: new THREE.Color("#00f0ff"),
-    }),
+    () => {
+      const v = resolveCelTokenPalette({
+        baseToken: "--cel-surface-sub", rimToken: "--cel-cyan", highlightToken: "--cel-text-secondary",
+        fallback: { base: [0.102, 0.133, 0.2], shadow: [0.031, 0.043, 0.071], highlight: [0.451, 0.518, 0.651], rim: [0, 0.941, 1] },
+      });
+      return {
+        base: new THREE.Color(...v.base),
+        shadow: new THREE.Color(...v.shadow),
+        highlight: new THREE.Color(...v.highlight),
+        rim: new THREE.Color(...v.rim),
+      };
+    },
     []
   );
 
@@ -345,7 +358,7 @@ function CelToggleMesh({ checked, focused }: { checked: boolean; focused: boolea
       uBaseColor: { value: checked ? colorsOn.base : colorsOff.base },
       uShadowColor: { value: checked ? colorsOn.shadow : colorsOff.shadow },
       uHighlightColor: { value: checked ? colorsOn.highlight : colorsOff.highlight },
-      uRimColor: { value: focused ? new THREE.Color("#00f0ff") : colorsOn.rim },
+      uRimColor: { value: focused ? new THREE.Color(...readThemeRgb("--cel-cyan", [0, 0.941, 1])) : colorsOn.rim },
       uLightPos: { value: new THREE.Vector3(2, 3, 4) },
       uIsOutline: { value: 0.0 },
       uOutlineOffset: { value: 0.0 },
@@ -471,14 +484,14 @@ export function CelToggle3D({
           {label && (
             <span
               className={`text-xs font-black uppercase tracking-wider transition-colors ${
-                checked ? "text-[#ff184c]" : "text-slate-400"
+                checked ? "text-[var(--cel-crimson)]" : "text-[var(--cel-text-secondary)]"
               }`}
             >
               {label}
             </span>
           )}
           {sublabel && (
-            <span className="text-[11px] font-mono text-slate-400 tracking-tight font-semibold">
+            <span className="text-[11px] font-mono text-[var(--cel-text-secondary)] tracking-tight font-semibold">
               {sublabel}
             </span>
           )}
@@ -502,37 +515,36 @@ function CelBeaconMesh({ status }: { status: "idle" | "active" | "alert" | "succ
   const beaconRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Group>(null);
 
+  // per 2026-11-17 主题统一: alert=crimson active=gold success=cyan idle=次级面
   const colors = useMemo(() => {
+    const p = (v: CelTokenPalette) => ({
+      base: new THREE.Color(...v.base),
+      shadow: new THREE.Color(...v.shadow),
+      highlight: new THREE.Color(...v.highlight),
+      rim: new THREE.Color(...v.rim),
+    });
     switch (status) {
       case "alert":
-        return {
-          base: new THREE.Color("#ff184c"),
-          shadow: new THREE.Color("#380410"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#ffc400"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-crimson", rimToken: "--cel-gold",
+          fallback: { base: [1, 0.094, 0.298], shadow: [0.22, 0.016, 0.063], highlight: [1, 1, 1], rim: [1, 0.769, 0] },
+        }));
       case "active":
-        return {
-          base: new THREE.Color("#ffc400"),
-          shadow: new THREE.Color("#382802"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#00f0ff"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-gold", rimToken: "--cel-cyan",
+          fallback: { base: [1, 0.769, 0], shadow: [0.22, 0.157, 0.008], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
+        }));
       case "success":
-        return {
-          base: new THREE.Color("#00f0ff"),
-          shadow: new THREE.Color("#022230"),
-          highlight: new THREE.Color("#ffffff"),
-          rim: new THREE.Color("#ff184c"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-cyan", rimToken: "--cel-crimson",
+          fallback: { base: [0, 0.941, 1], shadow: [0.008, 0.133, 0.188], highlight: [1, 1, 1], rim: [1, 0.094, 0.298] },
+        }));
       case "idle":
       default:
-        return {
-          base: new THREE.Color("#3d495c"),
-          shadow: new THREE.Color("#0e131c"),
-          highlight: new THREE.Color("#a2b4d1"),
-          rim: new THREE.Color("#00f0ff"),
-        };
+        return p(resolveCelTokenPalette({
+          baseToken: "--cel-surface-sub", rimToken: "--cel-cyan", highlightToken: "--cel-text-secondary",
+          fallback: { base: [0.239, 0.286, 0.361], shadow: [0.055, 0.075, 0.11], highlight: [0.635, 0.706, 0.82], rim: [0, 0.941, 1] },
+        }));
     }
   }, [status]);
 
@@ -664,13 +676,20 @@ export interface CelDial3DProps {
 function CelDialMesh({ value }: { value: number }) {
   const dialRef = useRef<THREE.Group>(null);
 
+  // per 2026-11-17 主题统一: 表盘底=次级面, 高光/rim=主题强调色
   const colors = useMemo(
-    () => ({
-      base: new THREE.Color("#182133"),
-      shadow: new THREE.Color("#070a10"),
-      highlight: new THREE.Color("#00f0ff"),
-      rim: new THREE.Color("#ff184c"),
-    }),
+    () => {
+      const v = resolveCelTokenPalette({
+        baseToken: "--cel-surface-sub", rimToken: "--cel-crimson", highlightToken: "--cel-cyan",
+        fallback: { base: [0.094, 0.129, 0.2], shadow: [0.027, 0.039, 0.063], highlight: [0, 0.941, 1], rim: [1, 0.094, 0.298] },
+      });
+      return {
+        base: new THREE.Color(...v.base),
+        shadow: new THREE.Color(...v.shadow),
+        highlight: new THREE.Color(...v.highlight),
+        rim: new THREE.Color(...v.rim),
+      };
+    },
     []
   );
 
@@ -739,7 +758,7 @@ function CelDialMesh({ value }: { value: number }) {
             fragmentShader={CEL_UI_FRAGMENT}
             uniforms={{
               ...uniforms,
-              uBaseColor: { value: new THREE.Color("#00f0ff") },
+              uBaseColor: { value: new THREE.Color(...readThemeRgb("--cel-cyan", [0, 0.941, 1])) },
             }}
           />
         </mesh>
@@ -789,10 +808,10 @@ export function CelDial3D({ value, onChange, options, className = "" }: CelDial3
       </div>
 
       <div className="flex flex-col">
-        <span className="text-[11px] font-mono text-slate-400 font-bold uppercase tracking-wider">
+        <span className="text-[11px] font-mono text-[var(--cel-text-secondary)] font-bold uppercase tracking-wider">
           ROTARY INDEX [{value + 1}/{options.length}]
         </span>
-        <span className="text-xs font-black text-[#00f0ff] uppercase tracking-wider italic">
+        <span className="text-xs font-black text-[var(--cel-cyan)] uppercase tracking-wider italic">
           {options[value]}
         </span>
       </div>
