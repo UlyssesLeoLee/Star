@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=c88595df2c2bbb1730c68e57d71c16ce9469fddf38d949710ae5939152390c30
 MERGE (self:File {path:"frontend/src/components/ide/IdeFileWorkspace.tsx"})
 MERGE (nemaStore:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (hookFile:File {path:"frontend/src/hooks/useIdeKernel.ts"})

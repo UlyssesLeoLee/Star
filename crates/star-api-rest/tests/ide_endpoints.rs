@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=865def800f007d069b115b2c28909092c3bd126dab2741bd45cb450168d4729f
 MERGE (self:File {path:"crates/star-api-rest/tests/ide_endpoints.rs"})
 MERGE (suite:Symbol {id:"crates/star-api-rest/tests/ide_endpoints.rs::ide endpoints suite",kind:"test_suite"})
 MERGE (open:Symbol {id:"crates/star-api-rest/src/routes/ide.rs::open_doc",kind:"function"})
@@ -39,22 +39,17 @@ MERGE (suite)-[:TESTS]->(scmlog)
 //! - outline: 带 text 返回真实语义节点; 无 text 且无 IDE_PROJECT_ROOT 诚实降级 (case 5)
 //! - scm/log 在非 git 目录返回 error 字段 (200, 不报 500) (case 6)
 
-#[path = "../src/routes/ide.rs"]
-mod ide;
-
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use axum::Router;
 use serde_json::{json, Value};
+use star_api_rest::routes::ide;
 use tower::ServiceExt;
 
 /// 隔离 app: /api/v1/ide (fresh per-test state, 不走 OnceLock)
 fn isolated_app() -> Router {
-    Router::new().nest(
-        "/api/v1/ide",
-        ide::router_with_state(ide::default_state()),
-    )
+    Router::new().nest("/api/v1/ide", ide::router_with_state(ide::default_state()))
 }
 
 /// oneshot 发送 + 解析 JSON body
@@ -87,7 +82,10 @@ fn get(path: &str) -> Request<Body> {
 
 /// data.view 取 text 的快捷方式。
 fn view_text(body: &Value) -> String {
-    body["data"]["view"]["text"].as_str().unwrap_or_default().to_string()
+    body["data"]["view"]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string()
 }
 
 #[tokio::test]
@@ -96,7 +94,10 @@ async fn version_probes_kernel() {
     let (status, body) = send(&app, get("/api/v1/ide/version")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["data"]["service"], "ide-kernel");
-    assert!(!body["data"]["kernel_version"].as_str().unwrap_or_default().is_empty());
+    assert!(!body["data"]["kernel_version"]
+        .as_str()
+        .unwrap_or_default()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -116,11 +117,18 @@ async fn open_insert_undo_redo_roundtrip() {
     assert_eq!(body["data"]["view"]["dirty"], false, "刚打开不应 dirty");
 
     // caret + insert "b" → "abc"
-    let (status, _body) = send(&app, post("/api/v1/ide/doc/caret", json!({ "row": 0, "col": 1 }))).await;
+    let (status, _body) = send(
+        &app,
+        post("/api/v1/ide/doc/caret", json!({ "row": 0, "col": 1 })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let (status, body) = send(
         &app,
-        post("/api/v1/ide/doc/insert", json!({ "row": 0, "col": 1, "text": "b" })),
+        post(
+            "/api/v1/ide/doc/insert",
+            json!({ "row": 0, "col": 1, "text": "b" }),
+        ),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -139,7 +147,14 @@ async fn open_insert_undo_redo_roundtrip() {
 #[tokio::test]
 async fn edit_ops_without_active_doc_return_404() {
     let app = isolated_app();
-    let (status, body) = send(&app, post("/api/v1/ide/doc/insert", json!({ "row": 0, "col": 0, "text": "x" }))).await;
+    let (status, body) = send(
+        &app,
+        post(
+            "/api/v1/ide/doc/insert",
+            json!({ "row": 0, "col": 0, "text": "x" }),
+        ),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(body["error"]["code"], "RESOURCE_NOT_FOUND");
     let (status, _) = send(&app, post("/api/v1/ide/doc/undo", json!({}))).await;
@@ -149,8 +164,22 @@ async fn edit_ops_without_active_doc_return_404() {
 #[tokio::test]
 async fn tabs_activate_and_close() {
     let app = isolated_app();
-    send(&app, post("/api/v1/ide/doc/open", json!({ "path": "a.txt", "text": "AAA" }))).await;
-    send(&app, post("/api/v1/ide/doc/open", json!({ "path": "b.txt", "text": "BBB" }))).await;
+    send(
+        &app,
+        post(
+            "/api/v1/ide/doc/open",
+            json!({ "path": "a.txt", "text": "AAA" }),
+        ),
+    )
+    .await;
+    send(
+        &app,
+        post(
+            "/api/v1/ide/doc/open",
+            json!({ "path": "b.txt", "text": "BBB" }),
+        ),
+    )
+    .await;
 
     let (status, body) = send(&app, get("/api/v1/ide/doc/tabs")).await;
     assert_eq!(status, StatusCode::OK);
@@ -163,12 +192,20 @@ async fn tabs_activate_and_close() {
 
     // activate 第一个
     let first_id = tabs[0]["id"].as_u64().expect("id");
-    let (status, body) = send(&app, post("/api/v1/ide/doc/activate", json!({ "id": first_id }))).await;
+    let (status, body) = send(
+        &app,
+        post("/api/v1/ide/doc/activate", json!({ "id": first_id })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(view_text(&body), "AAA");
 
     // close 第一个 → 活动回到 b
-    let (status, body) = send(&app, post("/api/v1/ide/doc/close", json!({ "id": first_id }))).await;
+    let (status, body) = send(
+        &app,
+        post("/api/v1/ide/doc/close", json!({ "id": first_id })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(view_text(&body), "BBB");
 }
@@ -176,7 +213,14 @@ async fn tabs_activate_and_close() {
 #[tokio::test]
 async fn sync_export_mark_saved() {
     let app = isolated_app();
-    send(&app, post("/api/v1/ide/doc/open", json!({ "path": "crlf.txt", "text": "a\r\nb" }))).await;
+    send(
+        &app,
+        post(
+            "/api/v1/ide/doc/open",
+            json!({ "path": "crlf.txt", "text": "a\r\nb" }),
+        ),
+    )
+    .await;
 
     // sync 整段替换 (undo 栈重置)
     let (status, body) = send(
@@ -223,10 +267,20 @@ async fn outline_with_text_returns_semantic_nodes() {
     assert!(names.contains(&"Foo"));
 
     // 无 text 且无 IDE_PROJECT_ROOT → 诚实降级 (200 + error 字段)
-    let (status, body) = send(&app, post("/api/v1/ide/outline", json!({ "path": "test.rs" }))).await;
+    let (status, body) = send(
+        &app,
+        post("/api/v1/ide/outline", json!({ "path": "test.rs" })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(body["data"]["error"].as_str().is_some(), "应带 error 说明");
-    assert_eq!(body["data"]["entries"].as_array().expect("empty entries").len(), 0);
+    assert_eq!(
+        body["data"]["entries"]
+            .as_array()
+            .expect("empty entries")
+            .len(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -241,19 +295,38 @@ async fn scm_log_non_git_root_degrades_honestly() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body["data"]["error"].as_str().is_some(), "非 git 目录应带 error");
-    assert_eq!(body["data"]["commits"].as_array().expect("empty commits").len(), 0);
+    assert!(
+        body["data"]["error"].as_str().is_some(),
+        "非 git 目录应带 error"
+    );
+    assert_eq!(
+        body["data"]["commits"]
+            .as_array()
+            .expect("empty commits")
+            .len(),
+        0
+    );
     let _ = std::fs::remove_dir_all(&temp);
 }
 
 #[tokio::test]
 async fn find_and_replace_all() {
     let app = isolated_app();
-    send(&app, post("/api/v1/ide/doc/open", json!({ "path": "f.txt", "text": "cat cat cat" }))).await;
+    send(
+        &app,
+        post(
+            "/api/v1/ide/doc/open",
+            json!({ "path": "f.txt", "text": "cat cat cat" }),
+        ),
+    )
+    .await;
 
     let (status, body) = send(
         &app,
-        post("/api/v1/ide/doc/find", json!({ "pattern": "cat", "case_sensitive": true })),
+        post(
+            "/api/v1/ide/doc/find",
+            json!({ "pattern": "cat", "case_sensitive": true }),
+        ),
     )
     .await;
     assert_eq!(status, StatusCode::OK);

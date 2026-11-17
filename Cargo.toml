@@ -66,6 +66,9 @@ members = [
     "crates/nema-codec",
     # nema-codec-wasm: wasm-bindgen 绑定, 前端替换 lib/nema/nema.ts
     "crates/nema-codec-wasm",
+    # ide-kernel: 移植自 IDE1.0 编辑内核 (权利人授权按 MIT 复用, per
+    # REUSE-MAP-COLLAB-SANDBOX-001 §4 v0.2 2026-11-14) — 星后端 /api/v1/ide/* 复用同一份编辑语义
+    "crates/ide-kernel",
   "crates/ide-collab-core",
   "crates/star-git-core",
   "crates/sandtree-core",

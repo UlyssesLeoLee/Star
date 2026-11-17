@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=9a3761058f88b25fa65c7aa14cca7bb1d674f144e3c1d9ebe7f5901eaee7b700
 MERGE (self:File {path:"frontend/src/lib/nema/nemaCollaboration.ts"})
 MERGE (presence:Symbol {id:"frontend/src/lib/nema/nemaCollaboration.ts::nemaEditorPresence",kind:"function"})
 MERGE (resolve_actor:Symbol {id:"frontend/src/lib/nema/nemaCollaboration.ts::resolveNemaActor",kind:"function"})

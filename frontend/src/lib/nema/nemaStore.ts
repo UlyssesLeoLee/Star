@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6d06b61bae042ded623760577b333b8ad5697df510ad254b5863399241efad3f
+@cypher schema=1 source_sha256=b884a283ca160e5cd28cd4bfce98b4cdba6602603461bd4f77b700d99639317a
 MERGE (self:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::useNemaStore",kind:"hook"})
 MERGE (register:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::registerSharedFile",kind:"function"})

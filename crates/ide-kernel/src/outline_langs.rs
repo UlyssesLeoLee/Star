@@ -298,8 +298,8 @@ fn detect_function(
     }
     let name_tok = ws.iter().rev().find(|(_, st)| *st < open)?;
     let name = &name_tok.0;
-    if NOT_FUNC.contains(&name.as_str())
-        || name.chars().next().is_none_or(|c| c.is_ascii_digit()) // 移植差异: clippy::unnecessary_map_or (原 map_or(true, ..))
+    if NOT_FUNC.contains(&name.as_str()) || name.chars().next().is_none_or(|c| c.is_ascii_digit())
+    // 移植差异: clippy::unnecessary_map_or (原 map_or(true, ..))
     {
         return None;
     }

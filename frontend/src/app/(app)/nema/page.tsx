@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3dd208b3e4a4f50eb16cfb582487f1fb2fc659a7fc5a38649547d73b242d0433
+@cypher schema=1 source_sha256=237b390b0c482698e888a0682cc4893e5ae7b330db4e598c297345f5a3f16661
 MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::NemaPage",kind:"component"})
 MERGE (load_profiles:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::loadInterpreterProfiles",kind:"effect"})

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=beb13ab0b05abbdea3e09bf221888825b156855bc4993f465acb373600ad2cd2
+@cypher schema=1 source_sha256=61a8431946debd8dc067ab47ae52fa3bef8d4dd1f5b99aaec820ab0bdf234cae
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_router",kind:"function"})
 MERGE (oauthRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
@@ -153,6 +153,7 @@ pub fn build_router() -> Router {
         // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
         .nest("/runtime", routes::runtime::router())
         .nest("/terminal", routes::terminal::router())
+        .nest("/ide", routes::ide::router())
         .nest("/im", routes::im::router())
         .nest("/notifications", routes::notifications::router())
         .nest("/comments", routes::notifications::comments_router())
@@ -317,6 +318,7 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
                 .nest("/runtime", routes::runtime::router())
                 .nest("/terminal", routes::terminal::router())
+                .nest("/ide", routes::ide::router())
                 .nest("/im", routes::im::router())
                 .nest("/notifications", routes::notifications::router())
                 .nest("/comments", routes::notifications::comments_router())

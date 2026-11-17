@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=b0f9c1b55774cd918c76681be97df6ccbdb31d606bf1dc42b426f2068bb8e157
 MERGE (self:File {path:"crates/ide-kernel/src/lib.rs"})
 MERGE (buffer:Symbol {id:"crates/ide-kernel/src/lib.rs::buffer",kind:"module"})
 MERGE (cursor:Symbol {id:"crates/ide-kernel/src/lib.rs::cursor",kind:"module"})

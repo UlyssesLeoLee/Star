@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=47ac08357fca767cf08631814dfdcb9045fcb3aa49fc503c769223a8e178913d
 MERGE (self:File {path:"crates/star-api-rest/src/routes/ide.rs"})
 MERGE (docstore:Type {id:"crates/ide-kernel/src/doc_store.rs::DocStore",kind:"struct"})
 MERGE (docview:Type {id:"crates/ide-kernel/src/doc_store.rs::DocView",kind:"struct"})
@@ -65,8 +65,8 @@ use serde_json::{json, Value};
 use ide_kernel::doc_store::DocStore;
 use ide_kernel::{DocView, OutlineEntry};
 
-use star_api_rest::error::RestError;
-use star_api_rest::response::RestResponse;
+use crate::error::RestError;
+use crate::response::RestResponse;
 
 /// 打开文档时从磁盘读文件的上限 (与 IDE1.0 的 MAX_BODY_BYTES 一个量级)。
 const MAX_FILE_READ_BYTES: u64 = 4 * 1024 * 1024;
@@ -184,13 +184,21 @@ fn project_root() -> Option<PathBuf> {
 ///
 /// 不解析符号链接 (软链可能指向 root 外, 调用方应按需再校验; 当前只做
 /// 词法前缀检查, 与 IDE1.0 path_safety 的沙箱意图一致但更保守)。
-pub(crate) fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
+/// Joins a path under `root`, rejecting absolute paths and `..` escapes.
+///
+/// Public so the integration test can assert the containment guarantee
+/// directly — this is the boundary that keeps the read-only file bridge
+/// from walking outside the configured roots.
+pub fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
     let rel_path = Path::new(rel);
     if rel_path.is_absolute() {
         return None;
     }
     for seg in rel_path.components() {
-        if matches!(seg, std::path::Component::ParentDir | std::path::Component::Prefix(_)) {
+        if matches!(
+            seg,
+            std::path::Component::ParentDir | std::path::Component::Prefix(_)
+        ) {
             return None;
         }
     }
@@ -482,7 +490,9 @@ pub async fn insert(
     Json(req): Json<InsertRequest>,
 ) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
-    let view = docs.insert(req.row, req.col, &req.text).ok_or_else(no_active_doc)?;
+    let view = docs
+        .insert(req.row, req.col, &req.text)
+        .ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
@@ -493,26 +503,34 @@ pub async fn type_char(
 ) -> Result<Json<RestResponse<Value>>, RestError> {
     let ch = req.char.chars().next().unwrap_or(' ');
     let mut docs = state.docs.lock().expect("ide docs poisoned");
-    let view = docs.type_char(req.row, req.col, ch).ok_or_else(no_active_doc)?;
+    let view = docs
+        .type_char(req.row, req.col, ch)
+        .ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/newline` — 插入换行 (保留上一行缩进)。
-pub async fn newline(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn newline(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.insert_newline().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/backspace` — 退格。
-pub async fn backspace(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn backspace(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.backspace().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/delete` — 向前删除。
-pub async fn delete_forward(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn delete_forward(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.delete_forward().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
@@ -541,28 +559,36 @@ pub async fn set_caret(
 }
 
 /// `POST /api/v1/ide/doc/select_all` — 全选。
-pub async fn select_all(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn select_all(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.select_all().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/clear_selection` — 清空选区。
-pub async fn clear_selection(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn clear_selection(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.clear_selection().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/undo` — 撤销一步 (一次按键 = 一个 undo 单元)。
-pub async fn undo(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn undo(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.undo().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `POST /api/v1/ide/doc/redo` — 重做一步。
-pub async fn redo(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn redo(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.redo().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
@@ -621,7 +647,12 @@ pub async fn replace_all(
 ) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let stat = docs
-        .replace_all(&req.pattern, &req.replacement, req.case_sensitive, req.limit)
+        .replace_all(
+            &req.pattern,
+            &req.replacement,
+            req.case_sensitive,
+            req.limit,
+        )
         .ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({
         "replaced": stat.replaced,
@@ -646,17 +677,23 @@ pub async fn sync_text(
 }
 
 /// `POST /api/v1/ide/doc/mark_saved` — 标记已保存 (清 dirty, 保留 undo)。
-pub async fn mark_saved(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn mark_saved(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let mut docs = state.docs.lock().expect("ide docs poisoned");
     let view = docs.mark_saved().ok_or_else(no_active_doc)?;
     Ok(Json(RestResponse::ok(json!({ "view": view_json(view) }))))
 }
 
 /// `GET /api/v1/ide/doc/export` — 导出活动文档 (按声明行尾符, 无文档时 404)。
-pub async fn export_doc(State(state): State<Arc<IdeApiState>>) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn export_doc(
+    State(state): State<Arc<IdeApiState>>,
+) -> Result<Json<RestResponse<Value>>, RestError> {
     let docs = state.docs.lock().expect("ide docs poisoned");
     let (path, text) = docs.export().ok_or_else(no_active_doc)?;
-    Ok(Json(RestResponse::ok(json!({ "path": path, "text": text }))))
+    Ok(Json(RestResponse::ok(
+        json!({ "path": path, "text": text }),
+    )))
 }
 
 // ---------------------------------------------------------------------
@@ -669,9 +706,7 @@ pub async fn export_doc(State(state): State<Arc<IdeApiState>>) -> Result<Json<Re
 /// (Rust / Python / JS / TS / Go / ... 20+ 语言)。text 缺省时仅在
 /// IDE_PROJECT_ROOT 已设置时读盘, 否则返回空 entries + error 说明 (诚实降级,
 /// 前端据此回退"本地推导预览"标注)。
-pub async fn outline(
-    Json(req): Json<OutlineRequest>,
-) -> Json<RestResponse<Value>> {
+pub async fn outline(Json(req): Json<OutlineRequest>) -> Json<RestResponse<Value>> {
     let content: Option<String> = match req.text {
         Some(t) => Some(t),
         None => match project_root() {
@@ -754,7 +789,10 @@ pub async fn scm_log(Query(query): Query<ScmQuery>) -> Json<RestResponse<Value>>
         })));
     };
     let fmt = "%H%x00%h%x00%an%x00%ai%x00%s";
-    let raw = match run_git_readonly(&root, &["log", &format!("-{n}"), &format!("--format={fmt}")]) {
+    let raw = match run_git_readonly(
+        &root,
+        &["log", &format!("-{n}"), &format!("--format={fmt}")],
+    ) {
         Ok(r) => r,
         Err(e) => {
             return Json(RestResponse::ok(json!({ "commits": [], "error": e })));
@@ -773,7 +811,9 @@ pub async fn scm_log(Query(query): Query<ScmQuery>) -> Json<RestResponse<Value>>
             }));
         }
     }
-    Json(RestResponse::ok(json!({ "commits": commits, "error": Value::Null })))
+    Json(RestResponse::ok(
+        json!({ "commits": commits, "error": Value::Null }),
+    ))
 }
 
 /// `GET /api/v1/ide/scm/status?root=` — 工作区状态 (只读 `git status --porcelain`)。
@@ -788,7 +828,9 @@ pub async fn scm_status(Query(query): Query<ScmQuery>) -> Json<RestResponse<Valu
     let raw = match run_git_readonly(&root, &["status", "--porcelain"]) {
         Ok(r) => r,
         Err(e) => {
-            return Json(RestResponse::ok(json!({ "branch": "", "files": [], "error": e })));
+            return Json(RestResponse::ok(
+                json!({ "branch": "", "files": [], "error": e }),
+            ));
         }
     };
     let mut files: Vec<Value> = Vec::new();
@@ -798,7 +840,10 @@ pub async fn scm_status(Query(query): Query<ScmQuery>) -> Json<RestResponse<Valu
         }
         let code = &line[0..2];
         let path = line[3..].trim().trim_matches('"');
-        let (x, y) = (code.chars().next().unwrap_or(' '), code.chars().nth(1).unwrap_or(' '));
+        let (x, y) = (
+            code.chars().next().unwrap_or(' '),
+            code.chars().nth(1).unwrap_or(' '),
+        );
         if x == '?' && y == '?' {
             files.push(json!({ "path": path, "status": "untracked", "staged": false }));
             continue;
@@ -813,7 +858,8 @@ pub async fn scm_status(Query(query): Query<ScmQuery>) -> Json<RestResponse<Valu
         };
         files.push(json!({ "path": path, "status": status, "staged": x != ' ' && x != '?' }));
     }
-    let branch = run_git_readonly(&root, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
+    let branch =
+        run_git_readonly(&root, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
     Json(RestResponse::ok(json!({
         "branch": branch.trim(),
         "files": files,

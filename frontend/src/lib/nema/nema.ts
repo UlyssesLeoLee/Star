@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=5f90e6b00014eec735f62fbe0be582f8da7522ffd11e9c2049c086a8a471f3ca
+@cypher schema=1 source_sha256=3c2e8f1eda895e173d4fa006b488791624eba084e657748bfc41c3ecf23b4f5b
 MERGE (self:File {path:"frontend/src/lib/nema/nema.ts"})
 MERGE (parse:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNema",kind:"function"})
 MERGE (serialize:Symbol {id:"frontend/src/lib/nema/nema.ts::serializeNema",kind:"function"})
