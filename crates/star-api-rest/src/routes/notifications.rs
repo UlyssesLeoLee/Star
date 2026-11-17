@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=fa3931be8142ec966e0d8a4853433f291aefd527b3956a160391954a65ee1222
+@cypher schema=1 source_sha256=5ad76351978074c5dd36978a82cf8f0c693fe1d5edbd06077e6e67f567701dc5
 MERGE (self:File {path:"crates/star-api-rest/src/routes/notifications.rs"})
 MERGE (state:Type {id:"crates/star-api-rest/src/routes/notifications.rs::NotificationsApiState",kind:"struct"})
 MERGE (notif:Type {id:"crates/star-api-rest/src/routes/notifications.rs::Notification",kind:"struct"})
@@ -309,6 +309,7 @@ fn not_comment_owner(user_id: &str, comment_id: &str) -> RestError {
 ///
 /// 中间件 stub 实装前由请求头派生 (同 routes/im.rs current_user); 实装后从
 /// ActorContext/JWT claim 注入替换。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 fn current_user(headers: &HeaderMap) -> Result<String, RestError> {
     headers
         .get("x-user-id")
@@ -324,6 +325,7 @@ fn current_user(headers: &HeaderMap) -> Result<String, RestError> {
 }
 
 /// 必填字符串字段守卫: 缺省/空白 → 400
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 fn required_field(name: &str, value: Option<String>) -> Result<String, RestError> {
     match value {
         Some(v) if !v.trim().is_empty() => Ok(v),
@@ -335,6 +337,7 @@ fn required_field(name: &str, value: Option<String>) -> Result<String, RestError
 }
 
 /// kind 字符串 → NotificationKind (非法 → 400)
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub fn parse_notification_kind(s: &str) -> Result<NotificationKind, RestError> {
     match s {
         "review_request" => Ok(NotificationKind::ReviewRequest),
@@ -349,6 +352,7 @@ pub fn parse_notification_kind(s: &str) -> Result<NotificationKind, RestError> {
 }
 
 /// target_type 字符串 → TargetType (非法 → 400)
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub fn parse_target_type(s: &str) -> Result<TargetType, RestError> {
     match s {
         "work_item" => Ok(TargetType::WorkItem),
@@ -504,6 +508,7 @@ pub struct CreateCommentRequest {
 /// 过滤: tenant_id (精确) / kind (非法值 → 400) / unread_only (true 只回未读)。
 /// 分页: limit (缺省 20, clamp 1..=200) + offset (缺省 0)。排序:
 /// created_at DESC (新在前), 同刻按 id DESC 稳定。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn list_notifications(
     State(state): State<Arc<NotificationsApiState>>,
     Query(query): Query<ListNotificationsQuery>,
@@ -520,8 +525,8 @@ pub async fn list_notifications(
     let mut matched: Vec<&Notification> = store
         .values()
         .filter(|n| {
-            query.tenant_id.as_ref().map_or(true, |t| &n.tenant_id == t)
-                && kind_filter.map_or(true, |k| n.kind == k)
+            query.tenant_id.as_ref().is_none_or(|t| &n.tenant_id == t)
+                && kind_filter.is_none_or(|k| n.kind == k)
                 && (!unread_only || !n.read)
         })
         .collect();
@@ -546,6 +551,7 @@ pub async fn list_notifications(
 /// `GET /api/v1/notifications/unread-count` — 未读计数
 ///
 /// 返回 `{ count }`; ?tenant_id 可选过滤。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn unread_count(
     State(state): State<Arc<NotificationsApiState>>,
     Query(query): Query<UnreadCountQuery>,
@@ -554,7 +560,7 @@ pub async fn unread_count(
     let count = store
         .values()
         .filter(|n| !n.read)
-        .filter(|n| query.tenant_id.as_ref().map_or(true, |t| &n.tenant_id == t))
+        .filter(|n| query.tenant_id.as_ref().is_none_or(|t| &n.tenant_id == t))
         .count();
 
     Ok(Json(RestResponse::ok(json!({ "count": count }))))
@@ -564,6 +570,7 @@ pub async fn unread_count(
 ///
 /// 校验: tenant_id/kind/subject/body 必填非空; kind ∈ 4 枚举; target_type ∈
 /// 3 枚举且与 target_id 成对出现 (只给其一 → 400)。新建恒 read=false。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn create_notification(
     State(state): State<Arc<NotificationsApiState>>,
     Json(req): Json<CreateNotificationRequest>,
@@ -624,6 +631,7 @@ pub async fn create_notification(
 /// `PATCH /api/v1/notifications/{id}` — 更新 read 状态 (body: { read: bool })
 ///
 /// 不存在 → 404。响应回显更新后的通知。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn patch_notification_read(
     State(state): State<Arc<NotificationsApiState>>,
     Path(id): Path<String>,
@@ -640,6 +648,7 @@ pub async fn patch_notification_read(
 /// `POST /api/v1/notifications/{id}/read` — 标记已读 (幂等)
 ///
 /// 不存在 → 404; 已读再标 → 仍 200 + read:true 回显。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn mark_notification_read(
     State(state): State<Arc<NotificationsApiState>>,
     Path(id): Path<String>,
@@ -656,6 +665,7 @@ pub async fn mark_notification_read(
 ///
 /// ?target_type/&target_id 可选精确过滤; 时间正序 (线程阅读顺序), 同刻按 id
 /// 稳定排序; 响应含 total。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn list_comments(
     State(state): State<Arc<NotificationsApiState>>,
     Query(query): Query<ListCommentsQuery>,
@@ -667,8 +677,8 @@ pub async fn list_comments(
             query
                 .target_type
                 .as_ref()
-                .map_or(true, |t| &c.target_type == t)
-                && query.target_id.as_ref().map_or(true, |t| &c.target_id == t)
+                .is_none_or(|t| &c.target_type == t)
+                && query.target_id.as_ref().is_none_or(|t| &c.target_id == t)
         })
         .collect();
     matched.sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
@@ -687,6 +697,7 @@ pub async fn list_comments(
 /// 作者取 X-User-Id 请求头 (缺 → 400); author_name 缺省回落为 author_id;
 /// target_type 为自由字符串 (不套 notification 的 TargetType 枚举, 任务 spec
 /// 未枚举评论目标)。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn create_comment(
     State(state): State<Arc<NotificationsApiState>>,
     headers: HeaderMap,
@@ -728,6 +739,7 @@ pub async fn create_comment(
 ///
 /// 守卫: 不存在 → 404; X-User-Id ≠ author_id → 403 POLICY_DENIED; 成功
 /// 返回 `{ deleted: true, comment_id }`。
+#[allow(clippy::result_large_err)] // RestError 6-field 含 String, 跟 crates/star-api-rest 现有 handler 同模式
 pub async fn delete_comment(
     State(state): State<Arc<NotificationsApiState>>,
     Path(id): Path<String>,
