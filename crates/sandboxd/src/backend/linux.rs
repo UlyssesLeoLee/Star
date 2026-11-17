@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=3dcac25964f81764e45ca84699c57d00c449919e91d891b54d2de143a5ed2404
+@cypher schema=1 source_sha256=fcd96f3b8021cc05fb6b44e27bc5b3b61ee8205ef1004f24724513b662fff283
 MERGE (self:File {path:"crates/sandboxd/src/backend/linux.rs"})
 @endcypher
 */
@@ -147,6 +147,9 @@ pub fn build_wrap_argv(
 #[cfg(target_os = "linux")]
 pub use platform::{LinuxBackend, LinuxHandle};
 
+/// Linux-specific sandbox backend implementation.
+///
+/// Only compiled on Linux targets; other platforms use the fallback backend.
 #[cfg(target_os = "linux")]
 pub mod platform {
     use std::fs;
