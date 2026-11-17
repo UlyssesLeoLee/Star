@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f4b0cc6c123d93e600dad1b2b9226489f7706dc377327802fb3bb40ecac73447
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/components/ide/IdeFileWorkspace.test.tsx"})
 MERGE (target:File {path:"frontend/src/components/ide/IdeFileWorkspace.tsx"})
 MERGE (ideFileWorkspace:Symbol {id:"frontend/src/components/ide/IdeFileWorkspace.tsx::IdeFileWorkspace",kind:"component"})
@@ -19,8 +19,8 @@ MERGE (self)-[:TESTS]->(buildFileTree)
 //       IDE1.0 四能力徽标 / 纯函数 helper。
 // =====================================================================
 
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   IdeFileWorkspace,
   deriveSemanticNodes,
@@ -195,5 +195,190 @@ describe("buildFileTree", () => {
     ]);
     expect(tree[0].kind).toBe("dir");
     expect(tree[1].kind).toBe("file");
+  });
+});
+
+// =====================================================================
+// 内核已连接模式 (per 2026-11-17 IDE1.0 网页版接入) — mock fetch
+// =====================================================================
+
+/** 模拟内核 REST 响应 (hook 只用 ok/status/json)。 */
+function jsonBody(body: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  };
+}
+
+const DOC_VIEW = {
+  id: 1,
+  path: "src/lib/nema/nemaStore.ts",
+  text: "fn main() {}\n",
+  line_count: 1,
+  caret_row: 0,
+  caret_col: 0,
+  line_ending: "Unix (LF)",
+  encoding: "UTF-8",
+  dirty: false,
+  has_selection: false,
+  selected_text: "",
+  cursor_count: 1,
+  can_undo: true,
+  can_redo: false,
+};
+
+/** 按端点路由的 mock fetch。 */
+function mockIdeFetch() {
+  const mockFetch = vi.fn(async (input: unknown, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/api/v1/ide/version")) {
+      return jsonBody({ data: { kernel_version: "0.1.0", service: "ide-kernel" } });
+    }
+    if (url.includes("/api/v1/ide/doc/open")) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { path?: string; text?: string }) : {};
+      return jsonBody({
+        data: {
+          view: {
+            ...DOC_VIEW,
+            path: body.path ?? DOC_VIEW.path,
+            text: body.text ?? DOC_VIEW.text,
+          },
+        },
+      });
+    }
+    if (url.includes("/api/v1/ide/doc/undo")) {
+      return jsonBody({ data: { view: { ...DOC_VIEW, can_undo: false, can_redo: true } } });
+    }
+    if (url.includes("/api/v1/ide/doc/sync")) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { text?: string }) : {};
+      return jsonBody({ data: { view: { ...DOC_VIEW, text: body.text ?? "", dirty: true } } });
+    }
+    if (url.includes("/api/v1/ide/outline")) {
+      return jsonBody({
+        data: {
+          path: "x.rs",
+          language: "Rust",
+          entries: [
+            { name: "main", kind: "function", line: 0, depth: 0 },
+            { name: "helper", kind: "function", line: 2, depth: 0 },
+          ],
+          error: null,
+        },
+      });
+    }
+    if (url.includes("/api/v1/ide/scm/log")) {
+      return jsonBody({
+        data: {
+          commits: [
+            {
+              hash: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4",
+              short: "a1b2c3d4",
+              author: "tester",
+              time: "2026-11-17T00:00:00Z",
+              message: "feat: kernel wiring",
+            },
+          ],
+          error: null,
+        },
+      });
+    }
+    return jsonBody({ data: {} }, 404);
+  });
+  // @ts-expect-error - global fetch assignment for jsdom
+  global.fetch = mockFetch;
+  return mockFetch;
+}
+
+describe("IdeFileWorkspace 内核已连接 (probeKernel)", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockFetch = mockIdeFetch();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("探测成功 → 已连接徽标 + 内核版本 + 内核 Patch 记录", async () => {
+    render(<IdeFileWorkspace files={FILES} probeKernel />);
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-kernel-status").textContent).toContain("已连接");
+    });
+    expect(screen.getByTestId("ide-kernel-version").textContent).toContain("ide-kernel 0.1.0");
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-patch-log").textContent).toContain("feat: kernel wiring");
+    });
+    expect(screen.getByTestId("ide-patch-count").textContent).toBe("1");
+    expect(screen.getByTestId("ide-editor-panel")).toBeTruthy();
+  });
+
+  it("点击文件节点 → POST doc/open 载入内核会话并渲染 textarea", async () => {
+    render(<IdeFileWorkspace files={FILES} probeKernel />);
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-kernel-status").textContent).toContain("已连接");
+    });
+    fireEvent.click(screen.getByTestId("ide-file-node-f-readme"));
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-editor-textarea").value).toBe("fn main() {}\n");
+    });
+    const openCalls = mockFetch.mock.calls.filter(([input]) =>
+      String(input).includes("/api/v1/ide/doc/open"),
+    );
+    expect(openCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("textarea 修改 → 防抖 POST /doc/sync", async () => {
+    render(<IdeFileWorkspace files={FILES} probeKernel />);
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-kernel-status").textContent).toContain("已连接");
+    });
+    fireEvent.click(screen.getByTestId("ide-file-node-f-readme"));
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-editor-textarea")).toBeTruthy();
+    });
+    fireEvent.change(screen.getByTestId("ide-editor-textarea"), {
+      target: { value: "fn main() {}\n// edited" },
+    });
+    await waitFor(() => {
+      const syncCalls = mockFetch.mock.calls.filter(([input]) =>
+        String(input).includes("/api/v1/ide/doc/sync"),
+      );
+      expect(syncCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("撤销按钮 → POST /doc/undo (can_undo 时可用)", async () => {
+    render(<IdeFileWorkspace files={FILES} probeKernel />);
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-kernel-status").textContent).toContain("已连接");
+    });
+    fireEvent.click(screen.getByTestId("ide-file-node-f-readme"));
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-editor-textarea")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId("ide-op-undo"));
+    await waitFor(() => {
+      const undoCalls = mockFetch.mock.calls.filter(([input]) =>
+        String(input).includes("/api/v1/ide/doc/undo"),
+      );
+      expect(undoCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("已打开文档带正文 → 内核 outline 语义节点 (真实内核, 非本地推导)", async () => {
+    render(<IdeFileWorkspace files={FILES} probeKernel />);
+    await waitFor(() => {
+      expect(screen.getByTestId("ide-kernel-status").textContent).toContain("已连接");
+    });
+    // f-nema 路径与 mock open 返回的 view.path 一致 → outline 带正文
+    fireEvent.click(screen.getByTestId("ide-file-node-f-nema"));
+    await waitFor(() => {
+      expect(screen.getByText("内核 outline")).toBeTruthy();
+    });
+    const nodes = screen.getAllByTestId(/^ide-outline-node-f-nema-\d+$/);
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0].textContent).toContain("main");
   });
 });

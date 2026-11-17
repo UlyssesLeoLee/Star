@@ -1,0 +1,32 @@
+# =====================================================================
+# ide-kernel — IDE1.0 编辑内核移植 (Web/Tauri/TUI 共用一份编辑语义)
+# 来源: IDE1.0 (E:\IDE1.0, HEAD a200e5d)
+#   crates/ide-kernel/src/{lib,document,session,text_ops,doc_store}.rs
+#   crates/editcore/src/{buffer,cursor,undo}.rs       (editcore 为 Zlib 上游协议)
+#   crates/editcore/src/{type_config,types,outline_langs}.rs (语义 outline)
+# 许可: 权利人授权按 Star MIT 复用
+#   (docs/architecture/2026-11-14-ops-console/REUSE-MAP-COLLAB-SANDBOX-001.md §4 v0.2)
+# 落点: star-api-rest /api/v1/ide/* 端点 (routes/ide.rs) 的编辑内核;
+#   纯 serde 依赖, 无 wasmtime/zip/windows-registry, 理论可编 wasm32-unknown-unknown
+#   (本机已装 target), 当前按后端服务化接线 (照 routes/terminal.rs 模式)。
+# =====================================================================
+[package]
+# 2026-10-05 (per cargo-deny 实跑): 标记为 private, 使 cargo-deny 的
+# allow-wildcard-paths 生效, 并允许恢复 bans.wildcards = "deny"。
+# 本仓 crate 无 crates.io 发布意图。详见 PHASE-CD-SELECTION-REPORT.md §3 缺口 #6。
+publish = false
+name = "ide-kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+authors.workspace = true
+repository.workspace = true
+description = "IDE1.0 唯一编辑内核移植: Document/Session/多光标/undo/查找替换/语义 outline — 移植自 IDE1.0 (权利人授权 MIT)"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

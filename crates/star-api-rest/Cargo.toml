@@ -119,6 +119,9 @@ worktree-shared-dir = { path = "../worktree-shared-dir" }
 # 终端栈 HTTP 端点 (2026-11-16, routes/terminal.rs): terminal-stack 孤儿 crate 接线
 # (TerminalStackPersistence in_memory + scrollback + SplitTree, per ULYS-200/220)
 terminal-stack = { path = "../terminal-stack" }
+# IDE1.0 编辑内核 HTTP 端点 (2026-11-17, routes/ide.rs): ide-kernel 移植 crate 接线
+# (Document/Session/多光标/undo/语义 outline, per REUSE-MAP-COLLAB-SANDBOX-001 §4)
+ide-kernel = { path = "../ide-kernel" }
 
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)

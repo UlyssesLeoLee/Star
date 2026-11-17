@@ -3696,6 +3696,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ide-kernel"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7507,6 +7515,7 @@ dependencies = [
  "futures-util",
  "hex",
  "ide-collab-core",
+ "ide-kernel",
  "infrastructure",
  "jsonwebtoken",
  "pkcs8 0.11.0",

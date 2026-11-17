@@ -1,7 +1,9 @@
 /*
-@cypher schema=1 source_sha256=f9f5e2f586e99b83f8de8c6377e344012a2e81dd7ea00e5792649039b04fcf57
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
+MERGE (ideFileWorkspace:File {path:"frontend/src/components/ide/IdeFileWorkspace.tsx"})
+MERGE (ideFileWorkspaceComponent:Symbol {id:"frontend/src/components/ide/IdeFileWorkspace.tsx::IdeFileWorkspace",kind:"component"})
 MERGE (nema_store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (open_nema:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::openNemaAsStarTask",kind:"function"})
 MERGE (groupProjection:File {path:"frontend/src/lib/group/groupProjection.tsx"})
@@ -13,10 +15,12 @@ MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(nema_store)
 MERGE (self)-[:IMPORTS]->(groupProjection)
 MERGE (self)-[:IMPORTS]->(kanbanFilters)
+MERGE (self)-[:IMPORTS]->(ideFileWorkspace)
 MERGE (page)-[:CALLS]->(open_nema)
 MERGE (page)-[:CALLS]->(groupApiHook)
 MERGE (page)-[:CALLS]->(sessionStateHook)
 MERGE (page)-[:CALLS]->(applyBoardFilters)
+MERGE (page)-[:CALLS]->(ideFileWorkspaceComponent)
 @endcypher
 */
 // =====================================================================
@@ -445,7 +449,9 @@ export default function KanbanPage() {
           <section data-testid="kanban-file-cards" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
             {/* IDE1.0 编辑内核工作区 (per 2026-11-15: 文件编辑相关页面体现 IDE1.0 功能) */}
             <div className="mb-4" data-testid="kanban-ide-workspace">
-              <IdeFileWorkspace files={nemaTasks.map((task) => ({
+              <IdeFileWorkspace
+                probeKernel
+                files={nemaTasks.map((task) => ({
                 id: task.id, filePath: task.filePath, editors: task.editors, workItemId: task.workItemId,
               }))} />
             </div>
