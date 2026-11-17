@@ -6,6 +6,9 @@ MERGE (register:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::registerSharedFi
 MERGE (open:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::openNemaAsStarTask",kind:"function"})
 MERGE (import:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::importNemaSource",kind:"function"})
 MERGE (sync:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::syncNemaSource",kind:"function"})
+MERGE (update_editors:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::updateNemaEditors",kind:"function"})
+MERGE (desc_builder:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::workItemDescriptionFromView",kind:"function"})
+MERGE (editor_change:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaStrictDocumentWithEditorChange",kind:"function"})
 MERGE (parse_smart:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::parseNemaSmart",kind:"function"})
 MERGE (parse_entry:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::parseNemaEntryView",kind:"function"})
 MERGE (parse_wasm:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNemaWasm",kind:"function"})
@@ -19,6 +22,8 @@ MERGE (self)-[:DEFINES]->(register)
 MERGE (self)-[:DEFINES]->(open)
 MERGE (self)-[:DEFINES]->(import)
 MERGE (self)-[:DEFINES]->(sync)
+MERGE (self)-[:DEFINES]->(update_editors)
+MERGE (self)-[:DEFINES]->(desc_builder)
 MERGE (self)-[:DEFINES]->(parse_smart)
 MERGE (self)-[:DEFINES]->(parse_entry)
 MERGE (self)-[:DEFINES]->(operation_lock)
@@ -33,6 +38,14 @@ MERGE (register)-[:CALLS]->(format_profile)
 MERGE (open)-[:CALLS]->(parse_entry)
 MERGE (import)-[:CALLS]->(parse_entry)
 MERGE (sync)-[:CALLS]->(parse_entry)
+MERGE (update_editors)-[:CALLS]->(operation_lock)
+MERGE (update_editors)-[:CALLS]->(parse_profile)
+MERGE (update_editors)-[:CALLS]->(editor_change)
+MERGE (update_editors)-[:CALLS]->(format_profile)
+MERGE (update_editors)-[:CALLS]->(task_view)
+MERGE (update_editors)-[:CALLS]->(desc_builder)
+MERGE (sync)-[:CALLS]->(desc_builder)
+MERGE (desc_builder)-[:USES_TYPE]->(task_view)
 @endcypher
 */
 // =====================================================================
@@ -53,6 +66,8 @@ import {
   listNemaInterpreterProfilesWasm,
   loadNemaWasm,
   serializeNemaWithProfileWasm,
+  formatNemaWithProfileWasm,
+  nemaStrictDocumentWithEditorChange,
   NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
   type NemaDocument,
   type NemaInterpreterProfile,
@@ -157,6 +172,18 @@ export interface NemaTaskEntry {
   updated_at: string;
 }
 
+export type NemaEditorUpdateResult =
+  | { action: "updated"; entry: NemaTaskEntry }
+  | { action: "unchanged"; entry: NemaTaskEntry }
+  | { action: "refused"; reason: string };
+
+/** 已绑定 WorkItem 的描述回写: 标题同 what; 描述 = what/why/how + 共同编辑者。 */
+function workItemDescriptionFromView(view: NemaTaskView): string {
+  const parts = [view.what, view.why, view.how].filter(Boolean);
+  if (view.who.length > 0) parts.push(`共同编辑: ${view.who.join(", ")}`);
+  return parts.join("\n\n");
+}
+
 interface NemaState {
   nemaTasks: NemaTaskEntry[];
   /** 注册一个共享文件: editors ≥ 2 时自动生成 .nema (幂等, 同 path 复用)。 */
@@ -176,6 +203,22 @@ interface NemaState {
   importNemaSource: (nemaPath: string, source: string, profile: NemaInterpreterProfile) => Promise<NemaTaskEntry>;
   /** 文件系统监听同步 (per WBS 8.4.4): 磁盘 .nema 内容变化 → 更新记录 + 回写已绑定任务。 */
   syncNemaSource: (nemaPath: string, source: string, importProfile?: NemaInterpreterProfile) => Promise<{ action: "imported" | "updated" | "unchanged"; entry: NemaTaskEntry }>;
+  /**
+   * 追加/移除共同编辑者并重写 .nema 源 (per 2026-11-17 用户发令):
+   *   - 严格 AST 上改写 who / editors / editor_count / updated_at, 并追加
+   *     editor / edited_at / change 编辑痕迹 (Field/Value 表域 id=3);
+   *   - 走 Rust format 的 canonical round-trip 校验 + 显式 parse 验证;
+   *   - 保持条目 pin 的 interpreterProfile 不漂移;
+   *   - legacy 格式条目拒绝变更 (不静默升级);
+   *   - 已绑定 WorkItem 回写标题/描述。
+   */
+  updateNemaEditors: (nemaId: string, input: {
+    editors: string[];
+    /** 执行本次变更的编辑者 (来自既有身份机制解析的显示名)。 */
+    actor: string;
+    /** 变更摘要; 缺省按加入/移除 diff 自动生成。 */
+    change?: string;
+  }) => Promise<NemaEditorUpdateResult>;
 }
 
 function makeId(prefix: string): string {
@@ -359,12 +402,70 @@ export const useNemaStore = create<NemaState>()(
             main.updateWorkItemField(
               existing.workItemId,
               "description",
-              [view.what, view.why, view.how].filter(Boolean).join("\n\n"),
+              workItemDescriptionFromView(view),
             );
           }
         }
         return { action: "updated" as const, entry: updated };
       },
+
+      updateNemaEditors: async (nemaId, input) => withNemaOperationLock(`task:${nemaId}`, async () => {
+        const entry = get().nemaTasks.find((t) => t.id === nemaId);
+        if (!entry) return { action: "refused" as const, reason: "nema task not found" };
+        // legacy 条目永不静默升级 (契约: existing documents keep their pinned interpreter)
+        if (entry.legacyFormat === true || !entry.interpreterProfile) {
+          return {
+            action: "refused" as const,
+            reason: "legacy 格式条目不自动升级; 编辑者变更被拒绝",
+          };
+        }
+        const editors = [...new Set(input.editors.map((name) => name.trim()).filter(Boolean))];
+        const same =
+          editors.length === entry.editors.length &&
+          editors.every((name, index) => name === entry.editors[index]);
+        if (same) return { action: "unchanged" as const, entry };
+
+        const profile = entry.interpreterProfile;
+        const document = await parseNemaWithProfileWasm(entry.source, profile);
+        const added = editors.filter((name) => !entry.editors.includes(name));
+        const removed = entry.editors.filter((name) => !editors.includes(name));
+        const change =
+          input.change?.trim() ||
+          (added.length > 0 && removed.length > 0
+            ? `调整共同编辑者 (加入 ${added.join(",")}; 移除 ${removed.join(",")})`
+            : added.length > 0
+              ? `加入共同编辑者: ${added.join(",")}`
+              : `移除共同编辑者: ${removed.join(",")}`);
+        const at = new Date().toISOString();
+        const updatedDocument = nemaStrictDocumentWithEditorChange(document, {
+          editors,
+          trace: { editor: input.actor, edited_at: at, change },
+          at,
+        });
+        const source = await formatNemaWithProfileWasm(updatedDocument, profile);
+        // 显式往返验证: 新痕迹必须能被同一 strict profile 解析 (不合法直接抛错)
+        await parseNemaWithProfileWasm(source, profile);
+
+        const updated: NemaTaskEntry = { ...entry, editors, source, updated_at: at };
+        set((s) => ({
+          nemaTasks: s.nemaTasks.map((t) => (t.id === nemaId ? updated : t)),
+        }));
+        // 已绑定 WorkItem 回写 (同 syncNemaSource 路径)
+        if (entry.workItemId) {
+          const main = useMainStore.getState();
+          const target = main.workItems.find((w) => w.id === entry.workItemId);
+          if (target) {
+            const view = taskViewFromStrictDocument(updatedDocument);
+            main.updateWorkItemField(entry.workItemId, "title", view.title);
+            main.updateWorkItemField(
+              entry.workItemId,
+              "description",
+              workItemDescriptionFromView(view),
+            );
+          }
+        }
+        return { action: "updated" as const, entry: updated };
+      }),
     }),
     { name: "star-nema-files" },
   ),

@@ -25,6 +25,12 @@ MERGE (to_strict:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaDocumentToStrict
 MERGE (from_strict:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaDocumentFromStrictDocument",kind:"function"})
 MERGE (task_view:Symbol {id:"frontend/src/lib/nema/nema.ts::taskViewFromDocument",kind:"function"})
 MERGE (strict_task_view:Symbol {id:"frontend/src/lib/nema/nema.ts::taskViewFromStrictDocument",kind:"function"})
+MERGE (editor_change:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaStrictDocumentWithEditorChange",kind:"function"})
+MERGE (trail_from_strict:Symbol {id:"frontend/src/lib/nema/nema.ts::nemaEditTrailFromStrictDocument",kind:"function"})
+MERGE (read_trail:Symbol {id:"frontend/src/lib/nema/nema.ts::readNemaEditTrail",kind:"function"})
+MERGE (edit_log_id:Symbol {id:"frontend/src/lib/nema/nema.ts::NEMA_EDIT_LOG_DOMAIN_ID",kind:"constant"})
+MERGE (trace_type:Type {id:"frontend/src/lib/nema/nema.ts::NemaEditTraceEntry"})
+MERGE (change_input:Type {id:"frontend/src/lib/nema/nema.ts::NemaEditorChangeInput"})
 MERGE (list_profiles:Symbol {id:"frontend/src/lib/nema/nema.ts::listNemaInterpreterProfilesWasm",kind:"function"})
 MERGE (get_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::getNemaInterpreterProfileWasm",kind:"function"})
 MERGE (parse_profile:Symbol {id:"frontend/src/lib/nema/nema.ts::parseNemaWithProfileWasm",kind:"function"})
@@ -56,7 +62,18 @@ MERGE (self)-[:DEFINES]->(to_strict)
 MERGE (self)-[:DEFINES]->(from_strict)
 MERGE (self)-[:DEFINES]->(task_view)
 MERGE (self)-[:DEFINES]->(strict_task_view)
+MERGE (self)-[:DEFINES]->(editor_change)
+MERGE (self)-[:DEFINES]->(trail_from_strict)
+MERGE (self)-[:DEFINES]->(read_trail)
+MERGE (self)-[:DEFINES]->(edit_log_id)
+MERGE (self)-[:DEFINES]->(trace_type)
+MERGE (self)-[:DEFINES]->(change_input)
 MERGE (self)-[:DEFINES]->(list_profiles)
+MERGE (editor_change)-[:USES_TYPE]->(strict_document)
+MERGE (trail_from_strict)-[:USES_TYPE]->(strict_document)
+MERGE (read_trail)-[:CALLS]->(parse_profile)
+MERGE (read_trail)-[:CALLS]->(trail_from_strict)
+MERGE (read_trail)-[:USES_TYPE]->(profile)
 MERGE (self)-[:DEFINES]->(get_profile)
 MERGE (self)-[:DEFINES]->(parse_profile)
 MERGE (self)-[:DEFINES]->(format_profile)
@@ -681,6 +698,188 @@ export function taskViewFromStrictDocument(doc: NemaStrictDocument): NemaTaskVie
   };
 }
 
+
+// =====================================================================
+// 多人共同编辑痕迹 (per 2026-11-17 用户发令: 文件即任务式多 agent 共同编辑)
+//   - .nema 侧车用 strict v2 合法结构记录"谁在什么时候编辑了什么":
+//     独立 Field/Value 表域 (id = NEMA_EDIT_LOG_DOMAIN_ID), 每次编辑者
+//     变更追加 editor / edited_at / change 三行。
+//   - 改写全部发生在严格 AST (NemaStrictDocument) 上, 不经过 legacy
+//     NemaDocument 投影 (那是 lossy 的, 会丢 Cell 四态)。Rust format
+//     函数会做 canonical round-trip 校验, 非法输出直接抛错。
+// =====================================================================
+
+/** 严格 AST 里标准 5W1H 任务头的域 id (decimal string, 与 Rust u64 一致)。 */
+export const NEMA_FIVE_W_ONE_H_DOMAIN_ID = "1";
+/** 严格 AST 里标准 Field/Value 元数据表的域 id。 */
+export const NEMA_META_TABLE_DOMAIN_ID = "2";
+/** 严格 AST 里多人编辑痕迹表的域 id。 */
+export const NEMA_EDIT_LOG_DOMAIN_ID = "3";
+export const NEMA_FIELD_COLUMN = "Field";
+export const NEMA_VALUE_COLUMN = "Value";
+
+/** 一条共同编辑痕迹: 谁 (editor) 在什么时候 (edited_at) 改了什么 (change)。 */
+export interface NemaEditTraceEntry {
+  editor: string;
+  edited_at: string;
+  change: string;
+}
+
+export interface NemaEditorChangeInput {
+  editors: string[];
+  trace: NemaEditTraceEntry;
+  /** ISO-8601, 写入元数据表 updated_at 行。 */
+  at: string;
+}
+
+/** 空串必须落 Empty 态 — Rust emit 会拒绝 Value("") ("use Empty for empty value")。 */
+function strictValueCell(value: string): NemaStrictCell {
+  return value.length === 0 ? { kind: "empty" } : { kind: "value", value };
+}
+
+function isFieldValueTable(domain: NemaStrictDomain): boolean {
+  const columns = domain.columns;
+  return (
+    columns != null &&
+    columns.length === 2 &&
+    columns[0] === NEMA_FIELD_COLUMN &&
+    columns[1] === NEMA_VALUE_COLUMN
+  );
+}
+
+/**
+ * 在严格 AST 上直接改写共同编辑者并追加一条编辑痕迹:
+ *   - 5W1H 域: who 单元格重写为新编辑者列表;
+ *   - Field/Value 元数据表: editors / editor_count 行重写, updated_at 行补写;
+ *   - 编辑痕迹表 (id=3): 不存在则创建, 追加 editor / edited_at / change 三行。
+ * 输出必须经 formatNemaWithProfileWasm 走 Rust canonical round-trip 校验。
+ */
+export function nemaStrictDocumentWithEditorChange(
+  document: NemaStrictDocument,
+  change: NemaEditorChangeInput,
+): NemaStrictDocument {
+  const cloneCell = (cell: NemaStrictCell): NemaStrictCell =>
+    cell.kind === "value" ? { kind: "value", value: cell.value } : { ...cell };
+  const domains = document.domains.map((domain) => ({
+    ...domain,
+    records: domain.records.map((record) => record.map(cloneCell)),
+  }));
+
+  const five = domains.find((domain) => domain.mode === "five_w_one_h");
+  if (!five) throw new Error("NEMA 文档缺少 5W1H 域, 无法改写共同编辑者");
+  const headerRow = five.records[0];
+  if (!headerRow) throw new Error("NEMA 5W1H 域缺少记录");
+  while (headerRow.length < 6) headerRow.push({ kind: "missing" });
+  headerRow[3] = strictValueCell(change.editors.join(","));
+
+  const meta = domains.find(
+    (domain) =>
+      domain.mode === "table" &&
+      isFieldValueTable(domain) &&
+      domain.id !== NEMA_EDIT_LOG_DOMAIN_ID,
+  );
+  if (!meta) throw new Error("NEMA 文档缺少 Field/Value 元数据表, 无法安全改写编辑者");
+  const cellText = (cell: NemaStrictCell | undefined): string =>
+    cell?.kind === "value" ? cell.value : "";
+  let editorsRowFound = false;
+  let countRowFound = false;
+  let updatedAtRowFound = false;
+  const updated = meta.records.map((record) => {
+    const field = cellText(record[0]);
+    if (field === "editors") {
+      editorsRowFound = true;
+      record[1] = strictValueCell(change.editors.join(","));
+    } else if (field === "editor_count") {
+      countRowFound = true;
+      record[1] = strictValueCell(String(change.editors.length));
+    } else if (field === "updated_at") {
+      updatedAtRowFound = true;
+      record[1] = strictValueCell(change.at);
+    }
+    return record;
+  });
+  if (!editorsRowFound) {
+    updated.push([strictValueCell("editors"), strictValueCell(change.editors.join(","))]);
+  }
+  if (!countRowFound) {
+    updated.push([
+      strictValueCell("editor_count"),
+      strictValueCell(String(change.editors.length)),
+    ]);
+  }
+  if (!updatedAtRowFound) {
+    updated.push([strictValueCell("updated_at"), strictValueCell(change.at)]);
+  }
+  meta.records = updated;
+
+  let log = domains.find((domain) => domain.id === NEMA_EDIT_LOG_DOMAIN_ID);
+  if (log) {
+    if (log.mode !== "table" || !isFieldValueTable(log)) {
+      throw new Error(
+        `NEMA 域 id=${NEMA_EDIT_LOG_DOMAIN_ID} 已被非 Field/Value 表占用, 无法追加编辑痕迹`,
+      );
+    }
+  } else {
+    log = {
+      mode: "table",
+      id: NEMA_EDIT_LOG_DOMAIN_ID,
+      revision: "1",
+      columns: [NEMA_FIELD_COLUMN, NEMA_VALUE_COLUMN],
+      explicit_header: true,
+      declared_width: null,
+      records: [],
+    };
+    domains.push(log);
+  }
+  log.records.push(
+    [strictValueCell("editor"), strictValueCell(change.trace.editor)],
+    [strictValueCell("edited_at"), strictValueCell(change.trace.edited_at)],
+    [strictValueCell("change"), strictValueCell(change.trace.change)],
+  );
+  return { domains };
+}
+
+/** 从严格 AST 读取编辑痕迹 (痕迹表内 editor / edited_at / change 三行一组)。 */
+export function nemaEditTrailFromStrictDocument(
+  document: NemaStrictDocument,
+): NemaEditTraceEntry[] {
+  const log = document.domains.find((domain) => domain.id === NEMA_EDIT_LOG_DOMAIN_ID);
+  if (!log || log.mode !== "table" || !isFieldValueTable(log)) return [];
+  const text = (cell: NemaStrictCell | undefined): string =>
+    cell?.kind === "value" ? cell.value : "";
+  const entries: NemaEditTraceEntry[] = [];
+  let pending: { editor?: string; edited_at?: string } = {};
+  for (const record of log.records) {
+    const field = text(record[0]);
+    const value = text(record[1]);
+    if (field === "editor") {
+      pending = { editor: value || undefined };
+    } else if (field === "edited_at" && pending.editor) {
+      pending = { ...pending, edited_at: value || undefined };
+    } else if (field === "change" && pending.editor && pending.edited_at) {
+      entries.push({ editor: pending.editor, edited_at: pending.edited_at, change: value });
+      pending = {};
+    }
+  }
+  return entries;
+}
+
+/**
+ * 用 pin 的严格 profile 解析 .nema 源并读取编辑痕迹。
+ * 无 profile (legacy 条目) 或解析失败 → null (不伪造痕迹)。
+ */
+export async function readNemaEditTrail(
+  source: string,
+  profile: NemaInterpreterProfile | null | undefined,
+): Promise<NemaEditTraceEntry[] | null> {
+  if (!profile) return null;
+  try {
+    const document = await parseNemaWithProfileWasm(source, profile);
+    return nemaEditTrailFromStrictDocument(document);
+  } catch {
+    return null;
+  }
+}
 
 // =====================================================================
 // WASM 渐进增强通道 (per 2026-11-14: nema-codec-wasm 前端对接)

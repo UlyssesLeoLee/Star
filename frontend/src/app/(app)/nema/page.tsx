@@ -4,17 +4,39 @@ MERGE (self:File {path:"frontend/src/app/(app)/nema/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::NemaPage",kind:"component"})
 MERGE (load_profiles:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::loadInterpreterProfiles",kind:"effect"})
 MERGE (format_preview:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::formatProfilePreview",kind:"effect"})
+MERGE (add_editor_handler:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::handleAddEditor",kind:"function"})
+MERGE (remove_editor_handler:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::handleRemoveEditor",kind:"function"})
+MERGE (trail_loader:Symbol {id:"frontend/src/app/(app)/nema/page.tsx::loadEditTrail",kind:"effect"})
 MERGE (nema:File {path:"frontend/src/lib/nema/nema.ts"})
 MERGE (store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
 MERGE (watcher:File {path:"frontend/src/lib/nema/nemaWatcher.ts"})
+MERGE (collab:File {path:"frontend/src/lib/nema/nemaCollaboration.ts"})
+MERGE (main_store:File {path:"frontend/src/lib/store.ts"})
+MERGE (status_notice:File {path:"frontend/src/components/status/StatusNotice.tsx"})
+MERGE (update_editors:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::updateNemaEditors",kind:"function"})
+MERGE (read_trail:Symbol {id:"frontend/src/lib/nema/nema.ts::readNemaEditTrail",kind:"function"})
+MERGE (presence:Symbol {id:"frontend/src/lib/nema/nemaCollaboration.ts::nemaEditorPresence",kind:"function"})
+MERGE (resolve_actor:Symbol {id:"frontend/src/lib/nema/nemaCollaboration.ts::resolveNemaActor",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
+MERGE (self)-[:DEFINES]->(add_editor_handler)
+MERGE (self)-[:DEFINES]->(remove_editor_handler)
+MERGE (self)-[:DEFINES]->(trail_loader)
 MERGE (self)-[:IMPORTS]->(nema)
 MERGE (self)-[:IMPORTS]->(store)
 MERGE (self)-[:IMPORTS]->(watcher)
+MERGE (self)-[:IMPORTS]->(collab)
+MERGE (self)-[:IMPORTS]->(main_store)
+MERGE (self)-[:IMPORTS]->(status_notice)
 MERGE (page)-[:CALLS]->(load_profiles)
 MERGE (page)-[:CALLS]->(format_preview)
 MERGE (page)-[:CALLS]->(store)
 MERGE (page)-[:CALLS]->(watcher)
+MERGE (page)-[:CALLS]->(presence)
+MERGE (page)-[:CALLS]->(resolve_actor)
+MERGE (page)-[:CALLS]->(status_notice)
+MERGE (add_editor_handler)-[:CALLS]->(update_editors)
+MERGE (remove_editor_handler)-[:CALLS]->(update_editors)
+MERGE (trail_loader)-[:CALLS]->(read_trail)
 MERGE (load_profiles)-[:CALLS]->(nema)
 MERGE (format_preview)-[:CALLS]->(nema)
 @endcypher
@@ -50,9 +72,18 @@ import {
   loadNemaWasm,
   nemaDocumentForSharedFile,
   NEMA_DEFAULT_NEW_DOCUMENT_REVISION,
+  readNemaEditTrail,
   serializeNemaWithProfileWasm,
+  type NemaEditTraceEntry,
   type NemaInterpreterProfile,
 } from "@/lib/nema/nema";
+import {
+  nemaEditorPresence,
+  resolveNemaActor,
+  NEMA_REALTIME_COLLABORATION_AVAILABLE,
+} from "@/lib/nema/nemaCollaboration";
+import { useStore as useMainStore } from "@/lib/store";
+import { StatusNotice } from "@/components/status/StatusNotice";
 import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
 
 const PIPELINE = ["① 路由拆分", "② 并行编辑", "③ 语义合并", "④ 生成代码", "⑤ 验证"] as const;
@@ -95,6 +126,12 @@ export default function NemaPage() {
   const [selectedProfile, setSelectedProfile] = useState<NemaInterpreterProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [previewSource, setPreviewSource] = useState("");
+
+  // ---- 共同编辑区块状态 (per 2026-11-17 用户发令) ----
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [newEditorName, setNewEditorName] = useState("");
+  const [editTrail, setEditTrail] = useState<NemaEditTraceEntry[] | null>(null);
+  const [collaborationError, setCollaborationError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -145,7 +182,11 @@ export default function NemaPage() {
   const nemaTasks = useNemaStore((s) => s.nemaTasks);
   const registerSharedFile = useNemaStore((s) => s.registerSharedFile);
   const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
+  const updateNemaEditors = useNemaStore((s) => s.updateNemaEditors);
   const nemaWatcher = useNemaWatcher([""], undefined, selectedProfile);
+  // 复用既有身份机制 (store.identities) 解析当前编辑者, 不新造用户体系
+  const identities = useMainStore((s) => s.identities);
+  const actorName = resolveNemaActor(identities);
   const nemaLines = previewSource.split(/\r?\n/).filter(Boolean).map((text, index) => ({
     tag: String(index + 1),
     cls: text.trimStart().startsWith("\\") ? "text-accent" : "text-ink",
@@ -185,6 +226,59 @@ export default function NemaPage() {
       setProfileError(null);
     } catch (error) {
       setProfileError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  // ---- 共同编辑区块接线 ----
+  const selectedTask = nemaTasks.find((t) => t.id === selectedTaskId) ?? nemaTasks[0] ?? null;
+
+  // 编辑痕迹: 从 pin 的 strict profile 实时解析 .nema 源 (无 profile 的 legacy 条目 → null)
+  useEffect(() => {
+    if (!selectedTask) {
+      setEditTrail(null);
+      return;
+    }
+    let active = true;
+    setEditTrail(null);
+    void readNemaEditTrail(selectedTask.source, selectedTask.interpreterProfile)
+      .then((trail) => {
+        if (active) setEditTrail(trail);
+      })
+      .catch(() => {
+        if (active) setEditTrail(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedTask?.id, selectedTask?.source]);
+
+  const handleAddEditor = async () => {
+    const name = newEditorName.trim();
+    if (!selectedTask || !name) return;
+    setCollaborationError(null);
+    try {
+      const result = await updateNemaEditors(selectedTask.id, {
+        editors: [...selectedTask.editors.filter((e) => e !== name), name],
+        actor: actorName,
+      });
+      if (result.action === "refused") setCollaborationError(result.reason);
+      else setNewEditorName("");
+    } catch (error) {
+      setCollaborationError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleRemoveEditor = async (editor: string) => {
+    if (!selectedTask) return;
+    setCollaborationError(null);
+    try {
+      const result = await updateNemaEditors(selectedTask.id, {
+        editors: selectedTask.editors.filter((e) => e !== editor),
+        actor: actorName,
+      });
+      if (result.action === "refused") setCollaborationError(result.reason);
+    } catch (error) {
+      setCollaborationError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -425,7 +519,7 @@ export default function NemaPage() {
         {/* 协作组 */}
         <div className="grid grid-cols-2 gap-3">
           <section data-testid="nema-group-a" className="bg-bg-card rounded-xl border border-line shadow-soft p-3">
-            <header className="text-xs font-semibold text-ink mb-2">协作组 A · 同一文件 <span className="font-mono text-ink-dim">bfs.rs.nema</span>，按段和记录分区并行</header>
+            <header className="text-xs font-semibold text-ink mb-2">协作组 A · 同一文件 <span className="font-mono text-ink-dim">bfs.rs.nema</span>，按段和记录分区并行 <span className="text-[9px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
             <ul className="space-y-1.5">
               {[
                 { who: "A1", tag: "Agent A1", branch: "feat/A1", part: "§1 · 回边判定" },
@@ -443,7 +537,7 @@ export default function NemaPage() {
           </section>
 
           <section data-testid="nema-group-b" className="bg-bg-card rounded-xl border border-line shadow-soft p-3">
-            <header className="text-xs font-semibold text-ink mb-2">独立组 B · 不同文件 <span className="text-ink-dim font-normal">各自分支推进，跨文件契约已冻结</span></header>
+            <header className="text-xs font-semibold text-ink mb-2">独立组 B · 不同文件 <span className="text-ink-dim font-normal">各自分支推进，跨文件契约已冻结</span> <span className="text-[9px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
             <ul className="space-y-1.5">
               {[
                 { who: "B1", tag: "Agent B1", branch: "feat/B1", part: "bfs_test.rs" },
@@ -462,6 +556,134 @@ export default function NemaPage() {
             </p>
           </section>
         </div>
+
+        {/* ============ 共同编辑区块 (真实 store 数据, per 2026-11-17 用户发令) ============ */}
+        <section data-testid="nema-collaboration" className="bg-bg-card rounded-xl border border-line shadow-soft p-3">
+          <header className="flex items-center justify-between mb-2 gap-2">
+            <span className="text-xs font-semibold text-ink">共同编辑 · 编辑者登记与痕迹</span>
+            {!NEMA_REALTIME_COLLABORATION_AVAILABLE && (
+              <StatusNotice compact state="disconnected" title="实时协作未接入" />
+            )}
+          </header>
+          {!selectedTask ? (
+            <p data-testid="nema-collaboration-empty" className="text-[11px] text-ink-mute">
+              暂无共同编辑文件 — 先关联共享文件 (编辑者 ≥ 2) 生成 .nema 侧车
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-ink-mute">任务</span>
+                {nemaTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    data-testid={`nema-collab-select-${task.filePath}`}
+                    onClick={() => setSelectedTaskId(task.id)}
+                    className={clsx(
+                      "text-[10px] px-2 py-0.5 rounded-full border",
+                      task.id === selectedTask.id
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-line text-ink-dim hover:border-accent/50",
+                    )}
+                  >
+                    {task.filePath.split("/").pop() ?? task.filePath}
+                  </button>
+                ))}
+              </div>
+              <ul data-testid="nema-editor-list" className="space-y-1">
+                {selectedTask.editors.map((editor) => {
+                  const presence = nemaEditorPresence(selectedTask.editors, editTrail ?? [], editor);
+                  const identity = identities.find((i) => i.display_name === editor);
+                  return (
+                    <li
+                      key={editor}
+                      data-testid={`nema-editor-${editor}`}
+                      className="flex items-center gap-2 text-xs border border-line rounded-lg px-2 py-1"
+                    >
+                      <span className="size-5 rounded-full bg-accent/15 text-accent font-bold grid place-items-center text-[10px] shrink-0">
+                        {editor.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="text-ink truncate">{editor}</span>
+                      {identity && (
+                        <span
+                          className="text-[9px] font-mono text-ink-mute shrink-0"
+                          title={`${identity.email} · ${identity.type ?? "human"}`}
+                        >
+                          本地身份 {identity.id}
+                        </span>
+                      )}
+                      <span
+                        data-testid={`nema-presence-${editor}`}
+                        title={`来源: ${presence.source}`}
+                        className={clsx(
+                          "ml-auto rounded-full border px-1.5 py-0.5 text-[9px] shrink-0",
+                          presence.kind === "editing" && "border-ok/40 bg-ok/10 text-ok",
+                          presence.kind === "offline" && "border-warn/40 bg-warn/10 text-warn",
+                          presence.kind === "not_started" && "border-line text-ink-mute",
+                          presence.kind === "unavailable" && "border-warn/30 bg-warn/5 text-warn",
+                        )}
+                      >
+                        {presence.label}
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`nema-remove-editor-${editor}`}
+                        onClick={() => void handleRemoveEditor(editor)}
+                        className="text-[10px] text-ink-mute hover:text-err shrink-0"
+                        title="从共同编辑者中移除"
+                      >
+                        移除
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex items-center gap-1.5">
+                <input
+                  data-testid="nema-add-editor-input"
+                  value={newEditorName}
+                  onChange={(e) => setNewEditorName(e.target.value)}
+                  placeholder="添加编辑者 (姓名或身份显示名)"
+                  className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-[11px] text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                />
+                <button
+                  type="button"
+                  data-testid="nema-add-editor"
+                  onClick={() => void handleAddEditor()}
+                  disabled={!newEditorName.trim()}
+                  className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  添加
+                </button>
+              </div>
+              {collaborationError && (
+                <p data-testid="nema-collaboration-error" role="status" className="text-[10px] text-err">
+                  {collaborationError}
+                </p>
+              )}
+              <div data-testid="nema-edit-trail" className="rounded-lg border border-line bg-bg-soft/50 p-2">
+                <div className="text-[10px] font-mono text-ink-mute mb-1">
+                  编辑痕迹 (.nema 侧车 Field/Value 表, strict v2)
+                </div>
+                {selectedTask.legacyFormat || !selectedTask.interpreterProfile ? (
+                  <p className="text-[10px] text-ink-mute">legacy 格式条目 — 无 strict 痕迹表 (不静默升级)</p>
+                ) : editTrail === null ? (
+                  <p className="text-[10px] text-ink-mute">解析中…</p>
+                ) : editTrail.length === 0 ? (
+                  <p className="text-[10px] text-ink-mute">暂无编辑痕迹</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {editTrail.map((entry, index) => (
+                      <li key={index} className="text-[10px] font-mono text-ink-dim">
+                        {entry.editor} @ {entry.edited_at} — {entry.change}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* 操作按钮 */}
         <div className="flex items-center gap-2">
