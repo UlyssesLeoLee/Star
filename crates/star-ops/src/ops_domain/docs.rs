@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=8b6a49700db8c110cde3a5da51043e29cf9e442e1c4c9c9038b617c783810811
+MERGE (self:File {path:"crates/star-ops/src/ops_domain/docs.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! F-04 运维文档子域 (per SRS-001 §4 F-04 + brief §2.1)
 //!
@@ -122,7 +127,7 @@ impl DocScanner {
         Self { root }
     }
 
-    /// 扫描 4 docs 子目录 + 其他, 返 Vec<DocRef> 排序 by path
+    /// 扫描 4 docs 子目录 + 其他, 返 Vec`<DocRef>` 排序 by path
     /// 守門 #1 R-05: 仅扫 docs/ 子目录, 不扫全仓库
     /// 守門 #13: F-04 0 新表, 不持久化
     pub fn list(&self) -> Vec<DocRef> {

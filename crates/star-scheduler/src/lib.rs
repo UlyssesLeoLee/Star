@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=e613f226e878387a051ef3b802474f6ebea8456de341faad958c54f759ae69ee
+MERGE (self:File {path:"crates/star-scheduler/src/lib.rs"})
+@endcypher
+*/
 //! star-scheduler — MS Project-like 甘特/CPM Rust 阶段 1 (R8 阶段 1) 🟢
 //!
 //! Per ADR-0027 v0.1 §2.3 + plan-032 R8: **MS Project 长处整合** = 关键路径 CPM + 甘特图 +
@@ -350,7 +355,7 @@ impl Scheduler {
 
     /// 拓扑序排序 (Kahn's algorithm, per plan-032 R8 line 130)
     ///
-    /// 返 Vec<TaskId> 按拓扑序 (前置在前, 后置在后)
+    /// 返 Vec`<TaskId>` 按拓扑序 (前置在前, 后置在后)
     pub fn topologically_sort(&self, schedule: &Schedule) -> Result<Vec<TaskId>, SchedulerError> {
         // 入度表
         let mut in_degree: HashMap<TaskId, usize> = HashMap::new();
@@ -410,7 +415,7 @@ impl Scheduler {
 
     /// 计算关键路径 (CPM algorithm, per plan-032 R8 line 130)
     ///
-    /// 返 Vec<CpmNode> 按拓扑序, 每个 node 含 ES/EF/LS/LF/slack/is_critical
+    /// 返 Vec`<CpmNode>` 按拓扑序, 每个 node 含 ES/EF/LS/LF/slack/is_critical
     pub fn critical_path(&self, schedule: &Schedule) -> Result<Vec<CpmNode>, SchedulerError> {
         let topo = self.topologically_sort(schedule)?;
         let mut nodes: HashMap<TaskId, CpmNode> = HashMap::new();

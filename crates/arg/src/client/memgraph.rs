@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=f4e1c0f0241fba3d0b12f35a4f88b20601b2db9652349f54a2eb21816aa203ed
+MERGE (self:File {path:"crates/arg/src/client/memgraph.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! MemgraphClient (per DD-AGENT-RELATIONSHIP-001 §4.1).
 //!
@@ -25,7 +30,7 @@ pub const DEFAULT_MAX_CONN: u32 = 16;
 /// Bolt connection stub (per G-1 落地, 等 r2d2-memgraph 跨 session 续)
 ///
 /// v0.81: 用 tokio::sync::Mutex<Vec<()>> 模拟 connection pool
-/// 实际 r2d2-memgraph 落地后, 换成 r2d2::Pool<BoltConnectionManager>
+/// 实际 r2d2-memgraph 落地后, 换成 r2d2::Pool`<BoltConnectionManager>`
 #[derive(Debug, Default)]
 pub struct BoltConnectionPool {
     /// 实际连接池 (v0.81: 空 stub, 等 r2d2-memgraph 跨 session 续)
@@ -51,7 +56,7 @@ impl BoltConnectionPool {
 ///
 /// v0.81 阶段: 提供 connection_pool 字段, execute_write / execute 切到真实 driver path
 ///            (per 守门 #5 env safety + 守门 #11 缺标比错标 P3 跨 session 续)
-/// 等 r2d2-memgraph crate 落地后, 切到 r2d2::Pool<BoltConnectionManager>
+/// 等 r2d2-memgraph crate 落地后, 切到 r2d2::Pool`<BoltConnectionManager>`
 #[derive(Debug)]
 pub struct MemgraphClient {
     /// Bolt URL — never printed (守门 #5).

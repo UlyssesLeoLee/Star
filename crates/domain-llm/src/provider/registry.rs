@@ -1,14 +1,19 @@
+/*
+@cypher schema=1 source_sha256=838b344889d406d2db692863a7e788972150f89f6cdd139dd95e746afd7875f9
+MERGE (self:File {path:"crates/domain-llm/src/provider/registry.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `domain-llm/src/provider/registry.rs` — W2 (ULYS-98-W2) provider selection.
 //!
 //! Per `docs/briefs/ulys-98-star-cursor-min-v1.md` §"Sub-task 2.1":
 //! - provider 选择 by model name (model prefix → provider)
 //! - 注册 model → provider 映射; 默认 mock provider 兜底
-//! - thread-safe (Arc<dyn LlmProvider>) for axum handler sharing
+//! - thread-safe (`Arc<dyn LlmProvider>`) for axum handler sharing
 //!
 //! 守门合规 (per 守门 #1 v25 + 守门 #5 v2 + 守门 #7 + 守门 #11 + 守门 #14 v2 + 守门 #25 v25):
 //! - 0 `unsafe` blocks.
-//! - 注册表只持 Arc<dyn LlmProvider>, 不持有 API key 明文 (key 走 env / 调用方注入).
+//! - 注册表只持 `Arc<dyn LlmProvider>`, 不持有 API key 明文 (key 走 env / 调用方注入).
 //! - 5 域 Lead 真人到位前 Mavis 临时代签.
 
 use std::collections::HashMap;

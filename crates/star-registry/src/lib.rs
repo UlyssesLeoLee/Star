@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=5d03339c6861f6e29c482996efc9f686057c4696de80c9d881e4549f1dc19945
+MERGE (self:File {path:"crates/star-registry/src/lib.rs"})
+@endcypher
+*/
 //! star-registry — Multica Runtime Registry 域 (R3 阶段 1 Rust 实装)
 //!
 //! Per ADR-0027 R3 + plan-032 R3: 替代 `scripts/automation/registry/*_v0_legacy.py`,
@@ -56,7 +61,7 @@ impl Provider {
         }
     }
 
-    /// MULTICA_<NAME>_PATH env 名 (per Multica `agents_probe.go:116-118`)
+    /// MULTICA_`<NAME>`_PATH env 名 (per Multica `agents_probe.go:116-118`)
     pub const fn env_path(self) -> &'static str {
         match self {
             Self::Claude => "MULTICA_CLAUDE_PATH",
@@ -67,7 +72,7 @@ impl Provider {
         }
     }
 
-    /// MULTICA_<NAME>_MODEL env 名 (None for mcode per FR-4, mcode 自管 model)
+    /// MULTICA_`<NAME>`_MODEL env 名 (None for mcode per FR-4, mcode 自管 model)
     pub const fn env_model(self) -> Option<&'static str> {
         // flat match (per Rust 不在嵌套 match 跨 arm narrow, 须显式列全部 variant)
         match self {

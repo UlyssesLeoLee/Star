@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=f56d6843dff5c7c73a280145ff9d7f82c42f230eaef83fb87db85d2f6e886b10
+MERGE (self:File {path:"crates/nema-codec/src/interpreter.rs"})
+@endcypher
+*/
 // =====================================================================
 // 移植自 IDE1.0 (E:\IDE1.0, HEAD a200e5d)
 //   源文件: crates/nema-codec/src/lib.rs (sha256 前缀 1a71ad20b81a161c)
@@ -34,7 +39,7 @@ pub enum InterpreterProtocol {
     OfficialCliRender,
     /// 通用标准输入输出 JSON AST 协议 (stdin -> stdout)
     GenericJsonAstStdin,
-    /// 通用文件参数命令行 (cmd <file>)
+    /// 通用文件参数命令行 (cmd `<file>`)
     GenericFileArg,
 }
 

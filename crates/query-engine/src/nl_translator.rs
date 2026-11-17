@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=9c3d87485bbfd139dc03710a5b27551514c1cc4bedeba8d830e821e030c3c55a
+MERGE (self:File {path:"crates/query-engine/src/nl_translator.rs"})
+@endcypher
+*/
 //! `nl_translator.rs` — NL → Search DSL + Git Filter 翻译 (per FR-SEARCH-005)
 //!
 //! MVP 实现: 模板 + keyword matching, 不接真实 LLM.
@@ -5,7 +10,7 @@
 //!
 //! 输出:
 //! - `nl_to_dsl` — NL → DSL string (e.g. "show conflicts" → "show:conflict")
-//! - `nl_to_filters` — NL → Vec<Filter> (parsed DSL)
+//! - `nl_to_filters` — NL → Vec`<Filter>` (parsed DSL)
 //!
 //! 守门:
 //! - #1 v25 `cargo test -p query-engine --lib` 4/4 pass
@@ -15,8 +20,8 @@
 //! - "conflict" / "冲突" / "conflicts" → show:conflict
 //! - "stale" / "停滞" / "idle" → show:stale
 //! - "behind" / "落后" → behind:>0 (默认)
-//! - "modified" / "改动" / "changed" + filename → modified:<name>
-//! - 健康分关键词 → health:<op><num>
+//! - "modified" / "改动" / "changed" + filename → modified:`<name>`
+//! - 健康分关键词 → health:`<op>``<num>`
 //! - 否则 → empty DSL (MVP 不调用 LLM)
 
 use crate::dsl_parser::{DslParser, Filter};
@@ -109,7 +114,7 @@ pub fn nl_to_dsl(nl: &str) -> Result<String, QueryError> {
     Ok(dsl_parts.join(" "))
 }
 
-/// NL → Vec<Filter> (parse DSL 后返回)
+/// NL → Vec`<Filter>` (parse DSL 后返回)
 ///
 /// # Errors
 ///

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=bf82e96639f8b412d154937857f401a9e60df8232f6861fbb11a9022cc646d74
+MERGE (self:File {path:"crates/star-pg-adapter/src/lib.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `star-pg-adapter` — STAR PostgreSQL Adapter
 //!
@@ -129,7 +134,7 @@ pub async fn connect_pool(config: &PgConfig) -> Result<PgPool, PgAdapterError> {
 pub struct Migration {
     /// 迁移版本 (e.g. "2026-09-08-ops-cluster")
     pub version: String,
-    /// 迁移 SQL (从 db/migrations/<version>.sql 读)
+    /// 迁移 SQL (从 db/migrations/`<version>`.sql 读)
     pub sql: String,
 }
 

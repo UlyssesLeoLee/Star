@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=a2a9a7be939cc1acd7724670da54793c5e6d890097a8d077d1ae5a7fa4624218
+MERGE (self:File {path:"crates/git-observer/src/event.rs"})
+@endcypher
+*/
 //! `event.rs` — `GitEvent` 15 种 (per spec §4.5 + DD §11)
 //!
 //! Per ULYS-57.1 T2.6 (WORKTREE-CANVAS-IMPL-PLAN-001 §4.2) + TEST-DESIGN §2.2 UT `git_event_15_types_emit_correct_payload`:
@@ -44,7 +49,7 @@ pub enum GitEvent {
         /// 时间戳
         at: DateTime<Utc>,
     },
-    /// 2. refs/heads/<branch> 更新
+    /// 2. refs/heads/`<branch>` 更新
     RefsUpdated {
         /// Repo UUID
         repo_id: RepoId,
@@ -226,7 +231,7 @@ pub enum GitEvent {
 pub enum GitEventKind {
     /// HEAD commit SHA 变更
     HeadChanged,
-    /// refs/heads/<branch> 更新
+    /// refs/heads/`<branch>` 更新
     RefsUpdated,
     /// 工作区变更
     WorkingTreeChanged,

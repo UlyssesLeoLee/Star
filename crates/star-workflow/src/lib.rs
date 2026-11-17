@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=08dd6d898757fe0556a79f0cd0b1650fa50ccb0b891cee0388b1099e3c814001
+MERGE (self:File {path:"crates/star-workflow/src/lib.rs"})
+@endcypher
+*/
 //! Star 任务工作流，支持事项跟踪、状态迁移规则、迭代、指派与跨域依赖。
 //!
 //! WBS 集成 (per ADR-0027 §2.3.2 共享 Task schema 跨 3 view):
@@ -426,9 +431,9 @@ pub struct WorkflowEngine {
     pub workflows: HashMap<WorkflowId, Workflow>,
     /// Issue 仓库 (issue_key → Issue)
     pub issues: HashMap<IssueKey, Issue>,
-    /// Comment 仓库 (issue_key → Vec<Comment>)
+    /// Comment 仓库 (issue_key → Vec`<Comment>`)
     pub comments: HashMap<IssueKey, Vec<Comment>>,
-    /// Attachment 仓库 (issue_key → Vec<Attachment>)
+    /// Attachment 仓库 (issue_key → Vec`<Attachment>`)
     pub attachments: HashMap<IssueKey, Vec<Attachment>>,
     /// Sprint 仓库 (sprint_id → Sprint)
     pub sprints: HashMap<SprintId, Sprint>,

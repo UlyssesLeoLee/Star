@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=9ee61d128f8468a97567462984c696b204482d5302438520173392331b7e6970
+MERGE (self:File {path:"crates/git-observer/src/debouncer.rs"})
+@endcypher
+*/
 //! `debouncer.rs` — 100ms 防抖 (per DD §11 + spec §4.5)
 //!
 //! Per ULYS-57.1 T2.4 + IMPL-PLAN §4.2 T2.4:
@@ -8,7 +13,7 @@
 //! 关键设计 (per DD §11.1):
 //! - `pending` HashMap<EventKey, GitEvent> 暂存
 //! - `window` Duration (默认 100ms)
-//! - `tx` mpsc::Sender<GitEvent> emit 通道
+//! - `tx` mpsc::Sender`<GitEvent>` emit 通道
 //! - `run()` 主循环: 每 `window` 触发一次, 把 pending 全部 drain 到 tx
 //! - `push()`: 同 key 覆盖
 //!
@@ -29,7 +34,7 @@ use crate::event::GitEvent;
 pub enum EventKey {
     /// HEAD commit SHA 变更
     Head(std::path::PathBuf),
-    /// refs/heads/<branch>
+    /// refs/heads/`<branch>`
     Ref(String),
     /// 工作区变更 (per worktree)
     WorkingTree(std::path::PathBuf),

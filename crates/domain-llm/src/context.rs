@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=006a22b48dd69fcbac047ed1121f4c5a7c07d14baecd3fe107dd0a123b2361e8
+MERGE (self:File {path:"crates/domain-llm/src/context.rs"})
+@endcypher
+*/
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `crates/domain-llm/src/context.rs` — W3 (ULYS-98-W3) RAG 上下文检索 (per
 //! `docs/briefs/ulys-98-star-cursor-min-v1.md` §"Sub-task 3.6 上下文 RAG (基础)").
@@ -10,7 +15,7 @@
 //!
 //! **核心类型 (5 类)**:
 //! - [`Chunk`]         — 1 段被切分的原文 (path + offset + text)
-//! - [`Embedding`]     — 1 个 chunk 的向量表示 (Vec<f32> mock)
+//! - [`Embedding`]     — 1 个 chunk 的向量表示 (Vec`<f32>` mock)
 //! - [`ContextHit`]    — 1 个检索结果 (chunk + score)
 //! - [`ContextQuery`]  — 检索入参 (query text + TopK + threshold)
 //! - [`ContextBuilder`]trait — 构建 + 检索抽象, 跨 embedding provider

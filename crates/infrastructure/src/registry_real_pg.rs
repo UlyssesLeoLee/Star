@@ -48,7 +48,7 @@
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
 //!
-//! @cypher schema=1 source_sha256=9e1a57eeea4bd61b14a2d3cb6b195a96c2f700d998c84570bcf238bb80b58a43
+//! @cypher schema=1 source_sha256=fb5f78030e92248c7caaeec42cd4e0a494da50fa0028b728735ab9562563e592
 //! MERGE (self:File {path:"crates/infrastructure/src/registry_real_pg.rs"})
 //! MERGE (registry:Type {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry",kind:"struct"})
 //! MERGE (new:Symbol {id:"crates/infrastructure/src/registry_real_pg.rs::RealPostgresAdapterRegistry.new",kind:"method"})
@@ -215,7 +215,7 @@ impl RealPostgresAdapterRegistry {
 
     /// **v0.81 P0-4 Stage 3.0 多租户路由: get_pg_pool_for_tenant**
     ///
-    /// 查询 tenant 专属 PgPool (return cloned Option<PgPool> 避免 lifetime issue).
+    /// 查询 tenant 专属 PgPool (return cloned Option`<PgPool>` 避免 lifetime issue).
     /// 未注册的 tenant 返回 None (per 守门 #11 缺标比错标 + caller 自行 fallback).
     pub fn get_pg_pool_for_tenant(&self, tenant_id: Uuid) -> Option<sqlx::PgPool> {
         let tenant_pools = self.tenant_pools.read().expect("lock");

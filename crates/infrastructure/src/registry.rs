@@ -8,13 +8,13 @@
 //! 5 注册方法: postgres / nats / object_storage / scm / agent
 //! 1 查询方法: list_registered_adapters
 //!
-//! v0.72 P0-4 Stage 2 扩展: AdapterDescriptor 加 pg_url: Option<String> + registered_at: Option<DateTime<Utc>> 字段,
+//! v0.72 P0-4 Stage 2 扩展: AdapterDescriptor 加 pg_url: Option`<String>` + registered_at: Option<DateTime`<Utc>`> 字段,
 //! InMemoryAdapterRegistry 设 None (per backward compat); RealPostgresAdapterRegistry 设 Some(pg_url).
 //!
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
 //!
-//! @cypher schema=1 source_sha256=8580dfb81706d334ab8529eaf2f0b7708a834e3f49b9e36858f1f733a6f166f7
+//! @cypher schema=1 source_sha256=7d1e629efeb7cee99be10c7f91ca4fa1f42e153369e14fba1119846c3428c9e7
 //! MERGE (self:File {path:"crates/infrastructure/src/registry.rs"})
 //! MERGE (registry:Type {id:"crates/infrastructure/src/registry.rs::InMemoryAdapterRegistry",kind:"struct"})
 //! MERGE (kind:Type {id:"crates/infrastructure/src/registry.rs::AdapterKind",kind:"enum"})
@@ -72,7 +72,7 @@ use uuid::Uuid;
 /// 2. 单元测试 + 集成测试 (mock adapter)
 /// 3. 不需要真实 DB/NATS/Object Storage 的开发环境
 ///
-/// 状态: 注册过的 adapter descriptor HashMap<AdapterKind, Vec<AdapterDescriptor>>
+/// 状态: 注册过的 adapter descriptor HashMap<AdapterKind, Vec`<AdapterDescriptor>`>
 #[derive(Debug, Default)]
 pub struct InMemoryAdapterRegistry {
     /// 状态: registered adapters 索引 (kind → list of descriptors)

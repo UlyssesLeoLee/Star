@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=6d3e10c08b54217a7998fde6ee3f9e848a39a5e2eb9c5797b94e277781ebb5ea
+MERGE (self:File {path:"crates/domain-local-runtime/src/cli_session_lock.rs"})
+@endcypher
+*/
 //! Star Local Runtime — Session PID Lock 记录 (ULYS-156 P0-A 续)
 //!
 //! 实现 [ULYS-156](https://app.multica.ai/issue/01a0bf6b-486c-71b8-9bf4-92bde909c7f8)
@@ -132,7 +137,7 @@ pub struct SessionLockRegistry {
 }
 
 impl SessionLockRegistry {
-    /// 打开文件模式仓储(<data-root>/cli_session_lock.db)
+    /// 打开文件模式仓储(`<data-root>`/cli_session_lock.db)
     pub fn open(path: impl AsRef<FsPath>) -> Result<Self, SessionLockError> {
         let conn = Connection::open(path)?;
         let reg = Self {

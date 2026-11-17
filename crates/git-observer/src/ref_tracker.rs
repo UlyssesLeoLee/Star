@@ -1,4 +1,9 @@
-//! `ref_tracker.rs` — refs/heads/<branch> SHA 跟踪器 (per DD §11 + IMPL-PLAN T2.5)
+/*
+@cypher schema=1 source_sha256=0f6b00dfb2a0b00a5c4b06bc1a5fb8c3c0e287f0c54983d505849579e0fb305d
+MERGE (self:File {path:"crates/git-observer/src/ref_tracker.rs"})
+@endcypher
+*/
+//! `ref_tracker.rs` — refs/heads/`<branch>` SHA 跟踪器 (per DD §11 + IMPL-PLAN T2.5)
 //!
 //! Per branch 跟踪最近一次 SHA, 检测变更并 emit `RefsUpdated` event.
 

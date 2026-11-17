@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e90b29bba5aad7e94c8eda981f99cdc3d6418b0c22290c744a43da4ca405b2ae
+@cypher schema=1 source_sha256=fe11beb53646a8497028abc6109b88ae2f1617f6a6033bffb7ebb52f211cd7bb
 MERGE (self:File {path:"crates/star-api-rest/src/routes/im.rs"})
 MERGE (state:Type {id:"crates/star-api-rest/src/routes/im.rs::ImApiState",kind:"struct"})
 MERGE (conv:Type {id:"crates/star-api-rest/src/routes/im.rs::Conversation",kind:"struct"})
@@ -205,7 +205,7 @@ pub struct Message {
 pub struct ImApiState {
     /// conversation_id → Conversation
     pub conversations: Arc<Mutex<HashMap<String, Conversation>>>,
-    /// conversation_id → Vec<Message> (按 sequence 升序追加)
+    /// conversation_id → Vec`<Message>` (按 sequence 升序追加)
     pub messages: Arc<Mutex<HashMap<String, Vec<Message>>>>,
     /// DM 幂等索引: "min(user)|max(user)" → conversation_id (IM1.0 dm_pairs 语义)
     pub dm_index: Arc<Mutex<HashMap<String, String>>>,

@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=8c20c6d00aa1138bae79749655cfbd446e1d61650588b5aab9eaf6eba0a12073
+MERGE (self:File {path:"crates/leads/src/lib.rs"})
+@endcypher
+*/
 //! leads — 5 角色 Rust 化 (R10 阶段 1) 🟢
 //!
 //! Per plan-032 R10 line 150-155 + DD-SHARED-TASK-001 §4.6 + §7 缺口 #8:
@@ -134,7 +139,7 @@ impl LeadRealName {
     }
     /// Mavis 默认填的 5 域 Lead 真人姓名 (per 9/11 23:11 JST 强化)
     ///
-    /// 返回 Vec<LeadRealName> 含全部 5 域 Lead, 真人姓名由 Mavis 默认决定
+    /// 返回 Vec`<LeadRealName>` 含全部 5 域 Lead, 真人姓名由 Mavis 默认决定
     /// (per守门 #14 v3 "真人的内容由 agent 决定").
     pub fn mavis_default_5_leads() -> Vec<LeadRealName> {
         Lead::ALL

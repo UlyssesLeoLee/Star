@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=086ff4ed099d705a9a155e83fd69514f6f6ea4a6c824dca80d2bb6b6adf85123
+MERGE (self:File {path:"crates/terminal-stack/src/persistence.rs"})
+@endcypher
+*/
 //! `persistence.rs` — SQLite WAL Persistence Layer for Terminal Stack (ULYS-220 P1-A)
 //!
 //! **目的 (per ULYS-220 description §2)**: 把 ULYS-200 MVP v0 数据层 (ScrollbackBuffer + SplitTree
@@ -10,7 +15,7 @@
 //!   - `terminal_stack_scrollback_line` (id PRIMARY, pane_id FK, seq_no autoincrement, ...)
 //! - `ScrollbackBuffer::persist_to_sqlite()` / `restore_from_sqlite()` (per pane_id)
 //! - `SplitTree::persist_to_sqlite()` / `restore_from_sqlite()` (per root_id)
-//! - 并发: Mutex<Connection> (per cli_session_registry 模式)
+//! - 并发: Mutex`<Connection>` (per cli_session_registry 模式)
 //! - 12+ 单元测试 (含 restart scenario + 并发安全)
 //!
 //! **不在本 MVP v0 范围 (P1 followup)**:
