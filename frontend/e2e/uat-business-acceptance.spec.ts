@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=0d8e116adf24d354500b19bfced2efa6c08d421e6878ae49aa1e92cae61750f6
+MERGE (self:File {path:"frontend/e2e/uat-business-acceptance.spec.ts"})
+MERGE (client:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+MERGE (self)-[:TESTS]->(client)
+@endcypher
+*/
 // uat-business-acceptance.spec.ts — UAT 业务流程 6: 5 域 Lead CONTENT 4 维 + AC 跨引
 //
 // 触发: 2026-09-07 14:30 JST Ulysses 发令 "补充更新 playwright 测试脚本, 专门增设 UAT 测试的 mock 项目内容以及配套文档"
@@ -27,7 +34,7 @@ const FIVE_DOMAINS = [
   { id: 'player', tab: 'Agents', marker: 'player-domain-marker' },
   { id: 'economy', tab: 'Backlog', marker: 'economy-domain-marker' },
   { id: 'match', tab: 'Timeline', marker: 'match-domain-marker' },
-  { id: 'social', tab: 'Kanban', marker: 'social-domain-marker' },
+  { id: 'social', tab: 'Backlog', marker: 'social-domain-marker' },
   { id: 'admin', tab: 'Worktrees', marker: 'admin-domain-marker' },
 ] as const;
 

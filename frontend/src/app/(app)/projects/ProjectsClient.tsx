@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0fd3c4437c76f3b1aa907e43f312794263a11ebaa4c61b2d67cb8e19145a8d3d
+@cypher schema=1 source_sha256=3dc50ebbcb85d9b2e61dbc33b35470d82611ebad8768e7ff95bc2c33383e23ee
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -625,6 +625,9 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {tab === "backlog" && (
         <div data-testid="projects-backlog-tab" className="space-y-2">
           <DomainMarker domain="economy" label="economy 域 (billing/pricing/cost)" />
+          {/* social 域锚点 (per 2026-11-17 去重: 原挂在已删的 Kanban tab;
+               social 域 = 评论/协作, 跟 backlog 的任务条目同处一个工作面) */}
+          <DomainMarker domain="social" label="social 域 (评论/协作/comments)" />
           {/* Backlog 诚实态 (per 2026-11-16 清 seed/mock): 本地 seed 任务列表不作为任务事实展示 */}
           {unauthorized ? (
             <StatusNotice

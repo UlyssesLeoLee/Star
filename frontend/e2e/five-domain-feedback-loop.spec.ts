@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=4c5b2274d037a4c8b0500e8f5023f097070613455f9c9e42ce59c46fdafb341f
+MERGE (self:File {path:"frontend/e2e/five-domain-feedback-loop.spec.ts"})
+MERGE (client:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+MERGE (self)-[:TESTS]->(client)
+@endcypher
+*/
 // five-domain-feedback-loop.spec.ts — UAT 业务流程 2: 5 域 (player/economy/match/social/admin) 跨域 Feedback 流程
 //
 // 触发: 2026-09-07 14:30 JST Ulysses 发令 "补充更新 playwright 测试脚本, 专门增设 UAT 测试的 mock 项目内容以及配套文档"
@@ -23,7 +30,7 @@ const FIVE_DOMAINS = [
   { id: 'player', tab: 'Agents', marker: 'player-domain-marker', endpoint: '/api/workspaces' },
   { id: 'economy', tab: 'Backlog', marker: 'economy-domain-marker', endpoint: '/api/billing' },
   { id: 'match', tab: 'Timeline', marker: 'match-domain-marker', endpoint: '/api/worktrees' },
-  { id: 'social', tab: 'Kanban', marker: 'social-domain-marker', endpoint: '/api/comments' },
+  { id: 'social', tab: 'Backlog', marker: 'social-domain-marker', endpoint: '/api/comments' },
   { id: 'admin', tab: 'Worktrees', marker: 'admin-domain-marker', endpoint: '/api/tenants' },
 ] as const;
 

@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=3d185f02e07423f2d2e9840c6bcbe7eb299c94ed65b685efcfb6a8783bdc609b
+MERGE (self:File {path:"frontend/e2e/collaboration-5d-lead-coordination.spec.ts"})
+MERGE (client:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
+MERGE (self)-[:TESTS]->(client)
+@endcypher
+*/
 // collaboration-5d-lead-coordination.spec.ts — 100% 覆盖 协作预期 (5 类)
 //
 // 触发: 2026-09-07 16:15 JST Ulysses 发令 "测试结果中是否存在404或者交互不符合预期，协作不符合预期，这些都要100%覆盖"
@@ -29,7 +36,7 @@ const FIVE_DOMAINS = [
   { id: 'player', tab: 'Agents', marker: 'player-domain-marker', endpoint: '/api/workspaces' },
   { id: 'economy', tab: 'Backlog', marker: 'economy-domain-marker', endpoint: '/api/billing' },
   { id: 'match', tab: 'Timeline', marker: 'match-domain-marker', endpoint: '/api/worktrees' },
-  { id: 'social', tab: 'Kanban', marker: 'social-domain-marker', endpoint: '/api/comments' },
+  { id: 'social', tab: 'Backlog', marker: 'social-domain-marker', endpoint: '/api/comments' },
   { id: 'admin', tab: 'Worktrees', marker: 'admin-domain-marker', endpoint: '/api/tenants' },
 ] as const;
 
