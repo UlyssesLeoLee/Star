@@ -611,9 +611,11 @@ proptest! {
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
         bx in -1.0_f32..1.0, by in -1.0_f32..1.0, bz in -1.0_f32..1.0,
         cx in -1.0_f32..1.0, cy in -1.0_f32..1.0, cz in -1.0_f32..1.0,
-        ang_a in -3.14_f32..3.14,
-        ang_b in -3.14_f32..3.14,
-        ang_c in -3.14_f32..3.14,
+        // 用 std::f32::consts::PI 而不是 3.14 — clippy::approx_constant (deny 级)
+        // 拒绝近似常量; 区间语义不变 (原本就是用 ±π 的近似值).
+        ang_a in -std::f32::consts::PI..std::f32::consts::PI,
+        ang_b in -std::f32::consts::PI..std::f32::consts::PI,
+        ang_c in -std::f32::consts::PI..std::f32::consts::PI,
     ) {
         let axis_a = Vec3::new(ax, ay, az);
         let axis_b = Vec3::new(bx, by, bz);
@@ -662,7 +664,7 @@ proptest! {
     #[test]
     fn quat_to_mat3_matches_rotate_vec3(
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
-        angle in -3.14_f32..3.14,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
         vx in -100.0_f32..100.0, vy in -100.0_f32..100.0, vz in -100.0_f32..100.0,
     ) {
         let axis = Vec3::new(ax, ay, az);
@@ -689,7 +691,7 @@ proptest! {
     #[test]
     fn mat3_from_quat_is_orthogonal(
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
-        angle in -3.14_f32..3.14,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
     ) {
         let axis = Vec3::new(ax, ay, az);
         prop_assume!(axis.length_squared() > 1e-6);
@@ -720,7 +722,7 @@ proptest! {
     #[test]
     fn mat3_preserves_length(
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
-        angle in -3.14_f32..3.14,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
         vx in -100.0_f32..100.0, vy in -100.0_f32..100.0, vz in -100.0_f32..100.0,
     ) {
         let axis = Vec3::new(ax, ay, az);
@@ -747,7 +749,7 @@ proptest! {
     #[test]
     fn mat3_columns_are_orthonormal(
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
-        angle in -3.14_f32..3.14,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
     ) {
         let axis = Vec3::new(ax, ay, az);
         prop_assume!(axis.length_squared() > 1e-6);
@@ -828,7 +830,7 @@ proptest! {
     #[test]
     fn axis_angle_quat_is_unit(
         ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
-        angle in -3.14_f32..3.14,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
     ) {
         let axis = Vec3::new(ax, ay, az);
         prop_assume!(axis.length_squared() > 1e-6);
