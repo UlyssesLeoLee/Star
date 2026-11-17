@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b57f39a2294da7ff8ffa5d3cd11cfebbcde7cee9a091f3295de2c947eecfab2c
+@cypher schema=1 source_sha256=daee24b1c17d8d9ba5549420f653db01d98e177c6afd0d06f099b5843d5b233e
 MERGE (self:File {path:"frontend/src/components/sprint/SprintBoardView.tsx"})
 @endcypher
 */
@@ -496,10 +496,16 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
 }) {
   const sprints = useStore((s) => s.sprints);
   const allWorkItems = useStore((s) => s.workItems);
+  // per 2026-11-17 功能补齐: projectId prop 接线 (此前声明未用) — 按 project_id
+  // 过滤 sprints/workItems; 未传保持全局旧行为。
+  const visibleSprints = projectId ? sprints.filter((s) => s.project_id === projectId) : sprints;
+  const scopedWorkItems = projectId
+    ? allWorkItems.filter((w) => w.project_id === projectId)
+    : allWorkItems;
   // per 2026-11-15: Worktree 隔离 (未传 worktreeId = 全局视图, 保持旧行为)
   const workItems = worktreeId
-    ? allWorkItems.filter((w) => w.worktree_id === worktreeId)
-    : allWorkItems;
+    ? scopedWorkItems.filter((w) => w.worktree_id === worktreeId)
+    : scopedWorkItems;
   const identities = useStore((s) => s.identities);
   const createSprint = useStore((s) => s.createSprint);
   const startSprint = useStore((s) => s.startSprint);
@@ -524,9 +530,9 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
 
   const backlogItems = useMemo(() => filtered.filter((w) => !w.sprint_id), [filtered]);
 
-  const activeSprints = useMemo(() => sprints.filter((s) => s.status === "active"), [sprints]);
-  const plannedSprints = useMemo(() => sprints.filter((s) => s.status === "planned"), [sprints]);
-  const completedSprints = useMemo(() => sprints.filter((s) => s.status === "completed" || s.status === "cancelled"), [sprints]);
+  const activeSprints = useMemo(() => visibleSprints.filter((s) => s.status === "active"), [visibleSprints]);
+  const plannedSprints = useMemo(() => visibleSprints.filter((s) => s.status === "planned"), [visibleSprints]);
+  const completedSprints = useMemo(() => visibleSprints.filter((s) => s.status === "completed" || s.status === "cancelled"), [visibleSprints]);
 
   // 拖动 sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -558,7 +564,7 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
   const draggingItem = activeDragId ? workItems.find((w) => w.id === activeDragId) : null;
 
   // 关闭 dialog 用的 ref
-  const completeSprintTarget = completeSprintId ? sprints.find((s) => s.id === completeSprintId) ?? null : null;
+  const completeSprintTarget = completeSprintId ? visibleSprints.find((s) => s.id === completeSprintId) ?? null : null;
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -665,7 +671,7 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
               </div>
             )}
 
-            {sprints.length === 0 && (
+            {visibleSprints.length === 0 && (
               <div className="anime-panel p-13 text-center">
                 <Target className="w-10 h-10 mx-auto mb-3 text-ink-mute" />
                 <h3 className="text-title font-bold mb-1">尚無 Sprint</h3>
@@ -682,7 +688,7 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
         <CreateSprintDialog
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          onCreate={(input) => createSprint(input)}
+          onCreate={(input) => createSprint(projectId ? { ...input, project_id: projectId } : input)}
         />
         <CompleteSprintDialog
           open={!!completeSprintId}

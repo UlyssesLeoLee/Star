@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=9c464ca208b812920c77471e7947ff1d4188b079fc918738fda8365aaffcbf7f
+@cypher schema=1 source_sha256=8a6f92029327ad22a98d2cfdcd4a89d6e86d45366f87ceb6d5ef03767d40a286
 MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 @endcypher
 */
@@ -9,13 +9,13 @@ MERGE (self:File {path:"frontend/src/lib/redirects.ts"})
 // Single source of truth for legacy routes redirected to consolidated app
 // routes. /worktree is an active Project Worktree Index route, not a redirect.
 //
-// 20 domain routes are absorbed into 4 new panel routes (20 total
+// 19 domain routes are absorbed into consolidated panel routes (19 total
 // entries because /workspace has both an exact-match and a /:id
-// path-param variant for deep links):
+// path-param variant for deep links). per 2026-11-17 去重:
+//   /kanban     ← /board (任务看板合并进 /kanban 顶层路由)
 //   /inbox      ← notification / comment / audit / feedback / search / context
 //   /sprint     ← work-item
-//   /projects   ← project / workspace / board / planning / scm / collaboration
-//                 / relation
+//   /projects   ← project / workspace / scm / collaboration / relation
 //   /settings   ← tenant / identity / permission / integration
 //
 //   /canvas/:id 是画布本体路由, 不在 redirect 列表 (per 2026-09-04 canvas e2e
@@ -57,12 +57,11 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
   { source: "/project", destination: "/projects", permanent: false },
   // per 2026-08-31 12:42 JST DRIFT-α-003/004 修复 (handoff 兜底):
   //   5 tab 拍板 (kanban/timeline/backlog/agents/worktrees) → redirect 4 tab 死链全改 worktrees
-  { source: "/board", destination: "/projects?tab=kanban", permanent: false },
-  {
-    source: "/planning",
-    destination: "/projects?tab=timeline",
-    permanent: false,
-  },
+  // per 2026-11-17 去重: /projects?tab=kanban 已合并进 /kanban 顶层路由
+  { source: "/board", destination: "/kanban", permanent: false },
+  // /planning 无 redirect (per 2026-11-17 去重): Planning Hub 恢复独立页
+  //   src/app/planning/page.tsx (Sprint 容量/里程碑/日历) 直接可达 —
+  //   与 /workflow 同先例, redirect 抢先拦截会让独立页永不可达。
   {
     source: "/scm",
     destination: "/projects?tab=worktrees",

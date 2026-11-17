@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=18245106cf25e884a649b2aef09a6b15dbd60068259433dde809f0cd96d61c50
+@cypher schema=1 source_sha256=f9f5e2f586e99b83f8de8c6377e344012a2e81dd7ea00e5792649039b04fcf57
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (nema_store:File {path:"frontend/src/lib/nema/nemaStore.ts"})
@@ -7,16 +7,16 @@ MERGE (open_nema:Symbol {id:"frontend/src/lib/nema/nemaStore.ts::openNemaAsStarT
 MERGE (groupProjection:File {path:"frontend/src/lib/group/groupProjection.tsx"})
 MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
 MERGE (sessionStateHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupSessionState",kind:"function"})
-MERGE (statusNoticeFile:File {path:"frontend/src/components/status/StatusNotice.tsx"})
-MERGE (statusNotice:Symbol {id:"frontend/src/components/status/StatusNotice.tsx::StatusNotice",kind:"component"})
+MERGE (kanbanFilters:File {path:"frontend/src/components/board/KanbanFilters.tsx"})
+MERGE (applyBoardFilters:Symbol {id:"frontend/src/components/board/KanbanFilters.tsx::applyBoardFilters",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(nema_store)
 MERGE (self)-[:IMPORTS]->(groupProjection)
-MERGE (self)-[:IMPORTS]->(statusNoticeFile)
+MERGE (self)-[:IMPORTS]->(kanbanFilters)
 MERGE (page)-[:CALLS]->(open_nema)
 MERGE (page)-[:CALLS]->(groupApiHook)
 MERGE (page)-[:CALLS]->(sessionStateHook)
-MERGE (page)-[:CALLS]->(statusNotice)
+MERGE (page)-[:CALLS]->(applyBoardFilters)
 @endcypher
 */
 // =====================================================================
@@ -50,17 +50,15 @@ import {
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
-import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import { KanbanFilters, applyBoardFilters, type KanbanFiltersValue } from "@/components/board/KanbanFilters";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { IdeFileWorkspace } from "@/components/ide/IdeFileWorkspace";
-import { GanttView } from "@/components/gantt";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { KANBAN_COLUMNS } from "@/mocks/data/kanban";
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
-import { StatusNotice } from "@/components/status/StatusNotice";
 import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 
 const VIEW_TABS = ["Sprint", "任务看板", "IPA 流程图", "按文件开卡", "时间线", "日历"] as const;
@@ -146,7 +144,16 @@ export default function KanbanPage() {
   const renameBoardColumn = useStore((s) => s.renameBoardColumn);
   const reorderBoardColumns = useStore((s) => s.reorderBoardColumns);
 
-  const [activeView, setActiveView] = useState<ViewTab>("Sprint");
+  // per 2026-11-17 去重: Sprint 视图收敛到 /sprint (同一 SprintBoardView 不渲染两处),
+  // 本页默认视图改为"任务看板"; Sprint tab 变为直达入口卡 (沿用"时间线→/analytics"入口卡模式)。
+  const [activeView, setActiveView] = useState<ViewTab>("任务看板");
+
+  // 任务看板筛选 (per 2026-11-17 功能补齐: 复用 KanbanFilters 孤儿组件, kind/assignee/priority)
+  const [boardFilter, setBoardFilter] = useState<KanbanFiltersValue>({
+    kind: "all",
+    assignee_id: "all",
+    priority: "all",
+  });
 
   // 深链 ?view= (client-only 解析; 不用 useSearchParams — dev 下与页面级
   // Suspense 组合会产生双份 DOM 渲染)
@@ -167,6 +174,17 @@ export default function KanbanPage() {
   const selectedProjectId = useNavStore((s) => s.selectedProjectId);
   const projectId = selectedProjectId || projects[0]?.id || "";
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
+
+  // ---- 任务看板数据 (per 2026-11-17 去重合并): 从 /projects?tab=kanban 合并进来的
+  //      project 范围语义 — 选中项目时按 project_id 过滤, 未选中时保持全局旧行为。
+  const boardWorkItems = useMemo(
+    () => (selectedProjectId ? workItems.filter((w) => w.project_id === selectedProjectId) : workItems),
+    [workItems, selectedProjectId],
+  );
+  const filteredBoardWorkItems = useMemo(
+    () => applyBoardFilters(boardWorkItems, boardFilter),
+    [boardWorkItems, boardFilter],
+  );
 
   // ---- nema 文件即任务 (真实 store) ----
   const nemaTasks = useNemaStore((s) => s.nemaTasks);
@@ -356,56 +374,40 @@ export default function KanbanPage() {
         {/* ============ 视图内容 = 原有真实功能 ============ */}
         {activeView === "Sprint" && (
           <section data-testid="kanban-sprint-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
-            {/* Backlog 快捷建卡 (per 1b mockup: 从 IPA 流程建卡 / 按文件开卡) */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-ink-dim">从下方 Backlog 把卡移进来</span>
-              <span className="flex-1" />
-              <button
-                type="button"
-                onClick={() => setActiveView("IPA 流程图")}
-                data-testid="kanban-backlog-create-ipa"
-                className="rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
-              >
-                从 IPA 流程建卡
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveView("按文件开卡")}
-                data-testid="kanban-backlog-create-file"
-                className="rounded-lg border border-line bg-bg-soft/60 px-2.5 py-1.5 text-[11px] font-semibold text-ink hover:border-accent/50 transition-colors"
-              >
-                按文件开卡
-              </button>
+            {/* per 2026-11-17 去重: SprintBoardView 收敛到 /sprint 独立模块
+                (同一组件 + 同一数据 + 同一组操作不在两处渲染), 本 tab 变为直达入口卡。
+                沿用"时间线→/analytics"入口卡模式, 不另起炉灶。 */}
+            <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-center">
+              <p className="text-xs font-semibold text-ink">Sprint 规划已收敛到 Sprint 主面板</p>
+              <p className="text-[11px] text-ink-dim">
+                Backlog 拖入 / 创建 / 启动 / 完成 / 删除 Sprint 与
+                List · Tree 视图现在统一在
+                <a
+                  href="/sprint?view=sprint"
+                  className="mx-1 font-semibold text-accent underline underline-offset-2"
+                  data-testid="kanban-sprint-open-issues"
+                >
+                  Sprint 主面板
+                </a>
+                打开 (per 2026-11-17 去重)
+              </p>
             </div>
-            {/* Sprint 视图诚实态 (per 2026-11-16 清 seed/mock): sprints 取 store 真实数据,
-                无则空态; 未授权时不渲染 seed sprints (不当真 Sprint 记录) */}
-            {unauthorized ? (
-              <div data-testid="kanban-sprint-unauthorized">
-                <StatusNotice
-                  state="unauthorized"
-                  title="未授权 — Sprint 数据不可用"
-                  hint="当前会话未获授权读取服务端 Sprint 数据。请在宿主会话中重新授权后刷新, 本地 seed 数据不作为任务事实展示。"
-                />
-              </div>
-            ) : sprints.length === 0 ? (
-              <div data-testid="kanban-sprint-empty">
-                <StatusNotice
-                  state="empty"
-                  title="暂无 Sprint 数据"
-                  hint="当前没有可显示的 Sprint。请在宿主会话接入后由授权投影填充, 或调整项目选择。"
-                />
-              </div>
-            ) : (
-              <SprintBoardView onSelect={(id) => setDrawerMode({ kind: "view", workItemId: id })} />
-            )}
           </section>
         )}
 
         {activeView === "任务看板" && (
           <section data-testid="kanban-board-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+            {/* 筛选 (per 2026-11-17 功能补齐: KanbanFilters 原为无接线孤儿组件, 此处接入) */}
+            <KanbanFilters
+              value={boardFilter}
+              onChange={setBoardFilter}
+              assignees={identities}
+              total={boardWorkItems.length}
+              shown={filteredBoardWorkItems.length}
+            />
             <KanbanBoard
               board={board}
-              workItems={workItems}
+              workItems={filteredBoardWorkItems}
               identities={identities}
               onTransition={transitionWorkItem}
               onWorkItemClick={(wi) => setDrawerMode({ kind: "view", workItemId: wi.id })}
@@ -420,7 +422,7 @@ export default function KanbanPage() {
                   ? "unauthorized"
                   : !hostConnected
                     ? "disconnected"
-                    : workItems.length === 0
+                    : boardWorkItems.length === 0
                       ? "empty"
                       : null
               }

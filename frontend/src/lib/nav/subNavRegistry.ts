@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=131575c0251f127bf28e2d61d4bf9eaa0f5447083db2f6d57f4c920f18e55519
+@cypher schema=1 source_sha256=0dff9fd4fde3a6e0fc856c13dca7597ded96d3f27636ecd89392b36196debc10
 MERGE (self:File {path:"frontend/src/lib/nav/subNavRegistry.ts"})
 @endcypher
 */
@@ -24,7 +24,6 @@ MERGE (self:File {path:"frontend/src/lib/nav/subNavRegistry.ts"})
 // =====================================================================
 
 import {
-  SquareKanban,
   SquareChartGantt,
   LayoutDashboard,
   Users,
@@ -81,15 +80,8 @@ export const SUBNAV_REGISTRY: SubNavGroup[] = [
     pathnamePrefix: "/projects",
     topLabel: "Project",
     category: "work",
+    // per 2026-11-17 去重: kanban 项移除 (任务看板合并进 /kanban 顶层路由)
     items: [
-      {
-        id: "kanban",
-        label: "Kanban",
-        code: "KB",
-        icon: SquareKanban,
-        category: "work",
-        query: "tab=kanban",
-      },
       {
         id: "timeline",
         label: "Timeline",

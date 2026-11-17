@@ -18,7 +18,7 @@
 //   cookies.server.ts 加 import "server-only" 让 client bundle 完全不含 next/headers.
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=258e928ee84b0bc6746332207a0dafcebb82bb4238202848710d8426568e8d14
+@cypher schema=1 source_sha256=7b07c5f46668c28db612c3c1c6b0cdefad3f85bd068b043040cca8a13bf858fe
 MERGE (self:File {path:"frontend/src/lib/cookies.ts"})
 MERGE (tabType:Type {id:"frontend/src/lib/cookies.ts::ProjectsTabId",kind:"type"})
 MERGE (validTabs:Symbol {id:"frontend/src/lib/cookies.ts::VALID_PROJECTS_TABS",kind:"constant"})
@@ -34,6 +34,8 @@ MERGE (self)-[:DEFINES]->(resolve)
 export const PROJECTS_DEFAULT_TAB_COOKIE = "projects-default-tab";
 
 export const VALID_PROJECTS_TABS = [
+  // per 2026-11-17 去重: "kanban" 保留为 legacy 合法值 (老 cookie/URL ?tab=kanban
+  // 由 ProjectsClient redirect effect 转发 /kanban), 不再是本页可选 tab。
   "kanban",
   "timeline",
   "backlog",
@@ -61,7 +63,8 @@ export function writeProjectsDefaultTabCookie(tab: ProjectsTabId): void {
 
 /**
  * 解析 URL ?tab= / ?canvas= 推断 default tab (server-side, 无 client hook 依赖).
- * 优先级: URL ?tab=X > URL ?canvas= → backlog > cookie > "kanban"
+ * 优先级: URL ?tab=X > URL ?canvas= → backlog > cookie > "backlog"
+ * per 2026-11-17 去重: 默认 tab 从 kanban 改 backlog (kanban 已合并进 /kanban)。
  */
 export function resolveInitialTab(
   urlSearchParams: Record<string, string | string[] | undefined> | undefined,
@@ -73,7 +76,7 @@ export function resolveInitialTab(
     // ?canvas=:id → backlog tab (per 2026-08-31 12:42 JST DRIFT-α-005 修复)
     if (pickString(urlSearchParams.canvas)) return "backlog";
   }
-  return cookieTab ?? "kanban";
+  return cookieTab ?? "backlog";
 }
 
 function pickString(v: string | string[] | undefined): string | undefined {

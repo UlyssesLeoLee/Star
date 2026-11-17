@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d23475ed934ec8a02fa43eb4a1b53aba97a58abb7fecca78fcb4dcb8f1a34d9a
+@cypher schema=1 source_sha256=9f75e27a92c76acbf2ec632b4ebec2ff6dcef9738b0a786cf10c7bac01cb2622
 MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.tsx"})
 @endcypher
 */
@@ -35,10 +35,11 @@ import { useState, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { useNavStore } from "@/lib/nav/navStore";
 import { StatusPill } from "@/components/StatusPill";
 import { PageHeader } from "@/components/PageHeader";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
-import { Plus, Search, X, Flag, User, Hash, Tag, FileText, GitBranch, ListTree, LayoutGrid, List, Calendar, ChevronRight } from "lucide-react";
+import { Plus, Search, X, Flag, User, Hash, Tag, FileText, ListTree, List, Calendar, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import type { WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
@@ -79,6 +80,8 @@ function IssuesPageInner() {
   const board = useStore((s) => s.board);
   const sprints = useStore((s) => s.sprints);
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
+  // per 2026-11-17 功能补齐: Sprint 视图项目范围 (null = 全局旧行为)
+  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
 
   // ---- view (URL ?view=) ----
   // Per 2026-09-05 19:13 JST 拍板: 默认打开 Sprint
@@ -324,7 +327,9 @@ function IssuesPageInner() {
             )}
             {view === "sprint" && (
               // Per 2026-09-05 19:32 JST 拍板: Sprint 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
-              <SprintBoardView onSelect={setSelectedId} />
+              // per 2026-11-17 功能补齐: 传入 navStore 选中项目, SprintBoardView 按
+              //   project_id 过滤 (未选项目时保持全局旧行为)。
+              <SprintBoardView onSelect={setSelectedId} projectId={selectedProjectId ?? undefined} />
             )}
           </div>
 
@@ -431,47 +436,81 @@ function IssuesListView({
 
 // =====================================================================
 // Tree view (per §5.1 树形 epic → story → task → subtask 缩进)
+// per 2026-11-17 功能补齐: 层级改用 WorkItem.parent_id (2026-11-11 addSubTask
+// 写入的真实父子关系, 复用既有子任务模型) 而非 kind 推断; 无 parent_id 的旧
+// 数据按 kind 归组兜底 (非 epic 归第一个 epic 下, 沿用旧行为)。
 // =====================================================================
-type TreeNode = WorkItem & { children: TreeNode[]; depth: number };
+export type TreeNode = WorkItem & { children: TreeNode[]; depth: number };
 
-function buildTree(items: WorkItem[]): TreeNode[] {
-  // 简化: 用 kind 分层 (epic → story → task → bug/spike)
-  // 真实环境应该用 parent_id / relations 表
-  // 排序: kind priority (epic > story > task > bug > spike) + key 升序
-  const KIND_ORDER: Record<string, number> = { epic: 0, story: 1, task: 2, bug: 3, spike: 4 };
+const KIND_ORDER: Record<string, number> = { epic: 0, story: 1, task: 2, bug: 3, spike: 4 };
 
+function byKindThenKey(a: WorkItem, b: WorkItem): number {
+  const ka = KIND_ORDER[a.kind] ?? 99;
+  const kb = KIND_ORDER[b.kind] ?? 99;
+  if (ka !== kb) return ka - kb;
+  return a.key.localeCompare(b.key);
+}
+
+export function buildTree(items: WorkItem[]): TreeNode[] {
   const byId = new Map<string, TreeNode>();
   items.forEach((w) => byId.set(w.id, { ...w, children: [], depth: 0 }));
 
-  // 按 kind 排序的 root 节点 (epic 当 root)
-  const sorted = [...items].sort((a, b) => {
-    const ka = KIND_ORDER[a.kind] ?? 99;
-    const kb = KIND_ORDER[b.kind] ?? 99;
-    if (ka !== kb) return ka - kb;
-    return a.key.localeCompare(b.key);
-  });
+  // parent_id → children 映射 (真实父子关系); parent 缺失/自环 → 孤儿
+  const childrenOf = new Map<string, TreeNode[]>();
+  const orphans: TreeNode[] = [];
+  for (const w of items) {
+    const node = byId.get(w.id)!;
+    if (w.parent_id && w.parent_id !== w.id && byId.has(w.parent_id)) {
+      const list = childrenOf.get(w.parent_id) ?? [];
+      list.push(node);
+      childrenOf.set(w.parent_id, list);
+    } else {
+      orphans.push(node);
+    }
+  }
+
+  const visited = new Set<string>();
+  const attach = (node: TreeNode, depth: number) => {
+    if (visited.has(node.id)) return;
+    visited.add(node.id);
+    node.depth = depth;
+    const kids = (childrenOf.get(node.id) ?? []).sort(byKindThenKey);
+    for (const c of kids) {
+      // 环边切断: 已访问节点不再挂载 (防 parent 链成环时无限递归/渲染栈溢出)
+      if (visited.has(c.id)) continue;
+      node.children.push(c);
+      attach(c, depth + 1);
+    }
+  };
 
   const roots: TreeNode[] = [];
-  sorted.forEach((w) => {
-    const node = byId.get(w.id)!;
-    if (w.kind === "epic") {
-      // epic 是 root
-      node.depth = 0;
+  const sortedOrphans = [...orphans].sort(byKindThenKey);
+  let firstEpic: TreeNode | null = null;
+  for (const node of sortedOrphans) {
+    if (node.kind === "epic") {
       roots.push(node);
-    } else {
-      // 找一个 epic (key prefix 匹配) 或者 上一个更高优先级
-      const epicRoot = roots.find((r) => r.kind === "epic");
-      if (epicRoot) {
-        node.depth = 1;
-        epicRoot.children.push(node);
-      } else {
-        // 没有 epic — 自当 root
-        node.depth = 0;
-        roots.push(node);
-      }
+      attach(node, 0);
+      if (!firstEpic) firstEpic = node;
     }
-  });
-
+  }
+  // 旧数据兜底: 无 parent_id 的非 epic 归到第一个 epic 下 (per 旧 kind 推断行为)
+  for (const node of sortedOrphans) {
+    if (node.kind === "epic") continue;
+    if (firstEpic) {
+      attach(node, 1);
+      firstEpic.children.push(node);
+    } else {
+      roots.push(node);
+      attach(node, 0);
+    }
+  }
+  // 环兜底: parent 链成环的节点自当 root (防静默丢节点)
+  for (const node of byId.values()) {
+    if (!visited.has(node.id)) {
+      roots.push(node);
+      attach(node, 0);
+    }
+  }
   return roots;
 }
 
@@ -583,104 +622,11 @@ function IssuesTreeView({
 }
 
 // =====================================================================
-// Sprint view (per §5.1 按 sprint 分组的 Kanban)
+// per 2026-11-17 去重: 页内旧 IssuesSprintView (按 sprint 分组 kanban) 删除 —
+//   与 SprintBoardView 同数据同操作, 渲染分支早已切换, 属死代码。
 // =====================================================================
-function IssuesSprintView({
-  items,
-  sprints,
-  identities,
-  onSelect,
-}: {
-  items: WorkItem[];
-  sprints: ReturnType<typeof useStore.getState>["sprints"];
-  identities: Identity[];
-  onSelect: (id: string) => void;
-}) {
-  // 按 sprint 分组 (有 sprint_id 优先, 没 sprint_id 的进 "Backlog")
-  const grouped = useMemo(() => {
-    const map = new Map<string, WorkItem[]>();
-    sprints.forEach((s) => map.set(s.id, []));
-    map.set("__backlog__", []);
-
-    items.forEach((w) => {
-      const key = w.sprint_id ?? "__backlog__";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(w);
-    });
-
-    return sprints
-      .map((s) => ({ sprint: s, items: map.get(s.id) ?? [] }))
-      .filter((g) => g.items.length > 0)
-      .concat(
-        map.get("__backlog__")!.length > 0
-          ? [{ sprint: { id: "__backlog__", name: "Backlog", status: "planned" } as any, items: map.get("__backlog__")! }]
-          : [],
-      );
-  }, [items, sprints]);
-
-  if (grouped.length === 0) {
-    return <div className="card text-center text-ink-mute italic py-6">无 sprint</div>;
-  }
-
-  return (
-    <div className="space-y-4" data-testid="issues-sprint-list">
-      {grouped.map(({ sprint, items: sprintItems }) => (
-        <div key={sprint.id} className="card" data-testid={`issues-sprint-${sprint.id}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <GitBranch size={12} className="text-accent" />
-              <span className="text-sm font-semibold">{sprint.name}</span>
-              {sprint.status && <StatusPill value={sprint.status} size="xs" />}
-            </div>
-            <span className="text-[10px] text-ink-mute font-mono">
-              {sprintItems.length} items
-            </span>
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {(["todo", "in_progress", "review", "done"] as const).map((st) => {
-              const colItems = sprintItems.filter((w) => w.status === st);
-              return (
-                <div
-                  key={st}
-                  data-testid={`issues-sprint-col-${sprint.id}-${st}`}
-                  className="border-2 border-black bg-[var(--cel-surface-sub, var(--color-surface))] p-2 min-h-[80px] shadow-soft"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <StatusPill value={st} size="xs" />
-                    <span className="text-[10px] text-ink-mute font-mono">{colItems.length}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {colItems.slice(0, 5).map((w) => (
-                      <div
-                        key={w.id}
-                        onClick={() => onSelect(w.id)}
-                        className="text-[11px] px-1.5 py-1 rounded bg-bg-soft/60 hover:bg-bg-soft cursor-pointer border-l-2"
-                        data-testid={`issues-sprint-card-${w.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-[9px] text-info">{w.key}</span>
-                          <span className={clsx("font-mono text-[9px]", PRIORITY_COLOR[w.priority])}>
-                            {w.priority.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="line-clamp-1">{w.title}</div>
-                      </div>
-                    ))}
-                    {colItems.length > 5 && (
-                      <div className="text-[10px] text-ink-mute italic text-center">+{colItems.length - 5} more</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// =====================================================================
+// Detail sidebar (320px — per §5.1 列下拉 详情侧栏)
+// =====================================================================// =====================================================================
 // Detail sidebar (320px — per §5.1 列下拉 详情侧栏)
 // =====================================================================
 function IssuesDetailSidebar({

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=122c7a609a331bda842a93b1465ffc4ddbc4991774d1a3d5d5b07908c3b0530b
+@cypher schema=1 source_sha256=3e35bd77fb6454780bd10e4a08ef261a1e7216ab0fd334abd6de7bf0d38fff54
 MERGE (self:File {path:"frontend/e2e/redirects.spec.ts"})
 MERGE (redirects:File {path:"frontend/src/lib/redirects.ts"})
 MERGE (shim:File {path:"frontend/src/lib/redirects.shim.cjs"})
@@ -61,11 +61,13 @@ const findRedirect = (source: string) => {
 };
 
 describe("redirects: legacy 20 routes → 4 panels", () => {
-  it("contains 20 entries (8 projects-sink + 2 issues/sprint-sink + 6 inbox-sink + 4 settings-sink)", () => {
+  it("contains 19 entries (per 2026-11-17 去重: /planning 恢复独立页, /board 改指 /kanban)", () => {
     // /worktree is not redirected because it is the Project Worktree Index route.
     // per 2026-11-16 10 条第 4 条: agent-sink 7 routes removed (不再固定指向 canvas-001).
-    // Total: 8 project routes + 2 sprint routes + 6 inbox routes + 4 settings routes.
-    expect(LEGACY_REDIRECTS.length).toBe(20);
+    // per 2026-11-17 去重: /planning redirect 删除 (独立页可达, 同 /workflow 先例),
+    //   /board 目的地改 /kanban (任务看板合并进 /kanban)。
+    // Total: 19 = 8 project routes + 2 sprint routes + 5 inbox + 4 settings.
+    expect(LEGACY_REDIRECTS.length).toBe(19);
   });
 
   it("/workspace → /projects (case 1)", () => {
@@ -83,11 +85,11 @@ describe("redirects: legacy 20 routes → 4 panels", () => {
     expect(findRedirect("/worktree")).toBeUndefined();
   });
 
-  it("/board → /projects?tab=kanban (case 3, per 2026-08-31 12:42 JST DRIFT-α-003 修复)", () => {
-    // per handoff 兜底 + 5 tab 拍板 (kanban/timeline/backlog/agents/worktrees):
-    //   /board 旧 redirect tab=board 不存在, 改 tab=kanban (5 tab 之一)
+  it("/board → /kanban (case 3, per 2026-11-17 去重: /projects?tab=kanban 合并进 /kanban)", () => {
+    // per 2026-08-31 12:42 JST DRIFT-α-003: 旧 tab=board 不存在, 改 kanban;
+    // per 2026-11-17 去重: /projects 的 kanban tab 合并进 /kanban 顶层路由, 目的地随之更新。
     const r = findRedirect("/board");
-    expect(r?.destination).toBe("/projects?tab=kanban");
+    expect(r?.destination).toBe("/kanban");
   });
 
   it("/audit → /inbox?type=audit (case 4)", () => {
@@ -95,9 +97,9 @@ describe("redirects: legacy 20 routes → 4 panels", () => {
     expect(r?.destination).toBe("/inbox?type=audit");
   });
 
-  it("/planning → /projects?tab=timeline (case 5)", () => {
+  it("/planning 无 redirect — 独立页 src/app/planning/page.tsx 直接可达 (2026-11-17 去重, 同 /workflow 先例)", () => {
     const r = findRedirect("/planning");
-    expect(r?.destination).toBe("/projects?tab=timeline");
+    expect(r).toBeUndefined();
   });
 
   it("/workflow 无 redirect — 独立页 src/app/workflow/page.tsx 直接可达 (2026-11-15 canvas 自审)", () => {
@@ -159,6 +161,7 @@ describe("redirects: legacy 20 routes → 4 panels", () => {
       "/sprint",
       "/projects",
       "/settings",
+      "/kanban",
     ];
     for (const r of LEGACY_REDIRECTS) {
       const ok = PANEL_PREFIXES.some(

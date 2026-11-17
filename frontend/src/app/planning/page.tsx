@@ -1,3 +1,10 @@
+/*
+@cypher schema=1 source_sha256=ef5fbc2e99cfc58fa64d0279f49d7e153dd0899ec042feb1b630420bd049bdfc
+MERGE (self:File {path:"frontend/src/app/planning/page.tsx"})
+MERGE (page:Symbol {id:"frontend/src/app/planning/page.tsx::PlanningPage",kind:"component"})
+MERGE (self)-[:DEFINES]->(page)
+@endcypher
+*/
 "use client";
 
 import { useMemo, useState } from "react";
@@ -79,6 +86,15 @@ export default function PlanningPage() {
         track="E"
         count={`${sprints.length} sprints / ${milestones.length} milestones / ${workItems.length} work-items`}
       />
+
+      {/* 数据来源标识 (per 2026-11-17 恢复可达后补诚实徽标: 预览/seed 数据不得冒充正式管理视图) */}
+      <div
+        data-testid="planning-data-source"
+        className="mb-3 flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn"
+      >
+        <span className="size-1.5 rounded-full bg-warn" />
+        预览数据模式 — 当前规划展示本地 seed 数据, 非授权服务端 Sprint/里程碑事实。宿主会话接入后自动切换为授权投影。
+      </div>
 
       <Tabs
         active={tab}

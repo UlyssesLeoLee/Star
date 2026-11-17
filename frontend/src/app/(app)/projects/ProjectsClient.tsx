@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=62b529b2595f59499eb413973b38e4008e882da183b5c6afb5e41d606887259a
+@cypher schema=1 source_sha256=0fd3c4437c76f3b1aa907e43f312794263a11ebaa4c61b2d67cb8e19145a8d3d
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsClient.tsx"})
 MERGE (dateUtils:File {path:"frontend/src/lib/gantt/dateUtils.ts"})
 MERGE (projectsClient:Function {name:"ProjectsClient", language:"typescript", visibility:"public"})
@@ -80,12 +80,9 @@ import {
   writeProjectsDefaultTabCookie,
   isValidProjectsTab,
 } from "@/lib/cookies";
-import { KanbanBoard } from "@/components/board/KanbanBoard";
-import type { KanbanUnavailableState } from "@/components/board/KanbanBoard";
 import { StatusNotice } from "@/components/status/StatusNotice";
 import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
-import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGraphModal";
 import { GanttChart } from "@/components/gantt";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { IPA_SKILL_CATALOG } from "@/lib/ipa-skills/catalog";
@@ -95,7 +92,6 @@ import {
   FolderTree,
   FolderPlus,
   LayoutDashboard,
-  SquareKanban,
   SquareChartGantt,
   CalendarRange,
   Users,
@@ -112,7 +108,7 @@ import {
   toUtcCalendarDate,
 } from "@/lib/gantt/dateUtils";
 import type {
-  Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
+  Project, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
@@ -122,6 +118,7 @@ import {
   applyKanbanFilter,
   applyWorktreeFilter,
   isFilterActive,
+  sortBacklogItems,
   KANBAN_STATUSES,
   BACKLOG_PRIORITIES,
   EMPTY_PROJECTS_FILTER,
@@ -129,8 +126,10 @@ import {
 } from "./ProjectsFilterBar";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
+// per 2026-11-17 去重: kanban tab 合并进 /kanban 顶层路由 (2026-11-14 拍板延续),
+// 本页 tabs = Timeline / Backlog / Agents / Worktrees / IPA 技能 (kanban 保留为 legacy
+// cookie/URL 值, 由 redirect effect 转发 /kanban)。
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
-  { id: "kanban",    label: "Kanban",    icon: <SquareKanban size={12} /> },
   { id: "timeline",  label: "Timeline",  icon: <SquareChartGantt size={12} /> },
   { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
   { id: "agents",    label: "Agents",    icon: <Users size={12} /> },
@@ -138,8 +137,7 @@ const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode
   { id: "ipa",       label: "IPA 技能",  icon: <Workflow size={12} /> },
 ];
 
-// Kanban 5 列 (per KANBAN_COLUMNS in mocks/data/kanban.ts, blocked 状态列入主面板)
-const KANBAN_COLUMNS: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done"];
+// Kanban 列已随 tab 合并进 /kanban (per 2026-11-17 去重), 本页不再内联 KANBAN_COLUMNS 副本。
 
 // ---- 角色 mock 推导 (per 已知缺口 #4) ----
 // member_count >= 5 → project_admin, 1-4 → developer, 0 → viewer
@@ -157,16 +155,10 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const workItems = useStore((s) => s.workItems);
   const sprints = useStore((s) => s.sprints);
   const milestones = useStore((s) => s.milestones);
-  const board = useStore((s) => s.board);
   const relations = useStore((s) => s.relations);
   const identities = useStore((s) => s.identities);
   const workspaces = useStore((s) => s.workspaces);
   const agentSessions = useStore((s) => s.agentSessions);
-  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板)
-  const addBoardColumn = useStore((s) => s.addBoardColumn);
-  const removeBoardColumn = useStore((s) => s.removeBoardColumn);
-  const renameBoardColumn = useStore((s) => s.renameBoardColumn);
-  const reorderBoardColumns = useStore((s) => s.reorderBoardColumns);
   const changeSets = useStore((s) => s.changeSets);
   const worktrees = useStore((s) => s.worktrees);
   // per DRIFT-α-009 修复 (2026-09-06): /canvas/:id 详情页可达但无入口 —
@@ -179,15 +171,11 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const canvases = useStore((s) => s.canvases);
   const repositories = useStore((s) => s.repositories);
   const pullRequests = useStore((s) => s.pullRequests);
-  const transitionWorkItem = useStore((s) => s.transitionWorkItem);
   const transitionMilestone = useStore((s) => s.transitionMilestone);
   const transitionSprint = useStore((s) => s.transitionSprint);
 
-  // ---- 架构查看器 trigger (per ADR-0041) ----
-  const arch = useArchGraphTrigger();
-
   // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
-  // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → Kanban/Backlog
+  // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → Backlog
   // 不渲染本地 seed 任务卡 (不当真任务), 改诚实未接入/未授权/空数据态;
   // 401 信号来自 useWorktreeGroupSessionState() (status === "invalidated"),
   // 判定顺序: unauthorized 先于 disconnected。
@@ -195,11 +183,6 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const groupSession = useWorktreeGroupSessionState();
   const unauthorized = groupSession.status === "invalidated";
   const hostConnected = groupApi !== null;
-  const kanbanUnavailable: KanbanUnavailableState | null = unauthorized
-    ? "unauthorized"
-    : !hostConnected
-      ? "disconnected"
-      : null;
 
   // ---- selectedProjectId 提升到 navStore (per 2026-09-03 12:36 JST 拍板 #1) ----
   // - 持久化到 localStorage, 跨 page 共享, 让 Sidebar 的 project scope 能读到
@@ -231,10 +214,23 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   useEffect(() => {
     setTabInternal(initialTab);
   }, [initialTab]);
+  // per 2026-11-17 去重: kanban 已合并进 /kanban 顶层路由 — 老 ?tab=kanban /
+  // cookie=kanban 深链客户端转发到 /kanban (next.config redirects 匹配不了 query,
+  // 这里做客户端兜底, 老链接不 404)。
+  useEffect(() => {
+    if (initialTab === "kanban") {
+      router.replace("/kanban");
+    }
+  }, [initialTab, router]);
   // 切 tab 时同步写 cookie (per 2026-09-01 16:41 JST cookie-default 拍板)
   //   同时写回 URL ?tab= 保证 前进/后退/分享链接 与 sidebar 高亮一致
   //   (per 2026-11-12 用户发令: 每个导航按钮都要正确切换)
   const setTab = useCallback((id: ProjectsTabId) => {
+    // per 2026-11-17 去重: 防御性 — kanban 切换一律转发到 /kanban 顶层路由
+    if (id === "kanban") {
+      router.replace("/kanban");
+      return;
+    }
     setTabInternal(id);
     if (isValidProjectsTab(id)) {
       writeProjectsDefaultTabCookie(id);
@@ -367,75 +363,10 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
     [identities, projectMemberIds],
   );
 
-  // ---- Board 拖动 transition: ProjectBoard 复用 W1 模式 (transitionWorkItem + 同步 board.columns) ----
-  const handleBoardTransition = useCallback(
-    (workItemId: string, toStatus: WorkItemStatus) => {
-      // 校验: 仅处理当前 project 的 work-item
-      const w = workItems.find((x) => x.id === workItemId);
-      if (!w || w.project_id !== selectedProjectId) return;
-
-      // 1) 走 store 状态机
-      transitionWorkItem(workItemId, toStatus);
-
-      // 2) 同步 board.columns (per W1 pattern)
-      useStore.setState((s) => {
-        const fromCol = s.board.columns.find((c) => c.work_item_ids.includes(workItemId));
-        const toCol = s.board.columns.find((c) => c.status === toStatus);
-        if (!fromCol || !toCol) return s;
-        if (fromCol.status === toCol.status) return s;
-        return {
-          board: {
-            ...s.board,
-            columns: s.board.columns.map((c) => {
-              if (c.status === fromCol.status) {
-                return { ...c, work_item_ids: c.work_item_ids.filter((id) => id !== workItemId) };
-              }
-              if (c.status === toCol.status) {
-                return { ...c, work_item_ids: [...c.work_item_ids, workItemId] };
-              }
-              return c;
-            }),
-          },
-        };
-      });
-    },
-    [workItems, selectedProjectId, transitionWorkItem],
-  );
-
   // ---- Kanban 卡 Drawer 状态 (per 2026-08-31 12:07 JST 拍板: 替换 inline add) ----
-  // mode="new"  → 列底部 +Add task 按钮触发, status 锁定为触发列
-  // mode="view" → KanbanCard 整张点击触发, 加载现有 wi
+  // per 2026-11-17 去重: 任务看板已合并进 /kanban, 本页 Drawer 仅供 IPA 技能 tab
+  // 的任务卡打开 (onOpenTaskCard) 使用。
   const [workItemDrawer, setWorkItemDrawer] = useState<WorkItemDrawerMode | null>(null);
-  const handleRequestNewWorkItem = useCallback(
-    (status: WorkItemStatus) => {
-      setWorkItemDrawer({ kind: "new", defaultStatus: status });
-    },
-    [],
-  );
-  const handleWorkItemClick = useCallback(
-    (w: WorkItem) => {
-      // 校验: 仅处理当前 project 的 work-item
-      if (w.project_id !== selectedProjectId) return;
-      setWorkItemDrawer({ kind: "view", workItemId: w.id });
-    },
-    [selectedProjectId],
-  );
-
-  // ---- ProjectBoard: project 过滤的虚拟 board (per project_id) ----
-  const projectBoard = useMemo<Board>(() => {
-    // 复制 seed board 结构, 过滤 work_item_ids
-    return {
-      ...board,
-      project_id: selectedProjectId,
-      name: `${selectedProject?.key ?? "Project"} Board`,
-      columns: board.columns.map((col) => ({
-        ...col,
-        work_item_ids: col.work_item_ids.filter((id) =>
-          projectWorkItems.some((w) => w.id === id),
-        ),
-      })),
-    };
-  }, [board, selectedProject, selectedProjectId, projectWorkItems]);
 
   // ---- ProjectCalendar: project 过滤的 events ----
   const projectEvents = useMemo(
@@ -541,12 +472,11 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       selectedProjectId,
       setSelectedProjectId,
       setTab,
-      getProjectBoard: () => projectBoard,
       getProjectWorkItems: () => projectWorkItems,
       getProjectEvents: () => projectEvents,
       getProjectMembers: () => projectMembers,
     };
-  }, [selectedProjectId, projectBoard, projectWorkItems, projectEvents, projectMembers]);
+  }, [selectedProjectId, projectWorkItems, projectEvents, projectMembers]);
 
   // ---- owner identity ----
   const ownerIdentity = useMemo<Identity | null>(
@@ -570,7 +500,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
     <div className="max-w-7xl" data-testid="projects-page">
       <PageHeader
         title={t.pageTitles['/projects'].title}
-        subtitle="多面板项目工作区 — Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板)。"
+        subtitle="多面板项目工作区 — Timeline / Backlog / Agents / Worktrees / IPA 技能 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板; per 2026-11-17 去重 Kanban 移入 /kanban)。"
         icon={<FolderTree className="text-accent" size={20} />}
         track="D"
         count={`${projects.length} projects`}
@@ -658,49 +588,8 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         onCalendarViewChange={setCalendarView}
       />
 
-      {/* ---- Tab content (5 tab per 2026-08-29 22:49 JST 拍板: Kanban / Timeline / Backlog / Agents / Worktrees) ---- */}
-
-      {tab === "kanban" && (
-        <div data-testid="projects-kanban-tab">
-          <DomainMarker domain="social" label="social 域 (collaboration/通知)" />
-          <KanbanBoard
-            board={projectBoard}
-            workItems={filteredProjectWorkItems}
-            identities={identities}
-            onTransition={handleBoardTransition}
-            onAddColumn={addBoardColumn}
-            onRemoveColumn={removeBoardColumn}
-            onRenameColumn={renameBoardColumn}
-            onReorderColumns={reorderBoardColumns}
-            onRequestNewWorkItem={handleRequestNewWorkItem}
-            onWorkItemClick={handleWorkItemClick}
-            onArchClick={arch.open}
-            // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入时不渲染本地 seed 任务卡
-            unavailableState={kanbanUnavailable}
-          />
-          {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板) */}
-          <WorkItemDetailDrawer
-            open={workItemDrawer}
-            onClose={() => setWorkItemDrawer(null)}
-            projectId={selectedProjectId}
-            projectKey={selectedProject?.key}
-            tenantId={selectedProject?.tenant_id}
-            reporterId={selectedProject?.owner_id}
-            onOpenChildTask={(childId) => setWorkItemDrawer({ kind: "view", workItemId: childId })}
-          />
-          {/* 架构查看器 (per ADR-0041-arch-agent-graph-viewer v0.1) */}
-          {arch.modalProps && (
-            <ArchGraphModal {...arch.modalProps} />
-          )}
-          <div className="mt-3 text-[10px] text-ink-mute font-mono">
-            列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片触发 transitionWorkItem (走 store 状态机)
-          </div>
-          {/* 已知缺口 #1 提示 */}
-          <div className="mt-1 text-[10px] text-ink-mute font-mono">
-            ⚠ Kanban 拖动改 status 走 store 状态机 + 同步 board.columns; 后端 PATCH /work-items/{`{id}`}/status 持久化 D.6+ 接
-          </div>
-        </div>
-      )}
+      {/* ---- Tab content (per 2026-08-29 22:49 JST 拍板 5 tab; per 2026-11-17 去重
+             Kanban 合并进 /kanban 顶层路由, 本页剩 Timeline / Backlog / Agents / Worktrees / IPA) ---- */}
 
       {tab === "timeline" && (
         <div data-testid="projects-timeline-tab" className="space-y-4">
@@ -751,7 +640,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             />
           ) : (
             <>
-          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorkItems.length}` : ""})</div>
+          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status + priority (p0→p3) 排序 ({projectWorkItems.length} 总数{isFilterActive(projectFilter) ? `, 筛选后 ${filteredProjectWorkItems.length}` : ""})</div>
           {filteredProjectWorkItems.length === 0 ? (
             <StatusNotice
               state="empty"
@@ -771,13 +660,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
                 </tr>
               </thead>
               <tbody>
-                {[...filteredProjectWorkItems]
-                  .sort((a, b) => {
-                    // status 排序: todo > in_progress > review > blocked > done > wontfix (per WorkItemStatus 真实定义)
-                    const order: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
-                    return order.indexOf(a.status) - order.indexOf(b.status);
-                  })
-                  .map((w) => {
+                {sortBacklogItems(filteredProjectWorkItems).map((w) => {
                     const assignee = identities.find((i) => i.id === w.assignee_id);
                     return (
                       <tr key={w.id} data-testid="backlog-item" data-row-id={w.id}>

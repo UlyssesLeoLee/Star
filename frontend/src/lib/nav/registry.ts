@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=bac84c9c329eda35a045bbd84e9b70654bad5dc270ff51ecd945e872aab1a065
 MERGE (self:File {path:"frontend/src/lib/nav/registry.ts"})
 @endcypher
 */
@@ -200,7 +200,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     // Per 2026-09-02 16:13 JST 域分色: Projects 是项目工作区, 归 work 域
     category: "work",
     categoryLabel: "Core Workspace",
-    description: "多面板项目工作区 (Kanban / Timeline / Backlog / Agents / Worktrees)",
+    description: "多面板项目工作区 (Timeline / Backlog / Agents / Worktrees / IPA 技能; per 2026-11-17 去重 Kanban 并入 /kanban)",
     icon: FolderKanban,
     isCore: true,
   },

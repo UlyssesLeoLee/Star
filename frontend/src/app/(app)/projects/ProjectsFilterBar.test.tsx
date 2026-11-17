@@ -1,10 +1,11 @@
 /*
-@cypher schema=1 source_sha256=db1d97b8c21900058573b5b53b06a370234f6177bd835176618db88b58f68785
+@cypher schema=1 source_sha256=14a2ccef9eaf6d08248d7b28b3d8354973ee042c48c4cfa3a0f02e174b07cea2
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsFilterBar.test.tsx"})
 MERGE (filterBar:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::ProjectsFilterBar",kind:"component"})
 MERGE (applyKanban:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::applyKanbanFilter",kind:"function"})
 MERGE (applyBacklog:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::applyBacklogFilter",kind:"function"})
 MERGE (applyWorktree:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::applyWorktreeFilter",kind:"function"})
+MERGE (sortBacklog:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::sortBacklogItems",kind:"function"})
 MERGE (suite:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.test.tsx::ProjectsFilterBar",kind:"suite"})
 MERGE (self)-[:IMPORTS]->(filterBar)
 MERGE (self)-[:DEFINES]->(suite)
@@ -12,6 +13,7 @@ MERGE (suite)-[:TESTS]->(filterBar)
 MERGE (suite)-[:TESTS]->(applyKanban)
 MERGE (suite)-[:TESTS]->(applyBacklog)
 MERGE (suite)-[:TESTS]->(applyWorktree)
+MERGE (suite)-[:TESTS]->(sortBacklog)
 @endcypher
 */
 // per WBS §23.32-B: /projects 下行 FilterBar 筛选标签页单元测试
@@ -23,6 +25,7 @@ import {
   applyKanbanFilter,
   applyBacklogFilter,
   applyWorktreeFilter,
+  sortBacklogItems,
   EMPTY_PROJECTS_FILTER,
   isFilterActive,
   type ProjectsFilterState,
@@ -134,5 +137,38 @@ describe("ProjectsFilterBar component", () => {
     expect(month.getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByTestId("calendar-subtab-week"));
     expect(onCalendarViewChange).toHaveBeenCalledWith("week");
+  });
+});
+
+describe("sortBacklogItems (per 2026-11-17 功能补齐: backlog 优先级排序)", () => {
+  it("status 主序: todo > in_progress > review > blocked > done > wontfix", () => {
+    const items = [
+      { id: "d", status: "done" as const, priority: "p0" },
+      { id: "t", status: "todo" as const, priority: "p3" },
+      { id: "w", status: "wontfix" as const, priority: "p0" },
+      { id: "p", status: "in_progress" as const, priority: "p2" },
+    ];
+    expect(sortBacklogItems(items).map((x) => x.id)).toEqual(["t", "p", "d", "w"]);
+  });
+
+  it("同 status 内 priority p0→p3, 无 priority 垫底", () => {
+    const items = [
+      { id: "a", status: "todo" as const, priority: "p3" },
+      { id: "b", status: "todo" as const, priority: null },
+      { id: "c", status: "todo" as const, priority: "p0" },
+      { id: "d", status: "todo" as const, priority: "p1" },
+    ];
+    expect(sortBacklogItems(items).map((x) => x.id)).toEqual(["c", "d", "a", "b"]);
+  });
+
+  it("不修改原数组 (纯函数)", () => {
+    const items = [{ id: "a", status: "todo" as const, priority: "p1" }];
+    const out = sortBacklogItems(items);
+    expect(out).not.toBe(items);
+    expect(items[0].id).toBe("a");
+  });
+
+  it("空数组安全", () => {
+    expect(sortBacklogItems([])).toEqual([]);
   });
 });

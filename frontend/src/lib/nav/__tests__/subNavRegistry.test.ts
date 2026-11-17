@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=4900f6f4760d12787c5e603c10a3bf73f1a68dd5685ceb2ae45d486fff922487
+MERGE (self:File {path:"frontend/src/lib/nav/__tests__/subNavRegistry.test.ts"})
+MERGE (registry:File {path:"frontend/src/lib/nav/subNavRegistry.ts"})
+MERGE (findGroup:Symbol {id:"frontend/src/lib/nav/subNavRegistry.ts::findSubNavGroup",kind:"function"})
+MERGE (findActive:Symbol {id:"frontend/src/lib/nav/subNavRegistry.ts::findActiveSubNavItem",kind:"function"})
+MERGE (self)-[:IMPORTS]->(registry)
+MERGE (self)-[:TESTS]->(findGroup)
+MERGE (self)-[:TESTS]->(findActive)
+@endcypher
+*/
 // =====================================================================
 // subNavRegistry.test.ts — SubNav 数据源注册表测试 (per 2026-09-03 12:36 JST 拍板)
 // =====================================================================
@@ -19,8 +30,8 @@ describe("subNavRegistry — findSubNavGroup", () => {
     const group = findSubNavGroup("/projects");
     expect(group).not.toBeNull();
     expect(group?.pathnamePrefix).toBe("/projects");
+    // per 2026-11-17 去重: kanban 项移除 (任务看板合并进 /kanban 顶层路由)
     expect(group?.items.map((i) => i.id)).toEqual([
-      "kanban",
       "timeline",
       "backlog",
       "agents",
@@ -74,9 +85,11 @@ describe("subNavRegistry — findSubNavGroup", () => {
 });
 
 describe("subNavRegistry — findActiveSubNavItem", () => {
-  it("returns 'kanban' for /projects?tab=kanban", () => {
+  // per 2026-11-17 去重: kanban 已移出 /projects SubNav (合并进 /kanban),
+  // ?tab=kanban 不再命中任何 sub-nav item (页面层 redirect 转发 /kanban)。
+  it("returns null for legacy /projects?tab=kanban (per 2026-11-17 去重)", () => {
     const group = findSubNavGroup("/projects");
-    expect(findActiveSubNavItem(group!, "?tab=kanban")).toBe("kanban");
+    expect(findActiveSubNavItem(group!, "?tab=kanban")).toBeNull();
   });
 
   it("returns 'timeline' for /projects?tab=timeline", () => {
@@ -109,7 +122,7 @@ describe("subNavRegistry — findActiveSubNavItem", () => {
 
   it("accepts search string without leading ?", () => {
     const group = findSubNavGroup("/projects");
-    expect(findActiveSubNavItem(group!, "tab=kanban")).toBe("kanban");
+    expect(findActiveSubNavItem(group!, "tab=backlog")).toBe("backlog");
   });
 });
 

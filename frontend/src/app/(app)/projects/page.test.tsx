@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=58b705473a0a6d3aa2bbdc735c7414a4a6ce2b0860286c3d661c00061440e539
+@cypher schema=1 source_sha256=df4da2b171d4cbf347ed9f58734a6e9b8e923bbea16718e05df4febbdaf0c5ef
 MERGE (self:File {path:"frontend/src/app/(app)/projects/page.test.tsx"})
 @endcypher
 */
@@ -18,8 +18,11 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 // per 2026-11-12 导航切换修复: ProjectsClient 用 useRouter 写回 URL ?tab=
+// per 2026-11-17 去重: legacy ?tab=kanban 客户端转发 /kanban, 断言 replace 调用需要 hoisted mock
+const { mockReplace } = vi.hoisted(() => ({ mockReplace: vi.fn() }));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: mockReplace, push: vi.fn() }),
 }));
 
 // per 2026-11-16 清 seed/mock 显示入口: ProjectsClient 用 Group API 会话判定宿主接入 —
@@ -72,65 +75,61 @@ function resetStore() {
 describe("ProjectsPage", () => {
   beforeEach(() => {
     cleanup();
+    mockReplace.mockClear();
     // 默认模拟宿主已接入 (per 2026-11-16: 既有用例断言 seed fixture 渲染)
     groupMockState.client = {};
     groupMockState.status = "ready";
     resetStore();
   });
 
-  it("renders project switcher + 5 tabs by default", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+  it("renders project switcher + 5 tabs by default (per 2026-11-17 去重: Kanban 已移入 /kanban)", () => {
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     // switcher
     expect(screen.getByTestId("project-switcher")).toBeTruthy();
     // 3 个 project 都可点
     expect(screen.getByTestId("project-switcher-prj-physis")).toBeTruthy();
     expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
     expect(screen.getByTestId("project-switcher-prj-mobile")).toBeTruthy();
-    // 5 个 tab 渲染 (Kanban / Timeline / Backlog / Agents / Worktrees)
-    expect(screen.getByRole("tab", { name: /Kanban|看板/i })).toBeTruthy();
+    // 5 个 tab 渲染 (Timeline / Backlog / Agents / Worktrees / IPA 技能)
     expect(screen.getByRole("tab", { name: /Timeline|时间线|甘特/i })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /Backlog|待办池|待办/i })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /Agents|Agent/i })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /Worktrees|Worktree/i })).toBeTruthy();
-    // 默认 Kanban tab
-    expect(screen.getByTestId("projects-kanban-tab")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /IPA/i })).toBeTruthy();
+    // per 2026-11-17 去重: Kanban tab 不再渲染
+    expect(screen.queryByRole("tab", { name: /Kanban|看板/i })).toBeNull();
+    // 默认 backlog tab
+    expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
   it("switching project updates selected project", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     const sgBtn = screen.getByTestId("project-switcher-prj-stargate");
     fireEvent.click(sgBtn);
     expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
   });
 
-  it("Kanban tab renders KanbanBoard with project-filtered data", () => {
+  it("legacy initialTab=kanban 客户端转发 /kanban (per 2026-11-17 去重, 老链接不 404)", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const kanbanTab = screen.getByRole("tab", { name: /Kanban|看板/i });
-    fireEvent.click(kanbanTab);
-    // kanban 4 列
-    expect(screen.getByTestId("kanban-board")).toBeTruthy();
-    expect(screen.getByTestId("kanban-column-todo")).toBeTruthy();
-    expect(screen.getByTestId("kanban-column-in_progress")).toBeTruthy();
-    expect(screen.getByTestId("kanban-column-review")).toBeTruthy();
-    expect(screen.getByTestId("kanban-column-done")).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith("/kanban");
   });
 
   it("Timeline tab renders Gantt and Calendar", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     const tlTab = screen.getByRole("tab", { name: /Timeline|时间线|甘特/i });
     fireEvent.click(tlTab);
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
   });
 
   it("Backlog tab renders work-items list", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     const backlogTab = screen.getByRole("tab", { name: /Backlog|待办池|待办/i });
     fireEvent.click(backlogTab);
     expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
   it("Agents tab shows members table with role (mock)", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     const agentsTab = screen.getByRole("tab", { name: /Agents|Agent/i });
     fireEvent.click(agentsTab);
     expect(screen.getByTestId("projects-members-tab")).toBeTruthy();
@@ -140,7 +139,7 @@ describe("ProjectsPage", () => {
   });
 
   it("Worktrees tab shows worktree list", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     const wtTab = screen.getByRole("tab", { name: /Worktrees|Worktree/i });
     fireEvent.click(wtTab);
     expect(screen.getByTestId("projects-worktrees-tab")).toBeTruthy();
@@ -152,7 +151,7 @@ describe("ProjectsPage", () => {
   // (canvas-001), 这条测试锁的是"确实渲染出一条可点的 /canvas/canvas-001 链接",
   // 而不只是代码路径存在但从不命中数据。
   it("Worktrees tab shows a working canvas link for the selected project (DRIFT-α-009)", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     // navStore.selectedProjectId 跨测试持久化 (per 2026-09-03 拍板), 显式选回
     // prj-physis 而非依赖默认值, 避免前面测试切过 project 导致这条测试脆弱
     fireEvent.click(screen.getByTestId("project-switcher-prj-physis"));
@@ -164,20 +163,17 @@ describe("ProjectsPage", () => {
   });
 
   it("Worktrees tab hides the canvas link block for a project with no linked canvas", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     fireEvent.click(screen.getByTestId("project-switcher-prj-stargate"));
     fireEvent.click(screen.getByRole("tab", { name: /Worktrees|Worktree/i }));
     expect(screen.queryByTestId("project-canvas-links")).toBeNull();
   });
 
-  it("switching to mobile project shows fewer work-items in Kanban", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+  it("switching to mobile project keeps backlog tab rendered (per 2026-11-17 去重)", () => {
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     // 切到 MOB project
     fireEvent.click(screen.getByTestId("project-switcher-prj-mobile"));
-    // 切到 Kanban tab
-    fireEvent.click(screen.getByRole("tab", { name: /Kanban|看板/i }));
-    // 验证 4 列都有 (即使 0 卡)
-    expect(screen.getByTestId("kanban-column-todo")).toBeTruthy();
+    expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
   // =====================================================================
@@ -200,7 +196,7 @@ describe("ProjectsPage", () => {
   });
 
   it("switching tab writes cookie for next SSR (cookie-default 持久化)", () => {
-    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    renderWithI18n(<ProjectsClient initialTab="backlog" />);
     // 清空 cookie (可能 vitest jsdom 残留)
     document.cookie = "projects-default-tab=; path=/; max-age=0";
     // 切到 Timeline tab
@@ -212,8 +208,8 @@ describe("ProjectsPage", () => {
   // per 2026-11-12 用户发令: sidebar Timeline/Backlog 跳本页不同 ?tab= 时必须
   // 正确切换 ("timeline 打开是看板标签页" 根因修复回归测试)
   it("sidebar jump re-render with new initialTab switches the active tab", () => {
-    const { rerender } = renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    expect(screen.getByTestId("projects-kanban-tab")).toBeTruthy();
+    const { rerender } = renderWithI18n(<ProjectsClient initialTab="backlog" />);
+    expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
     expect(screen.queryByTestId("projects-timeline-tab")).toBeNull();
 
     // 模拟 server wrapper 因 URL ?tab=timeline 重渲染传新 initialTab
@@ -223,7 +219,7 @@ describe("ProjectsPage", () => {
       </I18nProvider>,
     );
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
-    expect(screen.queryByTestId("projects-kanban-tab")).toBeNull();
+    expect(screen.queryByTestId("projects-backlog-tab")).toBeNull();
   });
 
   // =====================================================================
@@ -231,17 +227,13 @@ describe("ProjectsPage", () => {
   // Kanban/Backlog 不渲染本地 seed 任务卡, 改诚实未接入态 + 预览模式徽标。
   // =====================================================================
 
-  it("无宿主会话: Kanban tab 显示诚实未接入态, 不渲染 seed 任务卡", () => {
+  // per 2026-11-17 去重: 看板诚实态随任务看板移入 /kanban 页 (KanbanBoard 的
+  // unavailableState prop 承接), 本页只剩 legacy ?tab=kanban 转发行为。
+  it("无宿主会话: legacy ?tab=kanban 仍客户端转发 /kanban (不渲染死内容)", () => {
     groupMockState.client = null;
     groupMockState.status = "unavailable";
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    // 预览模式诚实徽标 + 未接入 StatusNotice + 看板诚实提示
-    expect(screen.getByTestId("projects-data-source")).toBeTruthy();
-    expect(screen.getByTestId("kanban-unavailable")).toBeTruthy();
-    expect(screen.getByTestId("status-notice-disconnected")).toBeTruthy();
-    expect(screen.getByTestId("kanban-preview-hint")).toBeTruthy();
-    // seed 看板不渲染
-    expect(screen.queryByTestId("kanban-board")).toBeNull();
+    expect(mockReplace).toHaveBeenCalledWith("/kanban");
   });
 
   it("无宿主会话: Backlog tab 显示诚实未接入态, 不渲染 seed 任务列表", () => {

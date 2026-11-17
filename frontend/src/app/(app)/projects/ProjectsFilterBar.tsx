@@ -1,9 +1,11 @@
 /*
-@cypher schema=1 source_sha256=2590e97b9f2faf118f4fd9231182a1141fff1621167b45bc75cc4ae3b0e7ecb7
+@cypher schema=1 source_sha256=9fab160c1ed9bac6d94365a18854b1f960754ed1df702d9f1054c85dff25dc38
 MERGE (self:File {path:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx"})
 MERGE (filterBar:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::ProjectsFilterBar",kind:"component"})
 MERGE (useTranslation:Symbol {id:"frontend/src/lib/i18n/index.ts::useTranslation",kind:"hook"})
+MERGE (sortBacklog:Symbol {id:"frontend/src/app/(app)/projects/ProjectsFilterBar.tsx::sortBacklogItems",kind:"function"})
 MERGE (self)-[:DEFINES]->(filterBar)
+MERGE (self)-[:DEFINES]->(sortBacklog)
 MERGE (self)-[:IMPORTS]->(useTranslation)
 MERGE (filterBar)-[:CALLS]->(useTranslation)
 @endcypher
@@ -13,7 +15,7 @@ MERGE (filterBar)-[:CALLS]->(useTranslation)
 import { useMemo } from "react";
 import { Search, X } from "lucide-react";
 import { clsx } from "clsx";
-import type { WorkItemStatus } from "@/types/ids";
+import type { WorkItemStatus, WorkItemPriority } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 
 // per WBS §23.32-B (2026-11-13 用户发令) + ui-redesign-multica-style.md §5.2:
@@ -22,6 +24,26 @@ import { useTranslation } from "@/lib/i18n";
 
 export const KANBAN_STATUSES: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done"];
 export const BACKLOG_PRIORITIES = ["critical", "high", "medium", "low"] as const;
+
+/** Backlog 排序主序 (status 语义序) + 次序 (priority p0→p3) */
+const BACKLOG_STATUS_ORDER: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
+const BACKLOG_PRIORITY_ORDER: WorkItemPriority[] = ["p0", "p1", "p2", "p3"];
+
+/**
+ * Backlog 优先级排序纯函数 (per 2026-11-17 功能补齐: backlog 列表 status 主序 +
+ * priority p0→p3 次序, 无 priority 垫底)。纯函数便于单测。
+ */
+export function sortBacklogItems<T extends { status: WorkItemStatus; priority?: string | null }>(
+  items: T[],
+): T[] {
+  return [...items].sort((a, b) => {
+    const s = BACKLOG_STATUS_ORDER.indexOf(a.status) - BACKLOG_STATUS_ORDER.indexOf(b.status);
+    if (s !== 0) return s;
+    const pa = BACKLOG_PRIORITY_ORDER.indexOf((a.priority ?? "") as WorkItemPriority);
+    const pb = BACKLOG_PRIORITY_ORDER.indexOf((b.priority ?? "") as WorkItemPriority);
+    return (pa === -1 ? BACKLOG_PRIORITY_ORDER.length : pa) - (pb === -1 ? BACKLOG_PRIORITY_ORDER.length : pb);
+  });
+}
 
 export interface ProjectsFilterState {
   statuses: WorkItemStatus[];

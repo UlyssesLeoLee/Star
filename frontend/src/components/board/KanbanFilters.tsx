@@ -1,3 +1,13 @@
+/*
+@cypher schema=1 source_sha256=800c0041b6ba20cc33cd31be93ec3b3f847a2ed8aa7baf480889df14cd04c81c
+MERGE (self:File {path:"frontend/src/components/board/KanbanFilters.tsx"})
+MERGE (filters:Symbol {id:"frontend/src/components/board/KanbanFilters.tsx::KanbanFilters",kind:"component"})
+MERGE (applyFn:Symbol {id:"frontend/src/components/board/KanbanFilters.tsx::applyBoardFilters",kind:"function"})
+MERGE (self)-[:DEFINES]->(filters)
+MERGE (self)-[:DEFINES]->(applyFn)
+MERGE (filters)-[:CALLS]->(applyFn)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -9,9 +19,10 @@
 // 已知缺口 (per 缺标比错标):
 //   - 不接 WIP-limit / 关键字搜索 (Phase D.6+ 补, 与 W5 store persist 一起)
 //   - filter 状态不持久化 (reload 后丢失, W5 加 zustand/persist 后再补)
+//   - per 2026-11-17 功能补齐: 已接入 /kanban 任务看板 (kind/assignee/priority 生效)
 // =====================================================================
 
-import type { WorkItemKind, WorkItemPriority, Identity } from "@/types/ids";
+import type { WorkItem, WorkItemKind, WorkItemPriority, Identity } from "@/types/ids";
 
 export interface KanbanFiltersValue {
   kind: WorkItemKind | "all";
@@ -29,6 +40,22 @@ export interface KanbanFiltersProps {
 
 const KIND_OPTIONS: Array<WorkItemKind> = ["story", "task", "bug", "spike", "epic"];
 const PRIORITY_OPTIONS: Array<WorkItemPriority> = ["p0", "p1", "p2", "p3"];
+
+/**
+ * 看板筛选纯函数 (per 2026-11-17 功能补齐: KanbanFilters 接入 /kanban 任务看板,
+ * 筛选逻辑从组件拆出便于单测)。"all" = 不筛选。
+ */
+export function applyBoardFilters(
+  items: WorkItem[],
+  value: KanbanFiltersValue,
+): WorkItem[] {
+  return items.filter((w) => {
+    if (value.kind !== "all" && w.kind !== value.kind) return false;
+    if (value.assignee_id !== "all" && (w.assignee_id ?? null) !== value.assignee_id) return false;
+    if (value.priority !== "all" && w.priority !== value.priority) return false;
+    return true;
+  });
+}
 
 export function KanbanFilters({ value, onChange, assignees, total, shown }: KanbanFiltersProps) {
   const set = <K extends keyof KanbanFiltersValue>(k: K, v: KanbanFiltersValue[K]) =>

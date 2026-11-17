@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6e526b912d04e1c39587aabd6e3d75d1702b29cae95527a0a6f7d6110b3a85cb
+@cypher schema=1 source_sha256=8c159628dc1a37f97297b3696f19677d34234d8509c59b5f996c068b4c548290
 MERGE (self:File {path:"frontend/src/lib/redirects.shim.cjs"})
 @endcypher
 */
@@ -29,8 +29,10 @@ const LEGACY_REDIRECTS = [
   { source: "/workspace", destination: "/projects", permanent: false },
   { source: "/workspace/:id", destination: "/projects/:id", permanent: false },
   { source: "/project", destination: "/projects", permanent: false },
-  { source: "/board", destination: "/projects?tab=kanban", permanent: false },
-  { source: "/planning", destination: "/projects?tab=timeline", permanent: false },
+  // per 2026-11-17 去重: /projects?tab=kanban 合并进 /kanban 顶层路由
+  { source: "/board", destination: "/kanban", permanent: false },
+  // /planning 无 redirect (per 2026-11-17 去重): Planning Hub 恢复独立页
+  //   src/app/planning/page.tsx 直接可达 (与 /workflow 同先例)。
   { source: "/scm", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/collaboration", destination: "/projects?tab=worktrees", permanent: false },
   // /workflow: no redirect — 独立页 src/app/workflow/page.tsx 直接可达 (2026-11-15 canvas 自审)

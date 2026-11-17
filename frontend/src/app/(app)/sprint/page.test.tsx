@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d1cc4fd979e17ae4556cdd14c036f32340ed98a4b98fb0c41c67be6f389bddd5
+@cypher schema=1 source_sha256=5402ba45b84c1ddb4e90eb9d2cdfcc630b921909f296a44c4aa75900f163405c
 MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.test.tsx"})
 @endcypher
 */
@@ -22,7 +22,7 @@ MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.test.tsx"})
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import IssuesPage from "./page";
+import IssuesPage, { buildTree, type TreeNode } from "./page";
 import { I18nProvider } from "@/lib/i18n";
 
 // per 2026-08-31 i18n 补缺口: PageHeader / Sidebar 等含 useTranslation() 必须包 I18nProvider
@@ -224,5 +224,78 @@ describe("IssuesPage (U2)", () => {
     // banner 出现
     expect(screen.getByTestId("issues-new-banner")).toBeTruthy();
     expect(screen.getByTestId("issues-new-title-input")).toBeTruthy();
+  });
+});
+
+// =====================================================================
+// buildTree (per 2026-11-17 功能补齐: Tree 视图层级改用 parent_id 真实父子关系)
+// =====================================================================
+describe("buildTree (parent_id 层级)", () => {
+  const mk = (over: Partial<WorkItem> & { id: string; key: string }): WorkItem => ({
+    id: over.id,
+    tenant_id: "t",
+    project_id: "p",
+    key: over.key,
+    title: over.key,
+    description: "",
+    kind: "task",
+    status: "todo",
+    priority: "p2",
+    reporter_id: "u",
+    labels: [],
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    ...over,
+  });
+  const flatten = (nodes: TreeNode[]): string[] =>
+    nodes.flatMap((n) => [n.id, ...flatten(n.children)]);
+
+  it("epic → story → task 链 (parent_id 真实父子关系)", () => {
+    const items = [
+      mk({ id: "e1", key: "E-1", kind: "epic" }),
+      mk({ id: "s1", key: "S-1", kind: "story", parent_id: "e1" }),
+      mk({ id: "t1", key: "T-1", kind: "task", parent_id: "s1" }),
+    ];
+    const tree = buildTree(items);
+    expect(tree.map((n) => n.id)).toEqual(["e1"]);
+    expect(tree[0].depth).toBe(0);
+    expect(tree[0].children.map((c) => c.id)).toEqual(["s1"]);
+    expect(tree[0].children[0].depth).toBe(1);
+    expect(tree[0].children[0].children.map((c) => c.id)).toEqual(["t1"]);
+    expect(tree[0].children[0].children[0].depth).toBe(2);
+  });
+
+  it("无 parent_id 旧数据: 非 epic 归第一个 epic 下 (旧行为兜底)", () => {
+    const items = [
+      mk({ id: "t1", key: "T-1" }),
+      mk({ id: "e1", key: "E-1", kind: "epic" }),
+      mk({ id: "t2", key: "T-2", kind: "spike" }),
+    ];
+    const tree = buildTree(items);
+    expect(tree.map((n) => n.id)).toEqual(["e1"]);
+    expect(tree[0].children.map((c) => c.id)).toEqual(["t1", "t2"]);
+    expect(tree[0].children[0].depth).toBe(1);
+  });
+
+  it("parent 断链 → 视为孤儿, 归第一个 epic (防丢节点)", () => {
+    const items = [
+      mk({ id: "t1", key: "T-1", parent_id: "ghost" }),
+      mk({ id: "e1", key: "E-1", kind: "epic" }),
+    ];
+    const tree = buildTree(items);
+    expect(flatten(tree).sort()).toEqual(["e1", "t1"]);
+  });
+
+  it("parent 链成环 → 环上节点自当根, 不丢", () => {
+    const items = [
+      mk({ id: "a", key: "A-1", parent_id: "b" }),
+      mk({ id: "b", key: "B-1", parent_id: "a" }),
+    ];
+    const tree = buildTree(items);
+    expect(flatten(tree).sort()).toEqual(["a", "b"]);
+  });
+
+  it("空数组安全", () => {
+    expect(buildTree([])).toEqual([]);
   });
 });
