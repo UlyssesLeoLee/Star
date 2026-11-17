@@ -157,6 +157,40 @@ ignore = [
     { id = "RUSTSEC-2025-0057", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
     { id = "RUSTSEC-2024-0384", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
     { id = "RUSTSEC-2024-0370", reason = "unmaintained (传递依赖, 无 CVE); 根因为 sled v0.34.7, 需评估替代 [复审期限 2026-12-16] (2026-11-16 复核: 引用面未变, 无 CVE)" },
+
+    # RUSTSEC-2026-0543 / RUSTSEC-2026-0555 — unmaintained (chrono / chrono-tz)
+    #
+    # 官方事实 (per rustsec.org, 2026-11-17 实测复核):
+    #   - RUSTSEC-2026-0543: chrono is unmaintained. Type = **INFO Unmaintained**
+    #     (不是漏洞), Reported 2026-09-14, Issued 2026-11-17, **Patched: no patched versions**
+    #   - RUSTSEC-2026-0555: chrono-tz is unmaintained. 同一上游 issue
+    #     (chronotope/chrono#1768), 同样 INFO / 无补丁
+    #   - 两者均**无 CVE 关联**, 无可利用漏洞, 无安全暴露面
+    #
+    # 暴露面实证 (per 2026-11-17 cargo tree -i --target all):
+    #   chrono v0.4.45       <- 73 个 crate 直接依赖 (api / star-api-rest /
+    #                          agent-domain / action-engine / bi-owner-runtime ...),
+    #                          用作时间戳与时区类型
+    #   chrono-tz v0.10.4    <- **唯一**直接引用方 crates/domain-automation
+    #                          (src/schedule.rs:179 `use chrono_tz::Tz;`,
+    #                          用于 schedule 规则的时区解析 + tzdb 版本校验)
+    #
+    # 保留忽略的理由:
+    #   1. 上游明确 all versions affected 且无补丁版本 -> 升级无法解决
+    #   2. INFO 类型, 无 CVE, 不存在可利用漏洞; "停止维护"本身不等于不安全
+    #   3. chrono 是 73 个 crate 的公共时间类型底座, 移除它是一次跨全仓的
+    #      重写 (换 time crate 或回到 std::time), 属架构级动作而非依赖补丁
+    #   4. 移除忽略只会让门禁永久红, 而无任何可执行的修复动作 -> 属"已知且无解",
+    #      显式登记优于隐藏
+    #
+    # 真正的缓解方向 (需架构拍板, 尚未实施):
+    #   把 73 个 crate 的时间类型从 chrono 迁到 time crate 或 std::time,
+    #   并把 domain-automation 的 Tz 解析换成自维护的 tzdb 绑定。
+    #
+    # 复审时以 `cargo tree -i chrono --target all` 确认引用面, 并检查上游
+    # chronotope/chrono#1768 是否恢复维护。
+    { id = "RUSTSEC-2026-0543", reason = "unmaintained (INFO 类型, 无 CVE, 上游 all versions affected 且无补丁); chrono v0.4.45 为 73 个 crate 的公共时间类型底座, 移除需跨全仓重写 (迁 time/std::time), 属架构级动作 [复审期限 2026-12-17] (2026-11-17 首次登记: 引用面 73 crate)" },
+    { id = "RUSTSEC-2026-0555", reason = "unmaintained (INFO 类型, 无 CVE, 同一上游 issue chronotope/chrono#1768, 无补丁); chrono-tz v0.10.4 唯一直接引用方 crates/domain-automation (schedule.rs:179 Tz 解析 + tzdb 版本校验) [复审期限 2026-12-17] (2026-11-17 首次登记)" },
 ]
 # 锁定到已 yanked 的版本属供应链风险, 直接拒。
 # 2026-10-04 实跑曾命中 yoke-derive v0.8.3, 已由 `cargo update -p yoke-derive`
