@@ -200,6 +200,7 @@ mod tests {
             roles: roles.into_iter().map(String::from).collect(),
             scope: "".to_string(),
             email: None,
+            projects: Vec::new(),
         }
     }
 
@@ -210,6 +211,7 @@ mod tests {
             roles: vec![],
             scope: scope.to_string(),
             email: None,
+            projects: Vec::new(),
         }
     }
 
@@ -315,6 +317,7 @@ mod tests {
             user_id: Uuid::nil(),
             tenant_id: Uuid::nil(),
             email: None,
+            projects: Vec::new(),
             roles: vec!["player".to_string()],
             scope: "player:read".to_string(),
         };
@@ -326,6 +329,7 @@ mod tests {
             user_id: Uuid::nil(),
             tenant_id: Uuid::nil(),
             email: None,
+            projects: Vec::new(),
             roles: vec!["player".to_string()],
             scope: "player:read player:write".to_string(),
         };

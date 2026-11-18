@@ -102,6 +102,10 @@ pub struct Claims {
     /// absent for legacy tokens issued before provider-email was carried.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+    /// Project memberships verified by the issuer (2026-11-19 SCM 真实化批次 B).
+    /// Absent for legacy tokens; domain 层按空集拒绝越权, 不做兜底放大。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projects: Vec<Uuid>,
 }
 
 /// Device identity copied only from a successfully verified issuer token.
@@ -185,6 +189,30 @@ pub fn issue_token_with_device_context(
     scope: String,
     device_context: Option<DeviceTokenContext>,
 ) -> Result<(String, Claims), JwtError> {
+    issue_token_with_project_memberships(
+        config,
+        sub,
+        tenant_id,
+        roles,
+        scope,
+        device_context,
+        Vec::new(),
+    )
+}
+
+/// Issue a JWT carrying issuer-verified project memberships (2026-11-19 SCM 真实化批次 B).
+///
+/// `projects` 是签发方核实过的项目成员资格; domain 层据此做 project-scoped
+/// 权限裁决 (INV-SCM-04)。空集 = 无项目成员资格, 不做兜底放大。
+pub fn issue_token_with_project_memberships(
+    config: &JwtConfig,
+    sub: Uuid,
+    tenant_id: Uuid,
+    roles: Vec<String>,
+    scope: String,
+    device_context: Option<DeviceTokenContext>,
+    projects: Vec<Uuid>,
+) -> Result<(String, Claims), JwtError> {
     let now = Utc::now();
     let exp = now + Duration::seconds(config.ttl_seconds);
     let claims = Claims {
@@ -202,6 +230,7 @@ pub fn issue_token_with_device_context(
         device_id: device_context.map(|context| context.device_id),
         device_generation: device_context.map(|context| context.generation),
         email: None,
+        projects,
     };
     let header = Header::new(jsonwebtoken::Algorithm::RS256);
     let encoding_key = EncodingKey::from_rsa_pem(config.private_key_pem.as_bytes())
@@ -250,6 +279,9 @@ pub struct AuthUser {
     pub scope: String,
     /// Provider-verified login email; absent for legacy tokens.
     pub email: Option<String>,
+    /// Issuer-verified project memberships (2026-11-19 SCM 真实化批次 B).
+    /// Empty for legacy tokens; domain 层按空集拒绝 project-scoped 越权。
+    pub projects: Vec<Uuid>,
 }
 
 impl From<Claims> for AuthUser {
@@ -260,6 +292,7 @@ impl From<Claims> for AuthUser {
             roles: c.roles,
             scope: c.scope,
             email: c.email,
+            projects: c.projects,
         }
     }
 }
@@ -273,6 +306,7 @@ impl Claims {
             roles: self.roles.clone(),
             scope: self.scope.clone(),
             email: self.email.clone(),
+            projects: self.projects.clone(),
         }
     }
 

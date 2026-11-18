@@ -324,6 +324,7 @@ mod tests {
             roles: vec!["user".to_string()],
             scope: "read write".to_string(),
             email: None,
+            projects: Vec::new(),
         };
         assert!(require_scope(&user, "read").is_ok());
         assert!(require_scope(&user, "write").is_ok());
@@ -370,6 +371,7 @@ mod tests {
             roles: vec!["player".to_string(), "ops".to_string()],
             scope: "".to_string(),
             email: None,
+            projects: Vec::new(),
         };
         assert!(require_role(&user, "player").is_ok());
         assert!(require_role(&user, "ops").is_ok());
@@ -384,6 +386,7 @@ mod tests {
             roles: vec![],
             scope: "".to_string(),
             email: None,
+            projects: Vec::new(),
         };
         assert!(require_scope(&user, "read").is_err());
     }
