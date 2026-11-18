@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=90183ebca19dc4caff66e19f56d7000355418a0928ce5c9bdbedc2137563c23c
+MERGE (self:File {path:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx"})
+MERGE (canvas:Symbol {id:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx::AnimeCelShaderCanvas",kind:"component"})
+MERGE (mecha:Symbol {id:"frontend/src/components/effects/AnimeCelShaderCanvas.tsx::MechaSilhouette",kind:"component"})
+MERGE (self)-[:DEFINES]->(canvas)
+MERGE (self)-[:DEFINES]->(mecha)
+@endcypher
+*/
 "use client";
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
@@ -385,7 +394,7 @@ function useThemeRevision(): number {
 }
 
 // ============================================================================
-// 3. 3D CEL-SHADED MESH RIG WITH INVERTED HULL OUTLINE
+// 3. CEL-SHADED MESH WITH INVERTED HULL OUTLINE
 // ============================================================================
 interface CelMeshProps {
   geometry: THREE.BufferGeometry;
@@ -471,9 +480,9 @@ function CelShadedMesh({
 }
 
 // ============================================================================
-// 4. THE CHRONO CORE SCENE COMPOSITION
+// 4. MECHA SILHOUETTE — 真3D 角色/机甲剪影
 // ============================================================================
-interface ChronoSceneProps {
+interface MechaSilhouetteProps {
   palette: CelPalette;
   activeTheme: ActiveTheme;
   outlineThickness: number;
@@ -483,7 +492,7 @@ interface ChronoSceneProps {
   speed: number;
 }
 
-function ChronoScene({
+function MechaSilhouette({
   palette,
   activeTheme,
   outlineThickness,
@@ -491,11 +500,18 @@ function ChronoScene({
   enableHalftone,
   enableRim,
   speed,
-}: ChronoSceneProps) {
+}: MechaSilhouetteProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const ring1Ref = useRef<THREE.Group>(null);
-  const ring2Ref = useRef<THREE.Group>(null);
-  const shardsRef = useRef<THREE.Group>(null);
+  const torsoRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Group>(null);
+  const lArmRef = useRef<THREE.Group>(null);
+  const rArmRef = useRef<THREE.Group>(null);
+  const lLegRef = useRef<THREE.Group>(null);
+  const rLegRef = useRef<THREE.Group>(null);
+  const wing1Ref = useRef<THREE.Group>(null);
+  const wing2Ref = useRef<THREE.Group>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
+  const particleRefs = useRef<THREE.Mesh[]>([]);
 
   const { pointer } = useThree();
   const lightPos = useMemo(() => new THREE.Vector3(5, 5, 5), []);
@@ -508,8 +524,8 @@ function ChronoScene({
   const resolved = useMemo(
     () => ({
       main: resolvePaletteWithTokens(palette, activeTheme),
-      ring: resolvePaletteWithTokens(ringPalette, activeTheme),
-      ring2: resolvePaletteWithTokens(ring2Palette, activeTheme),
+      accent: resolvePaletteWithTokens(ringPalette, activeTheme),
+      trim: resolvePaletteWithTokens(ring2Palette, activeTheme),
       gold: resolvePaletteWithTokens("gold", activeTheme),
       cyan: resolvePaletteWithTokens("cyan", activeTheme),
     }),
@@ -517,56 +533,129 @@ function ChronoScene({
     [palette, ringPalette, ring2Palette, activeTheme, themeRev]
   );
 
-  // Procedural Geometries
-  const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(1.2, 0), []);
-  const ringGeom = useMemo(() => new THREE.TorusGeometry(2.0, 0.08, 12, 48), []);
-  const outerRingGeom = useMemo(() => new THREE.TorusGeometry(2.5, 0.06, 12, 48), []);
-  const shardGeom = useMemo(() => new THREE.OctahedronGeometry(0.28, 0), []);
+  // Mecha geometries - humanoid silhouette
+  const torsoGeom = useMemo(() => new THREE.BoxGeometry(1.2, 1.6, 0.6, 2, 2, 1), []);
+  const headGeom = useMemo(() => new THREE.BoxGeometry(0.7, 0.7, 0.5, 2, 2, 1), []);
+  const armGeom = useMemo(() => new THREE.BoxGeometry(0.35, 1.2, 0.35, 1, 2, 1), []);
+  const forearmGeom = useMemo(() => new THREE.BoxGeometry(0.4, 0.9, 0.4, 1, 2, 1), []);
+  const legGeom = useMemo(() => new THREE.BoxGeometry(0.4, 1.0, 0.4, 1, 2, 1), []);
+  const shinGeom = useMemo(() => new THREE.BoxGeometry(0.35, 1.1, 0.35, 1, 2, 1), []);
+  const footGeom = useMemo(() => new THREE.BoxGeometry(0.5, 0.2, 0.6, 1, 1, 1), []);
+  const shoulderGeom = useMemo(() => new THREE.BoxGeometry(0.5, 0.35, 0.4, 1, 1, 1), []);
+  const wingGeom = useMemo(() => new THREE.BoxGeometry(1.8, 1.2, 0.08, 2, 2, 1), []);
+  const coreGeom = useMemo(() => new THREE.OctahedronGeometry(0.35, 0), []);
+  const particleGeom = useMemo(() => new THREE.TetrahedronGeometry(0.08, 0), []);
 
-  // Update light position tracking pointer & animate rotations
+  // Joint positions for articulation
+  const shoulderOffset = 0.85;
+  const hipOffset = 0.55;
+
   useFrame((_, delta) => {
     // Dynamic light reacts to mouse pointer
-    lightPos.set(pointer.x * 6 + 2, pointer.y * 6 + 3, 5);
+    lightPos.set(pointer.x * 8 + 2, pointer.y * 8 + 3, 5);
 
     const s = delta * speed;
+    const t = Date.now() * 0.001;
+
+    // Breathing idle animation
+    const breathe = Math.sin(t * 1.2) * 0.02;
+    const sway = Math.sin(t * 0.7) * 0.05;
+
     if (groupRef.current) {
-      groupRef.current.rotation.y += s * 0.4;
-      groupRef.current.rotation.x = Math.sin(Date.now() * 0.001) * 0.2;
+      groupRef.current.rotation.y += s * 0.15;
+      groupRef.current.position.y = breathe;
+      groupRef.current.rotation.z = sway;
     }
-    if (ring1Ref.current) {
-      ring1Ref.current.rotation.x += s * 0.8;
-      ring1Ref.current.rotation.y += s * 0.5;
+
+    // Torso subtle twist
+    if (torsoRef.current) {
+      torsoRef.current.rotation.y = Math.sin(t * 0.8) * 0.1;
+      torsoRef.current.rotation.x = Math.cos(t * 0.6) * 0.05;
     }
-    if (ring2Ref.current) {
-      ring2Ref.current.rotation.y -= s * 0.7;
-      ring2Ref.current.rotation.z += s * 0.6;
+
+    // Head tracking (subtle)
+    if (headRef.current) {
+      headRef.current.rotation.y = pointer.x * 0.3;
+      headRef.current.rotation.x = -pointer.y * 0.2;
     }
-    if (shardsRef.current) {
-      shardsRef.current.rotation.y += s * 0.6;
+
+    // Arm swing (counter-motion)
+    if (lArmRef.current) {
+      lArmRef.current.rotation.x = Math.sin(t * 1.5) * 0.4 - 0.3;
+      lArmRef.current.rotation.z = Math.cos(t * 1.2) * 0.15;
+    }
+    if (rArmRef.current) {
+      rArmRef.current.rotation.x = -Math.sin(t * 1.5) * 0.4 + 0.3;
+      rArmRef.current.rotation.z = -Math.cos(t * 1.2) * 0.15;
+    }
+
+    // Leg stance shift
+    if (lLegRef.current) {
+      lLegRef.current.rotation.x = Math.sin(t * 1.5 + Math.PI) * 0.15;
+    }
+    if (rLegRef.current) {
+      rLegRef.current.rotation.x = -Math.sin(t * 1.5 + Math.PI) * 0.15;
+    }
+
+    // Wings flutter
+    if (wing1Ref.current) {
+      wing1Ref.current.rotation.x = Math.sin(t * 2.0) * 0.2;
+      wing1Ref.current.rotation.z = Math.cos(t * 1.3) * 0.1;
+      wing1Ref.current.position.y = 0.8 + Math.sin(t * 1.8) * 0.05;
+    }
+    if (wing2Ref.current) {
+      wing2Ref.current.rotation.x = -Math.sin(t * 2.0) * 0.2;
+      wing2Ref.current.rotation.z = -Math.cos(t * 1.3) * 0.1;
+      wing2Ref.current.position.y = 0.8 + Math.sin(t * 1.8 + Math.PI) * 0.05;
+    }
+
+    // Core energy pulse
+    if (coreRef.current) {
+      const pulse = 0.7 + Math.sin(t * 3.0) * 0.3;
+      coreRef.current.scale.setScalar(pulse);
+      coreRef.current.rotation.x += delta * 2.0;
+      coreRef.current.rotation.y += delta * 1.5;
+      coreRef.current.rotation.z += delta * 1.0;
+    }
+
+    // Orbiting particles
+    if (particleRefs.current.length) {
+      particleRefs.current.forEach((p, i) => {
+        if (!p) return;
+        const pt = t * 0.8 + i * 1.2;
+        const r = 2.2 + Math.sin(pt * 0.9) * 0.4;
+        p.position.x = Math.cos(pt) * r;
+        p.position.y = Math.sin(pt * 0.7) * 1.5 + Math.cos(pt * 0.5) * 0.5;
+        p.position.z = Math.sin(pt) * r;
+        p.rotation.x += delta * 3.0;
+        p.rotation.y += delta * 2.0;
+        const scale = 0.7 + Math.sin(pt * 2.5) * 0.3;
+        p.scale.setScalar(scale);
+      });
     }
   });
 
   return (
-    <group ref={groupRef}>
-      {/* Central Tactical Core */}
-      <CelShadedMesh
-        geometry={coreGeom}
-        palette={palette}
-        resolvedPalette={resolved.main}
-        outlineThickness={outlineThickness}
-        bands={bands}
-        enableHalftone={enableHalftone}
-        enableRim={enableRim}
-        lightPos={lightPos}
-      />
-
-      {/* Orbiting Gimbal Ring 1 */}
-      <group ref={ring1Ref}>
+    <group ref={groupRef} position={[0, -0.5, 0]}>
+      {/* Backpack / Wings */}
+      <group ref={wing1Ref} position={[-1.0, 0.8, 0.2]} rotation={[0, -0.3, 0]}>
         <CelShadedMesh
-          geometry={ringGeom}
-          palette={ringPalette}
-          resolvedPalette={resolved.ring}
-          outlineThickness={outlineThickness * 0.75}
+          geometry={wingGeom}
+          palette={palette}
+          resolvedPalette={resolved.trim}
+          outlineThickness={outlineThickness * 0.6}
+          bands={bands}
+          enableHalftone={enableHalftone}
+          enableRim={enableRim}
+          lightPos={lightPos}
+        />
+      </group>
+      <group ref={wing2Ref} position={[1.0, 0.8, 0.2]} rotation={[0, 0.3, 0]}>
+        <CelShadedMesh
+          geometry={wingGeom}
+          palette={palette}
+          resolvedPalette={resolved.trim}
+          outlineThickness={outlineThickness * 0.6}
           bands={bands}
           enableHalftone={enableHalftone}
           enableRim={enableRim}
@@ -574,46 +663,240 @@ function ChronoScene({
         />
       </group>
 
-      {/* Orbiting Gimbal Ring 2 */}
-      <group ref={ring2Ref}>
+      {/* Left Leg */}
+      <group ref={lLegRef} position={[-hipOffset, -2.0, 0]}>
         <CelShadedMesh
-          geometry={outerRingGeom}
-          palette={ring2Palette}
-          resolvedPalette={resolved.ring2}
-          outlineThickness={outlineThickness * 0.75}
+          geometry={legGeom}
+          palette={palette}
+          resolvedPalette={resolved.main}
+          outlineThickness={outlineThickness}
           bands={bands}
           enableHalftone={enableHalftone}
           enableRim={enableRim}
           lightPos={lightPos}
         />
+        <group position={[0, -1.05, 0]}>
+          <CelShadedMesh
+            geometry={shinGeom}
+            palette={palette}
+            resolvedPalette={resolved.accent}
+            outlineThickness={outlineThickness * 0.9}
+            bands={bands}
+            enableHalftone={enableHalftone}
+            enableRim={enableRim}
+            lightPos={lightPos}
+          />
+          <group position={[0, -0.65, 0.15]}>
+            <CelShadedMesh
+              geometry={footGeom}
+              palette={palette}
+              resolvedPalette={resolved.trim}
+              outlineThickness={outlineThickness * 0.8}
+              bands={bands}
+              enableHalftone={enableHalftone}
+              enableRim={enableRim}
+              lightPos={lightPos}
+            />
+          </group>
+        </group>
       </group>
 
-      {/* Floating Tactical Shards */}
-      <group ref={shardsRef}>
-        {[0, 1, 2, 3].map((i) => {
-          const angle = (i * Math.PI) / 2;
-          const r = 2.9;
-          const pos: [number, number, number] = [
-            Math.cos(angle) * r,
-            (i % 2 === 0 ? 0.6 : -0.6),
-            Math.sin(angle) * r,
-          ];
-          return (
-            <group key={i} position={pos}>
+      {/* Right Leg */}
+      <group ref={rLegRef} position={[hipOffset, -2.0, 0]}>
+        <CelShadedMesh
+          geometry={legGeom}
+          palette={palette}
+          resolvedPalette={resolved.main}
+          outlineThickness={outlineThickness}
+          bands={bands}
+          enableHalftone={enableHalftone}
+          enableRim={enableRim}
+          lightPos={lightPos}
+        />
+        <group position={[0, -1.05, 0]}>
+          <CelShadedMesh
+            geometry={shinGeom}
+            palette={palette}
+            resolvedPalette={resolved.accent}
+            outlineThickness={outlineThickness * 0.9}
+            bands={bands}
+            enableHalftone={enableHalftone}
+            enableRim={enableRim}
+            lightPos={lightPos}
+          />
+          <group position={[0, -0.65, 0.15]}>
+            <CelShadedMesh
+              geometry={footGeom}
+              palette={palette}
+              resolvedPalette={resolved.trim}
+              outlineThickness={outlineThickness * 0.8}
+              bands={bands}
+              enableHalftone={enableHalftone}
+              enableRim={enableRim}
+              lightPos={lightPos}
+            />
+          </group>
+        </group>
+      </group>
+
+      {/* Torso */}
+      <group ref={torsoRef} position={[0, 0.2, 0]}>
+        <CelShadedMesh
+          geometry={torsoGeom}
+          palette={palette}
+          resolvedPalette={resolved.main}
+          outlineThickness={outlineThickness}
+          bands={bands}
+          enableHalftone={enableHalftone}
+          enableRim={enableRim}
+          lightPos={lightPos}
+        />
+
+        {/* Core reactor in chest */}
+        <mesh ref={coreRef} geometry={coreGeom} position={[0, 0.2, 0.5]}>
+          <shaderMaterial
+            vertexShader={CEL_VERTEX_SHADER}
+            fragmentShader={CEL_FRAGMENT_SHADER}
+            uniforms={{
+              uBaseColor: { value: new THREE.Color(resolved.main.base) },
+              uShadowColor: { value: new THREE.Color(resolved.main.shadow) },
+              uHighlightColor: { value: new THREE.Color(resolved.main.highlight) },
+              uRimColor: { value: new THREE.Color(resolved.main.rim) },
+              uCounterRimColor: { value: new THREE.Color(resolved.main.counterRim) },
+              uLightPos: { value: lightPos },
+              uBands: { value: bands },
+              uHalftoneScale: { value: 0.15 },
+              uHalftoneIntensity: { value: 0.6 },
+              uEnableHalftone: { value: enableHalftone ? 1.0 : 0.0 },
+              uEnableRim: { value: enableRim ? 1.0 : 0.0 },
+              uTime: { value: 0 },
+            }}
+          />
+        </mesh>
+
+        {/* Left Shoulder */}
+        <group ref={lArmRef} position={[-shoulderOffset, 0.6, 0]}>
+          <CelShadedMesh
+            geometry={shoulderGeom}
+            palette={palette}
+            resolvedPalette={resolved.trim}
+            outlineThickness={outlineThickness * 0.8}
+            bands={bands}
+            enableHalftone={enableHalftone}
+            enableRim={enableRim}
+            lightPos={lightPos}
+          />
+          <group position={[0, -0.7, 0]} rotation={[0.2, 0, 0]}>
+            <CelShadedMesh
+              geometry={armGeom}
+              palette={palette}
+              resolvedPalette={resolved.main}
+              outlineThickness={outlineThickness}
+              bands={bands}
+              enableHalftone={enableHalftone}
+              enableRim={enableRim}
+              lightPos={lightPos}
+            />
+            <group position={[0, -1.05, 0]}>
               <CelShadedMesh
-                geometry={shardGeom}
-                palette={i % 2 === 0 ? "gold" : "cyan"}
-                resolvedPalette={i % 2 === 0 ? resolved.gold : resolved.cyan}
-                outlineThickness={outlineThickness * 0.7}
+                geometry={forearmGeom}
+                palette={palette}
+                resolvedPalette={resolved.accent}
+                outlineThickness={outlineThickness * 0.9}
                 bands={bands}
-                enableHalftone={false}
-                enableRim={true}
+                enableHalftone={enableHalftone}
+                enableRim={enableRim}
                 lightPos={lightPos}
               />
             </group>
-          );
-        })}
+          </group>
+        </group>
+
+        {/* Right Shoulder */}
+        <group ref={rArmRef} position={[shoulderOffset, 0.6, 0]}>
+          <CelShadedMesh
+            geometry={shoulderGeom}
+            palette={palette}
+            resolvedPalette={resolved.trim}
+            outlineThickness={outlineThickness * 0.8}
+            bands={bands}
+            enableHalftone={enableHalftone}
+            enableRim={enableRim}
+            lightPos={lightPos}
+          />
+          <group position={[0, -0.7, 0]} rotation={[-0.2, 0, 0]}>
+            <CelShadedMesh
+              geometry={armGeom}
+              palette={palette}
+              resolvedPalette={resolved.main}
+              outlineThickness={outlineThickness}
+              bands={bands}
+              enableHalftone={enableHalftone}
+              enableRim={enableRim}
+              lightPos={lightPos}
+            />
+            <group position={[0, -1.05, 0]}>
+              <CelShadedMesh
+                geometry={forearmGeom}
+                palette={palette}
+                resolvedPalette={resolved.accent}
+                outlineThickness={outlineThickness * 0.9}
+                bands={bands}
+                enableHalftone={enableHalftone}
+                enableRim={enableRim}
+                lightPos={lightPos}
+              />
+            </group>
+          </group>
+        </group>
+
+        {/* Head */}
+        <group ref={headRef} position={[0, 1.35, 0]}>
+          <CelShadedMesh
+            geometry={headGeom}
+            palette={palette}
+            resolvedPalette={resolved.main}
+            outlineThickness={outlineThickness}
+            bands={bands}
+            enableHalftone={enableHalftone}
+            enableRim={enableRim}
+            lightPos={lightPos}
+          />
+          {/* Visor */}
+          <mesh position={[0, 0, 0.3]} scale={[0.5, 0.25, 0.1]}>
+            <meshBasicMaterial
+              color={new THREE.Color(resolved.accent.base)}
+              transparent
+              opacity={0.9}
+            />
+          </mesh>
+        </group>
       </group>
+
+      {/* Orbiting Tactical Particles */}
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <mesh
+          key={i}
+          ref={(el) => { if (el) particleRefs.current[i] = el; }}
+          geometry={particleGeom}
+          position={[
+            Math.cos(i * 1.05) * 2.2,
+            Math.sin(i * 1.05) * 0.5,
+            Math.sin(i * 1.05) * 2.2,
+          ]}
+        >
+          <CelShadedMesh
+            geometry={particleGeom}
+            palette={i % 2 === 0 ? "gold" : "cyan"}
+            resolvedPalette={i % 2 === 0 ? resolved.gold : resolved.cyan}
+            outlineThickness={outlineThickness * 0.7}
+            bands={bands}
+            enableHalftone={false}
+            enableRim={true}
+            lightPos={lightPos}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -753,7 +1036,7 @@ export function AnimeCelShaderCanvas({
         frameloop={shouldRender ? "always" : "demand"}
         className="w-full h-full"
       >
-        <ChronoScene
+        <MechaSilhouette
           palette={activePalette}
           activeTheme={activeTheme}
           outlineThickness={outlineThickness}

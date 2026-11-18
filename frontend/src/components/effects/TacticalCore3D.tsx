@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=690eb0c00b060ddd8ac7d349e3d7b7f086789ce7d8ab4c9cfe161d5f7db59a8a
+@cypher schema=1 source_sha256=5727c6bd2f648712bebccf1ef0f511e2ca5a341778c04d4012a547b58a72c17b
 MERGE (self:File {path:"frontend/src/components/effects/TacticalCore3D.tsx"})
 MERGE (fx:Symbol {id:"frontend/src/components/effects/TacticalCore3D.tsx::TacticalCore3D",kind:"component"})
 MERGE (self)-[:DEFINES]->(fx)
@@ -86,7 +86,58 @@ const OUTLINE_FRAGMENT = /* glsl */ `
 `;
 
 // ============================================================================
-// 2. PROCEDURAL 3D MESH RIG (~180 POLYGONS)
+// 2. ENERGY RING SHADER (additive glow)
+// ============================================================================
+const ENERGY_RING_VERTEX = /* glsl */ `
+  varying vec3 vNormal;
+  varying vec3 vViewPos;
+  varying vec3 vWorldPos;
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vViewPos = -mvPos.xyz;
+    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+    gl_Position = projectionMatrix * mvPos;
+  }
+`;
+
+const ENERGY_RING_FRAGMENT = /* glsl */ `
+  uniform vec3 uGlowColor;
+  uniform vec3 uCoreColor;
+  uniform float uTime;
+  uniform float uIntensity;
+
+  varying vec3 vNormal;
+  varying vec3 vViewPos;
+  varying vec3 vWorldPos;
+  varying vec2 vUv;
+
+  void main() {
+    vec3 N = normalize(vNormal);
+    vec3 V = normalize(vViewPos);
+
+    // Fresnel glow
+    float fresnel = 1.0 - max(0.0, dot(N, V));
+    float glow = smoothstep(0.3, 0.9, fresnel);
+
+    // Pulsing energy wave along ring
+    float wave = sin(vUv.x * 8.0 - uTime * 4.0) * 0.5 + 0.5;
+    float pulse = smoothstep(0.4, 0.6, wave);
+
+    vec3 color = mix(uCoreColor, uGlowColor, glow * pulse * uIntensity);
+
+    // Additive blending effect
+    float alpha = glow * pulse * uIntensity * 0.8;
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// ============================================================================
+// 3. PROCEDURAL 3D MESH RIG — TRUE GIMBAL SYSTEM
 // ============================================================================
 export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel" | "physis";
 
@@ -103,8 +154,14 @@ function CoreMesh({
   theme?: TacticalCoreTheme;
   isLight?: boolean;
 }) {
-  const coreRef = useRef<THREE.Group>(null);
-  const ringRef = useRef<THREE.Group>(null);
+  // Three independent gimbal groups
+  const innerRef = useRef<THREE.Group>(null);   // Core icosahedron
+  const middleRef = useRef<THREE.Group>(null);  // Middle gimbal ring
+  const outerRef = useRef<THREE.Group>(null);   // Outer gimbal ring
+  const energyRing1Ref = useRef<THREE.Mesh>(null);
+  const energyRing2Ref = useRef<THREE.Mesh>(null);
+  const energyRing3Ref = useRef<THREE.Mesh>(null);
+  const particleRefs = useRef<THREE.Mesh[]>([]);
 
   const effectiveTheme = isLight ? "light" : theme;
 
@@ -127,6 +184,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#ea580c"),
             counterRim: new THREE.Color("#2563eb"),
             outline: new THREE.Color("#111827"),
+            energy: new THREE.Color("#f59e0b"),
           };
         case "overdrive":
           return {
@@ -135,6 +193,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#f59e0b"),
             counterRim: new THREE.Color("#2563eb"),
             outline: new THREE.Color("#111827"),
+            energy: new THREE.Color("#ea580c"),
           };
         case "nominal":
         default:
@@ -144,6 +203,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#ea580c"),
             counterRim: new THREE.Color("#f59e0b"),
             outline: new THREE.Color("#111827"),
+            energy: new THREE.Color("#00f0ff"),
           };
       }
     }
@@ -158,6 +218,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#b8282b"),
             counterRim: new THREE.Color("#1b5e48"),
             outline: new THREE.Color("#7a1518"),
+            energy: new THREE.Color("#d49e35"),
           };
         case "overdrive":
           return {
@@ -166,6 +227,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#d49e35"),
             counterRim: new THREE.Color("#1b5e48"),
             outline: new THREE.Color("#221c16"),
+            energy: new THREE.Color("#b8282b"),
           };
         case "nominal":
         default:
@@ -175,6 +237,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#b8282b"),
             counterRim: new THREE.Color("#1b5e48"),
             outline: new THREE.Color("#c89228"),
+            energy: new THREE.Color("#d49e35"),
           };
       }
     }
@@ -189,6 +252,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#8b5cf6"),
             counterRim: new THREE.Color("#e11d48"),
             outline: new THREE.Color("#050409"),
+            energy: new THREE.Color("#f59e0b"),
           };
         case "overdrive":
           return {
@@ -197,6 +261,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#8b5cf6"),
             counterRim: new THREE.Color("#f59e0b"),
             outline: new THREE.Color("#050409"),
+            energy: new THREE.Color("#e11d48"),
           };
         case "nominal":
         default:
@@ -206,6 +271,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#e11d48"),
             counterRim: new THREE.Color("#f59e0b"),
             outline: new THREE.Color("#050409"),
+            energy: new THREE.Color("#8b5cf6"),
           };
       }
     }
@@ -220,6 +286,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#d42426"),
             counterRim: new THREE.Color("#22c55e"),
             outline: new THREE.Color("#060b08"),
+            energy: new THREE.Color("#f8b229"),
           };
         case "overdrive":
           return {
@@ -228,6 +295,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#f8b229"),
             counterRim: new THREE.Color("#d42426"),
             outline: new THREE.Color("#060b08"),
+            energy: new THREE.Color("#165b33"),
           };
         case "nominal":
         default:
@@ -237,6 +305,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#f8b229"),
             counterRim: new THREE.Color("#165b33"),
             outline: new THREE.Color("#060b08"),
+            energy: new THREE.Color("#d42426"),
           };
       }
     }
@@ -251,6 +320,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#e60033"),
             counterRim: new THREE.Color("#0055ff"),
             outline: new THREE.Color("#0a0d14"),
+            energy: new THREE.Color("#d48800"),
           };
         case "overdrive":
           return {
@@ -259,6 +329,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#0055ff"),
             counterRim: new THREE.Color("#d48800"),
             outline: new THREE.Color("#0a0d14"),
+            energy: new THREE.Color("#e60033"),
           };
         case "nominal":
         default:
@@ -268,6 +339,7 @@ function CoreMesh({
             keyRim: new THREE.Color("#e60033"),
             counterRim: new THREE.Color("#d48800"),
             outline: new THREE.Color("#0a0d14"),
+            energy: new THREE.Color("#0055ff"),
           };
       }
     }
@@ -281,6 +353,7 @@ function CoreMesh({
           keyRim: new THREE.Color("#ff184c"),
           counterRim: new THREE.Color("#00f0ff"),
           outline: new THREE.Color("#000000"),
+          energy: new THREE.Color("#ffc400"),
         };
       case "overdrive":
         return {
@@ -289,6 +362,7 @@ function CoreMesh({
           keyRim: new THREE.Color("#00f0ff"),
           counterRim: new THREE.Color("#ffc400"),
           outline: new THREE.Color("#000000"),
+          energy: new THREE.Color("#ff184c"),
         };
       case "nominal":
       default:
@@ -298,6 +372,7 @@ function CoreMesh({
           keyRim: new THREE.Color("#ff184c"),
           counterRim: new THREE.Color("#ffc400"),
           outline: new THREE.Color("#000000"),
+          energy: new THREE.Color("#00f0ff"),
         };
     }
     // ── 7. 主题 token 覆盖 (per 2026-11-17 主题统一) ──
@@ -318,15 +393,21 @@ function CoreMesh({
         keyRim: c(keyRim),
         counterRim: c(counterRim),
         outline: c(outline),
+        energy: c(base),
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, effectiveTheme, themeRev]);
 
-  const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(0.85, 0), []);
-  const ringGeom = useMemo(() => new THREE.TorusGeometry(1.25, 0.05, 8, 24), []);
+  // Geometries
+  const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(0.75, 0), []);
+  const middleRingGeom = useMemo(() => new THREE.TorusGeometry(1.15, 0.04, 8, 32), []);
+  const outerRingGeom = useMemo(() => new THREE.TorusGeometry(1.45, 0.035, 8, 32), []);
+  const energyRingGeom = useMemo(() => new THREE.RingGeometry(1.0, 1.05, 64), []);
+  const particleGeom = useMemo(() => new THREE.OctahedronGeometry(0.08, 0), []);
 
-  const uniforms = useMemo(
+  // Uniforms
+  const coreUniforms = useMemo(
     () => ({
       uBaseColor: { value: colors.base },
       uShadowColor: { value: colors.shadow },
@@ -345,29 +426,184 @@ function CoreMesh({
     [colors.outline]
   );
 
+  const energyUniforms1 = useMemo(
+    () => ({
+      uGlowColor: { value: colors.energy },
+      uCoreColor: { value: colors.base },
+      uTime: { value: 0 },
+      uIntensity: { value: 1.0 },
+    }),
+    [colors]
+  );
+
+  const energyUniforms2 = useMemo(
+    () => ({
+      uGlowColor: { value: colors.keyRim },
+      uCoreColor: { value: colors.base },
+      uTime: { value: 0 },
+      uIntensity: { value: 0.7 },
+    }),
+    [colors]
+  );
+
+  const energyUniforms3 = useMemo(
+    () => ({
+      uGlowColor: { value: colors.counterRim },
+      uCoreColor: { value: colors.base },
+      uTime: { value: 0 },
+      uIntensity: { value: 0.5 },
+    }),
+    [colors]
+  );
+
+  const particleUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.energy },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.keyRim },
+      uRimColor: { value: colors.energy },
+      uLightPos: { value: new THREE.Vector3(3, 4, 4) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 2.0 },
+    }),
+    [colors]
+  );
+
+  // Animation state
+  const [burstPhase, setBurstPhase] = useState(0);
+
   useFrame((_, delta) => {
     const isBursting = Date.now() - burstTime < 600;
-    const speed = isBursting ? 7.5 : isHovered ? 2.5 : 1.0;
+    const baseSpeed = isBursting ? 5.0 : isHovered ? 2.0 : 1.0;
 
-    if (coreRef.current) {
-      coreRef.current.rotation.y += delta * 1.2 * speed;
-      coreRef.current.rotation.x += delta * 0.6 * speed;
+    // Update energy ring time uniforms
+    energyUniforms1.uTime.value += delta;
+    energyUniforms2.uTime.value += delta * 1.3;
+    energyUniforms3.uTime.value += delta * 0.7;
+
+    // Three-axis independent gimbal rotation
+    // Inner core: X + Y rotation
+    if (innerRef.current) {
+      innerRef.current.rotation.x += delta * 0.8 * baseSpeed;
+      innerRef.current.rotation.y += delta * 1.2 * baseSpeed;
+      innerRef.current.rotation.z += delta * 0.4 * baseSpeed;
     }
-    if (ringRef.current) {
-      ringRef.current.rotation.x += delta * 1.6 * speed;
-      ringRef.current.rotation.z -= delta * 0.9 * speed;
+
+    // Middle gimbal: Y + Z rotation (counter-rotating)
+    if (middleRef.current) {
+      middleRef.current.rotation.y -= delta * 1.0 * baseSpeed;
+      middleRef.current.rotation.z += delta * 1.5 * baseSpeed;
+      middleRef.current.rotation.x += delta * 0.3 * baseSpeed;
+    }
+
+    // Outer gimbal: Z + X rotation (counter-rotating to middle)
+    if (outerRef.current) {
+      outerRef.current.rotation.z -= delta * 0.7 * baseSpeed;
+      outerRef.current.rotation.x -= delta * 1.1 * baseSpeed;
+      outerRef.current.rotation.y += delta * 0.5 * baseSpeed;
+    }
+
+    // Energy rings pulse and rotate
+    if (energyRing1Ref.current) {
+      energyRing1Ref.current.rotation.z += delta * 0.8 * baseSpeed;
+      const pulse = 0.6 + Math.sin(Date.now() * 0.003) * 0.4;
+      energyUniforms1.uIntensity.value = pulse * (isBursting ? 2.0 : 1.0);
+    }
+    if (energyRing2Ref.current) {
+      energyRing2Ref.current.rotation.z -= delta * 1.2 * baseSpeed;
+      energyRing2Ref.current.rotation.x += delta * 0.5 * baseSpeed;
+      const pulse = 0.4 + Math.sin(Date.now() * 0.0025 + 1) * 0.3;
+      energyUniforms2.uIntensity.value = pulse * (isBursting ? 1.5 : 1.0);
+    }
+    if (energyRing3Ref.current) {
+      energyRing3Ref.current.rotation.y += delta * 0.6 * baseSpeed;
+      energyRing3Ref.current.rotation.x -= delta * 0.9 * baseSpeed;
+      const pulse = 0.3 + Math.sin(Date.now() * 0.002 + 2) * 0.25;
+      energyUniforms3.uIntensity.value = pulse * (isBursting ? 1.2 : 1.0);
+    }
+
+    // Orbiting particles
+    if (particleRefs.current.length) {
+      particleRefs.current.forEach((p, i) => {
+        if (!p) return;
+        const t = Date.now() * 0.001 + i * 2;
+        const r = 1.8 + Math.sin(t * 0.7) * 0.3;
+        p.position.x = Math.cos(t * (isBursting ? 3 : 1)) * r;
+        p.position.y = Math.sin(t * (isBursting ? 2.5 : 0.8) + i) * r * 0.6;
+        p.position.z = Math.sin(t * (isBursting ? 2 : 1.2) + i * 1.5) * r;
+        p.rotation.x += delta * (isBursting ? 8 : 3);
+        p.rotation.y += delta * (isBursting ? 5 : 2);
+        // Scale pulse
+        const scale = 0.8 + Math.sin(t * 2) * 0.2;
+        p.scale.setScalar(scale);
+      });
+    }
+
+    // Burst flash
+    if (isBursting && burstPhase < 1) {
+      setBurstPhase((p) => p + delta * 3);
+    } else if (!isBursting && burstPhase > 0) {
+      setBurstPhase((p) => Math.max(0, p - delta * 2));
     }
   });
 
+  // Build orbiting particles
+  const particles = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < 6; i++) {
+      arr.push(i);
+    }
+    return arr;
+  }, []);
+
   return (
     <group>
-      {/* 1. Central Icosahedron Facet Core */}
-      <group ref={coreRef}>
+      {/* Outer Gimbal Ring */}
+      <group ref={outerRef}>
+        <mesh geometry={outerRingGeom}>
+          <shaderMaterial
+            vertexShader={CORE_VERTEX_SHADER}
+            fragmentShader={CORE_FRAGMENT_SHADER}
+            uniforms={coreUniforms}
+          />
+        </mesh>
+        <mesh geometry={outerRingGeom}>
+          <shaderMaterial
+            vertexShader={OUTLINE_VERTEX}
+            fragmentShader={OUTLINE_FRAGMENT}
+            uniforms={outlineUniforms}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      </group>
+
+      {/* Middle Gimbal Ring */}
+      <group ref={middleRef}>
+        <mesh geometry={middleRingGeom}>
+          <shaderMaterial
+            vertexShader={CORE_VERTEX_SHADER}
+            fragmentShader={CORE_FRAGMENT_SHADER}
+            uniforms={coreUniforms}
+          />
+        </mesh>
+        <mesh geometry={middleRingGeom}>
+          <shaderMaterial
+            vertexShader={OUTLINE_VERTEX}
+            fragmentShader={OUTLINE_FRAGMENT}
+            uniforms={outlineUniforms}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      </group>
+
+      {/* Inner Core */}
+      <group ref={innerRef}>
         <mesh geometry={coreGeom}>
           <shaderMaterial
             vertexShader={CORE_VERTEX_SHADER}
             fragmentShader={CORE_FRAGMENT_SHADER}
-            uniforms={uniforms}
+            uniforms={coreUniforms}
           />
         </mesh>
         <mesh geometry={coreGeom}>
@@ -380,30 +616,63 @@ function CoreMesh({
         </mesh>
       </group>
 
-      {/* 2. Orbiting Gimbal Ring */}
-      <group ref={ringRef}>
-        <mesh geometry={ringGeom}>
+      {/* Energy Rings - additive glow layers */}
+      <mesh ref={energyRing1Ref} geometry={energyRingGeom} rotation={[-Math.PI / 2, 0, 0]}>
+        <shaderMaterial
+          vertexShader={ENERGY_RING_VERTEX}
+          fragmentShader={ENERGY_RING_FRAGMENT}
+          uniforms={energyUniforms1}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={energyRing2Ref} geometry={energyRingGeom} rotation={[-Math.PI / 2, 0, 0]} scale={[1.3, 1.3, 1]}>
+        <shaderMaterial
+          vertexShader={ENERGY_RING_VERTEX}
+          fragmentShader={ENERGY_RING_FRAGMENT}
+          uniforms={energyUniforms2}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={energyRing3Ref} geometry={energyRingGeom} rotation={[-Math.PI / 2, 0, 0]} scale={[1.6, 1.6, 1]}>
+        <shaderMaterial
+          vertexShader={ENERGY_RING_VERTEX}
+          fragmentShader={ENERGY_RING_FRAGMENT}
+          uniforms={energyUniforms3}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Orbiting Tactical Particles */}
+      {particles.map((i) => (
+        <mesh
+          key={i}
+          ref={(el) => { if (el) particleRefs.current[i] = el; }}
+          geometry={particleGeom}
+          position={[
+            Math.cos(i * 1.05) * 1.8,
+            Math.sin(i * 1.05) * 0.5,
+            Math.sin(i * 1.05) * 1.8,
+          ]}
+        >
           <shaderMaterial
             vertexShader={CORE_VERTEX_SHADER}
             fragmentShader={CORE_FRAGMENT_SHADER}
-            uniforms={uniforms}
+            uniforms={particleUniforms}
           />
         </mesh>
-        <mesh geometry={ringGeom}>
-          <shaderMaterial
-            vertexShader={OUTLINE_VERTEX}
-            fragmentShader={OUTLINE_FRAGMENT}
-            uniforms={outlineUniforms}
-            side={THREE.BackSide}
-          />
-        </mesh>
-      </group>
+      ))}
     </group>
   );
 }
 
 // ============================================================================
-// 3. EXPORTABLE TACTICAL CORE COMPONENT (40x40)
+// 4. EXPORTABLE TACTICAL CORE COMPONENT (40x40)
 // ============================================================================
 export interface TacticalCore3DProps {
   status?: "nominal" | "warning" | "overdrive";
@@ -482,7 +751,7 @@ export function TacticalCore3D({
     <div
       role="button"
       tabIndex={0}
-      title="Tactical Neural Core [3渲2 真3D 陀螺仪]"
+      title="Tactical Neural Core [3渲2 真3D 三轴陀螺仪]"
       aria-label="Tactical Neural Core"
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}

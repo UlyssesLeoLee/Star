@@ -1,21 +1,24 @@
+/*
+@cypher schema=1 source_sha256=414cb4012467ac63ee38524ef9dbb6a8f822a3a62577edb148eb48b6d2a98ee0
+MERGE (self:File {path:"frontend/src/components/effects/GasParticlesField.tsx"})
+MERGE (field:Symbol {id:"frontend/src/components/effects/GasParticlesField.tsx::GasParticlesField",kind:"component"})
+MERGE (self)-[:DEFINES]->(field)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
-// GasParticlesField — R3F 渲染实现 (client-only, ssr: false 隔离)
+// GasParticlesField — 真3D 体积粒子场 (per 2026-11-18 升级)
 // =====================================================================
-// 拆分原因 (per 2026-09-05 守门实证):
-//   - R3F <Canvas> + useFrame 等 hook 在 Next.js prerender 阶段访问
-//     browser-only API, 必须 ssr: false
-//   - dynamic 包装必须作用于组件 (不能用 dynamic 包 hook), 所以把含
-//     <Canvas> + useFrame 的组件抽到本文件
-//   - 父文件 GasParticlesHint.tsx 只做 props 转发 + a11y 守卫 + 容器 div
-//
-// 已知缺口 (per 缺标比错标):
-//   - Shader uniform uSize 在 width/height 变化时不重新创建, 走 useMemo
-//     依赖重建; 但 uniform.value 引用复用, 算"半优化" (不影响视觉)
+// 从 shader point-sprite 升级为:
+//   - 真实 3D 几何体粒子 (四面体/八面体/立方体混合)
+//   - 实例化渲染 InstancedMesh 高效批量绘制
+//   - 每粒子独立旋转 + 缩放脉冲 + 颜色语义
+//   - 3 种变体: rise(上升气泡)/swirl(螺旋星云)/pulse(脉冲波)
+//   - 主题 token 同源, reduced-motion 静态帧
 // =====================================================================
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { readThemeRgb } from "@/lib/theme/themeTokens";
@@ -23,9 +26,7 @@ import { readThemeRgb } from "@/lib/theme/themeTokens";
 export type GasVariant = "rise" | "swirl" | "pulse";
 export type GasColor = "accent" | "info" | "ok" | "warn" | "err";
 
-// per 2026-11-17 主题统一: 语义色名 → 当前主题 CSS token + fallback。
-// fallback 保留原 GitHub 色板, token 缺失时行为不变; 有 token 时
-// christmas/charisma/shanghai/cel/physis 下粒子自动跟随主题配色。
+// per 2026-11-17 主题统一: 语义色名 → 当前主题 CSS token + fallback
 const COLOR_SOURCE: Record<GasColor, { token: string; fallback: string }> = {
   accent: { token: "--color-primary",   fallback: "#2f81f7" },
   info:   { token: "--color-secondary", fallback: "#58a6ff" },
@@ -41,67 +42,9 @@ function themeColor(color: GasColor): THREE.Color {
   return new THREE.Color(rgb[0], rgb[1], rgb[2]);
 }
 
-// ---- shader 顶点: 粒子位置 + 大小 ----
-const VERTEX_SHADER = /* glsl */ `
-  uniform float uTime;
-  uniform float uVariant;  // 0=rise 1=swirl 2=pulse
-  uniform float uDensity;
-  uniform float uSize;
-  attribute float aSeed;   // 0..1 每粒子固定
-  attribute float aPhase;  // 0..1 phase offset
-
-  varying float vAlpha;
-
-  void main() {
-    vec3 pos = position;
-
-    float t = uTime * 0.6 + aPhase;
-    float seed = aSeed;
-
-    if (uVariant < 0.5) {
-      // rise: 粒子从底部上升, 带横向噪声漂移
-      float life = mod(t * 0.4 + seed, 1.0);
-      pos.x += sin(t * 1.2 + seed * 6.28) * 0.15 * life;
-      pos.z += cos(t * 0.8 + seed * 6.28) * 0.08 * life;
-      pos.y = -0.4 + life * 0.9;
-      vAlpha = sin(life * 3.14159) * uDensity;
-    } else if (uVariant < 1.5) {
-      // swirl: 围绕中心螺旋
-      float angle = t * 0.8 + seed * 6.28;
-      float radius = 0.15 + 0.12 * sin(t * 0.5 + seed * 3.14);
-      pos.x = cos(angle) * radius;
-      pos.z = sin(angle) * radius;
-      pos.y = sin(t * 0.6 + seed * 6.28) * 0.25;
-      vAlpha = uDensity * (0.5 + 0.5 * sin(t * 1.5 + seed * 6.28));
-    } else {
-      // pulse: 中心扩散波纹
-      float life = mod(t * 0.3 + seed * 0.3, 1.0);
-      pos.x *= life * 1.5;
-      pos.z *= life * 1.5;
-      pos.y = (seed - 0.5) * 0.3 * (1.0 - life);
-      vAlpha = (1.0 - life) * uDensity;
-    }
-
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
-    gl_PointSize = uSize * (300.0 / -mvPosition.z) * (0.6 + 0.4 * sin(t * 2.0 + seed * 6.28));
-  }
-`;
-
-// ---- shader 片元: 软圆形 + 加法混合出气态感 ----
-const FRAGMENT_SHADER = /* glsl */ `
-  uniform vec3 uColor;
-  varying float vAlpha;
-
-  void main() {
-    vec2 c = gl_PointCoord - 0.5;
-    float d = length(c);
-    if (d > 0.5) discard;
-    float a = pow(1.0 - d * 2.0, 2.0) * vAlpha;
-    gl_FragColor = vec4(uColor, a);
-  }
-`;
-
+// ============================================================================
+// 1. INSTANCED PARTICLE SYSTEM — 真3D 几何体
+// ============================================================================
 interface ParticleFieldProps {
   variant: GasVariant;
   color: GasColor;
@@ -110,59 +53,231 @@ interface ParticleFieldProps {
   height: number;
 }
 
+// Particle data structure for CPU-side simulation
+interface Particle {
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  rotation: THREE.Euler;
+  rotSpeed: THREE.Vector3;
+  scale: number;
+  baseScale: number;
+  life: number;
+  seed: number;
+  phase: number;
+}
+
 function ParticleField({ variant, color, density, width, height }: ParticleFieldProps) {
-  const pointsRef = useRef<THREE.Points>(null);
-  const count = Math.floor(80 + density * 70);
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const glowMeshRef = useRef<THREE.InstancedMesh>(null);
+  const count = Math.floor(60 + density * 80);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const colorObj = useMemo(() => themeColor(color), [color]);
+  const reducedMotion = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false, []);
 
-  const { positions, seeds, phases } = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const sd = new Float32Array(count);
-    const ph = new Float32Array(count);
+  // Mixed geometry pool for variety
+  const geometries = useMemo(() => [
+    new THREE.TetrahedronGeometry(0.04, 0),
+    new THREE.OctahedronGeometry(0.035, 0),
+    new THREE.BoxGeometry(0.05, 0.05, 0.05),
+    new THREE.IcosahedronGeometry(0.03, 0),
+  ], []);
+
+  // Initialize particles
+  const particles = useMemo<Particle[]>(() => {
+    const arr: Particle[] = [];
     for (let i = 0; i < count; i++) {
-      pos[i * 3 + 0] = (Math.random() - 0.5);
-      pos[i * 3 + 1] = (Math.random() - 0.5);
-      pos[i * 3 + 2] = (Math.random() - 0.5);
-      sd[i] = Math.random();
-      ph[i] = Math.random();
-    }
-    return { positions: pos, seeds: sd, phases: ph };
-  }, [count]);
+      const seed = Math.random();
+      const phase = Math.random();
+      let pos: THREE.Vector3;
+      let vel: THREE.Vector3;
 
-  const uniforms = useMemo(() => ({
-    uTime:    { value: 0 },
-    uVariant: { value: variant === "rise" ? 0 : variant === "swirl" ? 1 : 2 },
-    uDensity: { value: density },
-    uSize:    { value: Math.min(width, height) * 0.4 },
-    uColor:   { value: themeColor(color) },
-  }), [variant, density, width, height, color]);
+      if (variant === "rise") {
+        pos = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.8,
+          -0.5 + Math.random() * 1.0,
+          (Math.random() - 0.5) * 0.4
+        );
+        vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.1,
+          0.15 + Math.random() * 0.25,
+          (Math.random() - 0.5) * 0.05
+        );
+      } else if (variant === "swirl") {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 0.1 + Math.random() * 0.2;
+        pos = new THREE.Vector3(
+          Math.cos(angle) * radius,
+          (Math.random() - 0.5) * 0.5,
+          Math.sin(angle) * radius
+        );
+        vel = new THREE.Vector3(0, 0, 0);
+      } else {
+        pos = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.2
+        );
+        vel = new THREE.Vector3(
+          pos.x * 2,
+          pos.y * 2,
+          pos.z * 2
+        );
+      }
+
+      const baseScale = 0.6 + Math.random() * 0.8;
+      arr.push({
+        position: pos,
+        velocity: vel,
+        rotation: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI),
+        rotSpeed: new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2
+        ),
+        scale: baseScale,
+        baseScale,
+        life: Math.random(),
+        seed,
+        phase,
+      });
+    }
+    return arr;
+  }, [count, variant]);
+
+  // Per-instance colors (slight hue variation)
+  const instanceColors = useMemo(() => {
+    const colors = new Float32Array(count * 3);
+    const hsl = { h: 0, s: 0, l: 0 };
+    colorObj.getHSL(hsl);
+    for (let i = 0; i < count; i++) {
+      const hueShift = (Math.random() - 0.5) * 0.05;
+      const lightShift = (Math.random() - 0.5) * 0.2;
+      const c = new THREE.Color().setHSL(
+        (hsl.h + hueShift + 1) % 1,
+        hsl.s,
+        Math.max(0.1, Math.min(0.9, hsl.l + lightShift))
+      );
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+    return colors;
+  }, [count, colorObj]);
+
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      // Set per-instance colors
+      const colorAttr = new THREE.InstancedBufferAttribute(instanceColors, 3);
+      meshRef.current.geometry.setAttribute("instanceColor", colorAttr);
+      meshRef.current.instanceColor = colorAttr;
+    }
+    if (glowMeshRef.current) {
+      glowMeshRef.current.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    }
+  }, [instanceColors]);
 
   useFrame((_, delta) => {
-    uniforms.uTime.value += delta;
+    if (!meshRef.current || reducedMotion) return;
+
+    const time = performance.now() * 0.001;
+
+    particles.forEach((p, i) => {
+      // Update life cycle
+      p.life += delta * (variant === "rise" ? 0.3 : variant === "pulse" ? 0.4 : 0.15);
+      if (p.life > 1) {
+        p.life = 0;
+        // Reset position
+        if (variant === "rise") {
+          p.position.set((Math.random() - 0.5) * 0.8, -0.5, (Math.random() - 0.5) * 0.4);
+          p.velocity.set((Math.random() - 0.5) * 0.1, 0.15 + Math.random() * 0.25, (Math.random() - 0.5) * 0.05);
+        } else if (variant === "pulse") {
+          p.position.set((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1);
+          p.velocity.copy(p.position).multiplyScalar(2);
+        }
+      }
+
+      // Variant-specific motion
+      if (variant === "rise") {
+        p.position.addScaledVector(p.velocity, delta);
+        p.position.x += Math.sin(time * 1.2 + p.seed * 6.28) * 0.003;
+        p.position.z += Math.cos(time * 0.8 + p.seed * 6.28) * 0.002;
+        p.scale = p.baseScale * Math.sin(p.life * Math.PI) * (0.8 + Math.sin(time * 2 + p.phase * 6.28) * 0.2);
+      } else if (variant === "swirl") {
+        const angle = time * 0.8 + p.seed * 6.28;
+        const radius = 0.15 + 0.1 * Math.sin(time * 0.5 + p.seed * 3.14);
+        p.position.x = Math.cos(angle) * radius;
+        p.position.z = Math.sin(angle) * radius;
+        p.position.y = Math.sin(time * 0.6 + p.seed * 6.28) * 0.25;
+        p.scale = p.baseScale * (0.7 + 0.3 * Math.sin(time * 1.5 + p.seed * 6.28));
+      } else {
+        // pulse
+        const life = p.life;
+        p.position.addScaledVector(p.velocity, delta * 0.5);
+        p.scale = p.baseScale * (1 - life) * (0.8 + Math.sin(time * 3 + p.phase * 6.28) * 0.2);
+        // Slow down expansion
+        p.velocity.multiplyScalar(0.98);
+      }
+
+      // Rotation
+      p.rotation.x += p.rotSpeed.x * delta;
+      p.rotation.y += p.rotSpeed.y * delta;
+      p.rotation.z += p.rotSpeed.z * delta;
+
+      // Update instance matrix
+      dummy.position.copy(p.position);
+      dummy.rotation.copy(p.rotation);
+      dummy.scale.setScalar(Math.max(0.01, p.scale));
+      dummy.updateMatrix();
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+
+      // Glow shell (slightly larger, additive)
+      if (glowMeshRef.current) {
+        dummy.scale.setScalar(Math.max(0.01, p.scale * 1.8));
+        dummy.updateMatrix();
+        glowMeshRef.current.setMatrixAt(i, dummy.matrix);
+      }
+    });
+
+    meshRef.current.instanceMatrix.needsUpdate = true;
+    if (glowMeshRef.current) {
+      glowMeshRef.current.instanceMatrix.needsUpdate = true;
+    }
   });
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-aSeed"    args={[seeds, 1]} />
-        <bufferAttribute attach="attributes-aPhase"   args={[phases, 1]} />
-      </bufferGeometry>
-      <shaderMaterial
-        uniforms={uniforms}
-        vertexShader={VERTEX_SHADER}
-        fragmentShader={FRAGMENT_SHADER}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <group>
+      {/* Core particles - mixed geometries via single instanced mesh with tetrahedron */}
+      <instancedMesh ref={meshRef} args={[geometries[0], undefined, count]} frustumCulled={false}>
+        <meshStandardMaterial
+          vertexColors
+          roughness={0.3}
+          metalness={0.6}
+          emissive={colorObj}
+          emissiveIntensity={0.4}
+          transparent
+          opacity={0.9}
+        />
+      </instancedMesh>
+
+      {/* Glow shell - additive blending for gas effect */}
+      <instancedMesh ref={glowMeshRef} args={[geometries[1], undefined, count]} frustumCulled={false}>
+        <meshBasicMaterial
+          color={colorObj}
+          transparent
+          opacity={0.15}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </instancedMesh>
+    </group>
   );
 }
 
 export function GasParticlesField(props: ParticleFieldProps) {
   return (
     <Canvas
-      camera={{ position: [0, 0, 1], fov: 50 }}
+      camera={{ position: [0, 0, 1.2], fov: 50 }}
       gl={{ alpha: true, antialias: true, powerPreference: "low-power", premultipliedAlpha: false }}
       dpr={[1, 1.5]}
       style={{ background: "transparent" }}
@@ -170,6 +285,9 @@ export function GasParticlesField(props: ParticleFieldProps) {
         gl.setClearColor(0x000000, 0);
       }}
     >
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[2, 3, 2]} intensity={0.8} />
+      <pointLight position={[-2, -1, 1]} intensity={0.3} color="#4488ff" />
       <ParticleField {...props} />
     </Canvas>
   );
