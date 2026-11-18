@@ -174,6 +174,7 @@ F15 G-01 生产路由挂载修复 + 8 组件纯 3D 人格化。**均未提交**�
 1. ✅ 工作区核清（本报告 §1）——已完成，未动任何文件。
 2. ✅ 交付文档刷新（本报告 §2–§4）——已完成。
 3. ✅ 按领域拆分提交（残留待办阶段执行，逐文件 `git add`，无整体暂存）：批次 = ① F15 G-01（lib.rs/main.rs/production_router.rs）② 3D 组件（9 文件）③ 纯 stamp + Guardian 修复（70+3 文件）④ 文档修正（6 文件 + INDEX）⑤ F 审计（14 文件）⑥ 本报告；CRLF 归一化已并入各领域文件，无独立噪声批次。
+   实际提交（已推送 origin/dev，远端 SHA 复核一致）：`ed53a223` fix(api-rest) F15 G-01（3 文件）→ `8f9990ad` feat(frontend) 3D 化（9）→ `74dc39af` chore(cypher) stamp+断链（70）→ `36b15227` docs 修正（7）→ `2fe50133` docs(features) 审计（14）→ `0eaa8369` docs(reports) 本报告（1）；合计 104 文件，提交后工作区全净（status 0 条）。
 4. ⏭ 门禁证据补齐前保持 NO-GO；任务卡关联 VM/沙盒/Build 需求另立工作项（锚点 F04/F13/local-runtime）。
 5. ⏭ 部署更新：本地生产构建 + `next start` 验证已完成（可复核证据见 §5）；正式发行部署仍受 W0–W9 门禁约束，**不解除 NO-GO**。
 
