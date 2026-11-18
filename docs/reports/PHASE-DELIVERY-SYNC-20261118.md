@@ -206,9 +206,10 @@ F15 G-01 生产路由挂载修复 + 8 组件纯 3D 人格化。**均未提交**�
   - `daaed30d` feat(auth)：JWT claims 携带 issuer 核实的 project 成员资格（`Claims.projects` / `issue_token_with_project_memberships` / middleware 透传 / rbac 夹具）。
   - `3c33174c` feat(scm)：MR/review/pipeline 真实化 — 共享 `InMemoryScmService` + `ScmApiState` + `actor_from_auth`（JWT→ActorContext）；7 条生产路由（`{id}` 语法）；`list_repositories` project 过滤 + `decide_review`（INV-SCM-04 / INV-SCM-07）；lib.rs F15 挂载与 SCM 两批交织，合并入本提交并在 message 注明。
   - `aecdba4f` chore(guardian)：9 文件 @cypher header 补边 + `cgg_guard.py --stamp` **PASS (9 source files)**（digest 脚本生成，未手算）。
+  - `418655b3` feat(scm)：INV-SCM-04 补齐 — `list_pull_requests` / `list_reviews_for_pr` 经 repository.project_id 按 project 过滤（fail-closed）；可见性测试补 outsider reviews 403 / admin 可见断言；复跑 scm_endpoints **8 passed** + domain-scm **19+9+7 passed** ✅；重 stamp 2 文件 PASS。
 - 测试证据（全部 `axum::Router::oneshot`，守门 #25 v25，无真 HTTP / 无真 PG）：
   - `--test scm_endpoints`：**8 passed / 0 failed** ✅（401 无 Bearer / 垃圾 token / 无设备上下文 / 吊销 generation；跨 handler 全链路同一 service；project 可见性；裁决仅 reviewer 本人 + 禁重复；Draft→Merged 非法；跨 tenant pipeline 403）。
   - `--lib`：**201 passed / 0 failed / 3 ignored** ✅。
   - `--test notifications_endpoints` 12 passed + `--test production_router` 1 passed（41 条镜像）✅。
   - `cargo test -p domain-scm`：EXIT=0 ✅；`cargo fmt --all --check`：0 diff ✅；`cargo check -p star-api-rest --tests`：EXIT=0 ✅。
-- 遗留（如实登记，未关闭）：domain-scm `list_pull_requests` / `list_reviews_for_pr` 的 INV-SCM-04 project 过滤待补；SCM 仍为内存 service（持久化属批次 C/D）；compat 三端点无鉴权仅供 legacy 预览骨架；发布 **NO-GO(v1.0.6) 维持**。
+- 遗留（如实登记，未关闭）：SCM 仍为内存 service（持久化属批次 C/D）；compat 三端点无鉴权仅供 legacy 预览骨架；发布 **NO-GO(v1.0.6) 维持**。（原"list_pull_requests / list_reviews_for_pr 过滤待补"已于 `418655b3` 关闭。）
