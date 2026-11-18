@@ -118,6 +118,7 @@ Worktree (git worktree)
 | L2 顶栏 | `z-30` | `AppHeader` (`sticky top-0`) | 横向通栏，可覆盖内容 |
 | **L3 底部 dock** | **`z-[35]`** | **FileSession 终端面板 / 底部面板**（当前代码中尚无使用 `z-[35]` 的元素） | 🔴 **必须 `left: var(--sidebar-w)`；被侧栏覆盖** |
 | **L4 侧栏** | **`z-40`** | **`Sidebar`** | 🔴 **垂直通栏，任何内容都不得覆盖** |
+| L4b 右侧聊天栏 | `z-40` | `RightChatRail` (`fixed top-0 right-0 h-screen`；折叠 `w-14` 56px，展开 `w-80` 320px) | 右侧通栏，位于侧栏对侧，不跨越侧栏区域 |
 | L5 抽屉 | `z-50` | 详情抽屉 / Modal（仅移动端全屏） | 移动端遮罩；桌面端不跨导航 |
 | L6 浮层 | `z-50` | `CommandBar` / ContextMenu / Popover | 临时浮层，Esc 关闭 |
 | L7 系统提示 | `z-[9997..9999]` | `PwaUpdateToast` / `MobileBottomNav` | 最高层 |

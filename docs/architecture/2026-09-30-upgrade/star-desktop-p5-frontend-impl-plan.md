@@ -3,12 +3,12 @@
 > **date**: 2026-09-30 JST (首版); 状态核对 2026-11-16。
 > **author**: Ulysses (一人公司 12 角色 per DEC-008) — minimax-agent (commit 正文 Co-authored-by 记录)
 > **trigger**: PR #244 follow-up of PR #243 (Tauri P3 docs) + PR-#241 (P2 adapters)
-> **核对基线**: 工作区 dev (HEAD `80830732` + 未提交改动), 2026-11-16; Routing 行含 e3636462 (2026-11-13) 的路由迁移结果。
+> **核对基线**: 工作区 dev (HEAD `1470c33c`), 2026-11-16; Routing 行含 e3636462 (2026-11-13) 的路由迁移结果。
 > **status**: 设计阶段已完成 (PR #244, e994e362); 实施已由后续 PR 部分落地: #246 React+Vite 骨架 (df099df1)、#247 类型与常量 (b8f0a18a)、#248 KanbanCard 移植 (508e7fee)、#249 KanbanBoard 移植 (630ec19c)、#250 Tauri IPC hooks (afbed082)、#251 WASM hooks (0a596d8e)、#252 BoardView 集成 (a1616b5a)。计划中的 loader.ts 未创建, .wasm 产物未打包, 集成测试未按计划文件名落地; 逐阶段实际状态见 §3.0。
 
 ## 1. 目标
 
-把 Tauri 端 KanbanBoard 从根目录 frontend/src/components/board/KanbanBoard.tsx (525 行, W/T/M swimlane) 适配为 crates/star-desktop/frontend/src/components/KanbanBoard.tsx (243 行, 630ec19c 落地), 不是把根目录文件原样嵌入; 未移植根目录的列增删改名 (onAddColumn、onRemoveColumn、onRenameColumn), 未分类项的处理与根目录不同 (桌面端落入 W 泳道); WIP 限制提示已保留。
+把 Tauri 端 KanbanBoard 从根目录 frontend/src/components/board/KanbanBoard.tsx (580 行, W/T/M swimlane) 适配为 crates/star-desktop/frontend/src/components/KanbanBoard.tsx (243 行, 630ec19c 落地), 不是把根目录文件原样嵌入; 未移植根目录的列增删改名 (onAddColumn、onRemoveColumn、onRenameColumn), 未分类项的处理与根目录不同 (桌面端落入 W 泳道); WIP 限制提示已保留。
 
 ## 2. 现状分析
 
@@ -27,14 +27,14 @@
 | 维度 | frontend/ (Next.js) | crates/star-desktop/frontend/ (Tauri) |
 |---|---|---|
 | Framework | Next.js 16 (frontend/package.json 当前 next ^16.4.6) App Router | Vite 7 + React 19 + TypeScript (TSX)；入口 crates/star-desktop/frontend/src/main.tsx 使用 createBrowserRouter。遗留 main.ts 仅为 6 行注释占位。（P5 计划的 React 19 + Vite 骨架已由 df099df1 / #246 落地） |
-| Routing | /board (`app/board/page.tsx`)、/kanban (`app/(app)/kanban/page.tsx`)、/canvas/worktree-graph (原 `(worktree-canvas)` 路由组已于 e3636462 迁移; 旧路径 /worktree-canvas 无 redirect 条目, 该路由的 not-found 页仍链接旧路径, 为死链, 待修) | React Router 7（react-router-dom，createBrowserRouter）路由：/、/worktree、/viz（crates/star-desktop/frontend/src/main.tsx） |
-| State | Zustand store (全局状态, seed + productionApi); TanStack Query (useBoardSync 以 useQuery + refetchInterval 轮询 productionApi.boardSync) | React 19 (已集成: crates/star-desktop/frontend/package.json react ^19.0.0, 由 df099df1 (PR #246) 引入; 看板为桌面端内 243 行适配副本, 未直接引用根目录 KanbanBoard.tsx) |
+| Routing | /board (`app/board/page.tsx`, 但 `/board` → `/projects?tab=kanban` 的 307 规则经 next.config.js 生效, 页面不直接可达)、/kanban (`app/(app)/kanban/page.tsx`)、/canvas/worktree-graph (原 `(worktree-canvas)` 路由组已于 e3636462 迁移; 旧路径 /worktree-canvas 无 redirect 条目, 该路由的 not-found 页仍链接旧路径, 为死链, 待修) | React Router 7（react-router-dom，createBrowserRouter）路由：/、/worktree、/viz（crates/star-desktop/frontend/src/main.tsx） |
+| State | Zustand store (全局状态, 空初始态, 不以 seed 兜底; productionApi); TanStack Query (useBoardSync 以 useQuery + refetchInterval 轮询 productionApi.boardSync) | React 19 (已集成: crates/star-desktop/frontend/package.json react ^19.0.0, 由 df099df1 (PR #246) 引入; 看板为桌面端内 243 行适配副本, 未直接引用根目录 KanbanBoard.tsx) |
 | Data | 看板页面: zustand store 与 useBoardSync (TanStack Query, 2000 ms 轮询, 仅在宿主数据通道已接入且会话未失效时启用); 宿主未接入、会话未授权或无授权数据时显示诚实态 (未接入 / 未授权 / 暂无任务数据), 不渲染本地 seed 任务卡; lib/api.ts boardSync 同步读取 store, 无 fetch; 未接入 /api/v1; 部分 lib 模块 fetch /api/v1/*; 看板任务卡 CLI 提交时经 useTerminalStackWs 调用 localhost:8081 /api/v1/terminal/*; components/board/ArchGraphModal 调用 /api/graph/ensure-fresh 与 /api/graph/cypher | Tauri IPC `invoke('cmd')` (前端仅 3 处调用: useTauriWorkItems → list_work_items, 由 BoardView 使用, 失败即关闭; useTauriBoardInfo → get_board_info 与 useTauriKeyboardLayout → get_keyboard_layout, 两个 hook 当前无组件引用) |
 | Components | KanbanBoard + 22 个组件（/kanban 路由闭包 23 个组件文件；/board 路由单独闭包为 9 个组件文件） | 3 个页面: HomePage (8 条 IPC 命令的静态清单)、WorktreePage (BoardView 经 Tauri IPC, 失败即关闭, 无 mock 兜底)、WorktreeVizPage (mock 节点 + useLayoutEngine 布局; WASM 未打包, 回退 JS) |
 
 ### 2.3 集成挑战
 
-1. **Framework 迁移**: KanbanBoard.tsx 文件顶部带有 'use client' 指令 (第 12 行), 但本身不引入 Next 模块。Next 耦合实际来自两处: KanbanCard.tsx 使用 next/navigation 的 useRouter 做卡片跳转, 以及经 KanbanBoard 间接引入的 GasParticlesHint.tsx 所用的 next/dynamic (ssr: false)。Tauri 副本已移除这两处 (KanbanCard 改用 react-router-dom 的 useNavigate, KanbanBoard 不引入 GasParticlesHint), 迁移只需 React 19 + Vite + React Router。
+1. **Framework 迁移**: KanbanBoard.tsx 文件顶部带有 'use client' 指令 (第 12 行), 但本身不引入 Next 模块。Next 耦合实际来自两处: KanbanCard.tsx 使用 next/navigation 的 useRouter 做卡片跳转, 以及 KanbanBoard 直接引入的 GasParticlesHint.tsx 所用的 next/dynamic (ssr: false)。Tauri 副本已移除这两处 (KanbanCard 改用 react-router-dom 的 useNavigate, KanbanBoard 不引入 GasParticlesHint), 迁移只需 React 19 + Vite + React Router。
 2. **Data source 切换**: fetch → Tauri IPC (8 个命令已在 PR #239-#241 落地并注册于 generate_handler, 见 lib.rs:306-315; generate_handler 自 PR #240 (81b03503) 起存在); 前端实际仅 3 处 invoke: useTauriWorkItems → list_work_items (失败即关闭, 无 mock 兜底), useTauriBoardInfo → get_board_info, useTauriKeyboardLayout → get_keyboard_layout (后两者 hook 无组件引用); 其余 5 个命令无前端调用。
 3. **CSS**: 根目录 KanbanBoard.tsx 所在 Next 应用使用 Tailwind 4 (frontend/package.json 声明 tailwindcss ^4.3.5)；Tauri 副本 (crates/star-desktop/frontend) 未声明 Tailwind 依赖, 样式入口为 App.module.css, 其 KanbanBoard 副本中的工具类名 (如 flex、gap-2、grid-cols-6) 的样式来源尚需确定 (CSS module 或引入 Tailwind)。Vite 配置位于 crates/star-desktop/frontend/vite.config.ts (PR #239 引入, port 1420 strictPort; PR #246 改为 React 插件配置)。
 4. **WASM hooks**: KanbanBoard.tsx 本身不引入 WASM hook; WASM 集成已在上层接入: BoardView.tsx 调用 useLayoutEngine 与 useQueryEngine (PR #252), WorktreeVizPage 使用 useLayoutEngine (PR #270)。在 wasm-pack 产物放入 crates/star-desktop/frontend/public/wasm/ 之前, 这些 hook 不会加载 WASM 模块。
@@ -99,15 +99,15 @@
 | 守门 | 状态 |
 |---|---|
 | **#7 unsafe_code = forbid** | 已完成 — Tauri Rust 部分: PR #239 落地 workspace lint (根 Cargo.toml [workspace.lints.rust] unsafe_code = forbid; star-desktop 清单 [lints] workspace = true, 现位于 crates/star-desktop/src-tauri/Cargo.toml); crate 源码级 #![forbid(unsafe_code)] 随后续 PR 补齐: lib.rs (81b03503, #240)、ipc_adapter.rs (44e386bb, #241)、db_adapter.rs (e8156b43, #245)、main.rs (4de395d4) |
-| **#11 缺标比错标** | 待完成: 前端组件仅部分移植。KanbanCard (508e7fee, 159 行, 根目录 234 行) 与 KanbanBoard (630ec19c, 243 行, 根目录 525 行) 已落地为 Tauri 端适配副本; 根目录 board 目录的 KanbanFilters、WorkItemDetailDrawer、TaskCardCommand、ArchGraphModal 未移植; 逐文件差异 (行数、列增删改名、未分类泳道) 需显式列出, 未列出的项不视为已同步。 |
-| **#19 0 动 V0.1 业务 logic** | ⚠️ 非逐字副本: 根目录 frontend/src/components/board/KanbanBoard.tsx 未被 Tauri 端修改; Tauri 端 crates/star-desktop/frontend/src/components/KanbanBoard.tsx 为 243 行的适配重写, 而非 525 行原件副本: 保留 W/T/M 泳道与 WIP 超限提示, 列集合为 6 列 (含 wontfix; 根目录 KANBAN_COLUMNS 为 5 列), 未分类项落入 W 泳道, 不含 StatusPill、Tooltip、粒子提示与 i18n; 根目录该文件此后有 3 次提交 (08b03c2d 主题 token、d3370e65 测试对齐、f1d2fa40 文案去除第三方产品名), 工作区另新增无授权数据诚实态 (unavailableState); 业务逻辑差异未逐行核对。 |
+| **#11 缺标比错标** | 待完成: 前端组件仅部分移植。KanbanCard (508e7fee, 159 行, 根目录 234 行) 与 KanbanBoard (630ec19c, 243 行, 根目录 580 行) 已落地为 Tauri 端适配副本; 根目录 board 目录的 KanbanFilters、WorkItemDetailDrawer、TaskCardCommand、ArchGraphModal 未移植; 逐文件差异 (行数、列增删改名、未分类泳道) 需显式列出, 未列出的项不视为已同步。 |
+| **#19 0 动 V0.1 业务 logic** | ⚠️ 非逐字副本: 根目录 frontend/src/components/board/KanbanBoard.tsx 未被 Tauri 端修改; Tauri 端 crates/star-desktop/frontend/src/components/KanbanBoard.tsx 为 243 行的适配重写, 而非 580 行原件副本: 保留 W/T/M 泳道与 WIP 超限提示, 列集合为 6 列 (含 wontfix; 根目录 KANBAN_COLUMNS 为 5 列), 未分类项落入 W 泳道, 不含 StatusPill、Tooltip、粒子提示与 i18n; 根目录该文件在 630ec19c 之后另有 4 次提交 (5864582b 无授权数据诚实态 unavailableState、08b03c2d 主题 token、d3370e65 测试对齐、f1d2fa40 文案去除第三方产品名); 业务逻辑差异未逐行核对。 |
 | **#14 v4 PR review** | 无正式评审记录: PR #244 已于 2026-09-30 合并, GitHub 正式 review 数为 0 (可用 gh api repos/UlyssesLeoLee/Star/pulls/244/reviews 核验), 仅有 bot 评论; P5 实施 PR #246 至 #252 已全部合并 (df099df1 至 a1616b5a), 同样无正式 review。仓库不保存评审结论, 评审状态以 GitHub 记录为准。 |
 
 ## 5. 风险
 
 | Risk | Mitigation |
 |---|---|
-| Next.js dynamic import 依赖 (已消除) | KanbanBoard.tsx 本身不使用 dynamic import; Next 的 dynamic (ssr: false) 位于 GasParticlesHint.tsx, 由根 KanbanBoard 间接引入。Tauri 副本不引入该组件, 风险已消除, 无需额外的移除步骤。 |
+| Next.js dynamic import 依赖 (已消除) | KanbanBoard.tsx 本身不使用 dynamic import; Next 的 dynamic (ssr: false) 位于 GasParticlesHint.tsx, 由根 KanbanBoard 直接引入。Tauri 副本不引入该组件, 风险已消除, 无需额外的移除步骤。 |
 | React 19 + Tailwind 兼容 | 仓内无 React 19 + Tailwind 3 的构建或测试证据。根 Next 应用使用 React 19 与 Tailwind 4 (未使用 Tailwind 3); Tauri 前端 (React 19 + Vite 7) 当前未安装 Tailwind, 其样式方案待定, 兼容性尚未在 Vite 环境中验证。 |
 | Tauri IPC vs fetch 延迟差异（未测量） | 仓内无 Tauri IPC 与 fetch 的延迟测量记录; 需在 P7 性能基线中以同一主机上的 invoke 往返与 HTTP 请求实测后替换。 |
 | WASM bundle size | CI 实测 (wasm-build 运行 43604213157, 2026-11-14, 未压缩): layout_engine_wasm_bg.wasm 17,401 字节、query_engine_wasm_bg.wasm 157,559 字节, 合计约 175 KB; relationship_engine_wasm_bg.wasm 321,041 字节, 三模块合计约 496 KB。其后两次构建运行 (43819223631、43860875844, 均基于 HEAD 80830732) 失败, 上述尺寸来自 2026-11-14 的构建; 当前体积以新日志为准。 |

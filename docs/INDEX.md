@@ -12,6 +12,7 @@
 | 前端设计 | [frontend-design.md](frontend-design.md) + [frontend/design/](frontend/design/) | active | frontend-internal-01..04 为其子文档 |
 | 测试 / UAT | [test-design.md](test-design.md), [uat-design.md](uat-design.md), [uat-runbook.md](uat-runbook.md) | active | |
 | 统一语言 | [ubiquitous-language.md](ubiquitous-language.md) | active | |
+| Feature 审计 | [features/](features/) | active | F01–F17 逐 feature 现状审计（14 份，未跟踪待提交）；见 reports/PHASE-DELIVERY-SYNC-20261118.md §3 |
 | 计划 | [implementation-plans/](implementation-plans/) | active | 现行 WBS/实施计划 |
 | 计划(旧) | [plan/](plan/), [plans/](plans/) | archive | 2026-08/09 草案，见 refactor/dedupe-20261113-lane-b.md |
 | 评审反馈 | [basic-design-feedback.md](basic-design-feedback.md), [detailed-design-feedback.md](detailed-design-feedback.md), [frontend-design-feedback.md](frontend-design-feedback.md) | archive | 审计证据 |

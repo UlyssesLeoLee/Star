@@ -30,7 +30,7 @@ The citation identifies test design v2.6 and retains anchors §4.8, §5.2, and �
 ## §3 Known gaps
 
 - Collaboration implementation remains OPEN / NOT_RUN. The current client read/poll and process-local gateway paths remain the implementation baseline until replaced and measured.
-- Owner migrations, Data Inventory rows, grants, RLS, and target PostgreSQL evidence remain open.
+- Owner migrations for the WLD-7 draft, revision, and conflict tables, their Data Inventory rows, grants, RLS, and target PostgreSQL evidence remain open. The separate Identity Outbox to Collaboration Inbox device-revocation migration (`db/migrations/2026-11-14-w17-device-outbox-inbox.sql`) defines five tables with RLS and owner or runtime grants, but it has no Data Inventory row, its PostgreSQL-backed test is ignored by default, and no runtime caller outside its module consumes it.
 - The referenced v2.6 cases do not establish a passing result; no application or runtime verification was run in this lane.
 - This lane has not been independently reviewed or integrated by the coordinator.
 

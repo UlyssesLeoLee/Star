@@ -125,8 +125,8 @@ cargo tauri dev
 |---|---|
 | **Tauri binary** | ~8 MB (Rust + WebView) |
 | **Frontend bundle (Vite)** | ~200 KB (React 19 + Vite + components) |
-| **WASM bundle** (layout-engine-wasm + query-engine-wasm + relationship-engine-wasm) | ~6 MB |
-| **合计** | ~14 MB |
+| **WASM bundle** (layout-engine-wasm + query-engine-wasm) | 未打包, 未实测: `crates/star-desktop/frontend/public/wasm/` 不存在, `npm run build` 不产出 .wasm, 运行时 fetch 失败回退 JS |
+| **合计** | ~8 MB (不含 WASM, 各项为估算) |
 | **对比: Electron app** | ~150 MB |
 
 ## 6. Screenshot Capture (留 PR #254+)

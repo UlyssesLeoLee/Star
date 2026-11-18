@@ -14,16 +14,16 @@ CodeGraph MCP 调用返回 `Transport closed`；本 lane 的 `.codegraph` 目录
 
 | 验收面 | 状态 | 证据与结论 |
 |---|---|---|
-| 桌面前端技术栈 | **缺失：Rust 原生 UI** | 当前桌面是 Tauri API + React 19/TypeScript/Vite：`crates/star-desktop/frontend/package.json:13-29`；README 列出的页面与运行方式见 `crates/star-desktop/README.md:28-39`。这不能描述为 Rust 原生 UI。 |
-| Worktree 图的真实数据与布局 | **缺失：生产接线** | `WorktreeVizPage` 用确定性 `makeMockNodes` 造数据：`crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx:29-43`；布局把节点分组并保存在 `Map`：`:45-70`，组件默认保留 120 个节点并对完整数组计算布局：`:73-86`。该页面是演示路径。 |
-| Worktree 图 UI 虚拟化 | **缺失：实际 UI** | 页面以 `nodes.map` 为每个节点创建 SVG group、circle 与 text，没有按 viewport 裁剪：`WorktreeVizPage.tsx:141-173`。Vitest 测试设计明确断言 120 个节点都出现在 DOM：`crates/star-desktop/frontend/tests/WorktreeVizPage.test.tsx:36-47`；本次未运行。 |
+| 桌面前端技术栈 | **缺失：Rust 原生 UI** | 当前桌面是 Tauri API + React 19/TypeScript/Vite：`crates/star-desktop/frontend/package.json:17-31`；README 列出的页面与技术栈见 `crates/star-desktop/README.md:28-39`。这不能描述为 Rust 原生 UI。 |
+| Worktree 图的真实数据与布局 | **缺失：生产接线** | `WorktreeVizPage` 用确定性 `makeMockNodes` 造数据：`crates/star-desktop/frontend/src/pages/WorktreeVizPage.tsx:37-51`；布局把节点分组并保存在 `Map`：`:53-79`，组件默认保留 120 个节点并对完整数组计算布局：`:82-94`。该页面是演示路径。 |
+| Worktree 图 UI 虚拟化 | **缺失：实际 UI** | 页面以 `nodes.map` 为每个节点创建 SVG group、circle 与 text，没有按 viewport 裁剪：`WorktreeVizPage.tsx:141-180`。Vitest 测试设计明确断言 120 个节点都出现在 DOM：`crates/star-desktop/frontend/tests/WorktreeVizPage.test.tsx:44-55`；本次未运行。 |
 | 看板长列表虚拟化 | **缺失** | `KanbanBoard` 在泳道和无泳道模式分别通过 `items.map` 渲染全部卡片：`crates/star-desktop/frontend/src/components/KanbanBoard.tsx:193-205,220-233`。现有实现没有证明存在分页或视口虚拟化。 |
 | Rust Canvas renderer 视口过滤 | **部分实现，未证明接入 Desktop** | `canvas-renderer` 提供 200px margin viewport 判定：`crates/canvas-renderer/src/viewport.rs:79-109`，renderer 可据此跳过视口外节点：`crates/canvas-renderer/src/renderer.rs:121-148`。但 Tauri manifest 未声明 `canvas-renderer`，也未声明 `canvas-engine`（`crates/star-desktop/src-tauri/Cargo.toml:33-34` 仅声明 `domain-board` 与 `domain-worktree`）；Desktop 图页面也直接用 SVG。现有 Rust 算法不能作为 Desktop 大数据渲染完成的证据。 |
-| “1000 节点”虚拟化证据 | **部分：合成计数，不是性能 benchmark** | `simulate_1000_wt` 生成固定坐标并统计视口内节点：`crates/canvas-renderer/src/viewport.rs:122-173`；没有真实 UI 渲染、计时、CPU 或内存采样。注释提出 `<30%` 预期：`:122-125`，同文件测试断言却为 `<60%`：`:188-198`。该目标冲突需在后续验收设计中消解；本报告不选择阈值，也未运行测试。 |
-| Task provider fail-closed | **已实现：缺 provider 时禁用** | Tauri 的 `list_work_items` 在 Run-scoped provider 未配置时返回错误：`crates/star-desktop/src-tauri/src/lib.rs:105-109`；前端 hook 调用 provider 并处理返回：`crates/star-desktop/frontend/src/hooks/useTauriWorkItems.ts:21-45`。此项不证明 provider、分页或任务执行闭环已接入。 |
-| Worktree / Canvas IPC 与数据上界 | **部分：固定 demo fixture；生产边界缺失** | `list_worktree_groups` 和 `list_canvas_entities` 从 `MockDb` 读取完整 `Vec`：`src-tauri/src/lib.rs:154-185`。README 标注每类当前 4 条 fixture、没有生产 Project/Run/provider 接入：`crates/star-desktop/README.md:59-61,81-86`。有限 fixture 不是 cursor、页大小、响应字节或取消契约。 |
+| “1000 节点”虚拟化证据 | **部分：合成计数，不是性能 benchmark** | `simulate_1000_wt` 生成固定坐标并统计视口内节点：`crates/canvas-renderer/src/viewport.rs:122-173`；没有真实 UI 渲染、计时、CPU 或内存采样。注释提出 `<30%` 预期：`:122-125`，同文件测试断言却为 `<60%`：`:195-199`。该目标冲突需在后续验收设计中消解；本报告不选择阈值，也未运行测试。 |
+| Task provider fail-closed | **已实现：缺 provider 时禁用** | Tauri 的 `list_work_items` 在 Run-scoped provider 未配置时返回错误：`crates/star-desktop/src-tauri/src/lib.rs:115-118`；前端 hook 调用 provider 并处理返回：`crates/star-desktop/frontend/src/hooks/useTauriWorkItems.ts:21-45`。此项不证明 provider、分页或任务执行闭环已接入。 |
+| Worktree / Canvas IPC 与数据上界 | **部分：固定 demo fixture；生产边界缺失** | `list_worktree_groups` 和 `list_canvas_entities` 从 `MockDb` 读取完整 `Vec`：`src-tauri/src/lib.rs:163-195`。README 标注每类当前 4 条 fixture、没有生产 Project/Run/provider 接入：`crates/star-desktop/README.md:59-61,81-86`。有限 fixture 不是 cursor、页大小、响应字节或取消契约。 |
 | Tokio 队列、公平调度、背压、取消与 drain | **未证明 / OPEN** | 本次检查的 Desktop 命令与 renderer 路径没有给出业务级有界队列容量、慢消费者背压、公平调度、取消/drain 的运行证据；Tauri async 命令或 renderer 单测不能替代这些验收。具体上限及跨 App 预算仍为 **unknown**。 |
-| 缓存、事件与日志驻留上界 | **未证明 / OPEN** | `useMemo` 和布局 `Map` 是页面派生数据结构，不是带容量、淘汰与内存预算的缓存策略：`WorktreeVizPage.tsx:45-86`。本次核对范围未发现可验收的日志保留/裁剪策略或 RSS 采样结果；数值上限为 **unknown**。 |
+| 缓存、事件与日志驻留上界 | **未证明 / OPEN** | `useMemo` 和布局 `Map` 是页面派生数据结构，不是带容量、淘汰与内存预算的缓存策略：`WorktreeVizPage.tsx:53-94`。本次核对范围未发现可验收的日志保留/裁剪策略或 RSS 采样结果；数值上限为 **unknown**。 |
 | Layout WASM / JavaScript fallback | **部分实现** | `useLayoutEngine` 仍以 JavaScript 实现并将 WASM 集成留作后续：`crates/star-desktop/frontend/src/hooks/useLayoutEngine.ts:7-8,57-66`；加载失败会 fallback 至 JS：`:71-98`。这不证明当前页面的布局在 Rust/WASM 中运行。 |
 | RSS、CPU、p95、并行容量 | **未知 / NOT_RUN** | 本次未运行 benchmark；所检查的 Desktop 源码与 README 没有目标设备 RSS、CPU、p95 或长时漂移实测。WBS 中 1/2/4/8/16 Agent 只是资源允许时的候选扫描序列，不是容量承诺或 PT-09 基线：`docs/implementation-plans/WORKTREE-GROUP-NEXT-WBS-2026-10-18.md:40,63`。README 仍列出桌面运行、bundle 与 Windows build 验证未完成：`crates/star-desktop/README.md:81-86`。 |
 
