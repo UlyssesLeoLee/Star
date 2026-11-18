@@ -1,6 +1,6 @@
 # F15 收件箱、通知与即时通信
 
-> 状态摘要: 收件箱页面、通知与评论的前端客户端和后端 REST 契约、领域层投递与已读规则 (domain-notification) 均已有代码，但服务二进制不挂载通知与 IM 路由，领域通知无生产调用方、无持久化、无重试与渠道发送。右侧聊天栏的私聊与群聊为浏览器本地存储，IM1.0 网关客户端已实现，网关服务端不在本仓库且默认地址与其记录端口不一致。
+> 状态摘要: 收件箱页面、通知与评论的前端客户端和后端 REST 契约、领域层投递与已读规则 (domain-notification) 均已有代码。**2026-11-18 更新: G-01 已修** — 服务进程 `main.rs` 现挂载 `routes::notifications::router()`、`comments_router()`、`routes::im::router()` (33 条路由)，oneshot 集成测试 12 passed (见 `tests/notifications_endpoints.rs`)。遗留: REST 存储仍为进程内存 (G-02/G-03/G-04)，领域通知无生产调用方、无持久化、无重试与渠道发送。右侧聊天栏的私聊与群聊为浏览器本地存储，IM1.0 网关客户端已实现，网关服务端不在本仓库且默认地址与其记录端口不一致。
 >
 > 代码基线: HEAD 1643559f; 核对方法: path/symbol grep plus file reads of the working tree (工作树与 HEAD 仅 crates/star-api-rest/src/routes/im.rs 中一行文档注释不同，行号不受影响); 核对日期 2026-11-17。
 
@@ -233,7 +233,7 @@ loading → error(real_mode_disabled) → "未接入"
 
 | 编号 | 差距 | 影响 | 下一步 |
 |---|---|---|---|
-| G-01 | 服务进程不挂载 `/api/v1/notifications`、`/api/v1/comments`、`/api/v1/im` | 真实模式收件箱显示"加载失败"；标记已读、评论、IM REST 不可用 | 将 `routes::notifications::router()`、`comments_router()`、`routes::im::router()` 合入 `build_group_router` 或 `main.rs` 的应用，并以服务进程的 router 做 oneshot 测试 |
+| G-01 | ~~服务进程不挂载 `/api/v1/notifications`、`/api/v1/comments`、`/api/v1/im`~~ **已修 (2026-11-18)** | 真实模式收件箱曾显示"加载失败"；现已挂载 33 条路由 | ✅ `main.rs` 合入 `routes::notifications::router()`、`comments_router()`、`routes::im::router()`；oneshot 测试 `tests/notifications_endpoints.rs` 12 passed (含 401 无 Bearer、跨用户隔离、mark-read)。遗留: 挂载的仍是内存版 REST (G-02/G-04 未修) |
 | G-02 | REST 与领域两套模型互不映射；REST 不调用 `domain-notification` | 领域 INV-N-03、INV-N-07 对 HTTP 调用方不生效；REST 无 user_id 与 event_type | REST 处理器改为调用 `NotificationCommandPort`、`NotificationQueryPort`，身份由 ActorContext 注入 |
 | G-03 | REST 层无租户与本人隔离；创建接口无角色限制 | 跨租户读取通知；任意调用方可向任意租户写入通知 | 认证中间件注入 ActorContext；列表按 actor 过滤；创建限定为服务身份或系统角色 |
 | G-04 | 通知与评论、IM 会话均为进程内存；`docs/data-design.md` §4.15 未实现 | 重启丢失数据；无 RLS | 按 §4.15 与 IM 设计建表，替换 `NotificationsApiState` 与 `ImApiState` 的存储 |
