@@ -1,4 +1,46 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=8734b8676691909226445f1f76cdaa9a8514beb73fe8c5f3c1548fdf817b1001
+MERGE (self:File {path:"crates/star-api-rest/tests/scm_endpoints.rs"})
+MERGE (harness:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::harness_with_active_device",kind:"function"})
+MERGE (t1:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_routes_require_bearer_token",kind:"function"})
+MERGE (t2:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_post_without_device_context_is_401",kind:"function"})
+MERGE (t3:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_post_with_revoked_device_generation_is_401",kind:"function"})
+MERGE (t4:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_cross_handler_chain_shares_one_service",kind:"function"})
+MERGE (t5:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_list_visibility_is_project_scoped",kind:"function"})
+MERGE (t6:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_decision_only_reviewer_self_and_no_repeat",kind:"function"})
+MERGE (t7:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_pipeline_not_found_and_cross_tenant",kind:"function"})
+MERGE (t8:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_create_mr_validation_errors",kind:"function"})
+MERGE (scmRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_scm_router",kind:"function"})
+MERGE (scmState:Type {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState",kind:"struct"})
+MERGE (scmStateNew:Symbol {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState.new",kind:"method"})
+MERGE (issueProjects:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_project_memberships",kind:"function"})
+MERGE (self)-[:DEFINES]->(harness)
+MERGE (self)-[:DEFINES]->(t1)
+MERGE (self)-[:DEFINES]->(t2)
+MERGE (self)-[:DEFINES]->(t3)
+MERGE (self)-[:DEFINES]->(t4)
+MERGE (self)-[:DEFINES]->(t5)
+MERGE (self)-[:DEFINES]->(t6)
+MERGE (self)-[:DEFINES]->(t7)
+MERGE (self)-[:DEFINES]->(t8)
+MERGE (harness)-[:CALLS]->(scmRouter)
+MERGE (harness)-[:CALLS]->(scmStateNew)
+MERGE (harness)-[:USES_TYPE]->(scmState)
+MERGE (t1)-[:TESTS]->(scmRouter)
+MERGE (t2)-[:TESTS]->(scmRouter)
+MERGE (t3)-[:TESTS]->(scmRouter)
+MERGE (t4)-[:TESTS]->(scmRouter)
+MERGE (t5)-[:TESTS]->(scmRouter)
+MERGE (t6)-[:TESTS]->(scmRouter)
+MERGE (t7)-[:TESTS]->(scmRouter)
+MERGE (t8)-[:TESTS]->(scmRouter)
+MERGE (t1)-[:CALLS]->(issueProjects)
+MERGE (t4)-[:CALLS]->(issueProjects)
+MERGE (t5)-[:CALLS]->(issueProjects)
+MERGE (t6)-[:CALLS]->(issueProjects)
+@endcypher
+*/
 //! SCM REST 生产路由集成测试 (2026-11-19 批次 B "有名无实"治理)。
 //!
 //! 守门 #25 v25: 不发真 HTTP — 全部走 axum::Router::oneshot; 不发真 PG —

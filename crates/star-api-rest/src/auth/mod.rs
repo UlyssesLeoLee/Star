@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=5427a252bdb44734357f3d81a836149e9f9955809e67ddd09893c1ceecf4406a
+@cypher schema=1 source_sha256=c63c39c1eecb55d2967156d629cac7c085890c07980ec5bfe2fecd5eff0b69c5
 MERGE (self:File {path:"crates/star-api-rest/src/auth/mod.rs"})
 MERGE (claims:Type {id:"crates/star-api-rest/src/auth/mod.rs::Claims",kind:"struct"})
 MERGE (device:Type {id:"crates/star-api-rest/src/auth/mod.rs::DeviceTokenContext",kind:"struct"})
@@ -13,6 +13,9 @@ MERGE (self)-[:DEFINES]->(context)
 MERGE (issue)-[:USES_TYPE]->(claims)
 MERGE (issue)-[:USES_TYPE]->(device)
 MERGE (context)-[:RETURNS_TYPE]->(device)
+MERGE (issueProjects:Symbol {id:"crates/star-api-rest/src/auth/mod.rs::issue_token_with_project_memberships",kind:"function"})
+MERGE (self)-[:DEFINES]->(issueProjects)
+MERGE (issueProjects)-[:USES_TYPE]->(claims)
 @endcypher
 */
 //! `star-api-rest::auth` — OAuth2 + JWT 鉴权 middleware (per §14.12 IV)

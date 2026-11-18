@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=25bdd1b2602c0c42c156feb73235eab01d621ecba9f1a11cf036d08fb22d75bd
+@cypher schema=1 source_sha256=e55317ca760297313c5582f590eae326b1e3ee110ca8167d5c8234cd61999547
 MERGE (self:File {path:"crates/domain-scm/src/lib.rs"})
 MERGE (metadata:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterMetadata", kind:"struct"})
 MERGE (revision:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterRevision", kind:"struct"})
@@ -39,7 +39,17 @@ MERGE (optionalMetadataTest)-[:TESTS]->(validate)
 MERGE (credentialUrlTest)-[:TESTS]->(validate)
 MERGE (schemeTest)-[:TESTS]->(validate)
 MERGE (sshUrlTest)-[:TESTS]->(validate)
-MERGE (whitespaceTest)-[:TESTS]->(validate);
+MERGE (whitespaceTest)-[:TESTS]->(validate)
+MERGE (listRepos:Symbol {id:"crates/domain-scm/src/lib.rs::InMemoryScmService.list_repositories",kind:"method"})
+MERGE (decideReview:Symbol {id:"crates/domain-scm/src/lib.rs::InMemoryScmService.decide_review",kind:"method"})
+MERGE (decisionInput:Type {id:"crates/domain-scm/src/lib.rs::ReviewDecisionInput",kind:"struct"})
+MERGE (actorCtx:Type {id:"crates/star-context/src/actor.rs::ActorContext",kind:"struct"})
+MERGE (self)-[:DEFINES]->(listRepos)
+MERGE (self)-[:DEFINES]->(decideReview)
+MERGE (self)-[:DEFINES]->(decisionInput)
+MERGE (listRepos)-[:USES_TYPE]->(actorCtx)
+MERGE (decideReview)-[:USES_TYPE]->(decisionInput)
+MERGE (decideReview)-[:USES_TYPE]->(actorCtx)
 @endcypher
 */
 //! domain-scm crate

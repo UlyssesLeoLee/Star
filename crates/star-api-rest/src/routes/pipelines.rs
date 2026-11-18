@@ -1,4 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=064cd52644c5a0419e4ab7ddcf8000b19b26fe589ebe5e402d3b5eafb72cbe11
+MERGE (self:File {path:"crates/star-api-rest/src/routes/pipelines.rs"})
+MERGE (router:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::router",kind:"function"})
+MERGE (getStatus:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::get_status",kind:"function"})
+MERGE (getStatusCompat:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::get_status_compat",kind:"function"})
+MERGE (getStatusImpl:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::get_status_impl",kind:"function"})
+MERGE (svc:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::service",kind:"function"})
+MERGE (scmState:Type {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState",kind:"struct"})
+MERGE (actorFromAuth:Symbol {id:"crates/star-api-rest/src/routes/scm_state.rs::actor_from_auth",kind:"function"})
+MERGE (authUser:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedUser",kind:"struct"})
+MERGE (scmService:Type {id:"crates/domain-scm/src/lib.rs::InMemoryScmService",kind:"struct"})
+MERGE (findPipeline:Symbol {id:"crates/domain-scm/src/lib.rs::InMemoryScmService.find_pipeline_by_external_id",kind:"method"})
+MERGE (self)-[:DEFINES]->(router)
+MERGE (self)-[:DEFINES]->(getStatus)
+MERGE (self)-[:DEFINES]->(getStatusCompat)
+MERGE (self)-[:DEFINES]->(getStatusImpl)
+MERGE (self)-[:DEFINES]->(svc)
+MERGE (router)-[:USES_TYPE]->(scmState)
+MERGE (router)-[:HANDLES]->(:Endpoint {path:"/api/v1/pipelines/{id}"})
+MERGE (getStatus)-[:CALLS]->(getStatusImpl)
+MERGE (getStatus)-[:CALLS]->(actorFromAuth)
+MERGE (getStatus)-[:USES_TYPE]->(authUser)
+MERGE (getStatusCompat)-[:CALLS]->(getStatusImpl)
+MERGE (getStatusCompat)-[:CALLS]->(svc)
+MERGE (getStatusImpl)-[:CALLS]->(findPipeline)
+MERGE (svc)-[:USES_TYPE]->(scmService)
+@endcypher
+*/
 //! pipeline 路由真实接线 (per Phase I Batch 2; 2026-11-19 批次 B 真实化)
 //!
 //! 范式来源 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #16):

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=d190784a430e236b58c7e9b7b0b81c133c7080daeaa2db06735099832b046d2d
+@cypher schema=1 source_sha256=ab6d86927f11cfa9c325c150de74d44c76a1115618c1d8a3fd278d553e068a82
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_router",kind:"function"})
 MERGE (oauthRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
@@ -16,6 +16,28 @@ MERGE (self)-[:DECLARES]->(memoryFile)
 MERGE (self)-[:DECLARES]->(agentsFile)
 MERGE (self)-[:DECLARES]->(runtimeFile)
 MERGE (router)-[:CALLS]->(runtimeRouter)
+MERGE (supplemental:Symbol {id:"crates/star-api-rest/src/lib.rs::build_supplemental_routers",kind:"function"})
+MERGE (scmRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_scm_router",kind:"function"})
+MERGE (mirror:Symbol {id:"crates/star-api-rest/src/lib.rs::build_legacy_mirror_routes",kind:"function"})
+MERGE (mrRouter:Symbol {id:"crates/star-api-rest/src/routes/merge_requests.rs::router",kind:"function"})
+MERGE (reviewRouter:Symbol {id:"crates/star-api-rest/src/routes/reviews.rs::router",kind:"function"})
+MERGE (pipeRouter:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::router",kind:"function"})
+MERGE (scmState:Type {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState",kind:"struct"})
+MERGE (mrCompat:Symbol {id:"crates/star-api-rest/src/routes/merge_requests.rs::create_compat",kind:"function"})
+MERGE (reviewCompat:Symbol {id:"crates/star-api-rest/src/routes/reviews.rs::request_compat",kind:"function"})
+MERGE (pipeCompat:Symbol {id:"crates/star-api-rest/src/routes/pipelines.rs::get_status_compat",kind:"function"})
+MERGE (self)-[:DEFINES]->(supplemental)
+MERGE (self)-[:DEFINES]->(scmRouter)
+MERGE (self)-[:DEFINES]->(mirror)
+MERGE (router)-[:CALLS]->(mirror)
+MERGE (supplemental)-[:CALLS]->(mirror)
+MERGE (scmRouter)-[:CALLS]->(mrRouter)
+MERGE (scmRouter)-[:CALLS]->(reviewRouter)
+MERGE (scmRouter)-[:CALLS]->(pipeRouter)
+MERGE (scmRouter)-[:USES_TYPE]->(scmState)
+MERGE (mirror)-[:CALLS]->(mrCompat)
+MERGE (mirror)-[:CALLS]->(reviewCompat)
+MERGE (mirror)-[:CALLS]->(pipeCompat)
 @endcypher
 */
 //! `crates/star-api-rest` — STAR Developer REST API

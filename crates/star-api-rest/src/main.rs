@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=1fc8bb2aa45f2beba4e83851c68b1540aba963451a35af33a5602b4923d7d44d
+@cypher schema=1 source_sha256=1b838b950f2cc8f2c92456927b15d8abd680628530c9f5e4e020c7f34f17fa69
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -36,6 +36,20 @@ MERGE (ingestion)-[:HAS_METHOD]->(shutdown)
 MERGE (wakeStart)-[:USES_TYPE]->(:Type {id:"sqlx::postgres::PgListener",kind:"struct"})
 MERGE (install)-[:USES_TYPE]->(port)
 MERGE (state)-[:HAS_METHOD]->(install)
+MERGE (scmState:Type {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState",kind:"struct"})
+MERGE (scmStateNew:Symbol {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState.new",kind:"method"})
+MERGE (scmService:Type {id:"crates/domain-scm/src/lib.rs::InMemoryScmService",kind:"struct"})
+MERGE (newForTest:Symbol {id:"crates/domain-scm/src/lib.rs::InMemoryScmService.new_for_test",kind:"method"})
+MERGE (jwtCfg:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.jwt_config",kind:"method"})
+MERGE (devRepo:Symbol {id:"crates/star-api-rest/src/group_api.rs::GroupApiState.device_binding_repository",kind:"method"})
+MERGE (scmRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_scm_router",kind:"function"})
+MERGE (main)-[:CALLS]->(scmStateNew)
+MERGE (main)-[:CALLS]->(newForTest)
+MERGE (main)-[:CALLS]->(jwtCfg)
+MERGE (main)-[:CALLS]->(devRepo)
+MERGE (main)-[:CALLS]->(scmRouter)
+MERGE (main)-[:USES_TYPE]->(scmState)
+MERGE (main)-[:USES_TYPE]->(scmService)
 @endcypher
 */
 //! Cypher structural manifest.

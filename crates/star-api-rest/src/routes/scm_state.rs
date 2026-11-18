@@ -1,4 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=aa32a6d7adf52919e479a24654e585fef6aa29aa570082a290fc95ff0b113cd0
+MERGE (self:File {path:"crates/star-api-rest/src/routes/scm_state.rs"})
+MERGE (state:Type {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState",kind:"struct"})
+MERGE (new:Symbol {id:"crates/star-api-rest/src/routes/scm_state.rs::ScmApiState.new",kind:"method"})
+MERGE (actorFromAuth:Symbol {id:"crates/star-api-rest/src/routes/scm_state.rs::actor_from_auth",kind:"function"})
+MERGE (scmService:Type {id:"crates/domain-scm/src/lib.rs::InMemoryScmService",kind:"struct"})
+MERGE (jwtConfig:Type {id:"crates/star-api-rest/src/auth/mod.rs::JwtConfig",kind:"struct"})
+MERGE (deviceRepo:Type {id:"crates/star-pg-adapter/src/repository/device_bindings.rs::DeviceBindingRepository",kind:"trait"})
+MERGE (authUser:Type {id:"crates/star-api-rest/src/auth/oauth/middleware.rs::AuthenticatedUser",kind:"struct"})
+MERGE (actorCtx:Type {id:"crates/star-context/src/actor.rs::ActorContext",kind:"struct"})
+MERGE (actorNew:Symbol {id:"crates/star-context/src/actor.rs::ActorContext.new",kind:"method"})
+MERGE (withRole:Symbol {id:"crates/star-context/src/actor.rs::ActorContext.with_role",kind:"method"})
+MERGE (withProject:Symbol {id:"crates/star-context/src/actor.rs::ActorContext.with_project",kind:"method"})
+MERGE (self)-[:DEFINES]->(state)
+MERGE (self)-[:DEFINES]->(actorFromAuth)
+MERGE (state)-[:HAS_METHOD]->(new)
+MERGE (state)-[:USES_TYPE]->(scmService)
+MERGE (state)-[:USES_TYPE]->(jwtConfig)
+MERGE (state)-[:USES_TYPE]->(deviceRepo)
+MERGE (actorFromAuth)-[:USES_TYPE]->(authUser)
+MERGE (actorFromAuth)-[:USES_TYPE]->(actorCtx)
+MERGE (actorFromAuth)-[:CALLS]->(actorNew)
+MERGE (actorFromAuth)-[:CALLS]->(withRole)
+MERGE (actorFromAuth)-[:CALLS]->(withProject)
+@endcypher
+*/
 //! SCM REST 共享 state (2026-11-19, F15 模块真实化批次 B)。
 //!
 //! 根因修复: merge_requests / reviews / pipelines 三个 handler 此前各持一份
