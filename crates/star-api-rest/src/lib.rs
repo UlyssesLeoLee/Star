@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=61a8431946debd8dc067ab47ae52fa3bef8d4dd1f5b99aaec820ab0bdf234cae
+@cypher schema=1 source_sha256=d190784a430e236b58c7e9b7b0b81c133c7080daeaa2db06735099832b046d2d
 MERGE (self:File {path:"crates/star-api-rest/src/lib.rs"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/lib.rs::build_router",kind:"function"})
 MERGE (oauthRouter:Symbol {id:"crates/star-api-rest/src/lib.rs::build_oauth_router",kind:"function"})
@@ -151,12 +151,18 @@ pub fn build_router() -> Router {
         .nest("/memory", routes::memory::router())
         .nest("/agents", routes::agents::router())
         // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
-        .nest("/runtime", routes::runtime::router())
-        .nest("/terminal", routes::terminal::router())
-        .nest("/ide", routes::ide::router())
-        .nest("/im", routes::im::router())
-        .nest("/notifications", routes::notifications::router())
-        .nest("/comments", routes::notifications::comments_router())
+        // ── 其余 6 模块 nest 统一由 build_supplemental_routers() 提供 ──
+        // (2026-11-17 F15 G-01: 生产 main.rs 与本 legacy 预览共用同一组合,
+        //  杜绝"两处各挂一份"再次漂移)
+        .merge(
+            Router::new()
+                .nest("/runtime", routes::runtime::router())
+                .nest("/terminal", routes::terminal::router())
+                .nest("/ide", routes::ide::router())
+                .nest("/im", routes::im::router())
+                .nest("/notifications", routes::notifications::router())
+                .nest("/comments", routes::notifications::comments_router()),
+        )
         // ── 6+3 Webhook 管理端点 (per spec §2.3) ───────────────────────
         .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
         .route(
@@ -224,6 +230,36 @@ pub fn build_router() -> Router {
         .layer(axum::middleware::from_fn(
             middleware::audit::audit_layer_stub,
         ))
+}
+
+/// 生产补充模块路由 (F15 G-01 修复, 2026-11-17)
+///
+/// `build_group_router` 只合并群组域路由; 下列 8 个自持 state (OnceLock /
+/// 内存态) 的模块路由此前仅挂在 legacy `build_router()` 上, 生产二进制
+/// (main.rs) 从未挂载 → 前端收件箱 / IM / 记忆 / runtime / terminal / IDE
+/// 页面真实模式全部 404。本函数把这 8 个 nest 以与 `build_router` 完全
+/// 一致的路径形态返回, 由 main.rs `.merge` 进生产 app; 全部为无外部
+/// state 依赖的 `Router`, 不触碰 `GroupApiState`。
+///
+/// 挂载清单 (与 lib.rs `build_router` 内 `.nest` 一一对应):
+/// - `/api/v1/memory`        — Agent 记忆 CRUD (star-memory)
+/// - `/api/v1/agents`        — Agent 列表 (agent-domain)
+/// - `/api/v1/runtime`       — Local Runtime 注册/心跳/挂载
+/// - `/api/v1/terminal`      — 终端 pane / 滚动缓冲
+/// - `/api/v1/ide`           — IDE kernel 文档/大纲/SCM
+/// - `/api/v1/im`            — IM 会话/消息/已读/在线
+/// - `/api/v1/notifications` — 收件箱通知 + 未读计数
+/// - `/api/v1/comments`      — 目标评论 CRUD
+pub fn build_supplemental_routers() -> Router {
+    Router::new()
+        .nest("/api/v1/memory", routes::memory::router())
+        .nest("/api/v1/agents", routes::agents::router())
+        .nest("/api/v1/runtime", routes::runtime::router())
+        .nest("/api/v1/terminal", routes::terminal::router())
+        .nest("/api/v1/ide", routes::ide::router())
+        .nest("/api/v1/im", routes::im::router())
+        .nest("/api/v1/notifications", routes::notifications::router())
+        .nest("/api/v1/comments", routes::notifications::comments_router())
 }
 
 /// OAuth2 5 endpoints router (per brief v0.47 §3.1)
@@ -316,12 +352,18 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .nest("/memory", routes::memory::router())
                 .nest("/agents", routes::agents::router())
                 // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
-                .nest("/runtime", routes::runtime::router())
-                .nest("/terminal", routes::terminal::router())
-                .nest("/ide", routes::ide::router())
-                .nest("/im", routes::im::router())
-                .nest("/notifications", routes::notifications::router())
-                .nest("/comments", routes::notifications::comments_router())
+                // ── 其余 6 模块 nest 统一由 build_supplemental_routers() 提供 ──
+                // (2026-11-17 F15 G-01: 生产 main.rs 与本 legacy 预览共用同一组合,
+                //  杜绝"两处各挂一份"再次漂移)
+                .merge(
+                    Router::new()
+                        .nest("/runtime", routes::runtime::router())
+                        .nest("/terminal", routes::terminal::router())
+                        .nest("/ide", routes::ide::router())
+                        .nest("/im", routes::im::router())
+                        .nest("/notifications", routes::notifications::router())
+                        .nest("/comments", routes::notifications::comments_router()),
+                )
                 .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
                 .route(
                     "/webhooks/endpoints",

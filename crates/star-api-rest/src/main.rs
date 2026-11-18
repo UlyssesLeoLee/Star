@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=b5003fce1af951ce128062e5c3b0873d6cd87510d63f2fc105216f003f1d6e9c
+@cypher schema=1 source_sha256=1fc8bb2aa45f2beba4e83851c68b1540aba963451a35af33a5602b4923d7d44d
 MERGE (self:File {path:"crates/star-api-rest/src/main.rs"})
 MERGE (main:Symbol {id:"crates/star-api-rest/src/main.rs::main",kind:"function"})
 MERGE (store:Type {id:"bi_owner_runtime::PgTaskEventQueryStore",kind:"struct"})
@@ -136,7 +136,10 @@ async fn main() -> anyhow::Result<()> {
         // 2026-11-11 用户发令: 网页版关联本地文件夹 (受控只读, 白名单 STAR_FILE_ROOTS)
         .merge(star_api_rest::workspace_files::router(
             star_api_rest::workspace_files::WorkspaceFilesState::from_env(),
-        ));
+        ))
+        // F15 G-01 (2026-11-17): 补充 8 模块路由进生产二进制
+        // 复用 lib.rs build_supplemental_routers(), 避免两处各挂一份再次漂移
+        .merge(star_api_rest::build_supplemental_routers());
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let server_result = bi_task_event_ingestion::serve_until_shutdown(
