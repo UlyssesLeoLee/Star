@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=8734b8676691909226445f1f76cdaa9a8514beb73fe8c5f3c1548fdf817b1001
+@cypher schema=1 source_sha256=f3ca63e69b92f8286772ee2dd926439406c3807836f7bc797911ad0d3b9e292e
 MERGE (self:File {path:"crates/star-api-rest/tests/scm_endpoints.rs"})
 MERGE (harness:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::harness_with_active_device",kind:"function"})
 MERGE (t1:Symbol {id:"crates/star-api-rest/tests/scm_endpoints.rs::scm_routes_require_bearer_token",kind:"function"})
@@ -550,6 +550,39 @@ async fn scm_list_visibility_is_project_scoped() {
     let (status, body) = send(&h.app, get_req("/api/v1/merge-requests", Some(&admin))).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["data"]["merge_requests"].as_array().unwrap().len(), 1);
+
+    // INV-SCM-04 补齐 (2026-11-19): reviews 列表同样按 project 过滤。
+    // 先由 author 请求评审, 再验证 outsider 403 / admin 可见。
+    let mr_id = body["data"]["merge_requests"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let reviewer = Uuid::new_v4();
+    let (status, body) = send(
+        &h.app,
+        post_json(
+            "/api/v1/reviews",
+            Some(&author_token),
+            json!({"mr_id": mr_id, "reviewers": [reviewer.to_string()]}),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "request review: {body}");
+
+    let (status, body) = send(
+        &h.app,
+        get_req(&format!("/api/v1/reviews?mr_id={mr_id}"), Some(&outsider)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "outsider reviews: {body}");
+
+    let (status, body) = send(
+        &h.app,
+        get_req(&format!("/api/v1/reviews?mr_id={mr_id}"), Some(&admin)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "admin reviews: {body}");
+    assert_eq!(body["data"]["reviews"].as_array().unwrap().len(), 1);
 }
 
 #[tokio::test]

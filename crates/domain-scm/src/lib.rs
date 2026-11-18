@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=e55317ca760297313c5582f590eae326b1e3ee110ca8167d5c8234cd61999547
+@cypher schema=1 source_sha256=0b46956ae519db3b1711bdc6866d776587d0ee50ef1834e856901189bf726754
 MERGE (self:File {path:"crates/domain-scm/src/lib.rs"})
 MERGE (metadata:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterMetadata", kind:"struct"})
 MERGE (revision:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterRevision", kind:"struct"})
@@ -1597,13 +1597,26 @@ impl InMemoryScmService {
     /// **REST 列表 helper**: 列出 actor 租户内全部 PR (per F06 前端接线)
     ///
     /// - 仅返回 actor.tenant_id 匹配的 PR (跨 tenant 不可见)
+    /// - **INV-SCM-04** (2026-11-19 批次 B 补齐): PR 经 repository.project_id
+    ///   关联 project; tenant_admin 可见整租户, 其余 actor 仅可见 issuer 核实
+    ///   的 project 成员资格覆盖的 PR (空集 → 空列表, 不兜底放大)
     /// - 按 created_at 降序 (最新在前)
     /// - 不修改 trait, 与 P2 helper 同模式挂在 struct 上
     pub async fn list_pull_requests(&self, actor: ActorContext) -> Vec<PullRequest> {
+        let repos = self.repos.read().await;
         let guard = self.prs.read().await;
         let mut items: Vec<PullRequest> = guard
             .values()
-            .filter(|pr| pr.tenant_id == TenantId::from(actor.tenant_id))
+            .filter(|pr| {
+                if pr.tenant_id != TenantId::from(actor.tenant_id) {
+                    return false;
+                }
+                match repos.get(&pr.repository_id) {
+                    Some(repo) => actor.can_access_project(repo.project_id.as_uuid()),
+                    // 仓库缺失/已删 → 不可见 (fail-closed)
+                    None => false,
+                }
+            })
             .cloned()
             .collect();
         items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -1613,6 +1626,8 @@ impl InMemoryScmService {
     /// **REST 列表 helper**: 列出某 PR 的全部 Review (per F06 前端接线)
     ///
     /// - 校验 PR 存在 + 跨 tenant 拒绝
+    /// - **INV-SCM-04** (2026-11-19 批次 B 补齐): 经 repository.project_id
+    ///   校验 project 成员资格; 无资格 → PermissionDenied (tenant_admin 除外)
     /// - 按 created_at 升序 (评审请求顺序)
     pub async fn list_reviews_for_pr(
         &self,
@@ -1620,12 +1635,22 @@ impl InMemoryScmService {
         actor: ActorContext,
     ) -> Result<Vec<Review>, ScmError> {
         {
+            let repos = self.repos.read().await;
             let guard = self.prs.read().await;
             let pr = guard
                 .get(&pr_id)
                 .ok_or(ScmError::NotFound(RepositoryId::default()))?;
             if pr.tenant_id != TenantId::from(actor.tenant_id) {
                 return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
+            }
+            let project_ok = repos
+                .get(&pr.repository_id)
+                .map(|repo| actor.can_access_project(repo.project_id.as_uuid()))
+                .unwrap_or(false);
+            if !project_ok {
+                return Err(ScmError::PermissionDenied(
+                    "无该 project 成员资格 (INV-SCM-04)".to_string(),
+                ));
             }
         }
         let guard = self.reviews.read().await;
