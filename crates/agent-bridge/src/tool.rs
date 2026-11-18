@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// @cypher schema=1 source_sha256=99620da9166a0879ee9992087d851ba4ff779cea8f30dded68da7fcb3f192586
+// @cypher schema=1 source_sha256=434d2e7326f3ce3a91f7026f07287db6963aca14217700bd366fcb43a83fb244
 // MERGE (self:File {path:"crates/agent-bridge/src/tool.rs"})
 // MERGE (dispatch:Symbol {id:"crates/agent-bridge/src/tool.rs::dispatch",kind:"function"})
 // MERGE (call:Type {id:"crates/agent-bridge/src/tool.rs::ToolCall"})

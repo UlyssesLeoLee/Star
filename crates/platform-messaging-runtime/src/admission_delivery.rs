@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d8ba1f571c783e473f9e2981174b8ee0a04b5c907e537d882bacb38aca7826f0
+@cypher schema=1 source_sha256=711b829579476d58403bb5ad739e7d11bec5bfb0ff6d0538d0dd69117c74efdd
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_delivery.rs"})
 MERGE (jetstream_feature:Config {id:"cargo.feature.platform-messaging-runtime.jetstream-adapter"})
 MERGE (store:Type {id:"platform_messaging_runtime::AdmissionDeliveryStore",kind:"struct"})

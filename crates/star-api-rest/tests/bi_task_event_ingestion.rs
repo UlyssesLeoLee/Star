@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=01440e8234a02f2f397f771d4ea1916e19abd574e785f31cb63b8ed6efd87704
+@cypher schema=1 source_sha256=cddbbd3133d7e4a60b90c601a78655398b80de229d3d3a2b0a95464b68ad2e73
 MERGE (self:File {path:"crates/star-api-rest/tests/bi_task_event_ingestion.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/tests/bi_task_event_ingestion.rs::bi_task_event_ingestion_tests",kind:"module"})
 MERGE (implementation:File {path:"crates/star-api-rest/src/bi_task_event_ingestion.rs"})

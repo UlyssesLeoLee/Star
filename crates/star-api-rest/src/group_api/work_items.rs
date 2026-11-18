@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=7d3681903cae398129bf7fc5b1234b9cc209512c5547617def442e9b5556b55f
+//! @cypher schema=1 source_sha256=00d3e485cc50e54d4383978720f27a8453c328802b3907a2e32b3ee43f02b395
 //! MERGE (self:File {path:"crates/star-api-rest/src/group_api/work_items.rs"})
 //! MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::module",kind:"module"})
 //! MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::router",kind:"function"})

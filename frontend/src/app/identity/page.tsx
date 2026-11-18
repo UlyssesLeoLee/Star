@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-identity-real-login-v1
+@cypher schema=1 source_sha256=4ed2befc53d7356c0311b74895ef1eb1ebe43c65eedec7057ef57f2de6e38659
 MERGE (self:File {path:"frontend/src/app/identity/page.tsx"})
 MERGE (identityPage:Function {name:"IdentityPage", language:"typescript", visibility:"public"})
 MERGE (googleSignIn:Function {name:"initGoogleIdentity", language:"typescript", visibility:"private"})

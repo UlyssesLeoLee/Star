@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=f2a260336e9eb576c4fb6418b8442aec81a8fb6b36d6713aafa38e7ec5917c8e
+@cypher schema=1 source_sha256=952522ff5c5cab1f3d74edbbe21161ec2b41f3356234ed4d563f8636a05a8515
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/transport_profile_pg.rs"})
 MERGE (owner:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileMaster",kind:"struct"})
 MERGE (resolver:Type {id:"crates/platform-messaging-runtime/src/transport_profile_pg.rs::PgTransportProfileResolver",kind:"struct"})

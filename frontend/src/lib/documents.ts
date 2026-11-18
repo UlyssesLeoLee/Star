@@ -1,12 +1,12 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-workitem-documents-v1
+@cypher schema=1 source_sha256=b48c06e91e53a1209e512f7b1e52a614581a8e300b97c37100ca2c8225cd8b1b
 MERGE (self:File {path:"frontend/src/lib/documents.ts"})
-MERGE (resolve:Symbol {id:"documents::resolveDocumentHref",kind:"function"})
-MERGE (open:Symbol {id:"documents::openWorkItemDocument",kind:"function"})
-MERGE (badge:Symbol {id:"documents::documentKindLabel",kind:"function"})
+MERGE (resolve:Symbol {id:"frontend/src/lib/documents.ts::resolveDocumentHref",kind:"function"})
+MERGE (open:Symbol {id:"frontend/src/lib/documents.ts::openWorkItemDocument",kind:"function"})
+MERGE (meta:Symbol {id:"frontend/src/lib/documents.ts::DOCUMENT_KIND_META",kind:"module"})
 MERGE (self)-[:DEFINES]->(resolve)
 MERGE (self)-[:DEFINES]->(open)
-MERGE (self)-[:DEFINES]->(badge)
+MERGE (self)-[:DEFINES]->(meta)
 @endcypher
 */
 // 任务卡关联文档打开逻辑 (per 2026-11-11 用户发令: 一卡多文档, 点击直接打开)

@@ -14,7 +14,7 @@
 //! 实现与 canonical serialization/digest 生成。
 
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=9dce5526ee973f8e4c5789078843e1005463e26bab71e081917743ede0779836
 MERGE (self:File {path:"crates/domain-agent/src/capability_profile.rs"})
 MERGE (kind:Symbol {id:"crates/domain-agent/src/capability_profile.rs::CapabilityKind",kind:"enum"})
 MERGE (digest:Symbol {id:"crates/domain-agent/src/capability_profile.rs::CapabilityProfileDigest",kind:"type"})

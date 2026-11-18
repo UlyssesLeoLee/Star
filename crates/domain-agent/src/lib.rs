@@ -1,4 +1,4 @@
-//! @cypher schema=1 source_sha256=9e66060ab684c8d5f19619d236cb4a3ca00ebc4d81ebf1eab297b0aebac717a2
+//! @cypher schema=1 source_sha256=8fa89a8569560c811f4f51a13c53d18d344036421fff3046e579e336c5ddf16a
 //! MERGE (self:File {path:"crates/domain-agent/src/lib.rs"})
 //! MERGE (execution_profile:Symbol {id:"crates/domain-agent/src/lib.rs::execution_profile",kind:"module"})
 //! MERGE (engineering_loop:Symbol {id:"crates/domain-agent/src/lib.rs::engineering_loop",kind:"module"})

@@ -8,7 +8,7 @@
 # Never deletes anything. To switch a ruleset off without removing it, set
 # "enforcement": "disabled" in its JSON (or "evaluate" to dry-run its effect)
 # and re-run this script.
-# @cypher schema=1
+# @cypher schema=1 source_sha256=db951d0339e6ab9a636a0b23ddfca9763f0579862ad658dd147847fa4dfaef60
 # MERGE (self:File {path:"scripts/ci/apply_rulesets.sh"})
 # MERGE (main:File {path:".github/rulesets/main.json"})
 # MERGE (dev:File {path:".github/rulesets/dev.json"})

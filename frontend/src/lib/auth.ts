@@ -1,13 +1,15 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-auth-client-v1
+@cypher schema=1 source_sha256=e038ced3aa617e5ed628898857bc625a568fc31cbafec2fe301e56b2c25b95dc
 MERGE (self:File {path:"frontend/src/lib/auth.ts"})
-MERGE (store:Symbol {id:"auth_client::authTokenStore",kind:"module"})
-MERGE (decodeJwt:Symbol {id:"auth_client::decodeJwtPayload",kind:"function"})
-MERGE (isAdmin:Symbol {id:"auth_client::isAdmin",kind:"function"})
-MERGE (api:Symbol {id:"auth_client::authApi",kind:"module"})
-MERGE (self)-[:DEFINES]->(store)
+MERGE (decodeJwt:Symbol {id:"frontend/src/lib/auth.ts::decodeJwtPayload",kind:"function"})
+MERGE (getSession:Symbol {id:"frontend/src/lib/auth.ts::getSession",kind:"function"})
+MERGE (setSessionToken:Symbol {id:"frontend/src/lib/auth.ts::setSessionToken",kind:"function"})
+MERGE (clearSession:Symbol {id:"frontend/src/lib/auth.ts::clearSession",kind:"function"})
+MERGE (api:Symbol {id:"frontend/src/lib/auth.ts::authApi",kind:"module"})
 MERGE (self)-[:DEFINES]->(decodeJwt)
-MERGE (self)-[:DEFINES]->(isAdmin)
+MERGE (self)-[:DEFINES]->(getSession)
+MERGE (self)-[:DEFINES]->(setSessionToken)
+MERGE (self)-[:DEFINES]->(clearSession)
 MERGE (self)-[:DEFINES]->(api)
 @endcypher
 */

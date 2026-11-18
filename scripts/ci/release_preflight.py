@@ -14,7 +14,7 @@ Usage:
   gh api repos/OWNER/REPO/commits/SHA/check-runs --paginate | release_preflight.py check-runs
 """
 
-# @cypher schema=1
+# @cypher schema=1 source_sha256=e8accf950d6ceac496eba68295be3f5040a6228bfd2b5af6db1f0b63183c550e
 # MERGE (self:File {path:"scripts/ci/release_preflight.py"})
 # MERGE (required:Config {id:"scripts/ci/release_preflight.py::REQUIRED_CHECKS",name:"CI gate (required), License (cargo-deny)"})
 # MERGE (tag_pattern:Config {id:"scripts/ci/release_preflight.py::TAG_PATTERN",name:"canonical stable vMAJOR.MINOR.PATCH"})

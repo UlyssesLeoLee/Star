@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c76e9c10d830bd1feb30fa5b78eeafc8d6220e2834e7a82b42573fb124549ead
+@cypher schema=1 source_sha256=3ba8ef29e7277ffae592f093b260af9bc4c447e4b73297d47a33bc9aff760a39
 MERGE (self:File {path:"frontend/src/lib/canvas-game/enemySpawner.ts"})
 MERGE (fn:Function {name:"enemySpawner::enemiesFromCanvas",language:"typescript"})
 MERGE (step:Function {name:"enemySpawner::stepEnemies",language:"typescript"})

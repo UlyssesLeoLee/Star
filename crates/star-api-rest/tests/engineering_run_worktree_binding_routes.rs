@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=b292c506da9876901eada07fe0ce15b8cb4ada6e9bec6d03633b9104a87dccc2
+@cypher schema=1 source_sha256=a7e505413b7a7fb7f54de647d95a62edf5e366551710ee09948e0e2ebfa42377
 MERGE (self:File {path:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_authentication",kind:"test"})
 MERGE (scopeTest:Symbol {id:"crates/star-api-rest/tests/engineering_run_worktree_binding_routes.rs::run_worktree_binding_mutations_require_both_scopes_before_database_access",kind:"test"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2102e72d4309888197a71e53bc6c945075d18f2afe50318af70812612f68628d
+@cypher schema=1 source_sha256=2159aec9b7ea3fcd945dcf33d06cca9f66aef591c74fe9b72d8b9b5c2df46cf4
 MERGE (self:File {path:"crates/platform-messaging-runtime/src/admission_receive.rs"})
 MERGE (receiver:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiver",kind:"struct"})
 MERGE (transport:Type {id:"crates/platform-messaging-runtime/src/admission_receive.rs::AdmissionReceiveTransport",kind:"trait"})

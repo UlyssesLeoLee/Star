@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=739e94f92dc4c023a1d33b3991ceaa005063dd979ca0b9c84f03215eb689deb5
+@cypher schema=1 source_sha256=01f80d99bdf09cf0779c0205f7f733de41b013e0ab16b1d667cd8cd6b72230a0
 MERGE (self:File {path:"crates/run-owner-runtime/src/task_outbox_delivery.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/task_outbox_delivery.rs::task_outbox_delivery",kind:"module"})
 MERGE (store:Type {id:"run_owner_runtime::TaskRunOutboxDeliveryStore",kind:"struct"})

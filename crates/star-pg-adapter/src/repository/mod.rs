@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=19ced9c7868542ea09d15bcc9e7761571120341aca90dbbc4533347efcacb312
+@cypher schema=1 source_sha256=a1bb05c704e83865f4e07d969894a8a9c3c6dc19ef45007bb256f8abf69a0da6
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/mod.rs"})
 MERGE (schedule_module:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (terminal:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::OccurrenceTerminalOutcome"})

@@ -11,7 +11,7 @@
 # requires its own APPROVED input, a `refs/tags/v*` ref, and (where configured)
 # the protected `star-stable-release` environment. It only removes the need to
 # click three separate "Run workflow" forms for the same tag.
-# @cypher schema=1
+# @cypher schema=1 source_sha256=bf5b9440349af9a63ced20d897bc897af6f70c497a139a7ae54336a443bc8ef9
 # MERGE (self:File {path:"scripts/ci/dispatch_release_workflows.sh"})
 # MERGE (desktop:File {path:".github/workflows/star-stable-desktop.yml"})
 # MERGE (web:File {path:".github/workflows/star-stable-web.yml"})

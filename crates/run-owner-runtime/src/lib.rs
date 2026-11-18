@@ -1,6 +1,6 @@
 //! Run-owner persistence and bounded Infrastructure result consumption.
 /*
-@cypher schema=1 source_sha256=ac235c2cbff2c831f7f768903b92af98f4ee1f9e5a420ff4bf964024110730c6
+@cypher schema=1 source_sha256=bfd1645c7e19cf4d5ad76dea30c9ed14d81860f9df5f45f651630d603f3bfed8
 MERGE (self:File {path:"crates/run-owner-runtime/src/lib.rs"})
 MERGE (module:Symbol {id:"crates/run-owner-runtime/src/lib.rs::run_owner_runtime",kind:"module"})
 MERGE (binding_module:Symbol {id:"crates/run-owner-runtime/src/run_infrastructure_binding.rs::module",kind:"module"})

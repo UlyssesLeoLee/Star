@@ -4,7 +4,7 @@
 //! It intentionally contains no in-memory scheduler or worker; materialization, claiming, and
 //! Run creation must be committed by the application layer against PostgreSQL.
 //!
-//! @cypher schema=1 source_sha256=058fe4616336902f4ae43facfc840f2374b4b9eb6991a5b65d11440f21fa749f
+//! @cypher schema=1 source_sha256=d0c32764315f7db6c62eb47ab535d58b0c8af0dc97b82b481668745ead4b6a87
 //! MERGE (self:File {path:"crates/domain-automation/src/schedule.rs"})
 //! MERGE (module:Symbol {id:"crates/domain-automation/src/schedule.rs::schedule",kind:"module"})
 //! MERGE (target:Type {id:"crates/domain-automation/src/schedule.rs::ScheduleTargetV1"})

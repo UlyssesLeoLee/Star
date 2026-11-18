@@ -15,7 +15,7 @@
 # (gh api repos/<owner>/<repo>/releases/tags/<tag> --jq '.assets[]|{name,digest}')
 # and is verified before anything is extracted. Never read it from the
 # downloaded asset itself.
-# @cypher schema=1
+# @cypher schema=1 source_sha256=bfd3b38a11541088194bfcf5aa900e43b929b1116bdc8eb4f7f443a7b46a0d3e
 # MERGE (self:File {path:"scripts/ci/install_pinned_binary.sh"})
 # MERGE (args:Config {id:"scripts/ci/install_pinned_binary.sh::args",name:"url sha256 binary-name [install-dir]"})
 # MERGE (tmp:Config {id:"scripts/ci/install_pinned_binary.sh::tmp",name:"mktemp -d, removed by EXIT trap"})

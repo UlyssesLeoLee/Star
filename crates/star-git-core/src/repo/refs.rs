@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=011484cdd682d4eca65c01940c2d994ba7f2f2b9cfd69759524f50fb0d56a564
+@cypher schema=1 source_sha256=0e7db93ad8e24883a1b92a3d17f14583f878477106343a5c43b8cbf6a5bc91c0
 MERGE (self:File {path:"crates/star-git-core/src/repo/refs.rs"})
 MERGE (read_head:Symbol {id:"crates/star-git-core/src/repo/refs.rs::read_head",kind:"function"})
 MERGE (read_ref:Symbol {id:"crates/star-git-core/src/repo/refs.rs::read_ref",kind:"function"})

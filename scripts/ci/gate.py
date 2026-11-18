@@ -10,7 +10,7 @@ failed or was cancelled must. `needs` + `if: always()` + this script gives
 exactly that, and an empty/unparseable context fails closed.
 """
 
-# @cypher schema=1
+# @cypher schema=1 source_sha256=77aec1127214c4c7dbf5bd2d0fea878c5c180578c718387eff99ef2104d92011
 # MERGE (self:File {path:"scripts/ci/gate.py"})
 # MERGE (ok:Config {id:"scripts/ci/gate.py::OK",name:"success|skipped are passing results"})
 # MERGE (needs_json:Config {id:"env.NEEDS_JSON",name:"toJSON(needs) from the aggregating job"})

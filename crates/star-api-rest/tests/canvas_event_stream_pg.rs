@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=bece16b21115cace523d64ee5e2e0c6a736312bd9afa3bc1e2779ce62133ee01
+@cypher schema=1 source_sha256=44521f7b22220e8317dd8f724ca6498e78b7ebb89fd4b18fd078707031355084
 MERGE (self:File {path:"crates/star-api-rest/tests/canvas_event_stream_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-api-rest/tests/canvas_event_stream_pg.rs::canvas_outbox_notification_is_transactional_and_worktree_scoped",kind:"test"})
 MERGE (authTest:Symbol {id:"crates/star-api-rest/tests/canvas_event_stream_pg.rs::stream_denies_missing_canvas_scope_before_database_access",kind:"test"})

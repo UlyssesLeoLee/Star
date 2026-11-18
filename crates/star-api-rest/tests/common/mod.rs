@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=7483c0180641ef22a974d760e0b801776ae1524ee211b745e603f1a2f49bf92d
+@cypher schema=1 source_sha256=5fcf29e7d978557a4fe5d75c689e860c06760cd1258c280370eb7d92a7a70f47
 MERGE (self:File {path:"crates/star-api-rest/tests/common/mod.rs"})
 MERGE (mockCode:Type {id:"crates/star-api-rest/tests/common/mod.rs::MockOAuthAuthorizationCodeRepository",kind:"struct"})
 MERGE (mockRefresh:Type {id:"crates/star-api-rest/tests/common/mod.rs::MockOAuthRefreshTokenRepository",kind:"struct"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=328ea5a01ddce8afc2b36a1fd815a4e0f5d7fdb89b7396228c32f8abb74e5464
+@cypher schema=1 source_sha256=f4ea7c3cd056daf44177ba5e087168f48027cee011c4565d0e5a7656391bf620
 MERGE (self:File {path:"crates/star-api-rest/tests/terminal_endpoints.rs"})
 MERGE (suite:Symbol {id:"crates/star-api-rest/tests/terminal_endpoints.rs::terminal endpoints suite",kind:"test_suite"})
 MERGE (create:Symbol {id:"crates/star-api-rest/src/routes/terminal.rs::create_pane",kind:"function"})

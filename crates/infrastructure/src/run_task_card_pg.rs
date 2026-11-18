@@ -3,7 +3,7 @@
 //! The adapter repeats authorization and binding checks inside each write transaction. It does
 //! not publish lifecycle Outbox events: the current migration only emits metadata events.
 //!
-//! @cypher schema=1 source_sha256=fa51e753c1114773104682c561630e97d618ddd861f1e1b6d8c8cbedf12e44a6
+//! @cypher schema=1 source_sha256=e3943eb2cc162809089d7e731c5bc7146c104a86acc7ac3d67bfd0555cdcfeea
 //! MERGE (self:File {path:"crates/infrastructure/src/run_task_card_pg.rs"})
 //! MERGE (module:Symbol {id:"crates/infrastructure/src/run_task_card_pg.rs::module",kind:"module"})
 //! MERGE (adapter:Type {id:"crates/infrastructure/src/run_task_card_pg.rs::PgRunTaskCardAdapter",kind:"struct"})

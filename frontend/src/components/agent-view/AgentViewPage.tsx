@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=bc663242b33993e217ab563b8075105dc0d63f36e1e0f8c0be6ed062ead950e0
 MERGE (self:File {path:"frontend/src/components/agent-view/AgentViewPage.tsx"})
 MERGE (agentSelectors:File {path:"frontend/src/lib/agent-view/selectors.ts"})
 MERGE (agentCanvasLayout:File {path:"frontend/src/lib/agent-view/layout.ts"})

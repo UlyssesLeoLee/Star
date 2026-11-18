@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=5f23c8acae4f99c20df093332de089a5a0e27668b48aca4ad327c415b7c66c71
 MERGE (self:File {path:"frontend/src/components/ide/IdeFileWorkspace.test.tsx"})
 MERGE (target:File {path:"frontend/src/components/ide/IdeFileWorkspace.tsx"})
 MERGE (ideFileWorkspace:Symbol {id:"frontend/src/components/ide/IdeFileWorkspace.tsx::IdeFileWorkspace",kind:"component"})

@@ -116,7 +116,7 @@ use domain_work_item::run_task_card::RunTaskCardError;
 use infrastructure::run_task_card_pg::PgRunTaskCardAdapter;
 use serde::{Deserialize, Serialize};
 use star_pg_adapter::repository::{DeviceBindingRepository, PgDeviceBindingRepository};
-// @cypher schema=1 source_sha256=17aae0fc970d3b1392401e21b81f7254b8e7e120dbede48bd1b8532338a15c18
+// @cypher schema=1 source_sha256=dffe60ae2d21194a77c235bccefdc595e0ca7bfe131f5a620c178420c95fc04a
 // MERGE (self:File {path:"crates/star-api-rest/src/group_api.rs"})
 // MERGE (api:Symbol {id:"crates/star-api-rest/src/group_api.rs::module",kind:"module"})
 // MERGE (build:Symbol {id:"crates/star-api-rest/src/group_api.rs::build_group_router",kind:"function"})

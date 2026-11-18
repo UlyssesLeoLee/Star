@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-admin-console-v1
+@cypher schema=1 source_sha256=cd0873c0545756ea6071f76ebbbad5a3f5444deef9abaff0bdb071979ec82fcc
 MERGE (self:File {path:"frontend/src/app/admin/page.tsx"})
 MERGE (adminPage:Function {name:"AdminPage", language:"typescript", visibility:"public"})
 MERGE (statusCard:Function {name:"AdminStatusCard", language:"typescript", visibility:"private"})

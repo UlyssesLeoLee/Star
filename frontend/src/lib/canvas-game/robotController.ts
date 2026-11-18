@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d70bc8ecc7d3535013a0d8221ad4ce4cb55c70417a02cb1741e52ca1ff797b88
+@cypher schema=1 source_sha256=7d382440fb1070b6957980d6176b25c910c8035a8b3b97c480cbcde2e1670b92
 MERGE (self:File {path:"frontend/src/lib/canvas-game/robotController.ts"})
 MERGE (step:Function {name:"robotController::stepRobot",language:"typescript"})
 MERGE (fire:Function {name:"robotController::fireBullet",language:"typescript"})

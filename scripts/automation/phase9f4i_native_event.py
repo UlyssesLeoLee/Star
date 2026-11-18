@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# @cypher schema=1 source_sha256=e01524357fd89fdd700a585f8984b6eb2efe60020a5bdabd591d119f15a10cef
+# @cypher schema=1 source_sha256=4feae2770d8b8e73abca4407f833d370a642c20d982f227c9bbe894a8c40459c
 # MERGE (self:File {path:"scripts/automation/phase9f4i_native_event.py"})
 # MERGE (main:Symbol {id:"scripts/automation/phase9f4i_native_event.py::main",kind:"function"})
 # MERGE (run:Symbol {id:"scripts/automation/phase9f4e_bi_task_event_inbox.py::run_command",kind:"function"})

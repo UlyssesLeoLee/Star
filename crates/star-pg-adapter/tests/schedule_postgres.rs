@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=6d4cb708e7c197509d3f394c074557ff33593ce2adad929cb6d51f328045f09f
+@cypher schema=1 source_sha256=e7ad23e082d0e5a4c034a89c3927867f00717af642b4d957446251f56f52d9fb
 MERGE (self:File {path:"crates/star-pg-adapter/tests/schedule_postgres.rs"})
 MERGE (fixture:Type {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture"})
 MERGE (branch_id:Symbol {id:"crates/star-pg-adapter/tests/schedule_postgres.rs::Fixture.branch_id",kind:"field"})

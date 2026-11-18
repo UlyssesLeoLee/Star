@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=2e4b2541a880deafb8f2210e310d8b7b8d3205c4df9df6c250083d1ef697c798
+@cypher schema=1 source_sha256=db2881eef723ffbb684fcd242261daadecfebee1254cb7e1d1ba39ca61b9ab0f
 MERGE (self:File {path:"crates/star-pg-adapter/tests/device_auth_pg.rs"})
 MERGE (test:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_proof_generation_and_revocation",kind:"test"})
 MERGE (capTest:Symbol {id:"crates/star-pg-adapter/tests/device_auth_pg.rs::postgres_device_challenge_creation_enforces_actor_cap_under_concurrency",kind:"test"})

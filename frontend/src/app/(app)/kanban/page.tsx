@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=fb3e47bbcd858fc8d23cd4bab1393c44a5d30ea1e1249858b509b0df4de16f00
 MERGE (self:File {path:"frontend/src/app/(app)/kanban/page.tsx"})
 MERGE (page:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::KanbanPage",kind:"component"})
 MERGE (ideFileWorkspace:File {path:"frontend/src/components/ide/IdeFileWorkspace.tsx"})

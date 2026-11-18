@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=1511164e9e191e8326c48f2f8b71c60b6a8d81cd05dfa03c08416c76edff3792
+@cypher schema=1 source_sha256=4df113df7e90e629e96496ae44c33ba9af58fc1083ffae2de700244bcbef51b3
 MERGE (self:File {path:"frontend/src/lib/canvas-game/useCanvasGame.ts"})
 MERGE (hook:Function {name:"canvas-game::useCanvasGame",language:"typescript"})
 MERGE (types:File {path:"frontend/src/lib/canvas-game/types.ts"})

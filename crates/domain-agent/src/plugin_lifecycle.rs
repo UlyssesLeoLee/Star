@@ -16,7 +16,7 @@
 //! drain; 调用方在租约归零后 complete_drain + uninstall 旧版本, 再激活新版本。
 
 /*
-@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+@cypher schema=1 source_sha256=26d4722e24b949a94a20038cdc1f9dc940ee7067860660c0f8a51bd213d138a7
 MERGE (self:File {path:"crates/domain-agent/src/plugin_lifecycle.rs"})
 MERGE (descriptor:Symbol {id:"crates/domain-agent/src/plugin_lifecycle.rs::PluginDescriptor",kind:"type"})
 MERGE (state:Symbol {id:"crates/domain-agent/src/plugin_lifecycle.rs::PluginLifecycleState",kind:"enum"})

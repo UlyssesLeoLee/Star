@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=03e034c96964c6fd5a24da47eee194ebabfe7dd631884a17dde8807cc378d6c5
+@cypher schema=1 source_sha256=2a95384101a9c091f235302840241ab750a09ace1920b4b61d13463f99376f7f
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::module",kind:"module"})
 MERGE (router:Symbol {id:"crates/star-api-rest/src/group_api/run_worktree_bindings.rs::router",kind:"function"})

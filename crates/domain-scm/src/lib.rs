@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=0b3a96039221a88e25a116ac72fae35d57a9601c80e7775cacde492f456abacc
+@cypher schema=1 source_sha256=25bdd1b2602c0c42c156feb73235eab01d621ecba9f1a11cf036d08fb22d75bd
 MERGE (self:File {path:"crates/domain-scm/src/lib.rs"})
 MERGE (metadata:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterMetadata", kind:"struct"})
 MERGE (revision:Type {id:"crates/domain-scm/src/lib.rs::RepositoryMasterRevision", kind:"struct"})

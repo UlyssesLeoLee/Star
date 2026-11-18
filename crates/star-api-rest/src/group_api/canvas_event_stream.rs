@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=1d4d4e175e477f3d55abe0b4b955505cf824a44de7effddbb00d30da068c1900
+@cypher schema=1 source_sha256=8a83769c72a435f682f8da2b9277729831f1be7612af01894fe1259627ccdb10
 MERGE (self:File {path:"crates/star-api-rest/src/group_api/canvas_event_stream.rs"})
 MERGE (module:Symbol {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::module",kind:"module"})
 MERGE (hub:Type {id:"crates/star-api-rest/src/group_api/canvas_event_stream.rs::CanvasEventWakeHub",kind:"struct"})

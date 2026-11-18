@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=61a6484fed307a83a34834f8f131d8ce236238960cab68e89bd7f66972c2f708
+@cypher schema=1 source_sha256=4de5d5aca7708350b698031404c98cd5af720625674736299c3eddfd17e8ea55
 MERGE (self:File {path:"frontend/src/components/canvas-game/CanvasGameOverlay.tsx"})
 MERGE (overlay:Symbol {id:"frontend/src/components/canvas-game/CanvasGameOverlay.tsx::CanvasGameOverlay",kind:"component"})
 MERGE (hook:Symbol {id:"frontend/src/lib/canvas-game/useCanvasGame.ts::useCanvasGame",kind:"hook"})

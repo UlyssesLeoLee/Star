@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=856cc72adb4733409b37405ef85530ce6ff30aedce33efb35465308e26e32a9e
+@cypher schema=1 source_sha256=bada929918dbfb004d8e9a1e8a0cb7302cf2420fa3548227815e43f8e41af114
 MERGE (self:File {path:"frontend/src/lib/canvas-game/types.ts"})
 MERGE (state:Type {id:"canvas-game::GameState",kind:"interface"})
 MERGE (robot:Type {id:"canvas-game::PlayerRobot",kind:"interface"})

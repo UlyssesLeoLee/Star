@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=374ccf79d7f1c848d61ae380fbd6d467fbb787c1f83474800c7adb2639c0609b
+@cypher schema=1 source_sha256=65d3f4c840c8766d8d9734525fcdac4db2876ac918d378ef35d6f8328932d584
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/automation_schedule.rs"})
 MERGE (repo:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::PgAutomationScheduleRepository"})
 MERGE (error:Type {id:"crates/star-pg-adapter/src/repository/automation_schedule.rs::ScheduleRepositoryError"})

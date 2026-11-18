@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=966e8843f5fcd2146eb9dd1e358c9f8a2aa722798b285e60ff28926f5f5e5c69
+@cypher schema=1 source_sha256=e1e0f10fe52e92c2db3c18d79bea1d54a2347c2107f6fa9a6f8b5427a9396cd0
 MERGE (self:File {path:"crates/star-api-rest/tests/oauth_device_auth_pg.rs"})
 MERGE (challengeTest:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::mock_device_challenge_creation_enforces_actor_scoped_cap",kind:"test"})
 MERGE (challengeFactory:Symbol {id:"crates/star-api-rest/tests/oauth_device_auth_pg.rs::device_enrollment_challenge",kind:"function"})

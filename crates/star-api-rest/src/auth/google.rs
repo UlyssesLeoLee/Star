@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=419bf068d378f7d1af264f9e43b6ff8ea8d8cfa2a3f641f8bcfdfbe06279a043
+@cypher schema=1 source_sha256=362a60323adfdec2d2a930ab7a43fb70d14c51760a6e8214dbda7edbadcc9877
 MERGE (self:File {path:"crates/star-api-rest/src/auth/google.rs"})
 MERGE (state:Type {id:"crates/star-api-rest/src/auth/google.rs::GoogleAuthState",kind:"struct"})
 MERGE (login:Symbol {id:"crates/star-api-rest/src/auth/google.rs::login_handler",kind:"function"})

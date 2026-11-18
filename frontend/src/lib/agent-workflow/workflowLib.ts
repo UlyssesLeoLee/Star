@@ -1,13 +1,12 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-agent-workflow-lib-v1
+@cypher schema=1 source_sha256=69d96c5115aff32f083d4a90b0a38f8b89df0473b488d456711106d4e2196850
 MERGE (self:File {path:"frontend/src/lib/agent-workflow/workflowLib.ts"})
-MERGE (lib:Symbol {id:"agent_workflow::workflowLib",kind:"module"})
-MERGE (makeNode:Symbol {id:"agent_workflow::workflowLib.makeNode",kind:"function"})
-MERGE (makeIpaSkillNode:Symbol {id:"agent_workflow::workflowLib.makeIpaSkillNode",kind:"function"})
-MERGE (wireExists:Symbol {id:"agent_workflow::workflowLib.wireExists",kind:"function"})
-MERGE (canConnect:Symbol {id:"agent_workflow::workflowLib.canConnect",kind:"function"})
-MERGE (self)-[:DEFINES]->(makeNode)
+MERGE (makeIpaSkillNode:Symbol {id:"frontend/src/lib/agent-workflow/workflowLib.ts::makeIpaSkillNode",kind:"function"})
+MERGE (makeControlNode:Symbol {id:"frontend/src/lib/agent-workflow/workflowLib.ts::makeControlNode",kind:"function"})
+MERGE (wireExists:Symbol {id:"frontend/src/lib/agent-workflow/workflowLib.ts::wireExists",kind:"function"})
+MERGE (canConnect:Symbol {id:"frontend/src/lib/agent-workflow/workflowLib.ts::canConnect",kind:"function"})
 MERGE (self)-[:DEFINES]->(makeIpaSkillNode)
+MERGE (self)-[:DEFINES]->(makeControlNode)
 MERGE (self)-[:DEFINES]->(wireExists)
 MERGE (self)-[:DEFINES]->(canConnect)
 @endcypher

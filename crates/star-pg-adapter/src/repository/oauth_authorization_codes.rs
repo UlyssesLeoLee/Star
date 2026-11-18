@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 /*
-@cypher schema=1 source_sha256=9b23dbcd966533673bbdebe5faff52f5ea6c4422ad11d7fc5d2cd2b63e42bf02
+@cypher schema=1 source_sha256=d8537b5f395b423ae6f23134ddb66b97eafc20f3bdd4a8d4689ad0dec180ac1f
 MERGE (self:File {path:"crates/star-pg-adapter/src/repository/oauth_authorization_codes.rs"})
 MERGE (find:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_authorization_codes.rs::find_by_code_hash",kind:"method"})
 MERGE (redeem:Symbol {id:"crates/star-pg-adapter/src/repository/oauth_authorization_codes.rs::consume_and_issue_if_active",kind:"method"})

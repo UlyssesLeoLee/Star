@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=65eecc4f922c8d0a702d006c042cdb460a601f4dd6cbb000c60d3162cde195c3
+@cypher schema=1 source_sha256=2f976cf1cd29e16d4b72bd839b09afe5c7ceb80e2a053d117b3000b4f07ac14e
 MERGE (self:File {path:"frontend/src/lib/nav/navStore.ts"})
 MERGE (store:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (defaults:Symbol {id:"frontend/src/lib/nav/navStore.ts::DEFAULT_SIDEBAR_ITEMS",kind:"constant"})

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2026-11-11-agent-workflow-v1
+@cypher schema=1 source_sha256=775f965a3516e3d25a37a661e1cecbfdbaacf21e0b1c7f4db4ec6c4b104386ce
 MERGE (self:File {path:"frontend/src/lib/agent-workflow/types.ts"})
 MERGE (node:Type {id:"agent_workflow::WorkflowNode",kind:"type"})
 MERGE (port:Type {id:"agent_workflow::WorkflowPort",kind:"type"})
