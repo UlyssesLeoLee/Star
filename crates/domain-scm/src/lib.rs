@@ -964,6 +964,17 @@ impl Review {
     pub const FIELD_COUNT: usize = 9;
 }
 
+/// **Review 裁决输入** (2026-11-19 REST 真实化批次 B, per F06 review 决策面)
+///
+/// 不改 `Review` 9 字段实体; 裁决 = reviewer 本人提交 state + body。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewDecisionInput {
+    /// 裁决后的状态 (Approved / ChangesRequested / Commented)
+    pub state: ReviewState,
+    /// 评审意见 (可选)
+    pub body: Option<String>,
+}
+
 /// **Pipeline**(§4.18.6,10 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pipeline {
@@ -1572,6 +1583,114 @@ impl InMemoryScmService {
                 reviews: created,
             });
         }
+    }
+    /// **REST 列表 helper**: 列出 actor 租户内全部 PR (per F06 前端接线)
+    ///
+    /// - 仅返回 actor.tenant_id 匹配的 PR (跨 tenant 不可见)
+    /// - 按 created_at 降序 (最新在前)
+    /// - 不修改 trait, 与 P2 helper 同模式挂在 struct 上
+    pub async fn list_pull_requests(&self, actor: ActorContext) -> Vec<PullRequest> {
+        let guard = self.prs.read().await;
+        let mut items: Vec<PullRequest> = guard
+            .values()
+            .filter(|pr| pr.tenant_id == TenantId::from(actor.tenant_id))
+            .cloned()
+            .collect();
+        items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        items
+    }
+
+    /// **REST 列表 helper**: 列出某 PR 的全部 Review (per F06 前端接线)
+    ///
+    /// - 校验 PR 存在 + 跨 tenant 拒绝
+    /// - 按 created_at 升序 (评审请求顺序)
+    pub async fn list_reviews_for_pr(
+        &self,
+        pr_id: PullRequestId,
+        actor: ActorContext,
+    ) -> Result<Vec<Review>, ScmError> {
+        {
+            let guard = self.prs.read().await;
+            let pr = guard
+                .get(&pr_id)
+                .ok_or(ScmError::NotFound(RepositoryId::default()))?;
+            if pr.tenant_id != TenantId::from(actor.tenant_id) {
+                return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
+            }
+        }
+        let guard = self.reviews.read().await;
+        let mut items: Vec<Review> = guard
+            .values()
+            .filter(|r| r.pull_request_id == pr_id)
+            .cloned()
+            .collect();
+        items.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        Ok(items)
+    }
+
+    /// **REST 列表 helper**: 列出 actor 租户内全部仓库 (per F06 前端接线)
+    ///
+    /// - 仅返回 actor.tenant_id 匹配的仓库
+    /// - **INV-SCM-04**: tenant_admin 可见整租户; 其余 actor 仅可见
+    ///   issuer 核实的 project 成员资格覆盖的仓库 (空集 → 空列表, 不兜底放大)
+    /// - 按 created_at 降序
+    pub async fn list_repositories(&self, actor: ActorContext) -> Vec<Repository> {
+        let guard = self.repos.read().await;
+        let mut items: Vec<Repository> = guard
+            .values()
+            .filter(|r| {
+                r.tenant_id == TenantId::from(actor.tenant_id)
+                    && actor.can_access_project(r.project_id.as_uuid())
+            })
+            .cloned()
+            .collect();
+        items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        items
+    }
+
+    /// **REST 裁决 helper**: reviewer 本人提交 review 裁决 (2026-11-19 批次 B, per F06)
+    ///
+    /// - 校验 review 存在 + 跨 tenant 拒绝
+    /// - **仅 reviewer 本人**可裁决 (tenant_admin 也不能代裁, 防冒名)
+    /// - Pending → Approved / ChangesRequested / Commented; 已裁决不可重复提交
+    /// - 不改 `Review` 9 字段实体, 仅更新 state / body / submitted_at / lock_version
+    pub async fn decide_review(
+        &self,
+        review_id: ReviewId,
+        input: ReviewDecisionInput,
+        actor: ActorContext,
+    ) -> Result<Review, ScmError> {
+        if !matches!(
+            input.state,
+            ReviewState::Approved | ReviewState::ChangesRequested | ReviewState::Commented
+        ) {
+            return Err(ScmError::InvalidState(
+                "裁决状态必须为 Approved / ChangesRequested / Commented".to_string(),
+            ));
+        }
+        let mut guard = self.reviews.write().await;
+        let review = guard
+            .get_mut(&review_id)
+            .ok_or(ScmError::NotFound(RepositoryId::default()))?;
+        if review.tenant_id != TenantId::from(actor.tenant_id) {
+            return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
+        }
+        if review.reviewer_user_id != UserId::from_uuid(actor.user_id) {
+            return Err(ScmError::PermissionDenied(
+                "仅 reviewer 本人可提交裁决".to_string(),
+            ));
+        }
+        if review.state != ReviewState::Pending {
+            return Err(ScmError::InvalidState(format!(
+                "review 已裁决 ({}), 不可重复提交",
+                review.state.as_api_str()
+            )));
+        }
+        review.state = input.state;
+        review.body = input.body;
+        review.submitted_at = Utc::now();
+        review.lock_version = review.lock_version.saturating_add(1);
+        Ok(review.clone())
     }
 }
 

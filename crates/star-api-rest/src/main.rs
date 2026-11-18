@@ -130,6 +130,14 @@ async fn main() -> anyhow::Result<()> {
     if let Some(query_port) = bi_task_event_query_port {
         group_api_state = group_api_state.with_bi_task_event_query_port(query_port);
     }
+    // 2026-11-19 批次 B: SCM 生产路由与 group 域同源 (同一 JWT 配置 +
+    // 设备绑定仓储 + 单一共享 InMemoryScmService), 先取 accessor 再 move state。
+    let scm_state = star_api_rest::routes::scm_state::ScmApiState::new(
+        domain_scm::InMemoryScmService::new_for_test(),
+        group_api_state.jwt_config(),
+        group_api_state.device_binding_repository(),
+    );
+    // new_for_test() 已返回 Arc<Self>, 直接传入保持单一共享实例。
     let app = build_group_router(group_api_state)
         .merge(bi_task_event_ingestion.readiness_router())
         .merge(star_api_rest::auth::google::router(google_auth))
@@ -139,7 +147,9 @@ async fn main() -> anyhow::Result<()> {
         ))
         // F15 G-01 (2026-11-17): 补充 8 模块路由进生产二进制
         // 复用 lib.rs build_supplemental_routers(), 避免两处各挂一份再次漂移
-        .merge(star_api_rest::build_supplemental_routers());
+        .merge(star_api_rest::build_supplemental_routers())
+        // 2026-11-19 批次 B: SCM 真实化路由 (MR/review/pipeline 共享 service + 真实 JWT)
+        .merge(star_api_rest::build_scm_router(scm_state));
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let server_result = bi_task_event_ingestion::serve_until_shutdown(

@@ -370,6 +370,16 @@ pub struct GroupApiState {
 }
 
 impl GroupApiState {
+    /// JWT 验签配置 (供 supplemental SCM 路由的 AuthenticatedUser extractor 复用)
+    pub fn jwt_config(&self) -> Arc<JwtConfig> {
+        self.jwt.clone()
+    }
+
+    /// 设备绑定仓储 (供 supplemental SCM 路由的 AuthenticatedUser extractor 复用)
+    pub fn device_binding_repository(&self) -> Arc<dyn DeviceBindingRepository> {
+        Arc::clone(&self.device_binding_repo)
+    }
+
     pub fn new(jwt: Arc<JwtConfig>, pool: PgPool) -> Self {
         let run_task_card_pg_adapter = Arc::new(PgRunTaskCardAdapter::new(pool.clone()));
         let device_binding_repo: Arc<dyn DeviceBindingRepository> =

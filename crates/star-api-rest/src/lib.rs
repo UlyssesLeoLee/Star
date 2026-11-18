@@ -91,66 +91,12 @@ pub const API_PREFIX: &str = "/api/v1";
 /// - `GET  /exclusion/metrics`            — EX-07 4 层可观测性
 /// - `POST /exclusion/test-runs`          — EX-08 测试运行启动
 pub fn build_router() -> Router {
-    let api = Router::new()
-        // ── 16 MCP tool REST 镜像 (per spec §2.2) — 相对 nest prefix 路径 ──────
-        .route("/work-items", get(routes::work_items::search))
-        .route("/work-items/current", get(routes::work_items::current))
-        .route("/work-items/{id}", get(routes::work_items::get_by_id))
-        .route("/work-items", post(routes::work_items::create))
-        .route("/work-items/{id}", patch(routes::work_items::update))
-        .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
-        // 4 内核 crate 门面 (per WBS-BACKEND-SUPPORT-001 W2: ide-collab-core/star-git-core/argo-core/sandtree-core)
-        .route("/collab/session", get(routes::integrations::collab_session))
-        .route(
-            "/collab/annotations",
-            get(routes::integrations::collab_annotations),
-        )
-        .route("/git/conflicts", get(routes::integrations::git_conflicts))
-        .route("/argo/nodes", get(routes::integrations::argo_nodes))
-        .route(
-            "/sandtree/resources",
-            get(routes::integrations::sandtree_resources),
-        )
-        .route("/worktrees", post(routes::worktrees::create))
-        .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
-        // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──
-        // 4 个 endpoint wiring `worktree-shared-dir` backend traits (PR #107).
-        .route(
-            "/worktrees/start-from-candidates",
-            get(routes::worktree_picker::list_candidates)
-                .with_state(routes::worktree_picker::state_arc()),
-        )
-        .route(
-            "/worktrees/start-from-picker/resolve",
-            post(routes::worktree_picker::resolve).with_state(routes::worktree_picker::state_arc()),
-        )
-        .route(
-            "/worktrees/external-worktrees",
-            get(routes::worktree_external::list_external)
-                .with_state(routes::worktree_external::state_arc()),
-        )
-        .route(
-            "/worktrees/external-worktrees/import",
-            post(routes::worktree_external::import_external)
-                .with_state(routes::worktree_external::state_arc()),
-        )
-        .route("/code/search", get(routes::code::search))
-        .route("/code/symbols/{id}", get(routes::code::get_symbol))
-        .route(
-            "/code/symbols/{id}/references",
-            get(routes::code::find_references),
-        )
-        .route("/code/context", get(routes::code::get_context))
-        .route("/context", get(routes::context::get))
-        .route("/merge-requests", post(routes::merge_requests::create))
-        .route("/reviews", post(routes::reviews::request))
-        .route("/validations", post(routes::validations::run))
-        .route("/pipelines/{id}", get(routes::pipelines::get_status))
-        .route("/submissions", post(routes::submissions::submit))
+    // 44 条 MCP 镜像 / 内核门面 / webhooks / exclusion 路由与生产
+    // supplemental 共用同一份定义 (build_legacy_mirror_routes), 杜绝漂移。
+    let api = build_legacy_mirror_routes()
         // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
         .nest("/memory", routes::memory::router())
         .nest("/agents", routes::agents::router())
-        // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
         // ── 其余 6 模块 nest 统一由 build_supplemental_routers() 提供 ──
         // (2026-11-17 F15 G-01: 生产 main.rs 与本 legacy 预览共用同一组合,
         //  杜绝"两处各挂一份"再次漂移)
@@ -162,63 +108,7 @@ pub fn build_router() -> Router {
                 .nest("/im", routes::im::router())
                 .nest("/notifications", routes::notifications::router())
                 .nest("/comments", routes::notifications::comments_router()),
-        )
-        // ── 6+3 Webhook 管理端点 (per spec §2.3) ───────────────────────
-        .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
-        .route(
-            "/webhooks/endpoints",
-            post(routes::webhooks::create_endpoint),
-        )
-        .route(
-            "/webhooks/endpoints/{id}",
-            get(routes::webhooks::get_endpoint),
-        )
-        .route(
-            "/webhooks/endpoints/{id}",
-            patch(routes::webhooks::update_endpoint),
-        )
-        .route(
-            "/webhooks/endpoints/{id}",
-            delete(routes::webhooks::delete_endpoint),
-        )
-        .route(
-            "/webhooks/endpoints/{id}/test",
-            post(routes::webhooks::test_endpoint),
-        )
-        .route(
-            "/webhooks/deliveries",
-            get(routes::webhooks::list_deliveries),
-        )
-        .route(
-            "/webhooks/deliveries/{delivery_id}",
-            get(routes::webhooks::get_delivery),
-        )
-        .route(
-            "/webhooks/deliveries/{delivery_id}/replay",
-            post(routes::webhooks::replay_delivery),
-        )
-        // ── 8 §14.9 Star-EI 路由 (per brief v0.53 §3, 5 域 Lead 拍板 临时代签) ──
-        // 全部 501 not_implemented 跨 session 占位, 跟 OAuth2 introspect 同模式
-        .route(
-            "/exclusion/idempotency-keys",
-            get(routes::ex_01::list_idempotency_keys),
-        )
-        .route("/exclusion/mutex", post(routes::ex_02::acquire_mutex))
-        .route(
-            "/exclusion/dispatch-locks",
-            post(routes::ex_03::acquire_dispatch_lock),
-        )
-        .route(
-            "/exclusion/subagent-locks",
-            post(routes::ex_04::acquire_subagent_lock),
-        )
-        .route("/exclusion/ui-state", get(routes::ex_05::get_ui_state))
-        .route(
-            "/exclusion/tool-idem",
-            post(routes::ex_06::check_tool_idempotency),
-        )
-        .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
-        .route("/exclusion/test-runs", post(routes::ex_08::start_test_run));
+        );
 
     Router::new()
         .route("/api/v1/health", get(routes::health))
@@ -252,6 +142,7 @@ pub fn build_router() -> Router {
 /// - `/api/v1/comments`      — 目标评论 CRUD
 pub fn build_supplemental_routers() -> Router {
     Router::new()
+        .route("/api/v1/health", get(routes::health))
         .nest("/api/v1/memory", routes::memory::router())
         .nest("/api/v1/agents", routes::agents::router())
         .nest("/api/v1/runtime", routes::runtime::router())
@@ -260,6 +151,153 @@ pub fn build_supplemental_routers() -> Router {
         .nest("/api/v1/im", routes::im::router())
         .nest("/api/v1/notifications", routes::notifications::router())
         .nest("/api/v1/comments", routes::notifications::comments_router())
+        // ── F15 G-01 第二批 (2026-11-18): legacy `build_router` 的其余
+        // 44 条路由同样从未进生产二进制。全部为自持 state (OnceLock /
+        // 内存态) 的无外部依赖 handler, 路径与 group 域 60 条路由零冲突
+        // (精确 + 参数归一化双重核对)。挂载后生产 = group + legacy 全量。
+        // 2026-11-19 批次 B: 41 条无鉴权镜像 (SCM 3 条改由 build_scm_router
+        // 挂真实 JWT + 共享 service, 不再走 legacy *_compat)。
+        .nest("/api/v1", build_legacy_mirror_routes())
+}
+
+/// SCM 生产路由 (2026-11-19 批次 B, per F06 §6 "有名无实"治理)。
+///
+/// merge_requests / reviews / pipelines 共用**单一** `InMemoryScmService`
+/// (ScmApiState 注入), JWT 验签 + 设备代际核验与 group 域同一套配置。
+/// 路径: POST+GET /api/v1/merge-requests, POST /api/v1/merge-requests/:id/transition,
+/// POST+GET /api/v1/reviews, POST /api/v1/reviews/:id/decision,
+/// GET /api/v1/pipelines/:id。由 main.rs `.merge` 进生产 app。
+pub fn build_scm_router(state: routes::scm_state::ScmApiState) -> Router {
+    Router::new()
+        .merge(routes::merge_requests::router(state.clone()))
+        .merge(routes::reviews::router(state.clone()))
+        .merge(routes::pipelines::router(state))
+}
+
+/// legacy `build_router` 的 41 条 MCP 镜像 / 内核门面 / webhooks / exclusion
+/// 路由 (不含 8 个已 nest 的模块; SCM 3 条 2026-11-19 起由 build_scm_router
+/// 挂真实鉴权版), 路径形态与 `build_router` 内完全一致。
+///
+/// 单独成函数以便 `build_router` 与生产 supplemental 共用同一份定义,
+/// 杜绝"两处各挂一份"再次漂移 (F15 G-01 教训)。
+fn build_legacy_mirror_routes() -> Router {
+    Router::new()
+        // ── 16 MCP tool REST 镜像 (per spec §2.2) ──
+        .route("/work-items", get(routes::work_items::search))
+        .route("/work-items/current", get(routes::work_items::current))
+        .route("/work-items/{id}", get(routes::work_items::get_by_id))
+        .route("/work-items", post(routes::work_items::create))
+        .route("/work-items/{id}", patch(routes::work_items::update))
+        .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
+        // 4 内核 crate 门面 (ide-collab-core/star-git-core/argo-core/sandtree-core)
+        .route("/collab/session", get(routes::integrations::collab_session))
+        .route(
+            "/collab/annotations",
+            get(routes::integrations::collab_annotations),
+        )
+        .route("/git/conflicts", get(routes::integrations::git_conflicts))
+        .route("/argo/nodes", get(routes::integrations::argo_nodes))
+        .route(
+            "/sandtree/resources",
+            get(routes::integrations::sandtree_resources),
+        )
+        .route("/worktrees", post(routes::worktrees::create))
+        .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
+        // ── ULYS-218.3 [P1-F] worktree picker + external import (FR-ORCA-009/011) ──
+        .route(
+            "/worktrees/start-from-candidates",
+            get(routes::worktree_picker::list_candidates)
+                .with_state(routes::worktree_picker::state_arc()),
+        )
+        .route(
+            "/worktrees/start-from-picker/resolve",
+            post(routes::worktree_picker::resolve).with_state(routes::worktree_picker::state_arc()),
+        )
+        .route(
+            "/worktrees/external-worktrees",
+            get(routes::worktree_external::list_external)
+                .with_state(routes::worktree_external::state_arc()),
+        )
+        .route(
+            "/worktrees/external-worktrees/import",
+            post(routes::worktree_external::import_external)
+                .with_state(routes::worktree_external::state_arc()),
+        )
+        // ── code intelligence + context ──
+        .route("/code/search", get(routes::code::search))
+        .route("/code/symbols/{id}", get(routes::code::get_symbol))
+        .route(
+            "/code/symbols/{id}/references",
+            get(routes::code::find_references),
+        )
+        .route("/code/context", get(routes::code::get_context))
+        .route("/context", get(routes::context::get))
+        // ── SCM 协作链 (MR → review → validation → pipeline → submission) ──
+        // 2026-11-19 批次 B: MR/review/pipeline 生产版已挂真实 JWT + 共享 service
+        // (见 build_scm_router); legacy 预览骨架仅保留 *_compat 无鉴权版。
+        .route(
+            "/merge-requests",
+            post(routes::merge_requests::create_compat),
+        )
+        .route("/reviews", post(routes::reviews::request_compat))
+        .route("/validations", post(routes::validations::run))
+        .route("/pipelines/{id}", get(routes::pipelines::get_status_compat))
+        .route("/submissions", post(routes::submissions::submit))
+        // ── webhooks 端点 CRUD + 投递记录 ──
+        .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
+        .route(
+            "/webhooks/endpoints",
+            post(routes::webhooks::create_endpoint),
+        )
+        .route(
+            "/webhooks/endpoints/{id}",
+            get(routes::webhooks::get_endpoint),
+        )
+        .route(
+            "/webhooks/endpoints/{id}",
+            patch(routes::webhooks::update_endpoint),
+        )
+        .route(
+            "/webhooks/endpoints/{id}",
+            delete(routes::webhooks::delete_endpoint),
+        )
+        .route(
+            "/webhooks/endpoints/{id}/test",
+            post(routes::webhooks::test_endpoint),
+        )
+        .route(
+            "/webhooks/deliveries",
+            get(routes::webhooks::list_deliveries),
+        )
+        .route(
+            "/webhooks/deliveries/{delivery_id}",
+            get(routes::webhooks::get_delivery),
+        )
+        .route(
+            "/webhooks/deliveries/{delivery_id}/replay",
+            post(routes::webhooks::replay_delivery),
+        )
+        // ── 8 §14.9 Star-EI 路由 (per brief v0.53 §3) ──
+        .route(
+            "/exclusion/idempotency-keys",
+            get(routes::ex_01::list_idempotency_keys),
+        )
+        .route("/exclusion/mutex", post(routes::ex_02::acquire_mutex))
+        .route(
+            "/exclusion/dispatch-locks",
+            post(routes::ex_03::acquire_dispatch_lock),
+        )
+        .route(
+            "/exclusion/subagent-locks",
+            post(routes::ex_04::acquire_subagent_lock),
+        )
+        .route("/exclusion/ui-state", get(routes::ex_05::get_ui_state))
+        .route(
+            "/exclusion/tool-idem",
+            post(routes::ex_06::check_tool_idempotency),
+        )
+        .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
+        .route("/exclusion/test-runs", post(routes::ex_08::start_test_run))
 }
 
 /// OAuth2 5 endpoints router (per brief v0.47 §3.1)
@@ -289,136 +327,23 @@ pub fn build_oauth_router() -> axum::Router<auth::oauth::OAuth2State> {
 /// v0.53 §14.9 Star-EI 8 路由 同样 wire (跟 v0.47 OAuth2 模式一致, per brief v0.53 §3)
 pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router {
     let oauth_router = build_oauth_router();
+    // REST 部分与 build_router() 完全同源 (build_legacy_mirror_routes +
+    // 8 模块 nest), 仅多 OAuth2 5 endpoints + 3 stub middleware layers。
+    let api = build_legacy_mirror_routes()
+        .nest("/memory", routes::memory::router())
+        .nest("/agents", routes::agents::router())
+        .merge(
+            Router::new()
+                .nest("/runtime", routes::runtime::router())
+                .nest("/terminal", routes::terminal::router())
+                .nest("/ide", routes::ide::router())
+                .nest("/im", routes::im::router())
+                .nest("/notifications", routes::notifications::router())
+                .nest("/comments", routes::notifications::comments_router()),
+        );
     Router::new()
         .route("/api/v1/health", get(routes::health))
-        .nest(
-            "/api/v1",
-            Router::new()
-                .route("/work-items", get(routes::work_items::search))
-                .route("/work-items/current", get(routes::work_items::current))
-                .route("/work-items/{id}", get(routes::work_items::get_by_id))
-                .route("/work-items", post(routes::work_items::create))
-                .route("/work-items/{id}", patch(routes::work_items::update))
-                .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
-                // 4 内核 crate 门面 (per WBS-BACKEND-SUPPORT-001 W2: ide-collab-core/star-git-core/argo-core/sandtree-core)
-                .route("/collab/session", get(routes::integrations::collab_session))
-                .route(
-                    "/collab/annotations",
-                    get(routes::integrations::collab_annotations),
-                )
-                .route("/git/conflicts", get(routes::integrations::git_conflicts))
-                .route("/argo/nodes", get(routes::integrations::argo_nodes))
-                .route(
-                    "/sandtree/resources",
-                    get(routes::integrations::sandtree_resources),
-                )
-                .route("/worktrees", post(routes::worktrees::create))
-                .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
-                // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──
-                .route(
-                    "/worktrees/start-from-candidates",
-                    get(routes::worktree_picker::list_candidates)
-                        .with_state(routes::worktree_picker::state_arc()),
-                )
-                .route(
-                    "/worktrees/start-from-picker/resolve",
-                    post(routes::worktree_picker::resolve)
-                        .with_state(routes::worktree_picker::state_arc()),
-                )
-                .route(
-                    "/worktrees/external-worktrees",
-                    get(routes::worktree_external::list_external)
-                        .with_state(routes::worktree_external::state_arc()),
-                )
-                .route(
-                    "/worktrees/external-worktrees/import",
-                    post(routes::worktree_external::import_external)
-                        .with_state(routes::worktree_external::state_arc()),
-                )
-                .route("/code/search", get(routes::code::search))
-                .route("/code/symbols/{id}", get(routes::code::get_symbol))
-                .route(
-                    "/code/symbols/{id}/references",
-                    get(routes::code::find_references),
-                )
-                .route("/code/context", get(routes::code::get_context))
-                .route("/context", get(routes::context::get))
-                .route("/merge-requests", post(routes::merge_requests::create))
-                .route("/reviews", post(routes::reviews::request))
-                .route("/validations", post(routes::validations::run))
-                .route("/pipelines/{id}", get(routes::pipelines::get_status))
-                .route("/submissions", post(routes::submissions::submit))
-                // ── Agent 记忆 + Agent 列表 (star-memory / agent-domain, 2026-11-15) ──
-                .nest("/memory", routes::memory::router())
-                .nest("/agents", routes::agents::router())
-                // ── Local Runtime 端点 (domain-local-runtime, 2026-11-16) ──
-                // ── 其余 6 模块 nest 统一由 build_supplemental_routers() 提供 ──
-                // (2026-11-17 F15 G-01: 生产 main.rs 与本 legacy 预览共用同一组合,
-                //  杜绝"两处各挂一份"再次漂移)
-                .merge(
-                    Router::new()
-                        .nest("/runtime", routes::runtime::router())
-                        .nest("/terminal", routes::terminal::router())
-                        .nest("/ide", routes::ide::router())
-                        .nest("/im", routes::im::router())
-                        .nest("/notifications", routes::notifications::router())
-                        .nest("/comments", routes::notifications::comments_router()),
-                )
-                .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
-                .route(
-                    "/webhooks/endpoints",
-                    post(routes::webhooks::create_endpoint),
-                )
-                .route(
-                    "/webhooks/endpoints/{id}",
-                    get(routes::webhooks::get_endpoint),
-                )
-                .route(
-                    "/webhooks/endpoints/{id}",
-                    patch(routes::webhooks::update_endpoint),
-                )
-                .route(
-                    "/webhooks/endpoints/{id}",
-                    delete(routes::webhooks::delete_endpoint),
-                )
-                .route(
-                    "/webhooks/endpoints/{id}/test",
-                    post(routes::webhooks::test_endpoint),
-                )
-                .route(
-                    "/webhooks/deliveries",
-                    get(routes::webhooks::list_deliveries),
-                )
-                .route(
-                    "/webhooks/deliveries/{delivery_id}",
-                    get(routes::webhooks::get_delivery),
-                )
-                .route(
-                    "/webhooks/deliveries/{delivery_id}/replay",
-                    post(routes::webhooks::replay_delivery),
-                )
-                // ── 8 §14.9 Star-EI 路由 (per brief v0.53 §3) ──────────
-                .route(
-                    "/exclusion/idempotency-keys",
-                    get(routes::ex_01::list_idempotency_keys),
-                )
-                .route("/exclusion/mutex", post(routes::ex_02::acquire_mutex))
-                .route(
-                    "/exclusion/dispatch-locks",
-                    post(routes::ex_03::acquire_dispatch_lock),
-                )
-                .route(
-                    "/exclusion/subagent-locks",
-                    post(routes::ex_04::acquire_subagent_lock),
-                )
-                .route("/exclusion/ui-state", get(routes::ex_05::get_ui_state))
-                .route(
-                    "/exclusion/tool-idem",
-                    post(routes::ex_06::check_tool_idempotency),
-                )
-                .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
-                .route("/exclusion/test-runs", post(routes::ex_08::start_test_run)),
-        )
+        .nest("/api/v1", api)
         .merge(oauth_router.with_state(oauth_state))
         .layer(axum::middleware::from_fn(middleware::auth::auth_layer_stub))
         .layer(axum::middleware::from_fn(

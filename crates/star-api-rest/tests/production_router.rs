@@ -85,6 +85,35 @@ async fn supplemental_modules_mounted_in_production_router() {
         "/api/v1/im/conversations",
         "/api/v1/notifications",
         "/api/v1/comments",
+        // ── F15 G-01 第二批 (2026-11-18): legacy 镜像 44 条 ──
+        "/api/v1/health",
+        "/api/v1/work-items",
+        "/api/v1/work-items/current",
+        // workspaces/{id} 业务性 404 (nil-tenant 跨租户拒绝, 见 lib.rs 同路径测试),
+        // 无法用「非 404」区分挂载; 用非法 UUID → 路由已挂载时 handler 返回 400。
+        "/api/v1/workspaces/not-a-uuid",
+        "/api/v1/collab/session",
+        "/api/v1/collab/annotations",
+        "/api/v1/git/conflicts",
+        "/api/v1/argo/nodes",
+        "/api/v1/sandtree/resources",
+        "/api/v1/worktrees", // POST only → 405
+        "/api/v1/worktrees/start-from-candidates",
+        "/api/v1/worktrees/external-worktrees",
+        "/api/v1/code/search",
+        "/api/v1/code/context",
+        "/api/v1/context",
+        "/api/v1/merge-requests", // POST only → 405
+        "/api/v1/reviews",        // POST only → 405
+        "/api/v1/validations",    // POST only → 405
+        "/api/v1/pipelines/PIPE-test",
+        "/api/v1/submissions", // POST only → 405
+        "/api/v1/webhooks/endpoints",
+        "/api/v1/webhooks/deliveries",
+        "/api/v1/exclusion/idempotency-keys",
+        "/api/v1/exclusion/ui-state",
+        "/api/v1/exclusion/metrics",
+        "/api/v1/exclusion/mutex", // POST only → 405
     ];
 
     for path in endpoints {

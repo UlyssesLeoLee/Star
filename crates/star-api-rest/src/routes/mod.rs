@@ -46,6 +46,7 @@ pub mod notifications;
 pub mod pipelines;
 pub mod reviews;
 pub mod runtime;
+pub mod scm_state;
 pub mod submissions;
 pub mod terminal;
 pub mod validations;
