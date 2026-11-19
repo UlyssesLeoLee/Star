@@ -1,16 +1,26 @@
 /*
-@cypher schema=1 source_sha256=db306a0a85ec5ef4f1900671834bb6a60a35a85f382beec7d421b8f176b292d7
+@cypher schema=1 source_sha256=2a03387a916641c712d4c8245697b1843c7d90b14ae6704809b6aaacc135c33c
 MERGE (self:File {path:"frontend/src/components/agent-workflow/WorkflowBuilder.tsx"})
 MERGE (builder:Function {name:"WorkflowBuilder", language:"typescript", visibility:"public"})
 MERGE (canvas:Function {name:"WorkflowCanvas", language:"typescript", visibility:"private"})
 MERGE (palette:Function {name:"WorkflowPalette", language:"typescript", visibility:"private"})
 MERGE (panel:Function {name:"WorkflowEditorPanel", language:"typescript", visibility:"private"})
 MERGE (nodeCard:Function {name:"WorkflowNodeCard", language:"typescript", visibility:"private"})
+MERGE (lib:File {path:"frontend/src/lib/agent-workflow/workflowLib.ts"})
+MERGE (fnReconcile:Function {name:"reconcileNodePorts", language:"typescript"})
+MERGE (fnValidate:Function {name:"validateWorkflow", language:"typescript"})
+MERGE (fnSim:Function {name:"simulateWorkflow", language:"typescript"})
 MERGE (self)-[:DEFINES]->(builder)
 MERGE (self)-[:DEFINES]->(canvas)
 MERGE (self)-[:DEFINES]->(palette)
 MERGE (self)-[:DEFINES]->(panel)
 MERGE (self)-[:DEFINES]->(nodeCard)
+MERGE (builder)-[:CALLS]->(fnReconcile)
+MERGE (builder)-[:CALLS]->(fnValidate)
+MERGE (builder)-[:CALLS]->(fnSim)
+MERGE (fnReconcile)-[:DEFINED_IN]->(lib)
+MERGE (fnValidate)-[:DEFINED_IN]->(lib)
+MERGE (fnSim)-[:DEFINED_IN]->(lib)
 @endcypher
 */
 "use client";
@@ -53,6 +63,12 @@ import {
   canConnect,
   nextWireId,
   createExampleWorkflow,
+  reconcileNodePorts,
+  validateWorkflow,
+  simulateWorkflow,
+  mergeInputCountOf,
+  type SimulationResult,
+  type WorkflowIssue,
 } from "@/lib/agent-workflow/workflowLib";
 import { IPA_PHASE_COLUMNS, IPA_SKILL_CATALOG, type IpaSkillEntry } from "@/lib/ipa-skills/catalog";
 
@@ -146,6 +162,24 @@ export function WorkflowBuilder() {
   const deleteSavedWorkflow = useStore((s) => s.deleteSavedWorkflow);
   const [draftName, setDraftName] = useState("");
   const [saveFlash, setSaveFlash] = useState(false);
+  // 校验 + 模拟执行 (per 2026-11-19: 各组件必须有正确功能, 不只存配置)
+  const [issues, setIssues] = useState<WorkflowIssue[] | null>(null);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+
+  const onValidate = useCallback(() => {
+    setIssues(validateWorkflow(workflow.nodes, workflow.wires));
+    setSimResult(null);
+  }, [workflow.nodes, workflow.wires]);
+
+  const onSimulate = useCallback(() => {
+    const found = validateWorkflow(workflow.nodes, workflow.wires);
+    setIssues(found);
+    if (found.some((i) => i.level === "error")) {
+      setSimResult(null);
+      return;
+    }
+    setSimResult(simulateWorkflow(workflow.nodes, workflow.wires));
+  }, [workflow.nodes, workflow.wires]);
 
   const onSaveDraft = useCallback(() => {
     if (!draftName.trim()) return;
@@ -157,9 +191,12 @@ export function WorkflowBuilder() {
   const onLoadDraft = useCallback((id: string) => {
     const draft = useStore.getState().savedWorkflows.find((w) => w.id === id);
     if (!draft) return;
-    setWorkflow({ nodes: draft.nodes, wires: draft.wires });
+    // 旧草稿可能带静态 switch/merge 端口: 加载时按配置重算
+    setWorkflow(reconcileNodePorts(draft.nodes, draft.wires));
     setDraftName(draft.name);
     setSelectedNodeId(null);
+    setIssues(null);
+    setSimResult(null);
   }, []);
 
   const selectedNode = useMemo(
@@ -317,10 +354,13 @@ export function WorkflowBuilder() {
   }, []);
 
   const updateNodeConfig = useCallback((nodeId: string, patch: Record<string, unknown>) => {
-    setWorkflow((w) => ({
-      ...w,
-      nodes: w.nodes.map((n) => (n.id === nodeId ? { ...n, config: { ...n.config, ...patch } } : n)),
-    }));
+    setWorkflow((w) => {
+      const nodes = w.nodes.map((n) =>
+        n.id === nodeId ? { ...n, config: { ...n.config, ...patch } } : n,
+      );
+      // 配置驱动端口: switch 分支 / merge 输入数变化时同步重算端口并清理悬空连线
+      return reconcileNodePorts(nodes, w.wires);
+    });
   }, []);
 
   const addSkillNode = useCallback((skill: IpaSkillEntry) => {
@@ -511,10 +551,75 @@ export function WorkflowBuilder() {
                 key={node.id}
                 node={node}
                 selected={node.id === selectedNodeId}
+                takenPorts={simResult?.takenPorts[node.id]}
               />
             ))}
           </g>
         </svg>
+        {/* 校验 / 模拟执行工具栏 */}
+        <div className="absolute top-3 left-3 flex gap-1.5">
+          <button
+            data-testid="workflow-validate-btn"
+            className="btn-ghost px-2 py-1 rounded border border-line text-[11px] text-ink"
+            onClick={onValidate}
+          >
+            校验
+          </button>
+          <button
+            data-testid="workflow-simulate-btn"
+            className="btn-ghost px-2 py-1 rounded border border-emerald-400/50 text-[11px] text-emerald-300"
+            onClick={onSimulate}
+          >
+            <Play size={11} className="inline mr-1" />模拟运行
+          </button>
+          {(issues !== null || simResult !== null) && (
+            <button
+              data-testid="workflow-results-clear"
+              className="btn-ghost px-2 py-1 rounded border border-line text-[11px] text-ink-dim"
+              onClick={() => { setIssues(null); setSimResult(null); }}
+            >
+              清除结果
+            </button>
+          )}
+        </div>
+        {(issues !== null || simResult !== null) && (
+          <div
+            data-testid="workflow-results-panel"
+            className="absolute top-12 left-3 w-80 max-h-[60%] overflow-y-auto rounded border border-line bg-[var(--cel-surface-card,var(--color-surface-2))] p-2 space-y-1.5 shadow-lg"
+          >
+            {issues !== null && (
+              <div className="space-y-1">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim">
+                  校验 · {issues.filter((i) => i.level === "error").length} 错误 / {issues.filter((i) => i.level === "warning").length} 警告
+                </div>
+                {issues.length === 0 && <div className="text-[11px] text-ok">✓ 结构校验通过</div>}
+                {issues.map((issue, i) => (
+                  <div
+                    key={i}
+                    data-testid="workflow-issue"
+                    className={`text-[11px] rounded px-1.5 py-1 border ${issue.level === "error" ? "border-red-400/50 text-red-300 bg-red-400/10" : "border-warn/40 text-warn bg-warn/10"}`}
+                  >
+                    {issue.level === "error" ? "✗" : "⚠"} {issue.message}
+                  </div>
+                ))}
+              </div>
+            )}
+            {simResult !== null && (
+              <div className="space-y-1">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim">
+                  模拟执行 · {simResult.steps.length} 步{simResult.truncated ? " (达到上限截断)" : ""}
+                </div>
+                {simResult.steps.map((step, i) => (
+                  <div key={i} data-testid="workflow-sim-step" className="text-[11px] text-ink border-l-2 border-emerald-400/60 pl-1.5">
+                    <span className="font-mono text-ink-mute mr-1">{i + 1}.</span>
+                    <span className="font-semibold">{step.title}</span>
+                    <span className="text-ink-dim"> — {step.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="absolute bottom-3 right-3 flex gap-1.5">
           <button className="btn-ghost p-1.5 rounded border border-line" onClick={() => zoomBy(0.1)} aria-label="zoom in">
             <ZoomIn size={14} />
@@ -557,8 +662,9 @@ function SkillSlot({ skill, onAdd }: { skill: IpaSkillEntry; onAdd: (skill: IpaS
   );
 }
 
-function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: boolean }) {
+function WorkflowNodeCard({ node, selected, takenPorts }: { node: WorkflowNode; selected: boolean; takenPorts?: string[] }) {
   const height = 46 + 10 + Math.max(node.inputs.length, node.outputs.length, 1) * 26 + 8;
+  const visited = !!takenPorts && takenPorts.length > 0;
   return (
     <g data-node-id={node.id} data-testid={`workflow-node-${node.id}`} className="cursor-move">
       {/* 卡片体 */}
@@ -569,8 +675,8 @@ function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: bo
         height={height}
         rx={8}
         fill="var(--cel-surface-card, var(--color-surface-2))"
-        stroke={selected ? "#38bdf8" : "rgba(120,140,160,0.35)"}
-        strokeWidth={selected ? 2 : 1}
+        stroke={selected ? "#38bdf8" : visited ? "#34d399" : "rgba(120,140,160,0.35)"}
+        strokeWidth={selected || visited ? 2 : 1}
       />
       {/* 头部 */}
       <rect
@@ -641,6 +747,7 @@ function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: bo
       {node.outputs.map((port, index) => {
         const y = portY(node, "out", index) + PORT_RADIUS / 2;
         const label = port.label.length > 12 ? `${port.label.slice(0, 12)}…` : port.label;
+        const taken = takenPorts?.includes(port.id) ?? false;
         return (
           <g
             key={port.id}
@@ -650,7 +757,7 @@ function WorkflowNodeCard({ node, selected }: { node: WorkflowNode; selected: bo
             data-testid={`workflow-port-out-${node.id}-${port.id}`}
             className="cursor-crosshair"
           >
-            <circle cx={node.position.x + NODE_WIDTH} cy={y} r={PORT_RADIUS} fill="#0f1422" stroke="#34d399" strokeWidth={1.6} />
+            <circle cx={node.position.x + NODE_WIDTH} cy={y} r={PORT_RADIUS} fill={taken ? "#34d399" : "#0f1422"} stroke="#34d399" strokeWidth={1.6} />
             <text x={node.position.x + NODE_WIDTH - 12} y={y + 3} fontSize={8.5} fill="#94a3b8" textAnchor="end">
               {label}
             </text>
@@ -809,10 +916,27 @@ function WorkflowEditorPanel({
       {node.kind === "switch" && (
         <div className="space-y-3">
           <div className="text-xs font-semibold text-pink-300">路由规则 (顺序匹配)</div>
+          <div className="text-[10px] text-ink-mute">
+            每条规则对应一个输出端口 <span className="font-mono text-emerald-400">Case N</span>,
+            增删分支时画布端口同步增减; 全部不命中走 <span className="font-mono text-emerald-400">Default</span>。
+          </div>
           {(config.rules as WorkflowConditionRule[]).map((rule, index) => (
             <div key={index} className="card !p-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-pink-300">Case {index + 1}</span>
+                <button
+                  data-testid={`workflow-switch-remove-${index}`}
+                  className="text-[10px] text-red-400/80 hover:text-red-300"
+                  onClick={() =>
+                    onConfigChange({ rules: (config.rules as WorkflowConditionRule[]).filter((_, i) => i !== index) })
+                  }
+                >
+                  删除分支
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-1.5">
                 <input
+                  data-testid={`workflow-switch-field-${index}`}
                   className="input text-[11px]"
                   value={rule.field}
                   placeholder="字段"
@@ -824,6 +948,7 @@ function WorkflowEditorPanel({
                   }}
                 />
                 <select
+                  data-testid={`workflow-switch-operator-${index}`}
                   className="input text-[11px]"
                   value={rule.operator}
                   onChange={(e) => {
@@ -840,6 +965,7 @@ function WorkflowEditorPanel({
                   ))}
                 </select>
                 <input
+                  data-testid={`workflow-switch-value-${index}`}
                   className="input text-[11px]"
                   value={rule.value}
                   placeholder="值"
@@ -854,6 +980,7 @@ function WorkflowEditorPanel({
             </div>
           ))}
           <button
+            data-testid="workflow-switch-add-rule"
             className="btn-secondary w-full text-xs"
             onClick={() =>
               onConfigChange({
@@ -957,14 +1084,39 @@ function WorkflowEditorPanel({
       )}
 
       {node.kind === "trigger" && (
-        <div className="text-[11px] text-ink-dim">
-          手动触发节点: 工作流从这里开始, 输出 <span className="font-mono text-lime-300">Start</span> 信号。
+        <div className="space-y-2">
+          <div className="text-[11px] text-ink-dim">
+            手动触发节点: 工作流从这里开始, 输出 <span className="font-mono text-lime-300">Start</span> 信号。
+          </div>
+          <label className="text-[11px] text-ink-dim">模拟载荷 (JSON, 供条件/路由规则求值)</label>
+          <textarea
+            data-testid="workflow-trigger-payload"
+            className="input font-mono text-[11px] min-h-[72px]"
+            value={(config.payload as string) ?? ""}
+            placeholder='{"status": "ok", "kind": "doc"}'
+            onChange={(e) => onConfigChange({ payload: e.target.value })}
+          />
         </div>
       )}
 
       {node.kind === "merge" && (
-        <div className="text-[11px] text-ink-dim">
-          合并两个输入为一个输出 (<span className="font-mono">append</span> 模式)。
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-sky-300">合并配置</div>
+          <label className="text-[11px] text-ink-dim">输入路数 (2–8, 画布输入端口同步增减)</label>
+          <input
+            data-testid="workflow-merge-input-count"
+            type="number"
+            min={2}
+            max={8}
+            className="input text-xs"
+            value={mergeInputCountOf(node)}
+            onChange={(e) =>
+              onConfigChange({ inputCount: Math.min(8, Math.max(2, Math.round(Number(e.target.value) || 2))) })
+            }
+          />
+          <div className="text-[10px] text-ink-mute">
+            合并 {mergeInputCountOf(node)} 路输入为一个输出 (<span className="font-mono">append</span> 模式)。
+          </div>
         </div>
       )}
     </div>
