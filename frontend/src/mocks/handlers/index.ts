@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=0485900e1718c680dcbdd24c1b2dd6a78824419ed26af72c3bfb37ff21093bcb
+MERGE (self:File {path:"frontend/src/mocks/handlers/index.ts"})
+MERGE (agg:Symbol {id:"frontend/src/mocks/handlers/index.ts::handlers",kind:"constant"})
+MERGE (runDir:File {path:"frontend/src/mocks/handlers/run-directory.ts"})
+MERGE (self)-[:DEFINES]->(agg)
+MERGE (self)-[:IMPORTS]->(runDir)
+@endcypher
+*/
 // frontend/src/mocks/handlers/index.ts
 // MSW handler re-export (per mock-msw-handlers.md §2.1)
 //
@@ -51,6 +60,7 @@ import { worktreeCanvasHandlers } from "./worktree-canvas";
 import { annotationsHandlers } from "./annotations";
 
 import { worktreeSharedHandlers } from "./worktree-shared";
+import { runDirectoryHandlers } from "./run-directory";
 
 
 export const handlers = [
@@ -72,4 +82,5 @@ export const handlers = [
   ...kmsHandlers,
   ...worktreeCanvasHandlers,
   ...annotationsHandlers,
+  ...runDirectoryHandlers,
 ];

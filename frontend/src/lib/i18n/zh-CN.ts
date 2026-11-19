@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=c246957d56998c2168894bab13b2f0ca582a45802a50e6ec7d0bf9dd72beecf7
+@cypher schema=1 source_sha256=d4fa2a63ff96515708972d3b266d5f1f47b1e72c7b540fddc220b7f0492b66db
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -46,6 +46,7 @@ export const zhCN: Dictionary = {
     directoryUnavailableDescription: "当前会话没有可验证的 Project 与 LANE 目录连接。目录恢复前不显示本地预览、缓存或 seed 记录，避免将示例状态误认为 Worktree 管理事实。",
     hierarchyHint: "LANE → 本地 Worktree → Branch",
     fallbackHint: "演示目录 — 宿主会话未装配, 显示 seed 层级 (网页版降级, 全部可达)",
+    emptyHint: "目录数据未加载 — 请刷新重试, 或装配宿主会话读取真实 Project 层级",
     fallbackLane: "默认 LANE",
     refreshDirectory: "重新读取授权目录",
     unknownCreateResult: "上次提交结果未知；再次提交将复用同一请求标识。",

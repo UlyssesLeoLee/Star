@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=f21832ce82ee24b45688e51fe50f4e9df498726e98434c70ca5c48e3d0997125
+@cypher schema=1 source_sha256=7afb6b8f911cfa0c5fff57730926bea85e6fe25f037b94a250095e788c25c332
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -80,6 +80,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEv
 import { canonicalRunHref, canonicalRunWorktreeHref, type RunDirectoryApiClient } from "@/lib/run/runDirectoryApi";
 import { useNavStore } from "@/lib/nav/navStore";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
+import { useFallbackRunDirectory } from "@/lib/run/useFallbackRunDirectory";
 import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
 import { useTranslation, type Dictionary } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
@@ -109,6 +110,9 @@ export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
 // =====================================================================
 function FallbackProjectRunTree() {
   const { t } = useTranslation();
+  // 网页版降级目录引导: store 为空时从 /api/run-directory 拉取层级
+  // (per 2026-11-19: Project 导航必须渲染树形结构, 不能只剩提示文字)
+  useFallbackRunDirectory();
   const projects = useStore((s) => s.projects);
   const worktrees = useStore((s) => s.worktrees);
   const pathname = usePathname() ?? "/";
@@ -152,6 +156,11 @@ function FallbackProjectRunTree() {
 
   return <div data-testid="project-run-directory-fallback">
     <p role="status" className="px-2 pb-1 text-[10px] text-ink-mute">{t.runDirectory.fallbackHint}</p>
+    {projects.length === 0 && (
+      <p data-testid="project-run-directory-empty" className="px-2 pb-1 text-[10px] text-warn">
+        {t.runDirectory.emptyHint}
+      </p>
+    )}
     <ul role="tree" aria-label={t.sidebar.projectDirectory} className="max-h-[288px] overflow-y-auto">
       {projects.map((project) => {
         const laneWorktrees = byProject.get(project.id) ?? [];
