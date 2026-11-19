@@ -8,12 +8,21 @@ MERGE (agentViewPage:Symbol {id:"frontend/src/components/agent-view/AgentViewPag
 MERGE (scopeSelector:Symbol {id:"frontend/src/components/canvas/CanvasScopeSelector.tsx::CanvasScopeSelector",kind:"component"})
 MERGE (navStore:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
 MERGE (createCanvasLocal:Symbol {id:"frontend/src/lib/canvas-entry.ts::createCanvasLocal",kind:"function"})
+MERGE (groupClient:Symbol {id:"frontend/src/lib/group-api/canvasClient.ts::GroupCanvasClient",kind:"class"})
+MERGE (resolveSource:Symbol {id:"frontend/src/lib/canvas-entry.ts::resolveCanvasSource",kind:"function"})
+MERGE (draftStore:Symbol {id:"frontend/src/lib/group-api/canvasClient.ts::CanvasDraftStore",kind:"class"})
+MERGE (wakeSubscriber:Symbol {id:"frontend/src/lib/group/worktreeGroupApi.ts::CanvasOutboxWakeSubscriber",kind:"class"})
+MERGE (groupApiHook:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::useWorktreeGroupApi",kind:"function"})
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(canvasView)
 MERGE (self)-[:IMPORTS]->(relationshipView)
 MERGE (self)-[:IMPORTS]->(agentViewPage)
 MERGE (self)-[:IMPORTS]->(scopeSelector)
-MERGE (self)-[:IMPORTS]->(createCanvasLocal)
+MERGE (self)-[:IMPORTS]->(groupClient)
+MERGE (self)-[:IMPORTS]->(resolveSource)
+MERGE (self)-[:IMPORTS]->(draftStore)
+MERGE (self)-[:IMPORTS]->(wakeSubscriber)
+MERGE (self)-[:IMPORTS]->(groupApiHook)
 MERGE (page)-[:CALLS]->(navStore)
 MERGE (page)-[:CALLS]->(createCanvasLocal)
 @endcypher
@@ -37,9 +46,15 @@ MERGE (page)-[:CALLS]->(createCanvasLocal)
 //   (点击读 navStore 范围传后端做权限复验, 接入点见下方注释).
 // 2026-11-16 (per 10 条第 4 条): 画布按路由 id 取用 (不再 fallback
 //   seed.canvases[0]); 找不到画布时渲染未接入状态 + 新建画布按钮.
+// 2026-11-20 (per TASK-p1-canvas-data): 独立入口接 Group Canvas 授权真源 —
+//   group 会话 + worktree 上下文 → 服务端画布 (group-context + canvases +
+//   elements), 权限快照决定只读/可写按钮; 移动与新增走同一 canWrite 判定
+//   (修复「live 模式能移动不能新增」: 消除 移动有回调/新增无回调 的分裂);
+//   SSE wake + cursor catch-up 断线恢复 (复用 CanvasOutboxWakeSubscriber) +
+//   断线横幅; 409 冲突 → 双方内容对话框 (不静默覆盖); 无会话 → 本地降级标注。
 // =====================================================================
 
-import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
 import { GitBranch, Network, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { CanvasView } from "@/components/CanvasView";
@@ -49,9 +64,87 @@ import { WorkflowBuilder } from "@/components/agent-workflow/WorkflowBuilder";
 import { GitCanvas } from "../components/GitCanvas";
 import { CanvasScopeSelector, type CanvasScope } from "@/components/canvas/CanvasScopeSelector";
 import { useNavStore } from "@/lib/nav/navStore";
-import { createCanvasLocal } from "@/lib/canvas-entry";
+import { createCanvasLocal, resolveCanvasSource } from "@/lib/canvas-entry";
+import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
+import {
+  CanvasConflictError,
+  CanvasDraftStore,
+  CanvasDisconnectedError,
+  CanvasReadOnlyError,
+  GroupCanvasClient,
+  type CanvasPendingDraft,
+  type GroupCanvasSnapshot,
+} from "@/lib/group-api/canvasClient";
+import { GroupApiError } from "@/lib/group/worktreeGroupApi";
+import type { CanvasElementKind, CanvasEntityRef } from "@/types/ids";
 
 const CANVAS_SUB_TABS = ["画布", "Agent 画布", "关系图", "流程", "Git 画布"] as const;
+
+// =====================================================================
+// 本页新文案 (i18n key 待父代理合并时补 dictionary/zh-CN/en/ja;
+// 此处按共享约束用局部三语常量, 不碰共享 dictionary)
+// =====================================================================
+const UI_TEXT = {
+  zh: {
+    localBadge: "本地画布 — 未连接服务端",
+    groupBadge: (worktreeId: string) => `Group Canvas 授权数据源 · worktree=${worktreeId}`,
+    readOnlyHint: "当前会话为只读: 创建/修改/删除按钮已禁用",
+    reconnecting: "连接中断, 重试中…",
+    conflictTitle: "画布已被他人更新",
+    conflictBody: "服务端最新与你的本地草稿均已保留, 请选择保留哪一方 (自动合并后续版本提供)。",
+    keepServer: "使用服务端版本 (放弃我的草稿)",
+    keepBoth: "保留双方草稿 (我的草稿留在本地, 可稍后恢复)",
+    noServerCanvas: "该 Worktree 尚无服务端画布",
+    createServerCanvas: "创建服务端画布",
+    creatingCanvas: "创建中…",
+    loadError: (message: string) => `画布加载失败: ${message}`,
+    retry: "重试",
+    loading: "加载 Group Canvas 授权数据…",
+  },
+  en: {
+    localBadge: "Local canvas — not connected to server",
+    groupBadge: (worktreeId: string) => `Group Canvas authorized source · worktree=${worktreeId}`,
+    readOnlyHint: "Read-only session: create / edit / delete buttons are disabled",
+    reconnecting: "Connection lost, retrying…",
+    conflictTitle: "Canvas was updated elsewhere",
+    conflictBody: "Server latest and your local draft are both kept. Choose which side to retain.",
+    keepServer: "Use server version (discard my draft)",
+    keepBoth: "Keep both drafts (my draft stays local for later recovery)",
+    noServerCanvas: "This Worktree has no server canvas yet",
+    createServerCanvas: "Create server canvas",
+    creatingCanvas: "Creating…",
+    loadError: (message: string) => `Canvas load failed: ${message}`,
+    retry: "Retry",
+    loading: "Loading Group Canvas data…",
+  },
+  ja: {
+    localBadge: "ローカルキャンバス — サーバー未接続",
+    groupBadge: (worktreeId: string) => `Group Canvas 承認データソース · worktree=${worktreeId}`,
+    readOnlyHint: "読み取り専用: 作成/編集/削除ボタンは無効です",
+    reconnecting: "接続が切れました, 再試行中…",
+    conflictTitle: "キャンバスが他で更新されました",
+    conflictBody: "サーバー最新とローカル下書きの両方を保持しています。どちらを残すか選択してください。",
+    keepServer: "サーバー版を使う (下書きを破棄)",
+    keepBoth: "両方の下書きを保持 (ローカルに残し後で復元)",
+    noServerCanvas: "この Worktree にはまだサーバーキャンバスがありません",
+    createServerCanvas: "サーバーキャンバスを作成",
+    creatingCanvas: "作成中…",
+    loadError: (message: string) => `キャンバス読み込み失敗: ${message}`,
+    retry: "再試行",
+    loading: "Group Canvas データを読み込み中…",
+  },
+} as const;
+
+type GroupCanvasViewState =
+  | { mode: "loading" }
+  | { mode: "live"; snapshot: GroupCanvasSnapshot }
+  | { mode: "error"; message: string };
+
+interface CanvasConflictView {
+  code: string;
+  draft: CanvasPendingDraft;
+  latest: GroupCanvasSnapshot | null;
+}
 
 export default function CanvasDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -76,9 +169,20 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
   const workItems = useStore((s) => s.workItems);
   const worktrees = useStore((s) => s.worktrees);
   const projects = useStore((s) => s.projects);
+  const lanes = useStore((s) => s.lanes);
   // 画布按路由 id 取用 (per 2026-11-16 10 条第 4 条: 不再 fallback seed.canvases[0]);
   // 找不到 → 画布 tab 渲染未接入状态 + 新建画布按钮 (本地创建, 写 store)
   const canvas = canvases.find((c) => c.id === id);
+
+  // ===================================================================
+  // Group 会话与 worktree 上下文解析 (per TASK-p1-canvas-data)
+  // ===================================================================
+  const groupApi = useWorktreeGroupApi();
+  const groupSessionState = useWorktreeGroupSessionState();
+  const groupSessionReady = Boolean(groupApi) && groupSessionState.status === "ready";
+  const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+  const selectedLaneId = useNavStore((s) => s.selectedLaneId);
+  const [deepLinkWorktreeId, setDeepLinkWorktreeId] = useState<string | null>(null);
 
   // 关系图 tenant 动态化 (per TASK-ulys-canvas-fine):
   //   RelationshipView.tenantId 语义 = RLS 13 類 tenant id (非 project id,
@@ -107,14 +211,14 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
       setScopeSyncError(wt);
       return;
     }
+    setDeepLinkWorktreeId(wt);
     const nav = useNavStore.getState();
     nav.setSelectedProjectId(match.project_id);
     nav.setLaneContext(match.lane_id ?? "", match.id, match.branch);
   }, []);
   const handleScopeChange = useCallback((scope: CanvasScope) => {
     setScopeSyncError(null);
-    // 画布数据按新范围重新加载 (本地预览: 数据源为 store;
-    //   按 Worktree 隔离的授权画布投影接入后, 此处替换为按 scope 重拉)
+    // 画布数据按新范围重新加载 (group 模式: 按 scope.worktreeId 重拉授权画布)
     setCanvasReloadKey((k) => k + 1);
     setScopeNotice(
       scope.worktreeId
@@ -122,6 +226,220 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
         : `范围已切换: project=${scope.projectId}${scope.laneId ? ` lane=${scope.laneId}` : ""} (尚未指定 Worktree)`,
     );
   }, []);
+
+  // ===================================================================
+  // 数据源解析 (per TASK-p1-canvas-data): group 会话 → 授权真源; 否则本地降级
+  // ===================================================================
+  const localCanvasWorktreeRef =
+    canvas?.ref_kind === "worktree" && canvas.ref_id ? canvas.ref_id : null;
+  const contextWorktreeId = deepLinkWorktreeId ?? selectedWorktreeId ?? localCanvasWorktreeRef;
+
+  const source = useMemo(
+    () =>
+      resolveCanvasSource(
+        { worktreeId: contextWorktreeId ?? undefined, laneId: selectedLaneId ?? undefined },
+        { worktreeId: groupSessionReady ? contextWorktreeId : null },
+        worktrees,
+        lanes,
+        canvases,
+      ),
+    [canvases, contextWorktreeId, groupSessionReady, lanes, selectedLaneId, worktrees],
+  );
+
+  // ===================================================================
+  // Group 模式: 授权真源加载 + SSE 断线恢复 + 冲突可见
+  // ===================================================================
+  const [groupViewState, setGroupViewState] = useState<GroupCanvasViewState>({ mode: "loading" });
+  const [connection, setConnection] = useState<"connected" | "reconnecting">("connected");
+  const [conflict, setConflict] = useState<CanvasConflictView | null>(null);
+  const [createServerCanvasPending, setCreateServerCanvasPending] = useState(false);
+
+  useEffect(() => {
+    if (source.mode !== "group" || !groupApi) {
+      setGroupViewState({ mode: "loading" });
+      return;
+    }
+    const worktreeId = source.worktreeId;
+    const client = new GroupCanvasClient(groupApi, worktreeId);
+    const controller = new AbortController();
+    let active = true;
+
+    const refresh = async (signal: AbortSignal) => {
+      const nextSnapshot = await client.loadCanvas(signal);
+      if (active && !signal.aborted) {
+        setGroupViewState({ mode: "live", snapshot: nextSnapshot });
+        setConnection("connected");
+      }
+    };
+
+    setGroupViewState({ mode: "loading" });
+    void refresh(controller.signal).catch((error: unknown) => {
+      if (!active || controller.signal.aborted) return;
+      setGroupViewState({ mode: "error", message: errorMessage(error) });
+    });
+
+    // 断线恢复: 复用 CanvasOutboxWakeSubscriber (SSE wake + cursor catch-up + 自动重连)
+    const subscriber = client.makeWakeSubscriber((signal) => refresh(signal));
+    const unsubscribe = subscriber.subscribe(controller.signal, (error: unknown) => {
+      if (!active || controller.signal.aborted) return;
+      if (error instanceof GroupApiError && (error.status === 401 || error.status === 403)) {
+        setGroupViewState({ mode: "error", message: "Group 会话已失效, 请重新登录后继续。" });
+        return;
+      }
+      if (error instanceof CanvasReadOnlyError) return; // 只读本身不是断线
+      setConnection("reconnecting");
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+      unsubscribe();
+    };
+  }, [source.mode, source.mode === "group" ? source.worktreeId : "", groupApi, canvasReloadKey]);
+
+  const snapshot = groupViewState.mode === "live" ? groupViewState.snapshot : null;
+  const serverCanvas = snapshot?.canvas ?? null;
+  const canWrite = snapshot?.permission.canWrite ?? false;
+  const canCreateCanvas = snapshot?.permission.canCreateCanvas ?? false;
+
+  const refreshGroup = useCallback(() => setCanvasReloadKey((k) => k + 1), []);
+
+  /** 冲突可见: 保存本地草稿, 拉取服务端最新, 双方同屏展示。 */
+  const openConflict = useCallback(
+    async (error: CanvasConflictError, draft: CanvasPendingDraft) => {
+      if (!groupApi || source.mode !== "group") return;
+      const client = new GroupCanvasClient(groupApi, source.worktreeId);
+      const latest = await client.loadCanvas().catch(() => null);
+      setConflict({ code: error.code, draft, latest });
+    },
+    [groupApi, source],
+  );
+
+  /** 新增元素 (与移动共用同一 canWrite 判定 + 同一授权写入路径)。 */
+  const handleCreateElement = useCallback(
+    async (input: {
+      kind: CanvasElementKind;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      z_index: number;
+      content: Record<string, unknown>;
+    }): Promise<{ id?: string } | void> => {
+      if (!groupApi || source.mode !== "group" || !serverCanvas || !canWrite) {
+        throw new Error("当前画布不可写");
+      }
+      const client = new GroupCanvasClient(groupApi, source.worktreeId);
+      const draft: CanvasPendingDraft = {
+        kind: "element-create",
+        payload: input,
+        savedAt: new Date().toISOString(),
+      };
+      CanvasDraftStore.save(source.worktreeId, serverCanvas.canvasId, draft);
+      try {
+        const { id: elementId } = await client.createElement(
+          serverCanvas.canvasId,
+          input,
+          crypto.randomUUID(),
+        );
+        CanvasDraftStore.clear(source.worktreeId, serverCanvas.canvasId);
+        refreshGroup();
+        return { id: elementId };
+      } catch (error) {
+        if (error instanceof CanvasConflictError) await openConflict(error, draft);
+        throw error;
+      }
+    },
+    [canWrite, groupApi, openConflict, refreshGroup, serverCanvas, source],
+  );
+
+  /** 移动元素: 乐观预览由 CanvasView 处理, 服务端确认走 PUT position。 */
+  const handleElementPositionChange = useCallback(
+    async (position: { elementId: string; x: number; y: number; expectedVersion: number }) => {
+      if (!groupApi || source.mode !== "group" || !serverCanvas || !canWrite) {
+        throw new Error("当前画布不可写");
+      }
+      const client = new GroupCanvasClient(groupApi, source.worktreeId);
+      const draft: CanvasPendingDraft = {
+        kind: "element-move",
+        elementId: position.elementId,
+        payload: position,
+        savedAt: new Date().toISOString(),
+      };
+      CanvasDraftStore.save(source.worktreeId, serverCanvas.canvasId, draft);
+      try {
+        await client.updateElementPosition(
+          serverCanvas.canvasId,
+          position.elementId,
+          position,
+          crypto.randomUUID(),
+        );
+        CanvasDraftStore.clear(source.worktreeId, serverCanvas.canvasId);
+        refreshGroup();
+      } catch (error) {
+        if (error instanceof CanvasConflictError) await openConflict(error, draft);
+        throw error;
+      }
+    },
+    [canWrite, groupApi, openConflict, refreshGroup, serverCanvas, source],
+  );
+
+  /** 删除元素: 同一授权写入路径。 */
+  const handleDeleteElements = useCallback(
+    async (elementIds: string[]) => {
+      if (!groupApi || source.mode !== "group" || !serverCanvas || !canWrite) {
+        throw new Error("当前画布不可写");
+      }
+      const client = new GroupCanvasClient(groupApi, source.worktreeId);
+      for (const elementId of elementIds) {
+        const element = snapshot?.elements.find((el) => el.id === elementId);
+        const draft: CanvasPendingDraft = {
+          kind: "element-delete",
+          elementId,
+          payload: { expectedVersion: element?.version ?? 0 },
+          savedAt: new Date().toISOString(),
+        };
+        CanvasDraftStore.save(source.worktreeId, serverCanvas.canvasId, draft);
+        try {
+          await client.deleteElement(
+            serverCanvas.canvasId,
+            elementId,
+            element?.version ?? 0,
+            crypto.randomUUID(),
+          );
+          CanvasDraftStore.clear(source.worktreeId, serverCanvas.canvasId);
+        } catch (error) {
+          if (error instanceof CanvasConflictError) await openConflict(error, draft);
+          throw error;
+        }
+      }
+      refreshGroup();
+    },
+    [canWrite, groupApi, openConflict, refreshGroup, serverCanvas, snapshot, source],
+  );
+
+  /** 服务端画布创建 (仅 can_create_canvas)。 */
+  const handleCreateServerCanvas = useCallback(async () => {
+    if (!groupApi || source.mode !== "group" || !canCreateCanvas || createServerCanvasPending) return;
+    setCreateServerCanvasPending(true);
+    try {
+      const client = new GroupCanvasClient(groupApi, source.worktreeId);
+      await client.createCanvas("Worktree Canvas", crypto.randomUUID());
+      refreshGroup();
+    } catch {
+      setScopeNotice("服务端画布创建失败, 请重试。");
+    } finally {
+      setCreateServerCanvasPending(false);
+    }
+  }, [canCreateCanvas, createServerCanvasPending, groupApi, refreshGroup, source]);
+
+  /** 冲突对话框: 使用服务端版本 → 清草稿并刷新。 */
+  const resolveConflictKeepServer = useCallback(() => {
+    if (!conflict || source.mode !== "group" || !serverCanvas) return;
+    CanvasDraftStore.clear(source.worktreeId, serverCanvas.canvasId);
+    setConflict(null);
+    refreshGroup();
+  }, [conflict, refreshGroup, serverCanvas, source]);
 
   // ===================================================================
   // BI / Plugins / Workflow 入口 (per 2026-11-16 范围选择器需求):
@@ -153,64 +471,210 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
     [canvas?.id],
   );
 
-  const renderCanvasContent = () => {
-    switch (activeTab) {
-      case "画布":
-        // 无限画布核心 (白板 CanvasView, store 数据通道)
+  // ===================================================================
+  // 画布 tab: group 模式 (授权真源) / local 模式 (store 降级)
+  // ===================================================================
+  const renderWhiteboard = () => {
+    if (source.mode === "group") {
+      if (groupViewState.mode === "loading") {
         return (
-          <div className="h-full overflow-hidden" data-testid="canvas-tab-whiteboard">
-            {canvas ? (
-              <CanvasView
-                canvas={canvas}
-                elements={canvasElements}
-                connectors={canvasConnectors}
-                readOnly={false}
-                groupWorkItems={workItems}
-                groupWorktrees={worktrees}
-                onCreateElement={async (input) => {
-                  const el = {
-                    id: `el-${globalThis.crypto.randomUUID()}`,
-                    canvas_id: canvas.id,
-                    kind: input.kind,
-                    x: input.x,
-                    y: input.y,
-                    width: input.width,
-                    height: input.height,
-                    rotation: 0,
-                    z_index: input.z_index,
-                    content: input.content,
-                    locked: false,
-                    hidden: false,
-                    created_by: "usr-001",
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                  };
-                  useStore.getState().addCanvasElement(el);
-                  return { id: el.id };
-                }}
-              />
-            ) : (
-              <div
-                className="h-full flex flex-col items-center justify-center gap-3"
-                data-testid="canvas-unbound"
+          <div className="h-full grid place-items-center" data-testid="canvas-group-loading">
+            <p className="text-sm text-ink-mute">{text.loading}</p>
+          </div>
+        );
+      }
+      if (groupViewState.mode === "error") {
+        return (
+          <div className="h-full flex flex-col items-center justify-center gap-3" data-testid="canvas-group-error">
+            <p className="text-sm text-err" data-testid="canvas-group-error-hint">
+              {text.loadError(groupViewState.message)}
+            </p>
+            <button
+              type="button"
+              data-testid="canvas-group-retry"
+              onClick={refreshGroup}
+              className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/20"
+            >
+              {text.retry}
+            </button>
+          </div>
+        );
+      }
+      // live: 服务端画布
+      if (!snapshot?.canvas) {
+        return (
+          <div className="h-full flex flex-col items-center justify-center gap-3" data-testid="canvas-group-no-canvas">
+            <p className="text-sm text-ink-mute" data-testid="canvas-group-no-canvas-hint">
+              {text.noServerCanvas}
+            </p>
+            {canCreateCanvas && (
+              <button
+                type="button"
+                data-testid="canvas-group-create-canvas"
+                disabled={createServerCanvasPending}
+                onClick={() => void handleCreateServerCanvas()}
+                className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/20 disabled:opacity-50"
               >
-                <p className="text-sm text-ink-mute" data-testid="canvas-unbound-hint">
-                  画布未接入 — 找不到 {id} 对应的画布 (不再回退 seed 默认画布)
-                </p>
-                <button
-                  type="button"
-                  data-testid="canvas-unbound-create"
-                  onClick={() =>
-                    createCanvasLocal({ id, title: `画布 ${id}`, ref_kind: "free" })
-                  }
-                  className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
-                >
-                  <Plus size={14} /> 新建画布
-                </button>
-              </div>
+                <Plus size={14} /> {createServerCanvasPending ? text.creatingCanvas : text.createServerCanvas}
+              </button>
             )}
           </div>
         );
+      }
+      const viewElements = snapshot.elements.map((el) => ({
+        ...el,
+        entity_ref: el.entity_ref
+          ? ({
+              ref_type: el.entity_ref.ref_type as CanvasEntityRef["ref_type"],
+              ref_id: el.entity_ref.ref_id,
+              worktree_id: el.entity_ref.worktree_id,
+            } satisfies CanvasEntityRef)
+          : undefined,
+      }));
+      return (
+        <div className="relative h-full overflow-hidden" data-testid="canvas-tab-whiteboard">
+          <CanvasView
+            key={`group:${snapshot.canvas.canvasId}:${snapshot.canvas.version}`}
+            canvas={{
+              id: snapshot.canvas.canvasId,
+              viewport: snapshot.canvas.viewport,
+              frames: snapshot.canvas.frames,
+            }}
+            elements={viewElements}
+            connectors={snapshot.canvas.connectors}
+            readOnly={!canWrite}
+            groupWorkItems={workItems.length > 0 ? workItems : undefined}
+            groupWorktrees={worktrees.length > 0 ? worktrees : undefined}
+            onCreateElement={canWrite ? handleCreateElement : undefined}
+            onElementPositionChange={canWrite ? handleElementPositionChange : undefined}
+            onDeleteElements={canWrite ? handleDeleteElements : undefined}
+          />
+          {!canWrite && (
+            <p
+              className="absolute bottom-10 left-3 z-20 rounded border border-warn/40 bg-warn/10 px-2 py-1 font-mono text-[10px] text-warn"
+              data-testid="canvas-group-readonly-hint"
+            >
+              {text.readOnlyHint}
+            </p>
+          )}
+          {conflict && (
+            <div
+              className="absolute inset-0 z-40 grid place-items-center bg-bg/70 p-6"
+              data-testid="canvas-conflict-dialog"
+              role="dialog"
+              aria-label={text.conflictTitle}
+            >
+              <div className="w-full max-w-lg rounded-xl border border-warn/40 bg-bg-card p-4 shadow-soft">
+                <h3 className="mb-2 text-sm font-semibold text-warn">{text.conflictTitle}</h3>
+                <p className="mb-3 text-xs text-ink-mute">{text.conflictBody}</p>
+                <div className="mb-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="rounded border border-line p-2" data-testid="canvas-conflict-server">
+                    <p className="mb-1 font-mono text-ink-mute">服务端最新</p>
+                    <p className="break-all font-mono text-ink">
+                      {conflict.code} · {conflict.latest ? `version=${conflict.latest.canvas?.version}` : "不可达"}
+                    </p>
+                  </div>
+                  <div className="rounded border border-line p-2" data-testid="canvas-conflict-draft">
+                    <p className="mb-1 font-mono text-ink-mute">本地草稿</p>
+                    <p className="break-all font-mono text-ink">
+                      {conflict.draft.kind} {conflict.draft.elementId ?? ""} · {conflict.draft.savedAt.slice(0, 19)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    data-testid="canvas-conflict-keep-server"
+                    onClick={resolveConflictKeepServer}
+                    className="rounded border border-line bg-bg-soft px-3 py-1.5 text-xs text-ink hover:border-accent hover:text-accent"
+                  >
+                    {text.keepServer}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="canvas-conflict-keep-both"
+                    onClick={() => setConflict(null)}
+                    className="rounded border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20"
+                  >
+                    {text.keepBoth}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    // local 模式 (无 group 会话): store 通道降级, 明确标注
+    return (
+      <div className="relative h-full overflow-hidden" data-testid="canvas-tab-whiteboard">
+        {canvas ? (
+          <>
+            <CanvasView
+              canvas={canvas}
+              elements={canvasElements}
+              connectors={canvasConnectors}
+              readOnly={false}
+              groupWorkItems={workItems}
+              groupWorktrees={worktrees}
+              onCreateElement={async (input) => {
+                const el = {
+                  id: `el-${globalThis.crypto.randomUUID()}`,
+                  canvas_id: canvas.id,
+                  kind: input.kind,
+                  x: input.x,
+                  y: input.y,
+                  width: input.width,
+                  height: input.height,
+                  rotation: 0,
+                  z_index: input.z_index,
+                  content: input.content,
+                  locked: false,
+                  hidden: false,
+                  created_by: "usr-001",
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                };
+                useStore.getState().addCanvasElement(el);
+                return { id: el.id };
+              }}
+            />
+            <span
+              className="absolute bottom-3 left-3 z-20 rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
+              data-testid="canvas-local-mode-badge"
+            >
+              {text.localBadge}
+            </span>
+          </>
+        ) : (
+          <div
+            className="h-full flex flex-col items-center justify-center gap-3"
+            data-testid="canvas-unbound"
+          >
+            <p className="text-sm text-ink-mute" data-testid="canvas-unbound-hint">
+              画布未接入 — 找不到 {id} 对应的画布 (不再回退 seed 默认画布)
+            </p>
+            <button
+              type="button"
+              data-testid="canvas-unbound-create"
+              onClick={() =>
+                createCanvasLocal({ id, title: `画布 ${id}`, ref_kind: "free" })
+              }
+              className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            >
+              <Plus size={14} /> 新建画布
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCanvasContent = () => {
+    switch (activeTab) {
+      case "画布":
+        // 无限画布核心: group 模式接授权真源, local 模式 store 通道降级
+        return renderWhiteboard();
       case "Agent 画布":
         return (
           <div className="h-full overflow-hidden" data-testid="canvas-tab-agent-canvas">
@@ -258,13 +722,31 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
       >
         <GitBranch size={13} className="shrink-0 text-accent" />
         <CanvasScopeSelector onScopeChange={handleScopeChange} />
-        <span
-          data-testid="canvas-worktree-data-scope"
-          title="画布元素按 canvas_id 加载; 按 Worktree 隔离的画布投影接入后, 此处切换为授权数据"
-          className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
-        >
-          数据未按 Worktree 隔离 (画布投影待接入)
-        </span>
+        {source.mode === "group" ? (
+          <span
+            data-testid="canvas-worktree-data-scope"
+            className="rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[9px] text-accent"
+          >
+            {text.groupBadge(source.worktreeId)}
+          </span>
+        ) : (
+          <span
+            data-testid="canvas-worktree-data-scope"
+            className="rounded border border-warn/40 bg-warn/10 px-1.5 py-0.5 font-mono text-[9px] text-warn"
+          >
+            {text.localBadge}
+          </span>
+        )}
+        {source.mode === "group" && connection === "reconnecting" && (
+          <span className="text-xs text-warn" data-testid="canvas-connection-reconnecting">
+            {text.reconnecting}
+          </span>
+        )}
+        {source.mode === "group" && snapshot?.permission.canWrite === false && (
+          <span className="text-[10px] text-ink-mute" data-testid="canvas-group-readonly-bar">
+            {text.readOnlyHint}
+          </span>
+        )}
         {scopeSyncError && (
           <span className="text-xs text-warn" data-testid="canvas-worktree-context-missing">
             Worktree 上下文未找到 / 未授权读取: {scopeSyncError}
@@ -330,4 +812,10 @@ export default function CanvasDetailPage({ params }: { params: Promise<{ id: str
       </main>
     </div>
   );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof CanvasReadOnlyError) return "当前会话对画布只读。";
+  if (error instanceof CanvasDisconnectedError) return "无法连接 Group Canvas 服务, 请检查网络。";
+  return error instanceof Error ? error.message : "Group Canvas 请求失败。";
 }

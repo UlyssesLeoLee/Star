@@ -3,9 +3,16 @@
 MERGE (self:File {path:"frontend/src/lib/canvas-entry.ts"})
 MERGE (resolveCanvasId:Symbol {id:"frontend/src/lib/canvas-entry.ts::resolveCanvasId",kind:"function"})
 MERGE (createCanvasLocal:Symbol {id:"frontend/src/lib/canvas-entry.ts::createCanvasLocal",kind:"function"})
+MERGE (resolveSource:Symbol {id:"frontend/src/lib/canvas-entry.ts::resolveCanvasSource",kind:"function"})
+MERGE (sessionCtx:Type {id:"frontend/src/lib/canvas-entry.ts::CanvasSessionContext",kind:"interface"})
+MERGE (source:Type {id:"frontend/src/lib/canvas-entry.ts::CanvasSource",kind:"type"})
 MERGE (store:File {path:"frontend/src/lib/store.ts"})
 MERGE (self)-[:DEFINES]->(resolveCanvasId)
 MERGE (self)-[:DEFINES]->(createCanvasLocal)
+MERGE (self)-[:DEFINES]->(resolveSource)
+MERGE (self)-[:DEFINES]->(sessionCtx)
+MERGE (self)-[:DEFINES]->(source)
+MERGE (resolveSource)-[:CALLS]->(resolveCanvasId)
 MERGE (self)-[:IMPORTS]->(store)
 @endcypher
 */
@@ -108,4 +115,43 @@ function newLocalCanvasId(): string {
       ? () => crypto.randomUUID()
       : () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return `canvas-${gen()}`;
+}
+
+// =====================================================================
+// 数据源解析 (per TASK-p1-canvas-data): 独立 Canvas 接 Group Canvas 授权真源。
+// - 有 group 会话 + worktree 上下文 → group 模式 (服务端授权画布,
+//   canvasId 由 GET /api/v1/worktrees/{id}/canvas 服务端解析返回)
+// - 无 group 会话 → local 模式 (本地 store 降级; UI 必须明确标注
+//   「本地画布 — 未连接服务端」, 不冒充真实记录)
+// =====================================================================
+
+export interface CanvasSessionContext {
+  /** Group API 会话与 worktree 上下文同时就绪时为其 id; 否则 null (本地降级) */
+  worktreeId: string | null;
+}
+
+export type CanvasSource =
+  | { mode: "group"; worktreeId: string; canvasId?: string }
+  | { mode: "local"; canvas: Canvas | null; reason: "no-group-session" };
+
+/**
+ * 解析画布数据源:
+ * 有 group 会话 (session.worktreeId 非空) → group 模式接授权真源;
+ * 否则回退本地 store 通道 (resolveCanvasId 级联不变)。
+ */
+export function resolveCanvasSource(
+  ctx: CanvasResolutionContext,
+  session: CanvasSessionContext,
+  worktrees: Worktree[],
+  lanes: Lane[],
+  canvases: Canvas[],
+): CanvasSource {
+  if (session.worktreeId) {
+    return { mode: "group", worktreeId: session.worktreeId };
+  }
+  return {
+    mode: "local",
+    canvas: resolveCanvasId(ctx, worktrees, lanes, canvases),
+    reason: "no-group-session",
+  };
 }

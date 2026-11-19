@@ -13,7 +13,7 @@ MERGE (self)-[:TESTS]->(createCanvasLocal)
 // =====================================================================
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { createCanvasLocal, resolveCanvasId } from "./canvas-entry";
+import { createCanvasLocal, resolveCanvasId, resolveCanvasSource } from "./canvas-entry";
 import { useStore } from "./store";
 import type { Canvas, Lane, Worktree } from "@/types/ids";
 
@@ -93,6 +93,57 @@ describe("resolveCanvasId — Worktree / Lane 上下文 → 画布", () => {
   it("其他 project 的画布不会误配到当前 Lane", () => {
     const canvases = [makeCanvas({ id: "canvas-other", ref_kind: "project", ref_id: "prj-stargate" })];
     expect(resolveCanvasId({ laneId: "lane-001" }, worktrees, lanes, canvases)).toBeNull();
+  });
+});
+
+describe("resolveCanvasSource — group 会话 → 授权真源 / 无会话 → 本地降级", () => {
+  const worktrees = [makeWorktree("wt-001", "prj-physis")];
+  const lanes = [makeLane("lane-001", "prj-physis")];
+  const canvases = [makeCanvas({ id: "canvas-wt", ref_kind: "worktree", ref_id: "wt-001" })];
+
+  it("group 会话就绪 → group 模式 (worktreeId 来自会话)", () => {
+    const source = resolveCanvasSource(
+      { worktreeId: "wt-001", laneId: "lane-001" },
+      { worktreeId: "wt-001" },
+      worktrees,
+      lanes,
+      canvases,
+    );
+    expect(source.mode).toBe("group");
+    if (source.mode === "group") expect(source.worktreeId).toBe("wt-001");
+  });
+
+  it("group 会话存在但无 worktree 上下文 → 本地降级 + 未接入 (canvas null)", () => {
+    const source = resolveCanvasSource({}, { worktreeId: null }, worktrees, lanes, canvases);
+    expect(source.mode).toBe("local");
+    if (source.mode === "local") {
+      expect(source.reason).toBe("no-group-session");
+      expect(source.canvas).toBeNull();
+    }
+  });
+
+  it("无 group 会话 → local 模式, 画布级联解析保持不变", () => {
+    const source = resolveCanvasSource(
+      { worktreeId: "wt-001", laneId: "lane-001" },
+      { worktreeId: null },
+      worktrees,
+      lanes,
+      canvases,
+    );
+    expect(source.mode).toBe("local");
+    if (source.mode === "local") expect(source.canvas?.id).toBe("canvas-wt");
+  });
+
+  it("local 模式上下文无匹配 → canvas null (入口页渲染未接入状态)", () => {
+    const source = resolveCanvasSource(
+      { worktreeId: "wt-999" },
+      { worktreeId: null },
+      worktrees,
+      lanes,
+      canvases,
+    );
+    expect(source.mode).toBe("local");
+    if (source.mode === "local") expect(source.canvas).toBeNull();
   });
 });
 
