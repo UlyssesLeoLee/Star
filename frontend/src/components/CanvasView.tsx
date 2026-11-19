@@ -5,6 +5,24 @@ MERGE (props:Type {id:"frontend/src/components/CanvasView.tsx::CanvasViewProps",
 MERGE (view:Symbol {id:"frontend/src/components/CanvasView.tsx::CanvasView",kind:"component"})
 MERGE (self)-[:DEFINES]->(props)
 MERGE (self)-[:DEFINES]->(view)
+MERGE (svgPointFromClient:Symbol {id:"frontend/src/components/CanvasView.tsx::svgPointFromClient",kind:"function"})
+MERGE (createElementAtWorld:Symbol {id:"frontend/src/components/CanvasView.tsx::createElementAtWorld",kind:"function"})
+MERGE (duplicateElement:Symbol {id:"frontend/src/components/CanvasView.tsx::duplicateElement",kind:"function"})
+MERGE (bringToFront:Symbol {id:"frontend/src/components/CanvasView.tsx::bringToFront",kind:"function"})
+MERGE (sendToBack:Symbol {id:"frontend/src/components/CanvasView.tsx::sendToBack",kind:"function"})
+MERGE (deleteByIds:Symbol {id:"frontend/src/components/CanvasView.tsx::deleteByIds",kind:"function"})
+MERGE (openElementMenu:Symbol {id:"frontend/src/components/CanvasView.tsx::openElementMenu",kind:"function"})
+MERGE (openBlankMenu:Symbol {id:"frontend/src/components/CanvasView.tsx::openBlankMenu",kind:"function"})
+MERGE (openConnectorMenu:Symbol {id:"frontend/src/components/CanvasView.tsx::openConnectorMenu",kind:"function"})
+MERGE (self)-[:DEFINES]->(svgPointFromClient)
+MERGE (self)-[:DEFINES]->(createElementAtWorld)
+MERGE (self)-[:DEFINES]->(duplicateElement)
+MERGE (self)-[:DEFINES]->(bringToFront)
+MERGE (self)-[:DEFINES]->(sendToBack)
+MERGE (self)-[:DEFINES]->(deleteByIds)
+MERGE (self)-[:DEFINES]->(openElementMenu)
+MERGE (self)-[:DEFINES]->(openBlankMenu)
+MERGE (self)-[:DEFINES]->(openConnectorMenu)
 @endcypher
 */
 /*
@@ -51,6 +69,106 @@ import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
 import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2, StickyNote, Type, Square, Frame, Brush, Minus, MessageSquare, Eraser, Undo2, Redo2, Layers, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { ContextMenu, type ContextMenuItem } from "./context-menu/ContextMenu";
+import { useContextMenu } from "./context-menu/useContextMenu";
+import { uiLangOf, type UiLang } from "./context-menu/messages";
+import { clientToWorld, clientDeltaToWorld, clientToSvg, svgToWorld, worldToSvg, type RectLike } from "@/lib/canvas/coords";
+
+/** 主 SVG viewBox — 坐标换算与 svg 属性共用这一常量 (单一真源) */
+const CANVAS_VIEWBOX = { x: 0, y: 0, width: 1200, height: 800 } as const;
+
+/** 右键菜单文案 (三语, 不碰共享 dictionary; 按 useTranslation().language 取值) */
+interface CanvasMenuLabels {
+  paste: string;
+  pasteUnavailable: string;
+  newSticky: string;
+  newText: string;
+  newShape: string;
+  resetZoomHere: string;
+  edit: string;
+  duplicate: string;
+  delete: string;
+  deleteSelection: string;
+  bringToFront: string;
+  sendToBack: string;
+  bringSelectionToFront: string;
+  lock: string;
+  unlock: string;
+  hide: string;
+  show: string;
+  deleteConnector: string;
+  connectorColor: string;
+  connectorMenuPending: string;
+}
+
+const CANVAS_MENU_LABELS: Record<UiLang, CanvasMenuLabels> = {
+  "zh-CN": {
+    paste: "粘贴",
+    pasteUnavailable: "剪贴板状态未接入 (待后端)",
+    newSticky: "新建便利贴",
+    newText: "新建文字",
+    newShape: "新建图形",
+    resetZoomHere: "此处缩放重置 (100%)",
+    edit: "编辑",
+    duplicate: "复制",
+    delete: "删除",
+    deleteSelection: "批量删除",
+    bringToFront: "置顶",
+    sendToBack: "置底",
+    bringSelectionToFront: "批量置顶",
+    lock: "锁定",
+    unlock: "解锁",
+    hide: "隐藏",
+    show: "显示",
+    deleteConnector: "删除连接线",
+    connectorColor: "更改颜色",
+    connectorMenuPending: "连接线写入待后端接入",
+  },
+  en: {
+    paste: "Paste",
+    pasteUnavailable: "Clipboard state not wired (backend pending)",
+    newSticky: "New sticky note",
+    newText: "New text",
+    newShape: "New shape",
+    resetZoomHere: "Reset zoom here (100%)",
+    edit: "Edit",
+    duplicate: "Duplicate",
+    delete: "Delete",
+    deleteSelection: "Delete selection",
+    bringToFront: "Bring to front",
+    sendToBack: "Send to back",
+    bringSelectionToFront: "Bring selection to front",
+    lock: "Lock",
+    unlock: "Unlock",
+    hide: "Hide",
+    show: "Show",
+    deleteConnector: "Delete connector",
+    connectorColor: "Change color",
+    connectorMenuPending: "Connector writes await backend",
+  },
+  ja: {
+    paste: "貼り付け",
+    pasteUnavailable: "クリップボード状態未接続 (バックエンド待ち)",
+    newSticky: "付箋を新規作成",
+    newText: "テキストを新規作成",
+    newShape: "図形を新規作成",
+    resetZoomHere: "ここでズームをリセット (100%)",
+    edit: "編集",
+    duplicate: "複製",
+    delete: "削除",
+    deleteSelection: "選択を一括削除",
+    bringToFront: "最前面へ",
+    sendToBack: "最背面へ",
+    bringSelectionToFront: "選択を最前面へ",
+    lock: "ロック",
+    unlock: "ロック解除",
+    hide: "非表示",
+    show: "表示",
+    deleteConnector: "コネクタを削除",
+    connectorColor: "色を変更",
+    connectorMenuPending: "コネクタ書き込みはバックエンド接続待ち",
+  },
+};
 
 interface CanvasViewProps {
   canvas: Pick<Canvas, "id" | "viewport" | "frames">;
@@ -108,7 +226,10 @@ const SHAPE_SVG_PATH: Record<ShapeKind, string> = {
 
 export function CanvasView(props: CanvasViewProps) {
   const { canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements, onCreateElement } = props;
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const lang = uiLangOf(language);
+  const L = CANVAS_MENU_LABELS[lang];
+  const { menu, openMenu, closeMenu } = useContextMenu();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
   const [selected, setSelected] = useState<string[]>([]);
@@ -192,6 +313,8 @@ export function CanvasView(props: CanvasViewProps) {
   const moveCanvasElement = useStore((s) => s.moveCanvasElement);
   const deleteCanvasElement = useStore((s) => s.deleteCanvasElement);
   const addCanvasConnector = useStore((s) => s.addCanvasConnector);
+  const addCanvasElement = useStore((s) => s.addCanvasElement);
+  const replaceCanvasElements = useStore((s) => s.replaceCanvasElements);
   const availableWorkItems = groupWorkItems ?? storeWorkItems;
   const availableWorktrees = groupWorktrees ?? worktrees;
 
@@ -262,17 +385,15 @@ export function CanvasView(props: CanvasViewProps) {
     onSelectionChange?.(selected);
   }, [onSelectionChange, selected]);
 
-  // 屏幕坐标 → 世界坐标
-  const screenToWorld = useCallback((sx: number, sy: number) => ({
-    x: sx / viewport.zoom + viewport.x,
-    y: sy / viewport.zoom + viewport.y,
-  }), [viewport]);
+  // 世界坐标 → SVG user 坐标 (渲染用; 单一真源 worldToSvg)
+  const worldToScreen = useCallback((wx: number, wy: number) => worldToSvg(wx, wy, viewport), [viewport]);
 
-  // 世界坐标 → 屏幕坐标
-  const worldToScreen = useCallback((wx: number, wy: number) => ({
-    x: (wx - viewport.x) * viewport.zoom,
-    y: (wy - viewport.y) * viewport.zoom,
-  }), [viewport]);
+  // 主 SVG 的 rect (坐标换算统一从这里取)
+  const svgRect = useCallback((): RectLike | null => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    return svg.getBoundingClientRect();
+  }, []);
 
   const updateViewport = useCallback((nextViewport: CanvasViewport) => {
     setViewport(nextViewport);
@@ -284,10 +405,10 @@ export function CanvasView(props: CanvasViewProps) {
     if (!highlightElementId) return;
     const el = elements.find((e) => e.id === highlightElementId);
     if (!el) return;
-    // 计算 fit to element
+    // 计算 fit to element (中心对齐视口)
     const targetX = el.x + el.width / 2;
     const targetY = el.y + el.height / 2;
-    setViewport({ x: targetX - 600 / viewport.zoom / 2, y: targetY - 400 / viewport.zoom / 2, zoom: viewport.zoom });
+    setViewport({ x: targetX - CANVAS_VIEWBOX.width / viewport.zoom / 2, y: targetY - CANVAS_VIEWBOX.height / viewport.zoom / 2, zoom: viewport.zoom });
   }, [highlightElementId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // pan / drag 处理
@@ -316,9 +437,11 @@ export function CanvasView(props: CanvasViewProps) {
   const onMouseMove = (e: React.MouseEvent) => {
     const ds = dragState.current;
     if (ds.type === "pan") {
-      const dx = (e.clientX - ds.startX) / viewport.zoom;
-      const dy = (e.clientY - ds.startY) / viewport.zoom;
-      updateViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+      // pan 位移: 客户端像素 → 世界位移 (单一真源 clientDeltaToWorld)
+      const rect = svgRect();
+      if (!rect) return;
+      const d = clientDeltaToWorld(e.clientX - ds.startX, e.clientY - ds.startY, rect, CANVAS_VIEWBOX, viewport);
+      updateViewport({ ...viewport, x: ds.elX - d.x, y: ds.elY - d.y });
     } else if (portDragRef.current) {
       // 端口拖线预览跟随鼠标 (per WBS §23.35)
       const svgPt = svgPointFromClient(e);
@@ -327,10 +450,12 @@ export function CanvasView(props: CanvasViewProps) {
       portDragRef.current = state;
       setPortDrag(state);
     } else if (ds.type === "element" && ds.elId && (!readOnly || onElementPositionChange)) {
-      const dx = (e.clientX - ds.startX) / viewport.zoom;
-      const dy = (e.clientY - ds.startY) / viewport.zoom;
-      const nextX = ds.elX + dx;
-      const nextY = ds.elY + dy;
+      // 物件拖拽 delta: 与绘制/新建同一换算比例 (单一真源)
+      const rect = svgRect();
+      if (!rect) return;
+      const d = clientDeltaToWorld(e.clientX - ds.startX, e.clientY - ds.startY, rect, CANVAS_VIEWBOX, viewport);
+      const nextX = ds.elX + d.x;
+      const nextY = ds.elY + d.y;
       if (onElementPositionChange) {
         const preview = { elementId: ds.elId, x: nextX, y: nextY };
         dragPreviewRef.current = preview;
@@ -396,20 +521,18 @@ export function CanvasView(props: CanvasViewProps) {
     setDragPreview(null);
   };
 
-  // 滚轮 zoom
+  // 滚轮 zoom (以光标为锚点, 换算走单一真源)
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.1, Math.min(4, viewport.zoom * delta));
-    // 以光标为中心
-    if (svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-      const wx = sx / viewport.zoom + viewport.x;
-      const wy = sy / viewport.zoom + viewport.y;
-      updateViewport({ x: wx - sx / newZoom, y: wy - sy / newZoom, zoom: newZoom });
-    }
+    const rect = svgRect();
+    if (!rect) return;
+    // 光标处 SVG user 坐标与对应世界坐标
+    const svgPt = clientToSvg(e, rect, CANVAS_VIEWBOX);
+    const worldPt = svgToWorld(svgPt, viewport);
+    // 保持光标下的世界点不动: viewport.x = world - svg / newZoom
+    updateViewport({ x: worldPt.x - svgPt.x / newZoom, y: worldPt.y - svgPt.y / newZoom, zoom: newZoom });
   };
 
   const onElementMouseDown = (e: React.MouseEvent, el: CanvasElementView) => {
@@ -492,7 +615,7 @@ export function CanvasView(props: CanvasViewProps) {
         // Shift+1 适应全部 / Shift+2 适应选中 (Miro 标准)
         case "!": {
           if (ev.shiftKey) {
-            updateViewport({ x: minX - 40, y: minY - 40, zoom: Math.min(1200 / (maxX - minX + 80), 800 / (maxY - minY + 80), 1) });
+            updateViewport({ x: minX - 40, y: minY - 40, zoom: Math.min(CANVAS_VIEWBOX.width / (maxX - minX + 80), CANVAS_VIEWBOX.height / (maxY - minY + 80), 1) });
           }
           break;
         }
@@ -504,7 +627,7 @@ export function CanvasView(props: CanvasViewProps) {
               const sy = Math.min(...selEls.map((e) => e.y));
               const ex = Math.max(...selEls.map((e) => e.x + e.width));
               const ey = Math.max(...selEls.map((e) => e.y + e.height));
-              updateViewport({ x: sx - 40, y: sy - 40, zoom: Math.min(1200 / (ex - sx + 80), 800 / (ey - sy + 80), 1.5) });
+              updateViewport({ x: sx - 40, y: sy - 40, zoom: Math.min(CANVAS_VIEWBOX.width / (ex - sx + 80), CANVAS_VIEWBOX.height / (ey - sy + 80), 1.5) });
             }
           }
           break;
@@ -577,18 +700,15 @@ export function CanvasView(props: CanvasViewProps) {
   };
 
   /**
-   * SVG client coords -> SVG user-space coords (考虑 viewport.zoom + viewport.x/y)
-   * - 不依赖 onMouseDown only target=svg (svgPtFromClient 也适用于 element 上的事件)
+   * SVG client coords -> 世界坐标 (单一真源 clientToWorld, 含 viewBox 比例 + letterbox)
+   * - 修复「画笔/鼠标偏离」根因: 旧公式缺 viewBox↔rect 比例与 meet letterbox 偏移
+   * - 不依赖 onMouseDown only target=svg (也适用于 element 上的事件)
    * - 不调用 React.hooks (helper function)
    */
-  const svgPointFromClient = (e: React.MouseEvent): { x: number; y: number } | null => {
-    if (!svgRef.current) return null;
-    const rect = svgRef.current.getBoundingClientRect();
-    // svg viewBox = 0 0 1200 800 (固定); 我们用 viewport.x/y/zoom 推导世界坐标
-    return {
-      x: (e.clientX - rect.left) / viewport.zoom + viewport.x,
-      y: (e.clientY - rect.top) / viewport.zoom + viewport.y,
-    };
+  const svgPointFromClient = (e: { clientX: number; clientY: number }): { x: number; y: number } | null => {
+    const rect = svgRect();
+    if (!rect) return null;
+    return clientToWorld(e, rect, CANVAS_VIEWBOX, viewport);
   };
 
   const displayElements = dragPreview
@@ -602,8 +722,8 @@ export function CanvasView(props: CanvasViewProps) {
    * - 本地 store canvas (preview mode) 走 addCanvasElement 直接入 store
    * - frame-select mode 已确定目标 frame 后创建
    */
-  const createElementAt = async (
-    e: React.MouseEvent,
+  const createElementAtWorld = async (
+    world: { x: number; y: number },
     kind: "sticky_note" | "text" | "shape",
     width: number,
     height: number,
@@ -611,8 +731,6 @@ export function CanvasView(props: CanvasViewProps) {
   ) => {
     if (readOnly || !onCreateElement || createPending) return;
     pushUndoSnapshot();
-    const world = { x: e.clientX / viewport.zoom + viewport.x, y: e.clientY / viewport.zoom + viewport.y };
-    if (!world) return;
     setCreateError(null);
     setCreatePending(true);
     try {
@@ -633,6 +751,19 @@ export function CanvasView(props: CanvasViewProps) {
     } finally {
       setCreatePending(false);
     }
+  };
+
+  /** client 事件 → 世界坐标后创建 (坐标换算走 svgPointFromClient = clientToWorld) */
+  const createElementAt = (
+    e: React.MouseEvent,
+    kind: "sticky_note" | "text" | "shape",
+    width: number,
+    height: number,
+    content: CanvasElement["content"] = {},
+  ) => {
+    const world = svgPointFromClient(e);
+    if (!world) return;
+    return createElementAtWorld(world, kind, width, height, content);
   };
 
   /**
@@ -680,6 +811,169 @@ export function CanvasView(props: CanvasViewProps) {
       setCreatePending(false);
     }
   };
+
+  // =====================================================================
+  // 右键菜单 (per canvas-ux 任务 §D: Miro 式情景菜单)
+  // 复用现有 store action / props 回调, 不新造数据; readOnly 时写动作 disabled。
+  // =====================================================================
+
+  /** 删除物件集合 (复用 onDeleteElements 或 deleteCanvasElement, 语义与工具栏一致) */
+  const deleteByIds = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    if (onCreateElement === undefined) pushUndoSnapshot();
+    if (onDeleteElements) void onDeleteElements(ids).catch(() => undefined);
+    else ids.forEach((id) => deleteCanvasElement(id));
+    setSelected([]);
+  }, [onCreateElement, onDeleteElements, deleteCanvasElement, pushUndoSnapshot]);
+
+  /** 复制物件: store 模式 addCanvasElement / 回调模式 onCreateElement (同形状偏移 +24) */
+  const duplicateElement = useCallback((el: CanvasElementView) => {
+    const nextZ = elements.length + 1;
+    if (onCreateElement === undefined) {
+      pushUndoSnapshot();
+      const now = new Date().toISOString();
+      addCanvasElement({
+        ...el,
+        id: `el-${globalThis.crypto.randomUUID()}`,
+        x: el.x + 24,
+        y: el.y + 24,
+        z_index: nextZ,
+        created_by: (el as CanvasElement & { created_by?: string }).created_by ?? "usr-001",
+        created_at: now,
+        updated_at: now,
+      } as CanvasElement);
+    } else {
+      void onCreateElement({
+        kind: el.kind,
+        x: el.x + 24,
+        y: el.y + 24,
+        width: el.width,
+        height: el.height,
+        z_index: nextZ,
+        content: el.content,
+      }).catch(() => undefined);
+    }
+  }, [elements.length, onCreateElement, addCanvasElement, pushUndoSnapshot]);
+
+  /** z_index 调整 (store 模式, 复用 replaceCanvasElements) */
+  const setZIndex = useCallback((id: string, z: number) => {
+    if (onCreateElement !== undefined) return;
+    replaceCanvasElements(elements.map((el) => (el.id === id ? { ...el, z_index: z } : el)));
+  }, [onCreateElement, elements, replaceCanvasElements]);
+
+  const bringToFront = useCallback((id: string) => {
+    const maxZ = elements.reduce((m, e) => Math.max(m, e.z_index), 0);
+    pushUndoSnapshot();
+    setZIndex(id, maxZ + 1);
+  }, [elements, pushUndoSnapshot, setZIndex]);
+
+  const sendToBack = useCallback((id: string) => {
+    const minZ = elements.reduce((m, e) => Math.min(m, e.z_index), 0);
+    pushUndoSnapshot();
+    setZIndex(id, minZ - 1);
+  }, [elements, pushUndoSnapshot, setZIndex]);
+
+  const bringSelectionToFront = useCallback((ids: string[]) => {
+    if (onCreateElement !== undefined) return;
+    let maxZ = elements.reduce((m, e) => Math.max(m, e.z_index), 0);
+    pushUndoSnapshot();
+    replaceCanvasElements(elements.map((el) => (ids.includes(el.id) ? { ...el, z_index: ++maxZ } : el)));
+  }, [onCreateElement, elements, pushUndoSnapshot, replaceCanvasElements]);
+
+  /** 此处缩放重置: 光标下的世界点保持不动, zoom → 1 */
+  const resetZoomAt = useCallback((client: { clientX: number; clientY: number }) => {
+    const rect = svgRect();
+    if (!rect) return;
+    const svgPt = clientToSvg(client, rect, CANVAS_VIEWBOX);
+    const worldPt = svgToWorld(svgPt, viewport);
+    updateViewport({ x: worldPt.x - svgPt.x, y: worldPt.y - svgPt.y, zoom: 1 });
+  }, [svgRect, viewport, updateViewport]);
+
+  /** 单物件 / 多选 情景菜单 */
+  const openElementMenu = useCallback((e: React.MouseEvent, el: CanvasElementView) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const storeMode = onCreateElement === undefined;
+    const isMulti = selected.length > 1 && selected.includes(el.id);
+    if (!isMulti) setSelected([el.id]);
+
+    if (isMulti) {
+      const selEls = elements.filter((x) => selected.includes(x.id));
+      const anyLocked = selEls.some((x) => x.locked);
+      const items: ContextMenuItem[] = [
+        { id: "delete", label: L.deleteSelection, danger: true, disabled: readOnly || anyLocked, onSelect: () => deleteByIds(selected) },
+        { id: "bring-to-front", label: L.bringSelectionToFront, disabled: readOnly || !storeMode, onSelect: () => bringSelectionToFront(selected) },
+      ];
+      openMenu(e, items);
+      return;
+    }
+
+    const editable = el.kind === "text" || el.kind === "sticky_note";
+    const items: ContextMenuItem[] = [
+      {
+        id: "edit",
+        label: L.edit,
+        disabled: readOnly || !editable || el.locked,
+        onSelect: () => {
+          setEditingId(el.id);
+          setEditingText(el.content.text ?? "");
+        },
+      },
+      { id: "duplicate", label: L.duplicate, disabled: readOnly || el.locked, onSelect: () => duplicateElement(el) },
+      { id: "delete", label: L.delete, danger: true, disabled: readOnly || el.locked, onSelect: () => deleteByIds([el.id]) },
+      { id: "sep-layer", label: "", separator: true },
+      { id: "bring-to-front", label: L.bringToFront, disabled: readOnly || !storeMode || el.locked, onSelect: () => bringToFront(el.id) },
+      { id: "send-to-back", label: L.sendToBack, disabled: readOnly || !storeMode || el.locked, onSelect: () => sendToBack(el.id) },
+      { id: "sep-state", label: "", separator: true },
+      { id: "toggle-lock", label: el.locked ? L.unlock : L.lock, disabled: readOnly || !storeMode, onSelect: () => toggleLayerLock(el.id) },
+      { id: "toggle-visible", label: el.hidden ? L.show : L.hide, disabled: readOnly || !storeMode, onSelect: () => toggleLayerVisible(el.id) },
+    ];
+    openMenu(e, items);
+  }, [L, selected, elements, readOnly, onCreateElement, deleteByIds, duplicateElement, bringToFront, sendToBack, bringSelectionToFront, toggleLayerLock, toggleLayerVisible, openMenu]);
+
+  /** 空白处情景菜单 */
+  const openBlankMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const world = svgPointFromClient(e);
+    if (!world) return;
+    const items: ContextMenuItem[] = [
+      // 剪贴板状态尚未接入 → 诚实 disabled + 原因
+      { id: "paste", label: L.paste, disabled: true, disabledReason: L.pasteUnavailable },
+      { id: "sep-create", label: "", separator: true },
+      {
+        id: "new-sticky",
+        label: L.newSticky,
+        disabled: readOnly || !onCreateElement,
+        onSelect: () => void createElementAtWorld(world, "sticky_note", 180, 100, { color: STICKY_PALETTE[0], text: "" }),
+      },
+      {
+        id: "new-text",
+        label: L.newText,
+        disabled: readOnly || !onCreateElement,
+        onSelect: () => void createElementAtWorld(world, "text", 200, 60, { text: "" }),
+      },
+      {
+        id: "new-shape",
+        label: L.newShape,
+        disabled: readOnly || !onCreateElement,
+        onSelect: () => void createElementAtWorld(world, "shape", 120, 120, { shape_kind: shapeKind }),
+      },
+      { id: "sep-view", label: "", separator: true },
+      { id: "reset-zoom-here", label: L.resetZoomHere, onSelect: () => resetZoomAt(e) },
+    ];
+    openMenu(e, items);
+  }, [L, readOnly, onCreateElement, shapeKind, resetZoomAt, createElementAtWorld, svgPointFromClient, openMenu]);
+
+  /** 连接线情景菜单: store 无 deleteCanvasConnector / 改色路径 → 诚实 disabled */
+  const openConnectorMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const items: ContextMenuItem[] = [
+      { id: "delete-connector", label: L.deleteConnector, danger: true, disabled: true, disabledReason: L.connectorMenuPending },
+      { id: "connector-color", label: L.connectorColor, disabled: true, disabledReason: L.connectorMenuPending },
+    ];
+    openMenu(e, items);
+  }, [L, openMenu]);
 
   // =====================================================================
   // 输入/输出端点渲染 (per WBS §23.35)
@@ -1040,7 +1334,15 @@ export function CanvasView(props: CanvasViewProps) {
     const midScreenX = (fx_s + tx_s) / 2;
     const midScreenY = (fy_s + ty_s) / 2;
     return (
-      <g key={c.id}>
+      <g key={c.id} onContextMenu={(e) => openConnectorMenu(e)} data-testid={`canvas-connector-${c.id}`}>
+        {/* 加宽透明命中区 (右键好点中细线) */}
+        <path
+          d={screenPath}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={Math.max(12, c.width * viewport.zoom * 2)}
+          style={{ pointerEvents: "stroke", cursor: "context-menu" }}
+        />
         <path
           d={screenPath}
           fill="none"
@@ -1066,11 +1368,11 @@ export function CanvasView(props: CanvasViewProps) {
   const allY = displayElements.map((e) => e.y);
   const minX = allX.length > 0 ? Math.min(...allX) - 100 : 0;
   const minY = allY.length > 0 ? Math.min(...allY) - 100 : 0;
-  const maxX = allX.length > 0 ? Math.max(...allX.map((x, i) => x + displayElements[i].width)) + 100 : 1200;
-  const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + displayElements[i].height)) + 100 : 800;
+  const maxX = allX.length > 0 ? Math.max(...allX.map((x, i) => x + displayElements[i].width)) + 100 : CANVAS_VIEWBOX.width;
+  const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + displayElements[i].height)) + 100 : CANVAS_VIEWBOX.height;
 
   return (
-    <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
+    <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden select-none">
       {/* Toolbar */}
       <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-soft">
         <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasSelect}>
@@ -1203,7 +1505,7 @@ export function CanvasView(props: CanvasViewProps) {
         </button>
         <button onClick={() => {
           // fit to content
-          updateViewport({ x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) });
+          updateViewport({ x: minX, y: minY, zoom: Math.min(CANVAS_VIEWBOX.width / (maxX - minX), CANVAS_VIEWBOX.height / (maxY - minY), 1) });
         }} className="btn p-1.5" title={t.ariaLabels.canvasFit}>
           <Maximize2 size={14} />
         </button>
@@ -1295,7 +1597,7 @@ export function CanvasView(props: CanvasViewProps) {
                 }
               }}
               data-testid="canvas-edit-textarea"
-              className="w-full h-full resize-none rounded border-2 border-accent bg-bg-card text-ink text-sm p-1.5 focus:outline-none shadow-soft"
+              className="w-full h-full resize-none rounded border-2 border-accent bg-bg-card text-ink text-sm p-1.5 focus:outline-none shadow-soft select-text"
               style={{ fontSize: 14 * viewport.zoom, lineHeight: 1.3 }}
             />
             <p className="absolute -bottom-5 left-0 text-[9px] font-mono text-ink-mute bg-bg-card/90 px-1 rounded">
@@ -1309,7 +1611,7 @@ export function CanvasView(props: CanvasViewProps) {
       <svg
         ref={svgRef}
         data-testid="canvas-svg"
-        viewBox="0 0 1200 800"
+        viewBox={`${CANVAS_VIEWBOX.x} ${CANVAS_VIEWBOX.y} ${CANVAS_VIEWBOX.width} ${CANVAS_VIEWBOX.height}`}
         className="w-full h-full"
         style={{ cursor: tool === "pan" || spacePanning ? "grab" : "default", backgroundColor: "var(--cel-surface-stage, var(--color-surface))", backgroundImage: "radial-gradient(circle, var(--cel-ink, var(--color-border)) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
         onMouseDown={onMouseDown}
@@ -1317,6 +1619,11 @@ export function CanvasView(props: CanvasViewProps) {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         onWheel={onWheel}
+        onContextMenu={(e) => {
+          // 空白处右键 → 情景菜单 (物件/连接线已 stopPropagation, 不会走到这里)
+          if ((e.target as Element).tagName?.toLowerCase() !== "svg") return;
+          openBlankMenu(e);
+        }}
         onClick={(e) => {
           // 新增元素工具 (sticky / text / shape) 在 SVG 空白区点击触发
           // - 仅 write mode (非 readOnly + 有 onCreateElement)
@@ -1356,8 +1663,9 @@ export function CanvasView(props: CanvasViewProps) {
         {portDrag && (() => {
           const from = displayElements.find((e) => e.id === portDrag.fromElementId);
           if (!from) return null;
-          const fx = (from.x + from.width - viewport.x) * viewport.zoom;
-          const fy = (from.y + from.height / 2 - viewport.y) * viewport.zoom;
+          const fromPos = worldToScreen(from.x + from.width, from.y + from.height / 2);
+          const fx = fromPos.x;
+          const fy = fromPos.y;
           const cx1 = fx + Math.max(40, (portDrag.x - fx) * 0.4);
           const cx2 = portDrag.x - Math.max(40, (portDrag.x - fx) * 0.4);
           return (
@@ -1388,7 +1696,7 @@ export function CanvasView(props: CanvasViewProps) {
 
         {/* Element */}
         {displayElements.map((el) => (
-          <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
+          <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)} onContextMenu={(e) => openElementMenu(e, el)}>
             {renderElement(el)}
           </g>
         ))}
@@ -1457,8 +1765,8 @@ export function CanvasView(props: CanvasViewProps) {
           <rect
             x={viewport.x}
             y={viewport.y}
-            width={1200 / viewport.zoom}
-            height={800 / viewport.zoom}
+            width={CANVAS_VIEWBOX.width / viewport.zoom}
+            height={CANVAS_VIEWBOX.height / viewport.zoom}
             fill="none"
             stroke="var(--cel-cyan, var(--color-primary))"
             strokeWidth={2}
@@ -1477,6 +1785,9 @@ export function CanvasView(props: CanvasViewProps) {
         <span>connectors {connectors.length}</span>
         <span>selected {selected.length}</span>
       </div>
+
+      {/* 共享右键菜单 (portal 到 body, 避开画布层叠) */}
+      <ContextMenu state={menu} onClose={closeMenu} />
     </div>
   );
 }

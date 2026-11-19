@@ -10,6 +10,20 @@ MERGE (addUtcCalendarDays:Function {name:"addUtcCalendarDays", language:"typescr
 MERGE (self)-[:IMPORTS]->(dateUtils)
 MERGE (ganttChart)-[:CALLS]->(toUtcCalendarDate)
 MERGE (ganttChart)-[:CALLS]->(addUtcCalendarDays)
+MERGE (openSprintMenu:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::openSprintMenu",kind:"function"})
+MERGE (openMilestoneMenu:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::openMilestoneMenu",kind:"function"})
+MERGE (openWorkItemMenu:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::openWorkItemMenu",kind:"function"})
+MERGE (openRowLabelMenu:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::openRowLabelMenu",kind:"function"})
+MERGE (openBlankMenu:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::openBlankMenu",kind:"function"})
+MERGE (scrollToToday:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::scrollToToday",kind:"function"})
+MERGE (zoomToFit:Symbol {id:"frontend/src/components/gantt/GanttChart.tsx::zoomToFit",kind:"function"})
+MERGE (self)-[:DEFINES]->(openSprintMenu)
+MERGE (self)-[:DEFINES]->(openMilestoneMenu)
+MERGE (self)-[:DEFINES]->(openWorkItemMenu)
+MERGE (self)-[:DEFINES]->(openRowLabelMenu)
+MERGE (self)-[:DEFINES]->(openBlankMenu)
+MERGE (self)-[:DEFINES]->(scrollToToday)
+MERGE (self)-[:DEFINES]->(zoomToFit)
 MERGE (self)-[:DEFINES]->(ganttChart)
 @endcypher
 */
@@ -38,16 +52,95 @@ MERGE (self)-[:DEFINES]->(ganttChart)
 //   - 浮动窗口内完整甘特图 (同 props, 可拖拽缩放精细操作)
 // =====================================================================
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
+import toast from "react-hot-toast";
 import { addUtcCalendarDays, toUtcCalendarDate } from "@/lib/gantt/dateUtils";
 import type { Sprint, Milestone, WorkItem, WorkItemStatus, SprintStatus } from "@/types/ids";
 import { GanttBar, type GanttBarStatus } from "./GanttBar";
 import { GanttHeader } from "./GanttHeader";
 import { GanttLegend } from "./GanttLegend";
 import { useTranslation, interpolate } from "@/lib/i18n";
+import { ContextMenu, type ContextMenuItem } from "../context-menu/ContextMenu";
+import { useContextMenu } from "../context-menu/useContextMenu";
+import { CONTEXT_MENU_MESSAGES, uiLangOf, type UiLang } from "../context-menu/messages";
+import { copyText } from "../context-menu/clipboard";
+import { transitionMilestone, transitionWorkItemSprint } from "./ganttActions";
+
+/** 甘特右键菜单文案 (三语; 不碰共享 dictionary, 按 useTranslation().language 取值) */
+interface GanttMenuLabels {
+  viewSprint: string;
+  viewMilestone: string;
+  openDetail: string;
+  copyKey: string;
+  changeDueDate: string;
+  goToToday: string;
+  moveToSprint: string;
+  noOtherSprint: string;
+  collapse: string;
+  expand: string;
+  collapseUnavailable: string;
+  zoomToFitAll: string;
+  dueDateRecorded: string;
+  sprintMoveRecorded: string;
+  copied: string;
+}
+
+const GANTT_MENU_LABELS: Record<UiLang, GanttMenuLabels> = {
+  "zh-CN": {
+    viewSprint: "查看 sprint",
+    viewMilestone: "查看里程碑",
+    openDetail: "打开详情",
+    copyKey: "复制 key",
+    changeDueDate: "改截止日期",
+    goToToday: "回到今天",
+    moveToSprint: "移到 sprint",
+    noOtherSprint: "没有其他 sprint 可选",
+    collapse: "折叠",
+    expand: "展开",
+    collapseUnavailable: "折叠/展开状态待接入",
+    zoomToFitAll: "缩放到全部",
+    dueDateRecorded: "已记录: 里程碑改期待服务端接入 (当前可直接拖动里程碑条形改期)",
+    sprintMoveRecorded: "已记录: 任务移动待服务端接入 (当前可拖拽任务条跨 sprint)",
+    copied: "已复制到剪贴板",
+  },
+  en: {
+    viewSprint: "View sprint",
+    viewMilestone: "View milestone",
+    openDetail: "Open detail",
+    copyKey: "Copy key",
+    changeDueDate: "Change due date",
+    goToToday: "Go to today",
+    moveToSprint: "Move to sprint",
+    noOtherSprint: "No other sprint available",
+    collapse: "Collapse",
+    expand: "Expand",
+    collapseUnavailable: "Collapse/expand state not wired yet",
+    zoomToFitAll: "Zoom to fit all",
+    dueDateRecorded: "Recorded: milestone due-date change awaits backend (drag the milestone bar to reschedule now)",
+    sprintMoveRecorded: "Recorded: work-item move awaits backend (drag the bar across sprints now)",
+    copied: "Copied to clipboard",
+  },
+  ja: {
+    viewSprint: "スプリントを表示",
+    viewMilestone: "マイルストーンを表示",
+    openDetail: "詳細を開く",
+    copyKey: "キーをコピー",
+    changeDueDate: "期日を変更",
+    goToToday: "今日へ移動",
+    moveToSprint: "スプリントへ移動",
+    noOtherSprint: "他のスプリントがありません",
+    collapse: "折りたたむ",
+    expand: "展開",
+    collapseUnavailable: "折りたたみ/展開は未接続",
+    zoomToFitAll: "全体を表示",
+    dueDateRecorded: "記録済み: 期日変更はバックエンド接続待ち (バーをドラッグして今は変更可能)",
+    sprintMoveRecorded: "記録済み: タスク移動はバックエンド接続待ち (バーをドラッグして移動可能)",
+    copied: "クリップボードにコピーしました",
+  },
+};
 
 export type ZoomLevel = "week" | "month" | "quarter";
 
@@ -208,7 +301,10 @@ export function GanttChart(props: GanttChartProps) {
   // (per 2026-08-29 17:33 JST 增强, 避免 dependency 冲突)
   // 注: useTranslation hook 在外面拿, 这里直接调 t.gantt.conflictPredecessor
   // 整个 hook 链需要 ref 因为 conflict message 依赖语言 (per 2026-08-31 v0.3)
-  const { t: i18nT } = useTranslation();
+  const { t: i18nT, language } = useTranslation();
+  const lang = uiLangOf(language);
+  const L = GANTT_MENU_LABELS[lang];
+  const msg = CONTEXT_MENU_MESSAGES[lang];
   const checkWorkItemConflict = useCallback(
     (workItemId: string, newStart: string, _newEnd: string): string | null => {
       // 找 workItem 的所有 predecessor
@@ -259,6 +355,123 @@ export function GanttChart(props: GanttChartProps) {
     },
     [router],
   );
+
+  // =====================================================================
+  // 右键情景菜单 (per canvas-ux 任务 §E)
+  // - stub 动作 (transitionMilestone / transitionWorkItemSprint) 只记录不冒充写入,
+  //   触发后给诚实 toast; 纯前端动作 (查看/复制/定位/缩放) 直接完成。
+  // - 折叠/展开无现有 state → disabled + 原因, 报告列父代理待办。
+  // =====================================================================
+  const { menu, openMenu, closeMenu } = useContextMenu();
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  /** 时间线滚动到今天 (纯前端) */
+  const scrollToToday = useCallback(() => {
+    const container = timelineRef.current;
+    if (!container) return;
+    const offsetPx = Math.max(0, differenceInDays(new Date(), start)) * pxPerDay;
+    container.scrollLeft = Math.max(0, offsetPx - 60);
+  }, [start, pxPerDay]);
+
+  /** 缩放到全部: 选一个 pxPerDay ≤ 容器宽/总天数的缩放级别 (纯前端) */
+  const zoomToFit = useCallback(() => {
+    const container = timelineRef.current;
+    const width = container?.clientWidth ?? 1200;
+    const level = ZOOM_ORDER.find((z) => PX_PER_DAY[z] * totalDays <= width) ?? "quarter";
+    setZoom(level);
+  }, [totalDays]);
+
+  /** 复制 key/id 到剪贴板 + 诚实 toast */
+  const copyKeyWithToast = useCallback(async (key: string) => {
+    const ok = await copyText(key);
+    if (ok) toast.success(L.copied);
+    else toast.error(msg.copyFailed);
+  }, [L, msg]);
+
+  /** sprint 条右键: 查看 / 复制 key (Sprint 类型无 key 字段 → 有则取, 无则回退 id) */
+  const openSprintMenu = useCallback((e: React.MouseEvent, sp: Sprint) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = (sp as Sprint & { key?: string }).key ?? sp.id;
+    const items: ContextMenuItem[] = [
+      { id: "view-sprint", label: L.viewSprint, onSelect: () => handleSprintClick(sp.id) },
+      { id: "copy-sprint-key", label: L.copyKey, onSelect: () => void copyKeyWithToast(key) },
+    ];
+    openMenu(e, items);
+  }, [L, handleSprintClick, copyKeyWithToast, openMenu]);
+
+  /** 里程碑条右键: 查看 / 复制 key / 改截止日期 (stub + 诚实 toast) / 定位到今天 */
+  const openMilestoneMenu = useCallback((e: React.MouseEvent, ms: Milestone) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = (ms as Milestone & { key?: string }).key ?? ms.id;
+    const items: ContextMenuItem[] = [
+      { id: "view-milestone", label: L.viewMilestone, onSelect: () => handleMilestoneClick(ms.id) },
+      { id: "copy-milestone-key", label: L.copyKey, onSelect: () => void copyKeyWithToast(key) },
+      {
+        id: "change-due-date",
+        label: L.changeDueDate,
+        onSelect: () => {
+          transitionMilestone(ms.id, ms.due_date);
+          toast(L.dueDateRecorded);
+        },
+      },
+      { id: "go-to-today", label: L.goToToday, onSelect: () => scrollToToday() },
+    ];
+    openMenu(e, items);
+  }, [L, handleMilestoneClick, copyKeyWithToast, scrollToToday, openMenu]);
+
+  /** 任务条 (work-item mini bar) 右键: 打开详情 / 复制 key / 移到各 sprint (stub + 诚实 toast) */
+  const openWorkItemMenu = useCallback((e: React.MouseEvent, wi: WorkItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const others = sprints.filter((s) => s.id !== wi.sprint_id);
+    const moveItems: ContextMenuItem[] = others.length === 0
+      ? [{ id: "move-to-sprint-none", label: `${L.moveToSprint} — ${L.noOtherSprint}`, disabled: true, disabledReason: L.noOtherSprint }]
+      : others.map((s) => ({
+          id: `move-to-sprint-${s.id}`,
+          label: `${L.moveToSprint} → ${s.name}`,
+          onSelect: () => {
+            transitionWorkItemSprint(wi.id, s.id);
+            toast(L.sprintMoveRecorded);
+          },
+        }));
+    const items: ContextMenuItem[] = [
+      { id: "open-work-item", label: L.openDetail, onSelect: () => router.push(`/work-item?selected=${wi.id}`) },
+      { id: "copy-work-item-key", label: L.copyKey, onSelect: () => void copyKeyWithToast(wi.key ?? wi.id) },
+      { id: "sep-move", label: "", separator: true },
+      ...moveItems,
+    ];
+    openMenu(e, items);
+  }, [L, sprints, router, copyKeyWithToast, openMenu]);
+
+  /** 行标签右键: 折叠/展开无现有 state → disabled + 诚实原因 (父代理待办) */
+  const openRowLabelMenu = useCallback((e: React.MouseEvent, kind: "sprint" | "milestone", targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const items: ContextMenuItem[] = [
+      kind === "sprint"
+        ? { id: "view-sprint", label: L.viewSprint, onSelect: () => handleSprintClick(targetId) }
+        : { id: "view-milestone", label: L.viewMilestone, onSelect: () => handleMilestoneClick(targetId) },
+      { id: "sep-collapse", label: "", separator: true },
+      { id: "collapse-row", label: L.collapse, disabled: true, disabledReason: L.collapseUnavailable },
+      { id: "expand-row", label: L.expand, disabled: true, disabledReason: L.collapseUnavailable },
+    ];
+    openMenu(e, items);
+  }, [L, handleSprintClick, handleMilestoneClick, openMenu]);
+
+  /** 甘特空白右键: 缩放到全部 / 回到今天 (纯前端) */
+  const openBlankMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // bar / work-item 条上不冒泡到空白菜单 (它们的 handler 已 stopPropagation, 这里兜底)
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("[data-gantt-bar], [data-work-item-id], [data-row-label-kind]")) return;
+    const items: ContextMenuItem[] = [
+      { id: "zoom-to-fit-all", label: L.zoomToFitAll, onSelect: () => zoomToFit() },
+      { id: "go-to-today", label: L.goToToday, onSelect: () => scrollToToday() },
+    ];
+    openMenu(e, items);
+  }, [L, zoomToFit, scrollToToday, openMenu]);
 
   return (
     <>
@@ -320,7 +533,7 @@ export function GanttChart(props: GanttChartProps) {
       <div className="flex border border-line rounded overflow-hidden bg-bg-soft/30">
         {/* Y-axis (fixed 200px) */}
         <div
-          className="w-[200px] flex-shrink-0 border-r border-line bg-bg-soft/50"
+          className="w-[200px] flex-shrink-0 border-r border-line bg-bg-soft/50 select-none"
           data-testid="gantt-yaxis"
         >
           <div className="h-10 border-b border-line bg-bg-soft/80 flex items-center px-2 text-[10px] uppercase tracking-wider text-ink-mute">
@@ -333,6 +546,7 @@ export function GanttChart(props: GanttChartProps) {
               data-row-label-id={sp.id}
               className="h-12 px-2 py-1 border-b border-line/50 flex flex-col justify-center cursor-pointer hover:bg-bg-soft/60"
               onClick={() => handleSprintClick(sp.id)}
+              onContextMenu={(e) => openRowLabelMenu(e, "sprint", sp.id)}
             >
               <div className="text-[11px] font-medium text-ink truncate">{sp.name}</div>
               <div className="text-[9px] text-ink-mute truncate">{sp.status}</div>
@@ -352,6 +566,7 @@ export function GanttChart(props: GanttChartProps) {
                 data-row-critical={critical ? "true" : "false"}
                 className="h-10 px-2 py-1 border-b border-line/50 flex flex-col justify-center cursor-pointer hover:bg-bg-soft/60"
                 onClick={() => handleMilestoneClick(ms.id)}
+                onContextMenu={(e) => openRowLabelMenu(e, "milestone", ms.id)}
               >
                 <div className={`text-[11px] font-medium truncate ${critical ? "text-err" : "text-ink"}`}>
                   ◆ {ms.name}
@@ -366,6 +581,7 @@ export function GanttChart(props: GanttChartProps) {
 
         {/* Timeline area (scrollable) — 双击空白区打开浮动窗口 */}
         <div
+          ref={timelineRef}
           className="flex-1 overflow-x-auto"
           data-testid="gantt-timeline"
           onDoubleClick={(e) => {
@@ -374,6 +590,7 @@ export function GanttChart(props: GanttChartProps) {
             const isBar = target.closest("[data-gantt-bar]") || target.closest("[data-work-item-id]");
             if (!isBar) openModal();
           }}
+          onContextMenu={openBlankMenu}
         >
           <div style={{ width: totalWidth, minWidth: "100%" }}>
             <GanttHeader
@@ -381,6 +598,14 @@ export function GanttChart(props: GanttChartProps) {
               totalDays={totalDays}
               pxPerDay={pxPerDay}
               zoom={zoom}
+              onContextMenu={(e) => {
+                // 列头右键: 折叠/展开无现有 state → disabled + 诚实原因
+                e.preventDefault();
+                openMenu(e, [
+                  { id: "collapse-header", label: L.collapse, disabled: true, disabledReason: L.collapseUnavailable },
+                  { id: "expand-header", label: L.expand, disabled: true, disabledReason: L.collapseUnavailable },
+                ]);
+              }}
             />
 
             {/* Sprint rows */}
@@ -406,6 +631,7 @@ export function GanttChart(props: GanttChartProps) {
                     variant="sprint"
                     onCheckConflict={undefined /* sprint 不检查 predecessor, 见 workItem 渲染分支 */}
                     onClick={() => handleSprintClick(sp.id)}
+                    onContextMenu={(e) => openSprintMenu(e, sp)}
                     onDragEnd={(newStart, newEnd) => {
                       onSprintUpdate?.(sp.id, newStart, newEnd);
                     }}
@@ -421,6 +647,7 @@ export function GanttChart(props: GanttChartProps) {
                         e.dataTransfer.setData("text/work-item-id", wi.id);
                         e.dataTransfer.effectAllowed = "move";
                       }}
+                      onContextMenu={(e) => openWorkItemMenu(e, wi)}
                       className="absolute h-3 text-[8px] text-white px-1 cursor-grab rounded-sm select-none"
                       style={{
                         top: 32,
@@ -481,6 +708,7 @@ export function GanttChart(props: GanttChartProps) {
                     variant="milestone"
                     isCritical={critical}
                     onClick={() => handleMilestoneClick(ms.id)}
+                    onContextMenu={(e) => openMilestoneMenu(e, ms)}
                     onDragEnd={(newStart) => {
                       onMilestoneUpdate?.(ms.id, newStart);
                     }}
@@ -784,6 +1012,9 @@ export function GanttChart(props: GanttChartProps) {
       </div>,
       document.body
     )}
+
+    {/* 共享右键菜单 (portal 到 body) */}
+    <ContextMenu state={menu} onClose={closeMenu} />
     </>
   );
 }

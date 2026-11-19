@@ -1,3 +1,12 @@
+/*
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"frontend/src/components/gantt/GanttHeader.tsx"})
+MERGE (props:Type {id:"frontend/src/components/gantt/GanttHeader.tsx::GanttHeaderProps",kind:"interface"})
+MERGE (header:Symbol {id:"frontend/src/components/gantt/GanttHeader.tsx::GanttHeader",kind:"component"})
+MERGE (self)-[:DEFINES]->(props)
+MERGE (self)-[:DEFINES]->(header)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -14,9 +23,11 @@ export interface GanttHeaderProps {
   totalDays: number;
   pxPerDay: number;
   zoom: ZoomLevel;
+  /** 列头右键情景菜单 (per canvas-ux 任务 §E) — 由 GanttChart 分派 */
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export function GanttHeader({ start, totalDays, pxPerDay, zoom }: GanttHeaderProps) {
+export function GanttHeader({ start, totalDays, pxPerDay, zoom, onContextMenu }: GanttHeaderProps) {
   const totalWidth = totalDays * pxPerDay;
   const cells: Array<{ key: string; left: number; width: number; label: string; sub?: string }> = [];
 
@@ -66,8 +77,9 @@ export function GanttHeader({ start, totalDays, pxPerDay, zoom }: GanttHeaderPro
       data-testid="gantt-header"
       data-zoom={zoom}
       data-px-per-day={pxPerDay}
-      className="h-10 border-b border-line relative bg-bg-soft/40"
+      className="h-10 border-b border-line relative bg-bg-soft/40 select-none"
       style={{ width: totalWidth }}
+      onContextMenu={onContextMenu}
     >
       {cells.map((c) => (
         <div

@@ -1,3 +1,14 @@
+/*
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"frontend/src/components/gantt/GanttBar.tsx"})
+MERGE (props:Type {id:"frontend/src/components/gantt/GanttBar.tsx::GanttBarProps",kind:"interface"})
+MERGE (item:Type {id:"frontend/src/components/gantt/GanttBar.tsx::GanttBarItem",kind:"interface"})
+MERGE (bar:Symbol {id:"frontend/src/components/gantt/GanttBar.tsx::GanttBar",kind:"component"})
+MERGE (self)-[:DEFINES]->(props)
+MERGE (self)-[:DEFINES]->(item)
+MERGE (self)-[:DEFINES]->(bar)
+@endcypher
+*/
 "use client";
 
 // =====================================================================
@@ -51,6 +62,11 @@ export interface GanttBarProps {
   variant?: "sprint" | "milestone" | "work-item";
   isCritical?: boolean;
   onClick?: () => void;
+  /**
+   * 右键情景菜单 (per canvas-ux 任务 §E) — 由父级 (GanttChart) 分派情景,
+   * 本组件只转发事件。
+   */
+  onContextMenu?: (e: React.MouseEvent) => void;
   /** (newStart ISO, newEnd ISO) — parent 决定是否接受 */
   onDragEnd?: (newStart: string, newEnd: string) => void;
   /**
@@ -100,6 +116,7 @@ export function GanttBar(props: GanttBarProps) {
     variant = "sprint",
     isCritical = false,
     onClick,
+    onContextMenu,
     onDragEnd,
     onCheckConflict,
   } = props;
@@ -277,6 +294,8 @@ export function GanttBar(props: GanttBarProps) {
   return (
     <div
       data-testid="gantt-bar"
+      data-gantt-bar="true"
+      data-gantt-bar-id={`${variant}-${item.id}`}
       data-bar-id={item.id}
       data-bar-status={item.status}
       data-bar-variant={variant}
@@ -293,6 +312,7 @@ export function GanttBar(props: GanttBarProps) {
         // 实际 handle 元素的 dataset.mode = resize-left/right, move 区域 = move
         handleMouseDown(e);
       }}
+      onContextMenu={onContextMenu}
       onClick={(e) => {
         // 拖动结束的 click 不触发
         if (lastDeltaRef.current !== 0) {
