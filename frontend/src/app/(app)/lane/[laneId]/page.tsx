@@ -16,7 +16,7 @@ MERGE (self)-[:DEFINES]->(page)
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CheckCircle, Layers, Link2, Monitor, Plus, RefreshCw } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -28,7 +28,6 @@ import {
   canonicalLaneWorktreeHref,
   type AuthorizedRunLane,
   type LaneWorktree,
-  type RunDirectoryApiClient,
 } from "@/lib/run/runDirectoryApi";
 import { useTranslation } from "@/lib/i18n";
 
@@ -193,7 +192,7 @@ export default function LaneDetailPage() {
     };
   }, [client, demo, laneId, realProjectId, refreshKey]);
 
-  async function attachWorktree(event: React.FormEvent<HTMLFormElement>) {
+  async function attachWorktree(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client || demo || !realProjectId || attachBusy) return;
     const worktreeId = attachValue.trim();
