@@ -52,6 +52,34 @@ MERGE (self)-[:DEFINES]->(biItem)
 MERGE (biList)-[:CALLS]->(request)
 MERGE (biList)-[:CALLS]->(biPage)
 MERGE (biPage)-[:CALLS]->(biItem)
+// P0-lane: Lane 服务端实体方法
+MERGE (listLanes:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listLanes",kind:"method"})
+MERGE (createLane:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.createLane",kind:"method"})
+MERGE (listLaneWt:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.listLaneWorktrees",kind:"method"})
+MERGE (attachWt:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::RunDirectoryApiClient.attachWorktreeToLane",kind:"method"})
+MERGE (mapLane:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapLane",kind:"function"})
+MERGE (mapLaneWt:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::mapLaneWorktree",kind:"function"})
+MERGE (laneHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalLaneHref",kind:"function"})
+MERGE (laneWtHref:Symbol {id:"frontend/src/lib/run/runDirectoryApi.ts::canonicalLaneWorktreeHref",kind:"function"})
+MERGE (laneType:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::AuthorizedRunLane",kind:"interface"})
+MERGE (laneWtType:Type {id:"frontend/src/lib/run/runDirectoryApi.ts::LaneWorktree",kind:"interface"})
+MERGE (self)-[:DEFINES]->(listLanes)
+MERGE (self)-[:DEFINES]->(createLane)
+MERGE (self)-[:DEFINES]->(listLaneWt)
+MERGE (self)-[:DEFINES]->(attachWt)
+MERGE (self)-[:DEFINES]->(mapLane)
+MERGE (self)-[:DEFINES]->(mapLaneWt)
+MERGE (self)-[:DEFINES]->(laneHref)
+MERGE (self)-[:DEFINES]->(laneWtHref)
+MERGE (self)-[:DEFINES]->(laneType)
+MERGE (self)-[:DEFINES]->(laneWtType)
+MERGE (listLanes)-[:CALLS]->(request)
+MERGE (createLane)-[:CALLS]->(request)
+MERGE (listLaneWt)-[:CALLS]->(request)
+MERGE (attachWt)-[:CALLS]->(request)
+MERGE (listLanes)-[:CALLS]->(mapLane)
+MERGE (createLane)-[:CALLS]->(mapLane)
+MERGE (listLaneWt)-[:CALLS]->(mapLaneWt)
 @endcypher
 */
 /* CYPHER STRUCTURE MANIFEST
@@ -115,6 +143,20 @@ export interface RunWorktree {
   agent_id: string | null; agent_session_id: string | null; runtime_id: string | null;
   archived: boolean; version: number; binding_id: string; binding_version: number;
   project_binding_id: string; project_binding_version: number;
+}
+/** 服务端 Lane 实体 (P0-lane): 无远端关联也能存在, repository_binding/branch_binding 为 null = 未绑定 */
+export interface AuthorizedRunLane {
+  lane_id: string; project_id: string; name: string; description: string | null;
+  created_by: string; lock_version: number; created_at: string; updated_at: string;
+  repository_binding: string | null; branch_binding: string | null;
+}
+/** Lane 维度 Worktree (P0-lane): engineering_run_id 为 null = 未挂 Run (诚实标注, 不伪造) */
+export interface LaneWorktree {
+  worktree_id: string; lane_id: string; project_id: string; repository_id: string;
+  name: string; branch: string; human_state: string; machine_state: string;
+  runtime_id: string | null; agent_id: string | null; agent_session_id: string | null;
+  archived: boolean; version: number; binding_id: string; binding_version: number;
+  engineering_run_id: string | null;
 }
 export interface RunAuthorization { binding_id: string; role: string; version: number }
 export interface RunContextEnvelope {
@@ -332,6 +374,37 @@ function mapWorktree(value: unknown): RunWorktree {
     archived: boolean(row.archived), version: positiveVersion(row.version), binding_id: uuid(row.binding_id),
     binding_version: positiveVersion(row.binding_version), project_binding_id: uuid(row.project_binding_id),
     project_binding_version: positiveVersion(row.project_binding_version),
+  };
+}
+function laneTimestamp(value: unknown): string {
+  const text = boundedText(value, 64);
+  if (!Number.isFinite(Date.parse(text))) throw new RunDirectoryError(0, "invalid_projection", "Lane 时间字段无效。");
+  return text;
+}
+function mapLane(value: unknown): AuthorizedRunLane {
+  const row = record(value);
+  return {
+    lane_id: uuid(row.lane_id), project_id: uuid(row.project_id),
+    name: boundedText(row.name, 128),
+    description: row.description === null ? null : boundedString(row.description, 2000),
+    created_by: uuid(row.created_by), lock_version: positiveVersion(row.lock_version),
+    created_at: laneTimestamp(row.created_at), updated_at: laneTimestamp(row.updated_at),
+    repository_binding: nullableUuid(row.repository_binding),
+    branch_binding: nullableUuid(row.branch_binding),
+  };
+}
+function mapLaneWorktree(value: unknown): LaneWorktree {
+  const row = record(value);
+  return {
+    worktree_id: uuid(row.worktree_id), lane_id: uuid(row.lane_id),
+    project_id: uuid(row.project_id), repository_id: uuid(row.repository_id),
+    name: boundedText(row.name), branch: boundedString(row.branch, 512),
+    human_state: boundedText(row.human_state, 64), machine_state: boundedText(row.machine_state, 64),
+    runtime_id: nullableUuid(row.runtime_id), agent_id: nullableUuid(row.agent_id),
+    agent_session_id: nullableUuid(row.agent_session_id), archived: boolean(row.archived),
+    version: positiveVersion(row.version), binding_id: uuid(row.binding_id),
+    binding_version: positiveVersion(row.binding_version),
+    engineering_run_id: nullableUuid(row.engineering_run_id),
   };
 }
 function mapAuthorization(value: unknown): RunAuthorization {
@@ -658,6 +731,40 @@ export class RunDirectoryApiClient {
     }
     return run;
   }
+  async listLanes(projectId: string, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<AuthorizedRunLane>> {
+    const id = uuid(projectId);
+    const result = record(await this.request(`/api/v1/projects/${id}/lanes?${pageQuery(cursor)}`, signal));
+    const page = mapPage(result, "lanes", mapLane, (row) => row.lane_id);
+    if (uuid(result.project_id) !== id || page.rows.some((row) => row.project_id !== id)) {
+      throw new RunDirectoryError(0, "scope_mismatch", "Lane 目录不属于当前 Project。");
+    }
+    return page;
+  }
+  async createLane(
+    projectId: string,
+    name: string,
+    idempotencyKey: string,
+    correlationId: string,
+    signal?: AbortSignal,
+  ): Promise<AuthorizedRunLane> {
+    const id = uuid(projectId);
+    const normalizedName = boundedText(name.trim(), 128);
+    const key = boundedText(idempotencyKey, 128);
+    const correlation = uuid(correlationId);
+    if (!normalizedName) throw new RunDirectoryError(0, "invalid_request", "Lane 名称不能为空。");
+    const result = record(await this.request(
+      `/api/v1/projects/${id}/lanes`,
+      signal,
+      MAX_RESPONSE_BYTES,
+      { method: "POST", idempotencyKey: key, body: JSON.stringify({ name: normalizedName, correlation_id: correlation }) },
+    ));
+    const lane = mapLane(result.lane);
+    if (uuid(result.project_id) !== id || lane.project_id !== id || lane.name !== normalizedName ||
+      lane.repository_binding !== null || lane.branch_binding !== null) {
+      throw new RunDirectoryError(0, "invalid_projection", "新建 Lane 响应与请求身份不一致或伪造了远端绑定。");
+    }
+    return lane;
+  }
   async listBranches(projectId: string, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<CloudBranch>> {
     const id = uuid(projectId);
     const result = record(await this.request(`/api/v1/projects/${id}/branches?${pageQuery(cursor)}`, signal));
@@ -680,6 +787,39 @@ export class RunDirectoryApiClient {
       throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 LANE。");
     }
     return page;
+  }
+  async listLaneWorktrees(lane: AuthorizedRunLane, cursor?: string, signal?: AbortSignal): Promise<DirectoryPage<LaneWorktree>> {
+    const projectId = uuid(lane.project_id);
+    const laneId = uuid(lane.lane_id);
+    const result = record(await this.request(`/api/v1/projects/${projectId}/lanes/${laneId}/worktrees?${pageQuery(cursor)}`, signal));
+    const page = mapPage(result, "worktrees", mapLaneWorktree, (row) => row.worktree_id);
+    if (uuid(result.project_id) !== projectId || uuid(result.lane_id) !== laneId ||
+      page.rows.some((row) => row.project_id !== projectId || row.lane_id !== laneId)) {
+      throw new RunDirectoryError(0, "scope_mismatch", "Worktree 目录不属于当前 Lane。");
+    }
+    return page;
+  }
+  async attachWorktreeToLane(
+    projectId: string,
+    laneId: string,
+    worktreeId: string,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<{ binding_id: string }> {
+    const project = uuid(projectId);
+    const lane = uuid(laneId);
+    const worktree = uuid(worktreeId);
+    const key = boundedText(idempotencyKey, 128);
+    const result = record(await this.request(
+      `/api/v1/projects/${project}/lanes/${lane}/worktrees`,
+      signal,
+      MAX_RESPONSE_BYTES,
+      { method: "POST", idempotencyKey: key, body: JSON.stringify({ worktree_id: worktree }) },
+    ));
+    if (uuid(result.project_id) !== project || uuid(result.lane_id) !== lane || uuid(result.worktree_id) !== worktree) {
+      throw new RunDirectoryError(0, "invalid_projection", "Worktree 挂 Lane 响应与请求身份不一致。");
+    }
+    return { binding_id: uuid(result.binding_id) };
   }
   async listRunTaskEvents(run: EngineeringRun, cursor?: RunBiTaskEventCursor, signal?: AbortSignal): Promise<RunBiTaskEventPage> {
     const runId = uuid(run.engineering_run_id);
@@ -940,6 +1080,16 @@ export class RunDirectoryApiClient {
 
 export function canonicalRunHref(projectId: string, runId: string): string {
   return `/projects/${uuid(projectId)}/runs/${uuid(runId)}`;
+}
+
+/** Lane 管理页深链 (P0-lane): project 上下文经 query 传递, 刷新后可按 URL 恢复 */
+export function canonicalLaneHref(projectId: string, laneId: string): string {
+  return `/lane/${uuid(laneId)}?project_id=${uuid(projectId)}`;
+}
+
+/** Lane + Worktree 深链 (P0-lane): 刷新后恢复已授权的选择 */
+export function canonicalLaneWorktreeHref(projectId: string, laneId: string, worktreeId: string): string {
+  return `${canonicalLaneHref(projectId, laneId)}&worktree_id=${uuid(worktreeId)}`;
 }
 
 export function canonicalRunWorktreeHref(projectId: string, runId: string, worktreeId: string): string {
