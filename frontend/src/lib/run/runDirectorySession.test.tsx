@@ -242,4 +242,24 @@ describe("RunDirectoryProvider host session", () => {
     await expect(oldClient.listProjects()).rejects.toMatchObject({ name: "AbortError" });
     expect(oldSession.getAccessToken).not.toHaveBeenCalled();
   });
+
+  // P0-lane 选择语义固化: 只有选中 Worktree 的 context 才能设置 checkout 焦点 —
+  // 无 focus 的 context (仅打开 Lane 页) 不改变焦点 (「先选 Worktree 再开页签」)。
+  it("does not set checkout focus without a selected Worktree", () => {
+    const { result } = renderHook(() => useRunDirectory(), { wrapper: wrapperFor(createHostSession("generation-1")) });
+    const unfocused = { ...contextFixture(), focus: null } as RunContextEnvelope;
+    act(() => result.current.setFocus(unfocused));
+    expect(result.current.focus).toBeNull();
+    act(() => result.current.setFocus(contextFixture()));
+    expect(result.current.focus).not.toBeNull();
+  });
+
+  // P0-lane 清除语义固化: 切换项目/撤权后 clearFocus 同步清除 checkout 焦点。
+  it("clears checkout focus synchronously on clearFocus (project switch / revocation)", () => {
+    const { result } = renderHook(() => useRunDirectory(), { wrapper: wrapperFor(createHostSession("generation-1")) });
+    act(() => result.current.setFocus(contextFixture()));
+    expect(result.current.focus).not.toBeNull();
+    act(() => result.current.clearFocus());
+    expect(result.current.focus).toBeNull();
+  });
 });

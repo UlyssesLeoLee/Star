@@ -28,6 +28,13 @@ pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod lane;
+pub use lane::{
+    validate_lane_description, validate_lane_name, CreateLaneCommand, DeleteLaneCommand,
+    GetLaneQuery, InMemoryLaneRepository, InMemoryLaneService, Lane, LaneCommandPort, LaneError,
+    LaneId, LaneQueryPort, LaneRepository, ListLanesQuery, UpdateLaneCommand,
+};
+
 // =====================================================================
 // ID 类型
 // =====================================================================

@@ -37,14 +37,18 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryTree.ts",type:"file",lang
 */
 
 import {
-  RunDirectoryApiClient, RunDirectoryError, type AuthorizedRunProject,
-  type DirectoryPage, type EngineeringRun, type RunWorktree,
+  RunDirectoryApiClient, RunDirectoryError, type AuthorizedRunLane,
+  type AuthorizedRunProject, type DirectoryPage, type EngineeringRun,
+  type LaneWorktree, type RunWorktree,
 } from "./runDirectoryApi";
 
 interface NodeBase { key: string; parentKey: string; depth: number; label: string }
-interface WorktreeBranch { name: string }
+/** Branch 行 (P0-lane): checkoutStatus 诚实标注 — 服务端无本地 checkout 字段时为 null */
+interface WorktreeBranch { name: string; checkoutStatus: string | null }
 export type DirectoryNode =
   | (NodeBase & { kind: "project"; entity: AuthorizedRunProject })
+  | (NodeBase & { kind: "lane"; entity: AuthorizedRunLane })
+  | (NodeBase & { kind: "laneWorktree"; entity: LaneWorktree })
   | (NodeBase & { kind: "run"; entity: EngineeringRun })
   | (NodeBase & { kind: "worktree"; entity: RunWorktree })
   | (NodeBase & { kind: "branch"; entity: WorktreeBranch });
@@ -62,7 +66,7 @@ export const RUN_DIRECTORY_TREE_BUDGET = { parents: 16, pagesPerParent: 4 } as c
 export function directoryErrorMessage(error: unknown): string {
   return error instanceof RunDirectoryError ? error.message : "授权目录暂时不可用，请重试。";
 }
-function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProject | EngineeringRun | RunWorktree | WorktreeBranch>): DirectoryNode[] {
+function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProject | AuthorizedRunLane | EngineeringRun | RunWorktree | LaneWorktree | WorktreeBranch>): DirectoryNode[] {
   return rows.map<DirectoryNode>((entity) => {
     const base = { parentKey: parent.key, depth: parent.depth + 1 };
     switch (parent.kind) {
@@ -71,8 +75,18 @@ function directoryNodes(parent: DirectoryParent, rows: Array<AuthorizedRunProjec
         return { ...base, kind: "project", key: `${parent.key}/project:${project.project_id}`, label: `Project ${project.project_id}`, entity: project };
       }
       case "project": {
-        const run = entity as EngineeringRun;
-        return { ...base, kind: "run", key: `${parent.key}/run:${run.engineering_run_id}`, label: run.title, entity: run };
+        // P0-lane: Project 的子层 = 服务端 Lane 实体 (real-mode 走 listLanes)
+        const lane = entity as AuthorizedRunLane;
+        return { ...base, kind: "lane", key: `${parent.key}/lane:${lane.lane_id}`, label: lane.name, entity: lane };
+      }
+      case "lane": {
+        // P0-lane: Lane 的子层 = 挂在该 Lane 的 Worktree
+        const worktree = entity as LaneWorktree;
+        return { ...base, kind: "laneWorktree", key: `${parent.key}/laneWorktree:${worktree.worktree_id}`, label: worktree.name, entity: worktree };
+      }
+      case "laneWorktree": {
+        const branch = entity as WorktreeBranch;
+        return { ...base, kind: "branch", key: `${parent.key}/branch`, label: branch.name || "未关联分支", entity: branch };
       }
       case "run": {
         const worktree = entity as RunWorktree;
@@ -194,14 +208,22 @@ export class RunDirectoryTree {
       }
     }
   }
-  private async requestPage(parent: DirectoryParent, cursor: string | undefined, signal: AbortSignal): Promise<DirectoryPage<AuthorizedRunProject | EngineeringRun | RunWorktree | WorktreeBranch>> {
+  private async requestPage(parent: DirectoryParent, cursor: string | undefined, signal: AbortSignal): Promise<DirectoryPage<AuthorizedRunProject | AuthorizedRunLane | EngineeringRun | RunWorktree | LaneWorktree | WorktreeBranch>> {
     switch (parent.kind) {
       case "root": return this.client.listProjects(cursor, signal);
-      case "project": return this.client.listProjectRuns(parent.entity.project_id, cursor, signal);
+      // P0-lane: Project → Lane (服务端实体) → Worktree → Branch
+      case "project": return this.client.listLanes(parent.entity.project_id, cursor, signal);
+      case "lane": return this.client.listLaneWorktrees(parent.entity, cursor, signal);
+      case "laneWorktree": {
+        const branch = parent.entity.branch.trim();
+        // checkout 状态诚实标注: 服务端暂无本地 checkout 字段, 用 worktree 状态映射 + 明确标注
+        const checkoutStatus = `本地 checkout 状态未提供 (Worktree ${parent.entity.human_state}/${parent.entity.machine_state})`;
+        return { rows: [{ name: branch, checkoutStatus }], limit: 1, next_cursor: null };
+      }
       case "run": return this.client.listWorktrees(parent.entity, cursor, signal);
       case "worktree": {
         const name = parent.entity.branch.trim();
-        return { rows: [{ name }], limit: 1, next_cursor: null };
+        return { rows: [{ name, checkoutStatus: null }], limit: 1, next_cursor: null };
       }
     }
   }

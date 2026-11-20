@@ -16,6 +16,15 @@ MERGE (pg_svc_module)-[:IMPORTS]->(:File {path:"crates/worktree-service/src/pg_w
 MERGE (self)-[:REEXPORTS]->(pg_repo)
 MERGE (self)-[:REEXPORTS]->(pg_svc)
 MERGE (self)-[:REEXPORTS]->(row)
+// P0-lane: lane PG 仓储模块
+MERGE (lane_repo_module:Symbol {id:"crates/worktree-service/src/lib.rs::lane_repository",kind:"module"})
+MERGE (lane_repo:Type {id:"worktree_service::PgLaneRepository",kind:"struct"})
+MERGE (lane_row:Type {id:"worktree_service::LaneRow",kind:"struct"})
+MERGE (self)-[:DEFINES]->(lane_repo_module)
+MERGE (lane_repo_module)-[:DEFINES]->(lane_repo)
+MERGE (lane_repo_module)-[:DEFINES]->(lane_row)
+MERGE (self)-[:REEXPORTS]->(lane_repo)
+MERGE (self)-[:REEXPORTS]->(lane_row)
 @endcypher
 */
 //! `worktree-service` — AI Worktree Graph Canvas Worktree Service crate.
@@ -74,10 +83,16 @@ pub use start_from_picker::{
 // (`cargo check --all-targets --all-features` 红, CI workspace job 此前不带
 // --all-features 所以漏检)。
 #[cfg(feature = "pg")]
+pub mod lane_repository;
+#[cfg(feature = "pg")]
 pub mod pg_worktree_repository;
 #[cfg(feature = "pg")]
 pub mod pg_worktree_service;
 
+#[cfg(feature = "pg")]
+pub use lane_repository::{
+    LaneRow, LaneWorktreeBindingRow, LaneWorktreeRow, PgLaneRepository,
+};
 #[cfg(feature = "pg")]
 pub use pg_worktree_repository::{PgWorktreeRepository, WorktreeRow};
 #[cfg(feature = "pg")]
