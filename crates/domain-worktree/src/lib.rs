@@ -195,6 +195,9 @@ pub struct Worktree {
     pub work_item_id: WorkItemId,
     /// Project ID
     pub project_id: ProjectId,
+    /// 所属 Lane ID(可选, P0-lane 新增; LaneId 强类型化待 domain-worktree → domain-project
+    /// 依赖接线, 见 P0-lane 报告父代理待办 — 现以 Uuid 表达避免动 Cargo.lock)
+    pub lane_id: Option<Uuid>,
     /// Repository ID
     pub repository_id: RepositoryId,
     /// 分支名
@@ -401,6 +404,27 @@ pub struct AssignWorktreeCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 将 Worktree 挂到 Lane 的命令 (P0-lane: Worktree 创建走原命令不动 manifest 外构造器,
+/// lane 归属经本命令 + PG binding 表接通)
+pub struct AttachWorktreeToLaneCommand {
+    /// 租户 ID
+    pub tenant_id: TenantId,
+    /// 目标 Worktree ID
+    pub worktree_id: WorktreeId,
+    /// 目标 Lane ID (nil Uuid = 解除归属)
+    pub lane_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 Lane 查询 Worktree 列表的查询 (P0-lane)
+pub struct ListByLaneQuery {
+    /// 租户 ID
+    pub tenant_id: TenantId,
+    /// 目标 Lane ID
+    pub lane_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Local Runtime 上报观测状态的命令
 pub struct RecordObservedStateCommand {
     /// 租户 ID
@@ -468,6 +492,8 @@ pub struct WorktreeSummary {
     pub tenant_id: TenantId,
     /// 关联的 WorkItem ID
     pub work_item_id: WorkItemId,
+    /// 所属 Lane ID (可选, P0-lane)
+    pub lane_id: Option<Uuid>,
     /// 当前状态
     pub status: WorktreeStatus,
     /// 绑定的 Runtime ID
@@ -494,6 +520,13 @@ pub trait WorktreeCommandPort: Send + Sync {
     async fn assign_to_agent(
         &self,
         cmd: AssignWorktreeCommand,
+        actor: &ActorContext,
+    ) -> Result<Worktree, WorktreeError>;
+
+    /// 将 Worktree 挂到 Lane (或解除归属, P0-lane)
+    async fn attach_to_lane(
+        &self,
+        cmd: AttachWorktreeToLaneCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
@@ -540,6 +573,13 @@ pub trait WorktreeQueryPort: Send + Sync {
     async fn list_by_agent(
         &self,
         q: ListByAgentQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<WorktreeSummary>, WorktreeError>;
+
+    /// 按 Lane 查询 Worktree 摘要列表 (P0-lane)
+    async fn list_by_lane(
+        &self,
+        q: ListByLaneQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError>;
 
@@ -591,6 +631,12 @@ pub trait WorktreeRepository: Send + Sync {
         &self,
         tenant_id: TenantId,
         agent_id: AgentId,
+    ) -> Result<Vec<Worktree>, WorktreeError>;
+    /// 按 Lane 列出关联的 Worktree (P0-lane)
+    async fn list_by_lane(
+        &self,
+        tenant_id: TenantId,
+        lane_id: Uuid,
     ) -> Result<Vec<Worktree>, WorktreeError>;
     /// 按 Repository 列出关联的 Worktree
     async fn list_by_repository(
@@ -702,6 +748,17 @@ impl WorktreeRepository for InMemoryWorktreeRepository {
             .cloned()
             .collect())
     }
+    async fn list_by_lane(
+        &self,
+        _tenant_id: TenantId,
+        lane_id: Uuid,
+    ) -> Result<Vec<Worktree>, WorktreeError> {
+        let s = self.store.read().expect("lock");
+        Ok(s.values()
+            .filter(|w| w.lane_id == Some(lane_id))
+            .cloned()
+            .collect())
+    }
     async fn list_by_repository(
         &self,
         _tenant_id: TenantId,
@@ -738,6 +795,7 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
             tenant_id: cmd.tenant_id,
             work_item_id: cmd.work_item_id,
             project_id: cmd.project_id,
+            lane_id: None, // P0-lane: 创建不挂 lane, 归属经 attach_to_lane
             repository_id: cmd.repository_id,
             branch: cmd.branch,
             base_branch: cmd.base_branch,
@@ -783,6 +841,31 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         wt.status = WorktreeStatus::Assigned;
         wt.assigned_agent_id = Some(cmd.agent_id);
         wt.current_agent_session_id = Some(cmd.agent_session_id);
+        wt.updated_at = Utc::now();
+        wt.version += 1;
+        self.repo.update(wt.clone()).await?;
+        Ok(wt)
+    }
+
+    async fn attach_to_lane(
+        &self,
+        cmd: AttachWorktreeToLaneCommand,
+        actor: &ActorContext,
+    ) -> Result<Worktree, WorktreeError> {
+        let mut wt = self.repo.get(cmd.worktree_id).await?;
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
+            return Err(WorktreeError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                wt.tenant_id,
+            ));
+        }
+        if wt.tenant_id != cmd.tenant_id {
+            return Err(WorktreeError::CrossTenantDenied(
+                cmd.tenant_id,
+                wt.tenant_id,
+            ));
+        }
+        wt.lane_id = cmd.lane_id;
         wt.updated_at = Utc::now();
         wt.version += 1;
         self.repo.update(wt.clone()).await?;
@@ -931,6 +1014,7 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
                 id: w.id,
                 tenant_id: w.tenant_id,
                 work_item_id: w.work_item_id,
+                lane_id: w.lane_id,
                 status: w.status,
                 runtime_id: w.runtime_id,
                 updated_at: w.updated_at,
@@ -955,6 +1039,37 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
                 id: w.id,
                 tenant_id: w.tenant_id,
                 work_item_id: w.work_item_id,
+                lane_id: w.lane_id,
+                status: w.status,
+                runtime_id: w.runtime_id,
+                updated_at: w.updated_at,
+            })
+            .collect())
+    }
+    async fn list_by_lane(
+        &self,
+        q: ListByLaneQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<WorktreeSummary>, WorktreeError> {
+        if q.tenant_id != TenantId::from(actor.tenant_id) {
+            return Err(WorktreeError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
+        }
+        if q.lane_id.is_nil() {
+            return Err(WorktreeError::Conflict(
+                "lane_id must not be nil".to_string(),
+            ));
+        }
+        let wts = self.repo.list_by_lane(q.tenant_id, q.lane_id).await?;
+        Ok(wts
+            .into_iter()
+            .map(|w| WorktreeSummary {
+                id: w.id,
+                tenant_id: w.tenant_id,
+                work_item_id: w.work_item_id,
+                lane_id: w.lane_id,
                 status: w.status,
                 runtime_id: w.runtime_id,
                 updated_at: w.updated_at,
@@ -1537,5 +1652,167 @@ mod tests {
         assert!(statuses.contains(&WorktreeStatus::Ready));
         assert!(statuses.contains(&WorktreeStatus::Abandoned));
         let _ = (wt1, wt2, wt3); // suppress unused
+    }
+
+    #[tokio::test]
+    async fn attach_to_lane_and_list_by_lane_filters() {
+        // P0-lane: worktree 挂 lane 后按 lane 过滤正确
+        let svc = InMemoryWorktreeService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let actor = make_actor(TenantId(tenant_id));
+        let lane_a = Uuid::new_v4();
+        let lane_b = Uuid::new_v4();
+        let wt1 = svc
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
+            .await
+            .unwrap();
+        let wt2 = svc
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
+            .await
+            .unwrap();
+        let wt3 = svc
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
+            .await
+            .unwrap();
+        // 初始无 lane 归属
+        assert!(wt1.lane_id.is_none());
+        // wt1/wt2 挂 lane_a, wt3 挂 lane_b
+        let attached = svc
+            .attach_to_lane(
+                AttachWorktreeToLaneCommand {
+                    tenant_id: TenantId(tenant_id),
+                    worktree_id: wt1.id,
+                    lane_id: Some(lane_a),
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(attached.lane_id, Some(lane_a));
+        svc.attach_to_lane(
+            AttachWorktreeToLaneCommand {
+                tenant_id: TenantId(tenant_id),
+                worktree_id: wt2.id,
+                lane_id: Some(lane_a),
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+        svc.attach_to_lane(
+            AttachWorktreeToLaneCommand {
+                tenant_id: TenantId(tenant_id),
+                worktree_id: wt3.id,
+                lane_id: Some(lane_b),
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+        let lane_a_list = svc
+            .list_by_lane(
+                ListByLaneQuery {
+                    tenant_id: TenantId(tenant_id),
+                    lane_id: lane_a,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(lane_a_list.len(), 2);
+        assert!(lane_a_list.iter().all(|s| s.lane_id == Some(lane_a)));
+        assert!(lane_a_list.iter().any(|s| s.id == wt1.id));
+        let lane_b_list = svc
+            .list_by_lane(
+                ListByLaneQuery {
+                    tenant_id: TenantId(tenant_id),
+                    lane_id: lane_b,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(lane_b_list.len(), 1);
+        assert_eq!(lane_b_list[0].id, wt3.id);
+        // 解除归属后不再出现在 lane_a 列表
+        svc.attach_to_lane(
+            AttachWorktreeToLaneCommand {
+                tenant_id: TenantId(tenant_id),
+                worktree_id: wt1.id,
+                lane_id: None,
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+        let after_detach = svc
+            .list_by_lane(
+                ListByLaneQuery {
+                    tenant_id: TenantId(tenant_id),
+                    lane_id: lane_a,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(after_detach.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn attach_to_lane_cross_tenant_denied() {
+        let svc = InMemoryWorktreeService::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let actor_a = make_actor(TenantId(tenant_a));
+        let wt = svc
+            .create_worktree(make_create_cmd(TenantId(tenant_a)), &actor_a)
+            .await
+            .unwrap();
+        let tenant_b = uuid::Uuid::new_v4();
+        let actor_b = make_actor(TenantId(tenant_b));
+        let res = svc
+            .attach_to_lane(
+                AttachWorktreeToLaneCommand {
+                    tenant_id: TenantId(tenant_b),
+                    worktree_id: wt.id,
+                    lane_id: Some(Uuid::new_v4()),
+                },
+                &actor_b,
+            )
+            .await;
+        assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
+    }
+
+    #[tokio::test]
+    async fn list_by_lane_cross_tenant_denied() {
+        let svc = InMemoryWorktreeService::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let actor_a = make_actor(TenantId(tenant_a));
+        let lane = Uuid::new_v4();
+        let wt = svc
+            .create_worktree(make_create_cmd(TenantId(tenant_a)), &actor_a)
+            .await
+            .unwrap();
+        svc.attach_to_lane(
+            AttachWorktreeToLaneCommand {
+                tenant_id: TenantId(tenant_a),
+                worktree_id: wt.id,
+                lane_id: Some(lane),
+            },
+            &actor_a,
+        )
+        .await
+        .unwrap();
+        let tenant_b = uuid::Uuid::new_v4();
+        let actor_b = make_actor(TenantId(tenant_b));
+        let res = svc
+            .list_by_lane(
+                ListByLaneQuery {
+                    tenant_id: TenantId(tenant_a),
+                    lane_id: lane,
+                },
+                &actor_b,
+            )
+            .await;
+        assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
     }
 }

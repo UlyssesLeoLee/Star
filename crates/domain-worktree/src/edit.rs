@@ -561,6 +561,7 @@ impl WorktreeEditPort for InMemoryWorktreeEditor {
             tenant_id: cmd.tenant_id,
             work_item_id: cmd.work_item_id,
             project_id: cmd.project_id,
+            lane_id: parent.lane_id, // P0-lane: fork 继承父 Lane 归属
             repository_id: cmd.repository_id,
             branch: cmd.branch,
             base_branch: if cmd.base_branch.is_empty() {
@@ -660,6 +661,7 @@ mod tests {
             tenant_id,
             work_item_id: WorkItemId::new(),
             project_id: ProjectId::new(),
+            lane_id: None,
             repository_id: RepositoryId::new(),
             branch: "feat/test".to_string(),
             base_branch: "main".to_string(),
