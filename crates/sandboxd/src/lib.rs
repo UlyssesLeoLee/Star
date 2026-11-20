@@ -46,6 +46,8 @@ pub mod error;
 pub mod health;
 pub mod logging;
 pub mod metrics;
+/// NEMA 解释器插件 worker 宿主: digest 校验 + 受限 session 启动 (P0 .nema lane)
+pub mod nema_worker;
 pub mod orchestrator;
 pub mod policy;
 #[allow(missing_docs, unreachable_pub, rust_2018_idioms, clippy::all)]

@@ -5,10 +5,18 @@ MERGE (strict_file:File {path:"crates/nema-codec/src/strict.rs"})
 MERGE (plugin_file:File {path:"crates/nema-codec/src/interpreter_plugin.rs"})
 MERGE (strict_module:Symbol {id:"crates/nema-codec/src/lib.rs::strict",kind:"module"})
 MERGE (plugin_module:Symbol {id:"crates/nema-codec/src/lib.rs::interpreter_plugin",kind:"module"})
+MERGE (runtime_module:Symbol {id:"crates/nema-codec/src/lib.rs::plugin_runtime",kind:"module"})
+MERGE (sha256_module:Symbol {id:"crates/nema-codec/src/lib.rs::sha256",kind:"module"})
 MERGE (self)-[:DEFINES]->(strict_module)
 MERGE (self)-[:DEFINES]->(plugin_module)
+MERGE (self)-[:DEFINES]->(runtime_module)
+MERGE (self)-[:DEFINES]->(sha256_module)
 MERGE (self)-[:IMPORTS]->(strict_file)
 MERGE (self)-[:IMPORTS]->(plugin_file)
+MERGE (runtime_file:File {path:"crates/nema-codec/src/plugin_runtime.rs"})
+MERGE (sha256_file:File {path:"crates/nema-codec/src/sha256.rs"})
+MERGE (self)-[:IMPORTS]->(runtime_file)
+MERGE (self)-[:IMPORTS]->(sha256_file)
 @endcypher
 */
 // =====================================================================
@@ -35,6 +43,10 @@ use thiserror::Error;
 pub mod interpreter;
 /// Exact-profile dispatch for built-in and isolated NEMA interpreter plugins.
 pub mod interpreter_plugin;
+/// Isolated plugin runtime: protocol, artifact verification, resource limits,
+/// independent installation, file binding and migration preview.
+pub mod plugin_runtime;
+mod sha256;
 /// Versioned, lossless grammar snapshots used by the NEMA interpreter adapters.
 pub mod strict;
 pub use interpreter::*;

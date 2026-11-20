@@ -49,6 +49,16 @@ fn print_usage() {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // NEMA 插件协议参考 worker 模式 (P0 .nema lane): 读请求文件, 写响应文件。
+    // 与 daemon 模式互斥; 供 nema_worker e2e 测试作为真实 worker 可执行文件使用。
+    if let Some(i) = args.iter().position(|a| a == "nema-worker-fixture") {
+        let request_path = PathBuf::from(args.get(i + 1).cloned().unwrap_or_default());
+        let response_path = PathBuf::from(args.get(i + 2).cloned().unwrap_or_default());
+        if request_path.as_os_str().is_empty() || response_path.as_os_str().is_empty() {
+            anyhow::bail!("nema-worker-fixture 需要 <request-file> <response-file>");
+        }
+        return sandboxd::nema_worker::run_fixture(&request_path, &response_path).await;
+    }
     if args.iter().any(|a| a == "-h" || a == "--help") {
         print_usage();
         return Ok(());

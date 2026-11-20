@@ -15,10 +15,12 @@ AST schema, grammar source digest, and Rust parser source artifact digest.
   profile until an explicit migration is requested.
 - The stable Rust adapter contract allows a grammar change that maps to the
   existing AST schema to be implemented without changing the document model
-  or plugin ABI. In the current integration, however, adapters are compiled
-  into `nema-codec` and its WASM binding. Independently installing and running
-  a third-party interpreter without shipping a new application artifact is not
-  supported yet; the isolated plugin runtime below is still a known gap.
+  or plugin ABI. Adapters are compiled into `nema-codec` and its WASM binding,
+  or installed behind the isolated plugin runtime (see "Execution and
+  lifecycle"): the fixed protocol, digest-verified artifacts, resource
+  limits and independent installation are implemented as of the P0 .nema
+  lane; the sandboxd glue seam and product wiring are tracked in
+  `docs/nema/KNOWN-GAPS.md`.
 - The captured 2026-11-15 matrix changes continuation syntax to an explicit
   column index. The crate keeps the earlier indentation-based v1 parser and
   adds an independent indexed-continuation v2 parser; a profile selects which
@@ -44,18 +46,63 @@ v1/v2 interpreters are native Rust and are the only adapters currently
 executable through the product path. A third-party interpreter must run behind
 an isolated worker or sandboxed WASM host with bounded input, output, memory,
 CPU/time, and capabilities. Do not `dlopen` a plugin DLL or run an arbitrary
-configured shell command in the Star process. The product does not yet have
-the isolated NEMA plugin request/response runtime, so third-party plugin
-execution and independent plugin installation are not available.
+configured shell command in the Star process.
+
+As of the P0 .nema lane (2026-11-20), the isolated plugin runtime exists as
+`nema-codec::plugin_runtime` and the sandboxd-side worker host as
+`sandboxd::nema_worker`, with these fixed contracts:
+
+- **Protocol**: `NEMA_PLUGIN_PROTOCOL_VERSION = 1`. Requests are serde JSON
+  (`ParseRequest` / `FormatRequest` with the exact `InterpreterProfile`,
+  source or tagged AST, and `ResourceLimits`); responses carry exactly one of
+  `ast`/`text` or a `PluginErrorPayload` (`resource_limit` / `timeout` /
+  `out_of_memory` map to `InterpreterError::ResourceLimit`). A version
+  mismatch or malformed response is rejected as `ProtocolViolation`.
+- **Artifacts**: `PluginArtifact { sha256, payload }` is verified before any
+  record or adapter exists; a mismatch fails with
+  `InterpreterError::DigestMismatch` carrying both digests. Digest computation
+  is a dependency-free SHA-256 (`nema-codec::sha256`), used for integrity
+  verification only — not a MAC or signature.
+- **Limits**: input/output bytes, domains, records, columns, total cells are
+  enforced host-side; memory/CPU/time are reported by the worker host and
+  mapped to `InterpreterError::ResourceLimit`. Oversized input remains
+  `InputTooLarge`; oversized output `OutputTooLarge`/`ResourceLimit`.
+- **Worker host (path a — sandboxd)**: `sandboxd::nema_worker` verifies the
+  worker executable digest again at launch, freezes a restricted 4-dimension
+  `SessionSpec` (network BLOCK_ALL, capability DropAll, fs allowlist = work
+  dir only), executes `argv = [program] + args + [request-file, response-file]`
+  by direct exec (never a shell), and enforces a response byte cap. The
+  `nema-worker-fixture` mode of the sandboxd binary is the reference worker
+  for the protocol contract. The cross-crate glue
+  (`SandboxdNemaPluginHost: NemaPluginHost` in nema-codec) is blocked by the
+  frozen `Cargo.lock` and remains a known gap; nema-codec tests use an
+  in-memory protocol host to exercise the seam. Path b (in-process WASM
+  host) is not implemented; the `NemaPluginHost` trait is the seam for it.
+- **Independent installation**: `NemaPluginInstaller` ports the
+  `domain-agent::PluginLifecycleManager` state machine
+  (Installed → Active → Draining → Drained → Uninstalled): digest + ABI/AST
+  checks at install, duplicate `plugin_id@version` rejected, upgrade installs
+  the new version and drains the old one, uninstall removes the adapter so
+  the profile becomes unregistered again. No built-in fallback anywhere.
+- **File binding and migration**: every file pins a `NemaFileBinding`
+  (exact profile + source digest). Old files keep their bound interpreter;
+  `preview_migration` never mutates anything and
+  `execute_migration` returns the original source for an explicit backup.
+  A migrated binding's digest is over the canonical target text.
+
+Known gaps after this lane (see `docs/nema/KNOWN-GAPS.md`): the
+nema-codec ↔ sandboxd glue dependency (Cargo.lock frozen), Windows v0.1
+policy-enforcement levels for network/fs/capability dims, the
+`wasm32-unknown-unknown` build verification, and persistence wiring. Claims
+that third-party plugin execution is available in the product must not be
+made until the glue and persistence exist with test evidence.
 
 Reusable infrastructure found: `domain-agent::PluginLifecycleManager` owns
-plugin id/version/digest, activation, admission, drain, and removal metadata;
+plugin id/version/digest, activation, admission, drain, and removal metadata
+(its state machine is ported 1:1 into `NemaPluginInstaller`);
 `sandboxd` provides a separate process isolation service with resource,
-network, filesystem, and capability policies. Neither currently defines a
-fixed NEMA interpreter request/response protocol or a digest-verified worker
-launcher, so wiring them together remains a separate runtime gap. The NEMA
-registry is ready to dispatch through a trusted adapter for such a host, but
-third-party plugin execution is not claimed as available. The legacy adaptive
+network, filesystem, and capability policies (`sandboxd::nema_worker` builds
+the NEMA-specific restricted session on top). The legacy adaptive
 `nema-codec::interpreter` probe is not used for profile dispatch because it can
 invoke Python/CLI and silently fall back to the built-in parser.
 

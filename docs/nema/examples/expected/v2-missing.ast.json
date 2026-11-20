@@ -1,0 +1,20 @@
+{
+  "domains": [
+    {
+      "mode": "table",
+      "id": 1,
+      "revision": 1,
+      "columns": ["A", "B", "C", "D"],
+      "explicit_header": true,
+      "declared_width": null,
+      "records": [
+        [
+          {"kind": "value", "value": "x"},
+          {"kind": "missing"},
+          {"kind": "value", "value": "v2"},
+          {"kind": "value", "value": "v3"}
+        ]
+      ]
+    }
+  ]
+}
