@@ -40,6 +40,7 @@ pub async fn get_by_id(Path(id): Path<String>) -> Result<Json<RestResponse<Value
             "id": wt.id.to_string(),
             "tenant_id": wt.tenant_id.to_string(),
             "project_id": wt.project_id.to_string(),
+            "lane_id": wt.lane_id.map(|id| id.to_string()),
             "repository_id": wt.repository_id.to_string(),
             "work_item_id": wt.work_item_id.to_string(),
             "runtime_id": wt.runtime_id.to_string(),
@@ -62,6 +63,8 @@ pub struct CreateBody {
     pub branch_name: Option<String>,
     /// Agent session ID — 可选 (P0 简化: 仅记录, 不绑定)
     pub agent_session_id: Option<String>,
+    /// 所属 Lane ID — 可选 (P0-lane: 创建后即挂 lane; 无则留空, 归属经 attach 语义)
+    pub lane_id: Option<String>,
 }
 
 /// `POST /api/v1/worktrees`
@@ -92,12 +95,37 @@ pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Va
         runtime_id,
         owner_user_id: UserId::from(actor.user_id),
     };
-    let wt = service().create_worktree(cmd, &actor).await?;
+    let lane_uuid = body
+        .lane_id
+        .as_deref()
+        .map(Uuid::parse_str)
+        .transpose()
+        .map_err(|e| {
+            RestError::validation(
+                format!("invalid lane_id UUID: {e}"),
+                "Provide a valid UUID or omit lane_id",
+            )
+        })?;
+    let mut wt = service().create_worktree(cmd, &actor).await?;
+    if let Some(lane_uuid) = lane_uuid {
+        // P0-lane: 创建后挂 lane (attach 语义, 与 PG binding 表一致)
+        wt = service()
+            .attach_to_lane(
+                domain_worktree::AttachWorktreeToLaneCommand {
+                    tenant_id,
+                    worktree_id: wt.id,
+                    lane_id: Some(lane_uuid),
+                },
+                &actor,
+            )
+            .await?;
+    }
     Ok(Json(RestResponse::ok(json!({
         "worktree": {
             "id": wt.id.to_string(),
             "tenant_id": wt.tenant_id.to_string(),
             "project_id": wt.project_id.to_string(),
+            "lane_id": wt.lane_id.map(|id| id.to_string()),
             "repository_id": wt.repository_id.to_string(),
             "work_item_id": wt.work_item_id.to_string(),
             "runtime_id": wt.runtime_id.to_string(),

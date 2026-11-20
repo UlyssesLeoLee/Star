@@ -43,6 +43,14 @@
 //! MATCH (m:Module {name:"worktrees",type:"module"}),(co:Function {name:"confirm_management_plan",type:"function"}),(archiveTests:Module {name:"archive_gate_tests",type:"module"});
 //! CREATE (outboxFact:Class {name:"WorktreeManagementOutboxFact",type:"class",language:"rust"}),(buildOutboxFact:Function {name:"worktree_management_outbox_fact",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(shouldMutate:Function {name:"management_plan_changes_worktree",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(requiresArchiveGate:Function {name:"management_plan_requires_archive_gate",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(schemaVersion:Variable {name:"WORKTREE_MANAGEMENT_OUTBOX_SCHEMA_VERSION",type:"variable",language:"rust"}),(outboxTest:Function {name:"management_outbox_fact_is_versioned_and_minimal",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(requestHashTest:Function {name:"management_request_hash_is_stable_and_detects_changed_requests",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(ownerAssignmentTest:Function {name:"owner_assignment_does_not_emit_archive_outbox_fact",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(noopTest:Function {name:"unchanged_archive_plan_preserves_worktree_version",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(outboxTable:Class {name:"multica.worktree_management_outbox",type:"class",language:"sql"});
 //! CREATE (m)-[:CONTAINS]->(outboxFact),(m)-[:CONTAINS]->(buildOutboxFact),(m)-[:CONTAINS]->(shouldMutate),(m)-[:CONTAINS]->(requiresArchiveGate),(m)-[:CONTAINS]->(schemaVersion),(archiveTests)-[:CONTAINS]->(outboxTest),(archiveTests)-[:CONTAINS]->(requestHashTest),(archiveTests)-[:CONTAINS]->(ownerAssignmentTest),(archiveTests)-[:CONTAINS]->(noopTest),(co)-[:CALLS]->(buildOutboxFact),(co)-[:CALLS]->(shouldMutate),(co)-[:CALLS]->(requiresArchiveGate),(buildOutboxFact)-[:USES]->(schemaVersion),(outboxTest)-[:CALLS]->(buildOutboxFact),(outboxTest)-[:USES]->(schemaVersion),(ownerAssignmentTest)-[:CALLS]->(buildOutboxFact),(requestHashTest)-[:CALLS]->(request_hash),(noopTest)-[:CALLS]->(shouldMutate),(noopTest)-[:CALLS]->(requiresArchiveGate),(co)-[:WRITES]->(outboxTable);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM (P0-lane 2026-11-20: Lane 正式数据端点)
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (createLane:Function {name:"create_lane",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(listLanes:Function {name:"list_project_lanes",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(getLane:Function {name:"get_lane",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(updateLane:Function {name:"update_lane",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(deleteLane:Function {name:"delete_lane",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(attachWt:Function {name:"attach_worktree_to_lane",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(listLaneWt:Function {name:"list_lane_worktrees",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(authorizeLane:Function {name:"authorize_lane_project",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(laneProjection:Function {name:"lane_projection",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(laneWtProjection:Function {name:"lane_worktree_projection",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(laneRow:Class {name:"LaneRow",type:"class",language:"rust"}),(laneWtRow:Class {name:"LaneWorktreeRow",type:"class",language:"rust"}),(laneCursor:Class {name:"LaneCursor",type:"class",language:"rust"}),(createLaneBody:Class {name:"CreateLaneBody",type:"class",language:"rust"}),(updateLaneBody:Class {name:"UpdateLaneBody",type:"class",language:"rust"}),(attachBody:Class {name:"AttachLaneWorktreeBody",type:"class",language:"rust"}),(laneTable:Class {name:"lane",type:"class",language:"sql"}),(bindingTable:Class {name:"multica.worktree_lane_binding",type:"class",language:"sql"});
+//! CREATE (m)-[:CONTAINS]->(createLane),(m)-[:CONTAINS]->(listLanes),(m)-[:CONTAINS]->(getLane),(m)-[:CONTAINS]->(updateLane),(m)-[:CONTAINS]->(deleteLane),(m)-[:CONTAINS]->(attachWt),(m)-[:CONTAINS]->(listLaneWt),(m)-[:CONTAINS]->(authorizeLane),(m)-[:CONTAINS]->(laneProjection),(m)-[:CONTAINS]->(laneWtProjection),(m)-[:CONTAINS]->(laneRow),(m)-[:CONTAINS]->(laneWtRow),(m)-[:CONTAINS]->(laneCursor),(m)-[:CONTAINS]->(createLaneBody),(m)-[:CONTAINS]->(updateLaneBody),(m)-[:CONTAINS]->(attachBody);
+//! CREATE (rt)-[:CALLS]->(createLane),(rt)-[:CALLS]->(listLanes),(rt)-[:CALLS]->(getLane),(rt)-[:CALLS]->(updateLane),(rt)-[:CALLS]->(deleteLane),(rt)-[:CALLS]->(attachWt),(rt)-[:CALLS]->(listLaneWt);
+//! CREATE (createLane)-[:CALLS]->(authorizeLane),(listLanes)-[:CALLS]->(authorizeLane),(getLane)-[:CALLS]->(authorizeLane),(updateLane)-[:CALLS]->(authorizeLane),(deleteLane)-[:CALLS]->(authorizeLane),(attachWt)-[:CALLS]->(authorizeLane),(listLaneWt)-[:CALLS]->(authorizeLane),(authorizeLane)-[:CALLS]->(set_tenant);
+//! CREATE (createLane)-[:CALLS]->(laneProjection),(listLanes)-[:CALLS]->(laneProjection),(getLane)-[:CALLS]->(laneProjection),(updateLane)-[:CALLS]->(laneProjection),(listLaneWt)-[:CALLS]->(laneWtProjection);
+//! CREATE (createLane)-[:WRITES]->(laneTable),(updateLane)-[:WRITES]->(laneTable),(deleteLane)-[:WRITES]->(laneTable),(attachWt)-[:WRITES]->(bindingTable),(attachWt)-[:WRITES]->(laneTable),(listLaneWt)-[:READS]->(bindingTable),(listLanes)-[:READS]->(laneTable);
 //! @endcypher
 
 use axum::{
@@ -226,6 +234,19 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/worktrees/{worktree_id}/management-plans/{plan_id}/confirm",
             post(confirm_management_plan),
+        )
+        // ── P0-lane: Lane 正式数据端点 (Project → Lane → Worktree → Branch) ──
+        .route(
+            "/api/v1/projects/{project_id}/lanes",
+            get(list_project_lanes).post(create_lane),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/lanes/{lane_id}",
+            get(get_lane).patch(update_lane).delete(delete_lane),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/lanes/{lane_id}/worktrees",
+            get(list_lane_worktrees).post(attach_worktree_to_lane),
         )
 }
 
@@ -1343,6 +1364,607 @@ fn archive_hook_projection(outcome: &ArchiveHookOutcome) -> Value {
         "admission_fence_expires_at": outcome.admission_fence_expires_at,
         "git_lock_observed_at": outcome.git_lock_observed_at,
     })
+}
+
+// =====================================================================
+// P0-lane: Lane 正式数据端点 (Project → Lane → Worktree → Branch)
+// 授权模式照 list_project_worktrees: validate_actor → require_scope →
+// authorize_lane_project (项目成员可读, 非成员 fail-closed 403) →
+// 写操作 require_manager_role。无远端仓库/分支关联也能创建 Lane。
+// =====================================================================
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreateLaneBody {
+    name: String,
+    description: Option<String>,
+    correlation_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdateLaneBody {
+    name: Option<String>,
+    description: Option<String>,
+    expected_version: i32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AttachLaneWorktreeBody {
+    worktree_id: Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LaneListQueryParams {
+    limit: Option<i64>,
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LaneCursor {
+    project_id: Uuid,
+    created_at: DateTime<Utc>,
+    id: Uuid,
+}
+
+#[derive(Debug, FromRow)]
+struct LaneRow {
+    id: Uuid,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    name: String,
+    description: Option<String>,
+    created_by: Uuid,
+    lock_version: i32,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct LaneWorktreeRow {
+    id: Uuid,
+    lane_id: Uuid,
+    project_id: Uuid,
+    repo_id: Uuid,
+    name: String,
+    branch: String,
+    human_state: String,
+    machine_state: String,
+    runtime_id: Option<Uuid>,
+    agent_id: Option<Uuid>,
+    agent_session_id: Option<Uuid>,
+    archived: bool,
+    version: i32,
+    binding_id: Uuid,
+    binding_version: i32,
+    engineering_run_id: Option<Uuid>,
+}
+
+fn lane_projection(row: &LaneRow) -> Value {
+    json!({
+        "lane_id": row.id,
+        "project_id": row.project_id,
+        "name": row.name,
+        "description": row.description,
+        "created_by": row.created_by,
+        "lock_version": row.lock_version,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        // P0: lane 表无远端列 — 诚实标注未绑定, 不伪造仓库/分支关联
+        "repository_binding": null,
+        "branch_binding": null,
+    })
+}
+
+fn lane_worktree_projection(row: &LaneWorktreeRow) -> Value {
+    json!({
+        "worktree_id": row.id,
+        "lane_id": row.lane_id,
+        "project_id": row.project_id,
+        "repository_id": row.repo_id,
+        "name": row.name,
+        "branch": row.branch,
+        "human_state": row.human_state,
+        "machine_state": row.machine_state,
+        "runtime_id": row.runtime_id,
+        "agent_id": row.agent_id,
+        "agent_session_id": row.agent_session_id,
+        "archived": row.archived,
+        "version": row.version,
+        "binding_id": row.binding_id,
+        "binding_version": row.binding_version,
+        "engineering_run_id": row.engineering_run_id,
+    })
+}
+
+fn validate_lane_name(value: &str) -> Result<String, GroupApiError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 128
+        || trimmed.chars().any(char::is_control)
+        || trimmed.contains("://")
+    {
+        return Err(GroupApiError::invalid_request("invalid_lane_name"));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn validate_lane_description(value: &Option<String>) -> Result<(), GroupApiError> {
+    match value {
+        None => Ok(()),
+        Some(text) if text.len() <= 2000 && !text.chars().any(char::is_control) => Ok(()),
+        Some(_) => Err(GroupApiError::invalid_request("invalid_lane_description")),
+    }
+}
+
+/// Lane 授权: 项目成员可读 (tenant + active project_role_binding)。
+/// 与 `active_binding` 不同, 无绑定时返回 403 (P0-lane 验收: 跨租户/非成员 403, fail-closed)。
+async fn authorize_lane_project(
+    tx: &mut Transaction<'_, sqlx::Postgres>,
+    actor: &super::AuthUser,
+    project_id: Uuid,
+) -> Result<(Uuid, String, i32), GroupApiError> {
+    set_tenant(tx, actor.tenant_id).await?;
+    let binding = sqlx::query_as::<_, (Uuid, String, i32)>(
+        r#"
+        SELECT id, role, version
+        FROM permission.project_role_binding
+        WHERE tenant_id = $1 AND project_id = $2 AND user_id = $3
+          AND valid_from <= now() AND valid_to IS NULL
+        FOR SHARE
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(actor.user_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::forbidden)?;
+    Ok(binding)
+}
+
+fn decode_lane_cursor(value: &str) -> Result<LaneCursor, GroupApiError> {
+    let bytes = URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| GroupApiError::invalid_request("invalid_cursor"))?;
+    serde_json::from_slice(&bytes).map_err(|_| GroupApiError::invalid_request("invalid_cursor"))
+}
+
+fn encode_lane_cursor(value: &LaneCursor) -> Result<String, GroupApiError> {
+    let bytes = serde_json::to_vec(value).map_err(|_| GroupApiError::internal())?;
+    Ok(URL_SAFE_NO_PAD.encode(bytes))
+}
+
+async fn create_lane(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Json(body): Json<CreateLaneBody>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:write")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let name = validate_lane_name(&body.name)?;
+    validate_lane_description(&body.description)?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let (_binding_id, role, _version) = authorize_lane_project(&mut tx, &actor, project_id).await?;
+    require_manager_role(&role)?;
+    let lane_id = Uuid::new_v4();
+    // P0 验收第一条: 无远端仓库/分支关联也能创建 (lane 表根本没有远端列)。
+    sqlx::query(
+        r#"
+        INSERT INTO lane (id, tenant_id, project_id, name, description, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        "#,
+    )
+    .bind(lane_id)
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(&name)
+    .bind(body.description.as_deref())
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let row = sqlx::query_as::<_, LaneRow>(
+        r#"
+        SELECT id, tenant_id, project_id, name, description, created_by,
+               lock_version, created_at, updated_at
+        FROM lane
+        WHERE tenant_id = $1 AND id = $2
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(lane_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(json!({ "project_id": project_id, "lane": lane_projection(&row) })),
+    ))
+}
+
+async fn list_project_lanes(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<LaneListQueryParams>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let cursor = query
+        .cursor
+        .as_deref()
+        .map(decode_lane_cursor)
+        .transpose()?;
+    if cursor
+        .as_ref()
+        .is_some_and(|value| value.project_id != project_id)
+    {
+        return Err(GroupApiError::invalid_request("cursor_filter_mismatch"));
+    }
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_lane_project(&mut tx, &actor, project_id).await?;
+    let mut rows = sqlx::query_as::<_, LaneRow>(
+        r#"
+        SELECT id, tenant_id, project_id, name, description, created_by,
+               lock_version, created_at, updated_at
+        FROM lane
+        WHERE tenant_id = $1 AND project_id = $2
+          AND ($3::TIMESTAMPTZ IS NULL OR (created_at, id) < ($3, $4))
+        ORDER BY created_at DESC, id DESC
+        LIMIT $5
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(cursor.as_ref().map(|value| value.created_at))
+    .bind(cursor.as_ref().map(|value| value.id))
+    .bind(limit + 1)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let has_more = rows.len() as i64 > limit;
+    rows.truncate(limit as usize);
+    let next_cursor = if has_more {
+        let row = rows.last().ok_or_else(GroupApiError::internal)?;
+        Some(encode_lane_cursor(&LaneCursor {
+            project_id,
+            created_at: row.created_at,
+            id: row.id,
+        })?)
+    } else {
+        None
+    };
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(json!({
+            "project_id": project_id,
+            "lanes": rows.iter().map(lane_projection).collect::<Vec<_>>(),
+            "limit": limit,
+            "next_cursor": next_cursor,
+        })),
+    ))
+}
+
+async fn get_lane(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((project_id, lane_id)): Path<(String, String)>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let lane_id = Uuid::parse_str(&lane_id).map_err(|_| GroupApiError::bad_request())?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_lane_project(&mut tx, &actor, project_id).await?;
+    let row = sqlx::query_as::<_, LaneRow>(
+        r#"
+        SELECT id, tenant_id, project_id, name, description, created_by,
+               lock_version, created_at, updated_at
+        FROM lane
+        WHERE tenant_id = $1 AND project_id = $2 AND id = $3
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(
+        json!({ "project_id": project_id, "lane": lane_projection(&row) }),
+    ))
+}
+
+async fn update_lane(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((project_id, lane_id)): Path<(String, String)>,
+    Json(body): Json<UpdateLaneBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:write")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let lane_id = Uuid::parse_str(&lane_id).map_err(|_| GroupApiError::bad_request())?;
+    let name = body.name.as_deref().map(validate_lane_name).transpose()?;
+    validate_lane_description(&body.description)?;
+    if body.expected_version < 1 {
+        return Err(GroupApiError::invalid_request("invalid_expected_version"));
+    }
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let (_binding_id, role, _version) = authorize_lane_project(&mut tx, &actor, project_id).await?;
+    require_manager_role(&role)?;
+    // 名称未传时保留现值 (乐观锁更新, 版本不匹配 → 409)
+    let updated = sqlx::query_as::<_, LaneRow>(
+        r#"
+        UPDATE lane
+        SET name = COALESCE($4, name),
+            description = CASE WHEN $5::BOOLEAN THEN $6 ELSE description END,
+            lock_version = lock_version + 1,
+            updated_at = now()
+        WHERE tenant_id = $1 AND project_id = $2 AND id = $3 AND lock_version = $7
+        RETURNING id, tenant_id, project_id, name, description, created_by,
+                  lock_version, created_at, updated_at
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .bind(name.as_deref())
+    .bind(body.description.is_some())
+    .bind(body.description.as_deref())
+    .bind(body.expected_version)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let row = match updated {
+        Some(row) => row,
+        None => {
+            // 区分「不存在」与「版本冲突」— 前者 404, 后者 409
+            let exists: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM lane WHERE tenant_id = $1 AND project_id = $2 AND id = $3",
+            )
+            .bind(actor.tenant_id)
+            .bind(project_id)
+            .bind(lane_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+            tx.commit().await.map_err(|_| GroupApiError::internal())?;
+            return if exists.is_some() {
+                Err(GroupApiError::conflict("lane_version_conflict"))
+            } else {
+                Err(GroupApiError::not_found())
+            };
+        }
+    };
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(
+        json!({ "project_id": project_id, "lane": lane_projection(&row) }),
+    ))
+}
+
+async fn delete_lane(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((project_id, lane_id)): Path<(String, String)>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:write")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let lane_id = Uuid::parse_str(&lane_id).map_err(|_| GroupApiError::bad_request())?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let (_binding_id, role, _version) = authorize_lane_project(&mut tx, &actor, project_id).await?;
+    require_manager_role(&role)?;
+    // 绑定行经 FK ON DELETE CASCADE 级联清理 (worktree_lane_binding → lane)
+    let deleted: Option<Uuid> = sqlx::query_scalar(
+        "DELETE FROM lane WHERE tenant_id = $1 AND project_id = $2 AND id = $3 RETURNING id",
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    deleted
+        .map(|id| Json(json!({ "project_id": project_id, "lane_id": id, "deleted": true })))
+        .ok_or_else(GroupApiError::not_found)
+}
+
+async fn attach_worktree_to_lane(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((project_id, lane_id)): Path<(String, String)>,
+    Json(body): Json<AttachLaneWorktreeBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:write")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let lane_id = Uuid::parse_str(&lane_id).map_err(|_| GroupApiError::bad_request())?;
+    if body.worktree_id.is_nil() {
+        return Err(GroupApiError::bad_request());
+    }
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let (_binding_id, role, _version) = authorize_lane_project(&mut tx, &actor, project_id).await?;
+    require_manager_role(&role)?;
+    // Lane 必须存在于该项目
+    let lane_exists: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM lane WHERE tenant_id = $1 AND project_id = $2 AND id = $3",
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if lane_exists.is_none() {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Err(GroupApiError::not_found());
+    }
+    // Worktree 必须已挂在同 project (active project binding)
+    let worktree_owned: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT p.worktree_id
+        FROM multica.worktree_project_binding p
+        WHERE p.tenant_id = $1 AND p.project_id = $2 AND p.worktree_id = $3
+          AND p.valid_to IS NULL
+        LIMIT 1
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(body.worktree_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if worktree_owned.is_none() {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Err(GroupApiError::not_found());
+    }
+    // 双时态绑定: 关闭该 worktree 的旧 active 绑定, 插入新绑定
+    sqlx::query(
+        r#"
+        UPDATE multica.worktree_lane_binding
+        SET valid_to = now()
+        WHERE tenant_id = $1 AND worktree_id = $2 AND valid_to IS NULL
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(body.worktree_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let binding_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO multica.worktree_lane_binding
+            (binding_id, tenant_id, project_id, lane_id, worktree_id, assigned_by, version)
+        VALUES ($1, $2, $3, $4, $5, $6, 1)
+        "#,
+    )
+    .bind(binding_id)
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .bind(body.worktree_id)
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(json!({
+        "project_id": project_id,
+        "lane_id": lane_id,
+        "worktree_id": body.worktree_id,
+        "binding_id": binding_id,
+    })))
+}
+
+async fn list_lane_worktrees(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((project_id, lane_id)): Path<(String, String)>,
+    Query(query): Query<LaneListQueryParams>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let lane_id = Uuid::parse_str(&lane_id).map_err(|_| GroupApiError::bad_request())?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_lane_project(&mut tx, &actor, project_id).await?;
+    let lane_exists: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM lane WHERE tenant_id = $1 AND project_id = $2 AND id = $3",
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(lane_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if lane_exists.is_none() {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Err(GroupApiError::not_found());
+    }
+    let rows = sqlx::query_as::<_, LaneWorktreeRow>(
+        r#"
+        SELECT w.id, b.lane_id, w.project_id, w.repo_id, w.name, w.branch,
+               w.human_state, w.machine_state, w.runtime_id, w.agent_id,
+               w.agent_session_id, w.archived, w.version,
+               b.binding_id, b.version AS binding_version,
+               erb.engineering_run_id
+        FROM multica.worktree_lane_binding b
+        JOIN worktree_canvas_worktree w
+          ON w.tenant_id = b.tenant_id AND w.id = b.worktree_id
+        LEFT JOIN multica.engineering_run_worktree_binding erb
+          ON erb.tenant_id = b.tenant_id AND erb.worktree_id = b.worktree_id
+         AND erb.valid_to IS NULL
+        WHERE b.tenant_id = $1 AND b.lane_id = $2 AND b.valid_to IS NULL
+        ORDER BY w.created_at DESC, w.id DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(lane_id)
+    .bind(limit)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(json!({
+        "project_id": project_id,
+        "lane_id": lane_id,
+        "worktrees": rows.iter().map(lane_worktree_projection).collect::<Vec<_>>(),
+        "limit": limit,
+        "next_cursor": null,
+    })))
 }
 
 async fn authorize_worktree(
