@@ -27,6 +27,7 @@ import {
   type McpServerConfig,
   type McpTransport,
 } from "@/lib/settings/capabilityRegistry";
+import { LocalOnlyConnectionNotice } from "./CapabilityConnectionStatus";
 import { useTranslation } from "@/lib/i18n";
 
 const TRANSPORT_META: Record<McpTransport, { icon: typeof Terminal; label: string }> = {
@@ -77,6 +78,7 @@ export function McpSettingsPanel() {
 
   return (
     <div className="space-y-4" data-testid="advanced-settings-mcp-panel">
+      <LocalOnlyConnectionNotice capability="mcp" />
       <div className="card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

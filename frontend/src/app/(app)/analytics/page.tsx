@@ -11,11 +11,17 @@ MERGE (self)-[:DEFINES]->(page)
 // =====================================================================
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { CheckCircle2, TrendingUp, Cpu, AlertTriangle, FileText } from "lucide-react";
+import { CheckCircle2, TrendingUp, Cpu, AlertTriangle, FileText, ListChecks, RefreshCw } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { buildAnalyticsData } from "./chartData";
+import {
+  useBiAnalyticsScope,
+  type BiAnalyticsScope,
+  type BiTaskEventItem,
+  type BiTaskSummary,
+} from "./serverAnalytics";
 import { ChartFrame } from "@/components/charts/shared/ChartFrame";
 import { Chart01Burndown } from "@/components/charts/Chart01Burndown";
 import { Chart02Burnup } from "@/components/charts/Chart02Burnup";
@@ -51,9 +57,273 @@ const IPA_PHASES = [
   { id: "P6.2", label: "集成测试", done: 1, total: 12 },
 ] as const;
 
+// =====================================================================
+// 服务端 BI 指标区 (per P1 BI 接通任务): 状态分布 + 完成量, 每张卡标注
+// 数据来源与 as_of; 可展开对回 task-events 源记录列表 (同一查询真源)。
+// 无授权会话 / 无 run 上下文时诚实空态, 不使用本地估算冒充服务端 BI。
+// =====================================================================
+const MAX_RECONCILE_PAGES = 200;
+const RECONCILE_PAGE_SIZE = 50;
+
+function scopeStatusLabel(scope: BiAnalyticsScope): { text: string; tone: "ok" | "warn" | "err" } {
+  switch (scope.kind) {
+    case "ready":
+      return { text: `服务端 BI 已接通 · Run ${scope.runId.slice(0, 8)}…`, tone: "ok" };
+    case "no-session":
+      return { text: "服务端 BI 未接通 — 无宿主认证会话 (数字不可与授权数据核对)", tone: "warn" };
+    case "invalid-run":
+      return { text: "服务端 BI 未接通 — URL 中 engineering_run_id 格式无效", tone: "err" };
+    case "no-run":
+      return { text: "服务端 BI 未接通 — 无 engineering run 上下文 (缺 ?engineering_run_id=)", tone: "warn" };
+  }
+}
+
+function ServerBiSection({ scope }: { scope: BiAnalyticsScope }) {
+  const [summary, setSummary] = useState<BiTaskSummary | null>(null);
+  const [summaryError, setSummaryError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
+  const [events, setEvents] = useState<BiTaskEventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState("");
+  const [eventsExhausted, setEventsExhausted] = useState(false);
+
+  const runId = scope.kind === "ready" ? scope.runId : null;
+  const client = scope.kind === "ready" ? scope.client : null;
+
+  useEffect(() => {
+    let active = true;
+    setSummary(null);
+    setSummaryError("");
+    setEvents([]);
+    setEventsExhausted(false);
+    if (!runId || !client) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+    setLoading(true);
+    client.getTaskSummary(runId).then((result) => {
+      if (!active) return;
+      setSummary(result);
+    }).catch((cause: unknown) => {
+      if (active) setSummaryError(cause instanceof Error ? cause.message : "服务端汇总读取失败。");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [runId, client]);
+
+  async function toggleReconcile() {
+    if (!runId || !client) return;
+    if (reconcileOpen) {
+      setReconcileOpen(false);
+      return;
+    }
+    setReconcileOpen(true);
+    if (events.length > 0 && eventsExhausted) return;
+    setEventsLoading(true);
+    setEventsError("");
+    setEvents([]);
+    let cursor: { before_occurred_at: string; before_event_id: string } | null = null;
+    const collected: BiTaskEventItem[] = [];
+    let exhausted = false;
+    try {
+      for (let page = 0; page < MAX_RECONCILE_PAGES; page += 1) {
+        const result = await client.listTaskEvents(runId, {
+          limit: RECONCILE_PAGE_SIZE,
+          ...(cursor ? cursor : {}),
+        });
+        collected.push(...result.items);
+        if (!result.has_more) {
+          exhausted = true;
+          break;
+        }
+        if (!result.next_cursor) break;
+        cursor = result.next_cursor;
+      }
+    } catch (cause) {
+      setEventsError(cause instanceof Error ? cause.message : "源记录对回失败。");
+    } finally {
+      setEventsLoading(false);
+    }
+    setEvents(collected);
+    setEventsExhausted(exhausted);
+  }
+
+  if (!runId || !client) {
+    const status = scopeStatusLabel(scope);
+    return (
+      <section data-testid="analytics-server-bi" className="rounded-xl border border-warn/40 bg-warn/10 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" />
+          <div>
+            <h2 className="text-sm font-bold text-ink">服务端指标</h2>
+            <p className="mt-1 text-xs text-warn" data-testid="analytics-server-bi-empty">{status.text}</p>
+            <p className="mt-2 text-[11px] text-ink-dim">
+              服务端 BI 走 <code className="font-mono">/api/v1/engineering-runs/&#123;run&#125;/bi/task-events</code> 授权查询
+              (状态分布 / 完成量均从同一源记录聚合, 可对回核对)。当前页面无 engineering run 上下文, 不展示任何伪装的 BI 数字。
+              下方图表全部为本地估算, 已在每张图上标注。
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const status = scopeStatusLabel(scope);
+  const distTotal = summary
+    ? summary.status_distribution.reduce((sum, bucket) => sum + bucket.count, 0)
+    : 0;
+  const reconcileCount = events.length;
+  const consistent = summary !== null
+    && eventsExhausted
+    && reconcileCount === summary.total_count;
+  const latestEventByWorkItem = new Map<string, BiTaskEventItem>();
+  for (const item of events) {
+    if (!latestEventByWorkItem.has(item.work_item_id)) latestEventByWorkItem.set(item.work_item_id, item);
+  }
+
+  return (
+    <section data-testid="analytics-server-bi" className="rounded-xl border border-line bg-bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+            服务端指标
+            <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${status.tone === "ok" ? "border-ok/40 bg-ok/10 text-ok" : status.tone === "warn" ? "border-warn/40 bg-warn/10 text-warn" : "border-err/40 bg-err/10 text-err"}`}>
+              {status.text}
+            </span>
+          </h2>
+          <p className="mt-1 text-[11px] text-ink-dim">
+            数据来源: <code className="font-mono">bi/task-summary</code> (与 task-events 同一授权查询真源)
+            {summary && <> · 聚合时间 as_of {new Date(summary.as_of).toLocaleString()}</>}
+            {summary && <> · 覆盖 {summary.source_event_range.earliest_occurred_at ?? "—"} ~ {summary.source_event_range.latest_occurred_at ?? "—"}</>}
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="analytics-bi-reconcile-toggle"
+          onClick={toggleReconcile}
+          disabled={eventsLoading}
+          className="btn-secondary inline-flex items-center gap-1.5 text-xs"
+        >
+          <ListChecks size={13} />
+          {reconcileOpen ? "收起源记录对回" : "对回 task-events 源记录"}
+        </button>
+      </div>
+
+      {loading && <p className="mt-3 text-xs text-ink-mute">正在读取服务端汇总…</p>}
+      {summaryError && <p role="alert" data-testid="analytics-bi-summary-error" className="mt-3 rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-600">服务端汇总读取失败：{summaryError}</p>}
+
+      {summary && (
+        <>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div data-testid="analytics-bi-total" className="rounded-lg bg-bg-soft p-3">
+              <span className="text-[11px] text-ink-dim">事件总数 (total_count)</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-ink">{summary.total_count.toLocaleString()}</p>
+              <p className="text-[10px] text-ink-mute">与 task-events 同范围全量条数一致</p>
+            </div>
+            <div data-testid="analytics-bi-completed" className="rounded-lg bg-bg-soft p-3">
+              <span className="text-[11px] text-ink-dim">完成量 (completed_count)</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-ink">{summary.completed_count.toLocaleString()}</p>
+              <p className="text-[10px] text-ink-mute">最新状态为 completed 的任务数</p>
+            </div>
+            <div data-testid="analytics-bi-work-items" className="rounded-lg bg-bg-soft p-3">
+              <span className="text-[11px] text-ink-dim">任务数 (work_item_count)</span>
+              <p className="mt-1 text-2xl font-bold font-mono text-ink">{summary.work_item_count.toLocaleString()}</p>
+              <p className="text-[10px] text-ink-mute">状态分布合计 = {distTotal.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-bg-soft p-3">
+              <span className="text-[11px] text-ink-dim">覆盖说明</span>
+              <p className="mt-1 text-[11px] text-ink-mute leading-snug">{summary.coverage.basis}</p>
+            </div>
+          </div>
+
+          <div className="mt-3" data-testid="analytics-bi-status-dist">
+            <span className="text-[11px] font-semibold text-ink-dim">任务状态分布 (每任务取最新事件状态)</span>
+            {summary.status_distribution.length === 0 ? (
+              <p className="mt-1 text-xs text-ink-mute">该范围暂无任务事件。</p>
+            ) : (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {summary.status_distribution.map((bucket) => (
+                  <li key={bucket.status} className="flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[11px]">
+                    <span className="font-mono text-ink">{bucket.status}</span>
+                    <span className="font-mono text-accent">{bucket.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+
+      {reconcileOpen && (
+        <div className="mt-3 rounded-lg border border-line" data-testid="analytics-bi-reconcile">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-bg-soft/60 px-3 py-2">
+            <span className="text-[11px] font-semibold text-ink">对回 task-events 源记录 (每任务标记最新事件)</span>
+            {eventsExhausted && summary && (
+              <span
+                data-testid="analytics-bi-reconcile-verdict"
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${consistent ? "border-ok/40 bg-ok/10 text-ok" : "border-err/40 bg-err/10 text-err"}`}
+              >
+                {consistent
+                  ? `一致 — 源记录 ${reconcileCount.toLocaleString()} 条 = total_count`
+                  : `不一致 — 源记录 ${reconcileCount.toLocaleString()} 条 ≠ total_count ${summary.total_count.toLocaleString()}`}
+              </span>
+            )}
+            {!eventsExhausted && !eventsLoading && !eventsError && (
+              <span className="text-[10px] text-warn">分页未走完 (上限 {MAX_RECONCILE_PAGES} 页), 未做全量核对</span>
+            )}
+          </div>
+          {eventsLoading && <p className="px-3 py-2 text-xs text-ink-mute"><RefreshCw size={12} className="mr-1 inline animate-spin" />正在对回源记录…</p>}
+          {eventsError && <p role="alert" className="px-3 py-2 text-xs text-red-600">源记录读取失败：{eventsError}</p>}
+          {!eventsLoading && !eventsError && events.length === 0 && (
+            <p className="px-3 py-2 text-xs text-ink-mute">该范围没有可对回的 task-events 源记录。</p>
+          )}
+          {events.length > 0 && (
+            <div className="max-h-72 overflow-y-auto">
+              <table className="w-full text-left text-[11px]" aria-label="task-events 源记录对回列表">
+                <thead className="sticky top-0 bg-bg-card">
+                  <tr className="border-b border-line text-ink-mute">
+                    <th className="px-3 py-1.5">发生时间</th>
+                    <th className="px-3 py-1.5">work_item</th>
+                    <th className="px-3 py-1.5">事件类型</th>
+                    <th className="px-3 py-1.5">lifecycle_status</th>
+                    <th className="px-3 py-1.5">变更</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((item) => {
+                    const isLatest = latestEventByWorkItem.get(item.work_item_id)?.event_id === item.event_id;
+                    return (
+                      <tr key={item.event_id} className="border-b border-line/50 text-ink-dim">
+                        <td className="px-3 py-1.5 font-mono">{new Date(item.occurred_at).toLocaleString()}</td>
+                        <td className="px-3 py-1.5 font-mono">{item.work_item_id.slice(0, 8)}…</td>
+                        <td className="px-3 py-1.5 font-mono">{item.event_type}</td>
+                        <td className="px-3 py-1.5 font-mono">
+                          {item.lifecycle_status ?? "—"}
+                          {isLatest && <span className="ml-1 rounded border border-accent/40 bg-accent/10 px-1 text-[9px] text-accent">最新</span>}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono">
+                          {item.from_status || item.to_status ? `${item.from_status ?? "—"} → ${item.to_status ?? "—"}` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function AnalyticsPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("概览");
+  const biScope = useBiAnalyticsScope();
+  const biStatus = scopeStatusLabel(biScope);
 
   const workItems = useStore((s) => s.workItems);
   const agents = useStore((s) => s.agentSessions);
@@ -82,7 +352,7 @@ export default function AnalyticsPage() {
   const preview = (
     <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-warn/40 bg-warn/10 px-3 py-1.5 text-[10px] text-warn">
       <AlertTriangle size={11} />
-      预览数据 — 图表基于本地 store 聚合；宿主 BI/数据库投影接入后切换为授权事实。
+      本地估算 — 基于当前会话数据 (store 聚合), 未接服务端 BI, 不可与授权数据核对；服务端指标见「概览」顶部。
     </p>
   );
 
@@ -113,6 +383,16 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-base font-bold text-ink">分析</h1>
           <span className="text-[10px] px-1.5 py-0.5 rounded border border-line text-ink-dim">全局</span>
+          <span
+            data-testid="analytics-data-source-status"
+            className={`text-[10px] px-1.5 py-0.5 rounded border ${
+              biStatus.tone === "ok" ? "border-ok/40 bg-ok/10 text-ok"
+                : biStatus.tone === "warn" ? "border-warn/40 bg-warn/10 text-warn"
+                : "border-err/40 bg-err/10 text-err"
+            }`}
+          >
+            {biStatus.text}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <select className="text-xs px-2 py-1.5 rounded border border-line bg-bg-soft text-ink" aria-label="项目">
@@ -152,6 +432,16 @@ export default function AnalyticsPage() {
       <main className="flex-1 overflow-auto bg-bg p-4">
         {activeTab === "概览" && (
           <div className="max-w-7xl mx-auto space-y-4">
+            <ServerBiSection scope={biScope} />
+
+            <div
+              data-testid="analytics-local-estimate-strip"
+              className="flex items-center gap-1.5 rounded-lg border border-warn/40 bg-warn/10 px-3 py-1.5 text-[10px] text-warn"
+            >
+              <AlertTriangle size={11} />
+              以下 KPI / 图表为本地估算 — 基于当前会话数据 (store 聚合), 非服务端 BI, 不可与授权数据核对。
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {kpiData.map((kpi, i) => (
                 <div key={i} data-testid={`analytics-kpi-${i}`} className="bg-bg-card rounded-xl border border-line p-4">
@@ -231,7 +521,9 @@ export default function AnalyticsPage() {
         {activeTab === "运维" && (
           <div className="max-w-7xl mx-auto space-y-4">
             <section className="bg-bg-card rounded-xl border border-line p-4">
-              <h2 className="text-sm font-bold text-ink mb-3">运维指标 (对接 MetricsTab / LogAITab)</h2>
+              <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">运维指标 (对接 MetricsTab / LogAITab)
+                <span data-testid="analytics-ops-demo-badge" className="text-[10px] px-1.5 py-0.5 rounded border border-warn/40 bg-warn/10 text-warn">演示数据 — 未接入服务端指标</span>
+              </h2>
               <p className="text-xs text-ink-dim">集成 /ops (运维控制台) 与 star-api-rest / canvas-engine 等服务指标</p>
               <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 {[
@@ -253,7 +545,9 @@ export default function AnalyticsPage() {
         {activeTab === "审计日志" && (
           <div className="max-w-7xl mx-auto space-y-4">
             <section className="bg-bg-card rounded-xl border border-line p-4">
-              <h2 className="text-sm font-bold text-ink mb-3">审计日志</h2>
+              <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">审计日志
+                <span data-testid="analytics-audit-demo-badge" className="text-[10px] px-1.5 py-0.5 rounded border border-warn/40 bg-warn/10 text-warn">演示数据 — 未接入服务端审计日志</span>
+              </h2>
               <p className="text-xs text-ink-dim mb-3">系统关键操作记录 (登录 / 权限变更 / 部署 / 删除 等)</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
