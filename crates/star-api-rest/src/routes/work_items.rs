@@ -1,4 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+/*
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
+MERGE (self:File {path:"crates/star-api-rest/src/routes/work_items.rs"})
+MERGE (search:Symbol {id:"crates/star-api-rest/src/routes/work_items.rs::search",kind:"function"})
+MERGE (current:Symbol {id:"crates/star-api-rest/src/routes/work_items.rs::current",kind:"function"})
+MERGE (get:Symbol {id:"crates/star-api-rest/src/routes/work_items.rs::get_by_id",kind:"function"})
+MERGE (create:Symbol {id:"crates/star-api-rest/src/routes/work_items.rs::create",kind:"function"})
+MERGE (update:Symbol {id:"crates/star-api-rest/src/routes/work_items.rs::update",kind:"function"})
+MERGE (self)-[:DEFINES]->(search)
+MERGE (self)-[:DEFINES]->(current)
+MERGE (self)-[:DEFINES]->(get)
+MERGE (self)-[:DEFINES]->(create)
+MERGE (self)-[:DEFINES]->(update)
+MERGE (create)-[:REDIRECTS_TO]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::create_work_item",kind:"function"})
+MERGE (update)-[:REDIRECTS_TO]->(:Symbol {id:"crates/star-api-rest/src/group_api/work_items.rs::move_work_item",kind:"function"})
+@endcypher
+*/
 //! 5 路由真实接线 (per Phase I Batch 1, brief: `docs/briefs/star-api-rest-phase-i-batch-1.md`)
 //!
 //! 范式来源 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #1-5):
@@ -20,8 +37,7 @@ use axum::{
     Json,
 };
 use domain_work_item::{
-    ActorContext, CreateWorkItemCommand, GetWorkItemQuery, InMemoryWorkItemService, Priority,
-    ProjectId, TenantId, TransitionStatusCommand, UserId, WorkItemCommandPort, WorkItemFilter,
+    ActorContext, GetWorkItemQuery, InMemoryWorkItemService, ProjectId, TenantId, WorkItemFilter,
     WorkItemId, WorkItemQueryPort, WorkItemStatus, WorkItemType,
 };
 use serde::Deserialize;
@@ -189,71 +205,23 @@ pub struct CreateBody {
     pub labels: Option<Vec<String>>,
 }
 
-fn parse_item_type(s: &str) -> Result<WorkItemType, RestError> {
-    match s {
-        "Epic" => Ok(WorkItemType::Epic),
-        "Story" => Ok(WorkItemType::Story),
-        "Task" => Ok(WorkItemType::Task),
-        "Bug" => Ok(WorkItemType::Bug),
-        "Subtask" => Ok(WorkItemType::Subtask),
-        "AITask" => Ok(WorkItemType::AITask),
-        _ => Err(RestError::validation(
-            format!("invalid item_type: {s}"),
-            "Use one of: Epic, Story, Task, Bug, Subtask, AITask",
-        )),
-    }
-}
-
-fn parse_priority(s: &str) -> Result<Priority, RestError> {
-    match s {
-        "Low" => Ok(Priority::Low),
-        "Medium" => Ok(Priority::Medium),
-        "High" => Ok(Priority::High),
-        "Urgent" => Ok(Priority::Urgent),
-        _ => Err(RestError::validation(
-            format!("invalid priority: {s}"),
-            "Use one of: Low, Medium, High, Urgent",
-        )),
-    }
-}
-
 /// `POST /api/v1/work-items`
-pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Value>>, RestError> {
-    let project_id = Uuid::parse_str(&body.project_id).map_err(|e| {
-        RestError::validation(format!("invalid project_id: {e}"), "Provide a valid UUID")
-    })?;
-    let workspace_id = Uuid::parse_str(&body.workspace_id).map_err(|e| {
-        RestError::validation(format!("invalid workspace_id: {e}"), "Provide a valid UUID")
-    })?;
-    let tenant_id = Uuid::parse_str(&body.tenant_id).map_err(|e| {
-        RestError::validation(format!("invalid tenant_id: {e}"), "Provide a valid UUID")
-    })?;
-    let reporter_user_id = Uuid::parse_str(&body.reporter_user_id).map_err(|e| {
-        RestError::validation(
-            format!("invalid reporter_user_id: {e}"),
-            "Provide a valid UUID",
-        )
-    })?;
-
-    let cmd = CreateWorkItemCommand {
-        tenant_id: TenantId(tenant_id),
-        workspace_id: domain_work_item::WorkspaceId(workspace_id),
-        project_id: ProjectId(project_id),
-        item_type: parse_item_type(&body.item_type)?,
-        title: body.title,
-        description: body.description,
-        priority: parse_priority(&body.priority)?,
-        severity: None,
-        reporter_user_id: UserId(reporter_user_id),
-        parent_work_item_id: None,
-        ai_task_data: None,
-        labels: body.labels.unwrap_or_default(),
-    };
-    let actor = ActorContext::default().with_role("developer");
-    let created = service().create_work_item(cmd, &actor).await?;
-    Ok(Json(RestResponse::ok(json!({
-        "issue": work_item_to_json(&created),
-    }))))
+///
+/// 统一写入路径已收敛到 group_api (PostgreSQL + 鉴权): `POST
+/// /api/v1/worktrees/{worktree_id}/work-items`。本旧内存态路由未接真实鉴权
+/// (nil-tenant actor + OnceLock 内存服务), 继续承接写入会造成与生产真源分裂的
+/// 双写, 因此 fail-closed 拒绝并明确指向生产路由 (per 共享约束: 未接真实鉴权的
+/// 路由必须拒绝访问, 不许裸奔)。
+#[allow(clippy::result_large_err)] // RestError 含 String, 跟现有 handler 同模式
+pub async fn create() -> Result<Json<RestResponse<Value>>, RestError> {
+    Err(RestError {
+        code: "NOT_IMPLEMENTED".to_string(),
+        message: "旧内存态工作项写入已停用: 统一写入路径为 POST /api/v1/worktrees/{worktree_id}/work-items (group_api, PostgreSQL + 鉴权)".to_string(),
+        source_module: "star-api-rest".to_string(),
+        source_kind: "NotImplemented".to_string(),
+        retriable: false,
+        hint: "本旧路由未接真实鉴权 (nil-tenant actor + 内存服务), fail-closed 拒绝; 请改走 group_api 工作项路由".to_string(),
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -266,42 +234,18 @@ pub struct UpdateBody {
 
 /// `PATCH /api/v1/work-items/{id}`
 ///
-/// 简化: PATCH 走 `transition_status`, REST 独有无 MCP 范式.
-/// 完整字段 update (title / description / assignee) 需 domain-work-item 增 `update_work_item` 方法,
-/// 留 Phase II 持久化决策时一并实装.
-pub async fn update(
-    Path(id): Path<String>,
-    Json(body): Json<UpdateBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| {
-        RestError::validation(
-            format!("invalid work item id UUID: {e}"),
-            "Provide a valid UUID",
-        )
-    })?;
-    let from = parse_status(&body.from).ok_or_else(|| {
-        RestError::validation(
-            format!("invalid from status: {}", body.from),
-            "Use TODO / IN_PROGRESS / DONE",
-        )
-    })?;
-    let to = parse_status(&body.status).ok_or_else(|| {
-        RestError::validation(
-            format!("invalid to status: {}", body.status),
-            "Use TODO / IN_PROGRESS / DONE",
-        )
-    })?;
-    let tenant_id = uuid::Uuid::nil();
-    let actor = ActorContext::default().with_role("developer");
-    let cmd = TransitionStatusCommand {
-        tenant_id: TenantId(tenant_id),
-        work_item_id: WorkItemId::from(uuid),
-        from,
-        to,
-        actor_user_id: UserId::from(actor.user_id),
-    };
-    let updated = service().transition_status(cmd, &actor).await?;
-    Ok(Json(RestResponse::ok(json!({
-        "issue": work_item_to_json(&updated),
-    }))))
+/// 统一移动/状态路径已收敛到 group_api: `POST
+/// /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/move` (列移动) 与
+/// `/lifecycle` (状态转换), 均走乐观锁 + 鉴权。本旧内存态 PATCH 未接真实鉴权,
+/// fail-closed 拒绝 (per 共享约束: 未接真实鉴权的路由必须拒绝访问, 不许裸奔)。
+#[allow(clippy::result_large_err)] // RestError 含 String, 跟现有 handler 同模式
+pub async fn update() -> Result<Json<RestResponse<Value>>, RestError> {
+    Err(RestError {
+        code: "NOT_IMPLEMENTED".to_string(),
+        message: "旧内存态工作项状态写入已停用: 统一路径为 POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/move (列移动) 与 /lifecycle (状态转换)".to_string(),
+        source_module: "star-api-rest".to_string(),
+        source_kind: "NotImplemented".to_string(),
+        retriable: false,
+        hint: "本旧路由未接真实鉴权 (nil-tenant actor + 内存服务), fail-closed 拒绝; 请改走 group_api 工作项路由".to_string(),
+    })
 }

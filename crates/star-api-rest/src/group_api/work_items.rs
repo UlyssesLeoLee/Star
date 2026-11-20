@@ -127,6 +127,22 @@
 //! MERGE (load)-[:READS]->(worktreeTask)
 //! MERGE (lookupIdempotency)-[:READS]->(idempotency)
 //! MERGE (saveIdempotency)-[:WRITES]->(idempotency)
+//! MERGE (moveWorkItem:Symbol {id:\"crates/star-api-rest/src/group_api/work_items.rs::move_work_item\",kind:\"function\"})
+//! MERGE (moveBody:Type {id:\"crates/star-api-rest/src/group_api/work_items.rs::MoveWorkItemBody\",kind:\"struct\"})
+//! MERGE (columnMap:Symbol {id:\"crates/star-api-rest/src/group_api/work_items.rs::unified_column_status\",kind:\"function\"})
+//! MERGE (moveTest:Symbol {id:\"crates/star-api-rest/src/group_api/work_items.rs::tests::unified_columns_map_to_lifecycle_statuses\",kind:\"test\"})
+//! MERGE (moveBodyTest:Symbol {id:\"crates/star-api-rest/src/group_api/work_items.rs::tests::move_body_shape_keeps_request_hash_shape\",kind:\"test\"})
+//! MERGE (module)-[:DEFINES]->(moveWorkItem)
+//! MERGE (module)-[:DEFINES]->(moveBody)
+//! MERGE (module)-[:DEFINES]->(columnMap)
+//! MERGE (module)-[:DEFINES]->(moveTest)
+//! MERGE (module)-[:DEFINES]->(moveBodyTest)
+//! MERGE (router)-[:CALLS]->(moveWorkItem)
+//! MERGE (moveWorkItem)-[:CALLS]->(columnMap)
+//! MERGE (moveWorkItem)-[:CALLS]->(context)
+//! MERGE (moveWorkItem)-[:CALLS]->(transitionPort)
+//! MERGE (moveWorkItem)-[:CALLS]->(mapError)
+//! MERGE (moveWorkItem)-[:CALLS]->(load)
 //! @endcypher
 //!
 use axum::{
@@ -192,6 +208,41 @@ struct ReviewCommandBody {
     reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     focus_worktree_id: Option<Uuid>,
+}
+
+/// Unified Kanban-column move command (Backlog/Sprint/Kanban 共享同一写入路径).
+///
+/// `target_column` 使用统一列词汇 (todo/in_progress/blocked/done/wontfix),
+/// `target_status` 直接使用六态生命周期词汇 (pending/claimed/in_progress/completed/
+/// failed/cancelled); 两者二选一, 最终都归一为 `RunTaskCardStatus` 后走同一个
+/// `RunTaskCardCommandPort.transition` 乐观锁写路径。
+#[derive(Debug, Deserialize, Serialize)]
+pub(super) struct MoveWorkItemBody {
+    /// Kanban 统一列 (todo/in_progress/blocked/done/wontfix)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    target_column: Option<String>,
+    /// 六态生命周期状态 (pending/claimed/in_progress/completed/failed/cancelled)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    target_status: Option<String>,
+    /// 乐观并发版本 (task_lifecycle_current.version)
+    expected_version: i32,
+    correlation_id: Option<Uuid>,
+    reason: Option<String>,
+}
+
+/// 统一列 → 六态生命周期状态的单一映射 (与 groupProjection 读侧映射互逆)。
+///
+/// 写侧唯一真源: Backlog/Sprint/Kanban 三入口移动卡片都经过本映射;
+/// 服务端没有 \"review\" 列语义 (评审由 review 流程独立驱动), 故不在闭集中。
+pub(super) fn unified_column_status(column: &str) -> Option<RunTaskCardStatus> {
+    match column {
+        "todo" => Some(RunTaskCardStatus::Pending),
+        "in_progress" => Some(RunTaskCardStatus::InProgress),
+        "blocked" => Some(RunTaskCardStatus::Failed),
+        "done" => Some(RunTaskCardStatus::Completed),
+        "wontfix" => Some(RunTaskCardStatus::Cancelled),
+        _ => None,
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -268,6 +319,10 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/review",
             post(review_work_item),
+        )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/move",
+            post(move_work_item),
         )
 }
 
@@ -627,6 +682,127 @@ async fn transition_work_item(
     Ok(Json(
         serde_json::to_value(receipt.snapshot).map_err(|_| GroupApiError::internal())?,
     ))
+}
+
+/// Unified Kanban-column move (Backlog/Sprint/Kanban 三入口共享的同一写入路径).
+///
+/// 语义:
+/// - `target_column` / `target_status` 二选一, 归一为六态生命周期状态;
+/// - 目标状态与当前状态相同时视为视图内重排 (服务端无列内排序), 不产生写,
+///   直接返回当前快照;
+/// - 其余情况走 `RunTaskCardCommandPort.transition` (乐观锁 `expected_version`),
+///   与 lifecycle 路由共用同一端口、同一状态规则、同一冲突反馈 (409 `version_conflict`
+///   / `invalid_transition` 等, 由 `GroupApiError::from_run_task_card` 统一映射)。
+#[allow(clippy::result_large_err)] // RestError 含 String, 跟现有 handler 同模式
+async fn move_work_item(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((worktree_id, work_item_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<MoveWorkItemBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:write")?;
+    let worktree_id = parse_id(&worktree_id)?;
+    let work_item_id = parse_id(&work_item_id)?;
+    // 请求体校验必须在任何数据库访问之前 (fail-closed: 未授权/非法输入不触库)
+    let target_status = resolve_move_target(&body)?;
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(&format!("move:{worktree_id}:{work_item_id}"), &body)?;
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let _run_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
+    let current = load_work_item(
+        &mut tx,
+        actor.tenant_id,
+        worktree.project_id,
+        worktree_id,
+        work_item_id,
+    )
+    .await?;
+    let current_status = current
+        .pointer("/lifecycle/status")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let current_version = current
+        .pointer("/lifecycle/version")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    // 目标列 = 当前列: 视图内重排不产生服务端状态写 (服务端无列内排序), 直接回当前快照
+    if current_status == target_status.as_str() {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Ok(Json(json!({
+            "moved": false,
+            "task_card": current,
+        })));
+    }
+    // 乐观锁: 调用方 expected_version 必须与服务端当前版本一致, 否则 409 明确反馈
+    if current_version != i64::from(body.expected_version) {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Err(GroupApiError::from_run_task_card(
+            RunTaskCardError::Conflict("version_conflict"),
+        ));
+    }
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let context = run_task_card_context(
+        actor.tenant_id,
+        actor.user_id,
+        None,
+        None,
+        Some(worktree_id),
+        key,
+        hash,
+        correlation_id,
+    )?;
+    let command = TransitionRunTaskCardCommand {
+        work_item_id: work_item_id.into(),
+        target_status,
+        expected_version: body.expected_version,
+        reason: body.reason,
+    };
+    let receipt = state
+        .run_task_card_command_port
+        .transition(context, command)
+        .await
+        .map_err(map_run_task_card_error)?;
+    Ok(Json(json!({
+        "moved": true,
+        "task_card": receipt.snapshot,
+    })))
+}
+
+/// Resolve the unified move target: exactly one of column/status, normalized to lifecycle status.
+fn resolve_move_target(body: &MoveWorkItemBody) -> Result<RunTaskCardStatus, GroupApiError> {
+    let has_column = body.target_column.is_some();
+    let has_status = body.target_status.is_some();
+    if has_column == has_status {
+        return Err(GroupApiError::invalid_request("move_target_required_once"));
+    }
+    if body.expected_version < 1 {
+        return Err(GroupApiError::invalid_request("invalid_move_command"));
+    }
+    if body
+        .reason
+        .as_ref()
+        .is_some_and(|reason| reason.len() > 4_000)
+    {
+        return Err(GroupApiError::invalid_request("invalid_move_command"));
+    }
+    if let Some(column) = body.target_column.as_deref() {
+        return unified_column_status(column)
+            .ok_or_else(|| GroupApiError::invalid_request("unsupported_target_column"));
+    }
+    if let Some(status) = body.target_status.as_deref() {
+        return RunTaskCardStatus::try_from(status).map_err(map_run_task_card_error);
+    }
+    Err(GroupApiError::invalid_request("move_target_required_once"))
 }
 
 async fn transition_run_work_item(
@@ -1232,6 +1408,70 @@ mod tests {
                 "expected_version": 1,
                 "correlation_id": null,
                 "reason": null
+            })
+        );
+    }
+
+    #[test]
+    fn unified_columns_map_to_lifecycle_statuses() {
+        use domain_work_item::run_task_card::RunTaskCardStatus;
+        assert_eq!(
+            super::unified_column_status("todo"),
+            Some(RunTaskCardStatus::Pending)
+        );
+        assert_eq!(
+            super::unified_column_status("in_progress"),
+            Some(RunTaskCardStatus::InProgress)
+        );
+        assert_eq!(
+            super::unified_column_status("blocked"),
+            Some(RunTaskCardStatus::Failed)
+        );
+        assert_eq!(
+            super::unified_column_status("done"),
+            Some(RunTaskCardStatus::Completed)
+        );
+        assert_eq!(
+            super::unified_column_status("wontfix"),
+            Some(RunTaskCardStatus::Cancelled)
+        );
+        // \"review\" 列没有服务端状态语义 — 评审由独立 review 流程驱动, 不在统一列闭集内
+        assert_eq!(super::unified_column_status("review"), None);
+        assert_eq!(super::unified_column_status("bogus"), None);
+    }
+
+    #[test]
+    fn move_body_shape_keeps_request_hash_shape() {
+        let body: super::MoveWorkItemBody = serde_json::from_value(json!({
+            "target_column": "in_progress",
+            "expected_version": 3,
+            "correlation_id": null,
+            "reason": null
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(body).unwrap(),
+            json!({
+                "target_column": "in_progress",
+                "expected_version": 3,
+                "correlation_id": null,
+                "reason": null
+            })
+        );
+        let status_body: super::MoveWorkItemBody = serde_json::from_value(json!({
+            "target_status": "cancelled",
+            "expected_version": 2,
+            "correlation_id": null,
+            "reason": "superseded"
+        }))
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(status_body).unwrap(),
+            json!({
+                "target_status": "cancelled",
+                "expected_version": 2,
+                "correlation_id": null,
+                "reason": "superseded"
             })
         );
     }

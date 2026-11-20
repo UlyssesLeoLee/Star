@@ -21,6 +21,17 @@ MERGE (page)-[:CALLS]->(groupApiHook)
 MERGE (page)-[:CALLS]->(sessionStateHook)
 MERGE (page)-[:CALLS]->(applyBoardFilters)
 MERGE (page)-[:CALLS]->(ideFileWorkspaceComponent)
+MERGE (unified:File {path:"frontend/src/app/(app)/kanban/unifiedWorkItems.ts"})
+MERGE (self)-[:IMPORTS]->(unified)
+MERGE (listUnified:Symbol {id:"frontend/src/app/(app)/kanban/unifiedWorkItems.ts::listUnifiedWorkItems",kind:"function"})
+MERGE (createUnified:Symbol {id:"frontend/src/app/(app)/kanban/unifiedWorkItems.ts::createUnifiedWorkItem",kind:"function"})
+MERGE (moveUnified:Symbol {id:"frontend/src/app/(app)/kanban/unifiedWorkItems.ts::moveUnifiedWorkItem",kind:"function"})
+MERGE (page)-[:CALLS]->(listUnified)
+MERGE (page)-[:CALLS]->(createUnified)
+MERGE (page)-[:CALLS]->(moveUnified)
+MERGE (serverTransition:Symbol {id:"frontend/src/app/(app)/kanban/page.tsx::handleServerTransition",kind:"function"})
+MERGE (serverTransition)-[:CALLS]->(moveUnified)
+MERGE (page)-[:CALLS]->(serverTransition)
 @endcypher
 */
 // =====================================================================
@@ -38,6 +49,7 @@ MERGE (page)-[:CALLS]->(ideFileWorkspaceComponent)
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import {
   ChevronDown,
   GitBranch,
@@ -61,9 +73,22 @@ import { IdeFileWorkspace } from "@/components/ide/IdeFileWorkspace";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { useNemaStore } from "@/lib/nema/nemaStore";
-import { KANBAN_COLUMNS } from "@/mocks/data/kanban";
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
 import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
+import { useRunDirectory } from "@/lib/run/runDirectorySession";
+import type { Board, WorkItem } from "@/types/ids";
+import {
+  createUnifiedWorkItem,
+  listUnifiedWorkItems,
+  moveUnifiedWorkItem,
+  toStorePriority,
+  toUnifiedError,
+  UNIFIED_COLUMN_LABELS,
+  UNIFIED_COLUMN_STATUS,
+  UNIFIED_KANBAN_COLUMNS,
+  type UnifiedKanbanColumn,
+  type UnifiedWorkItem,
+} from "./unifiedWorkItems";
 
 const VIEW_TABS = ["Sprint", "任务看板", "IPA 流程图", "按文件开卡", "时间线", "日历"] as const;
 type ViewTab = (typeof VIEW_TABS)[number];
@@ -105,13 +130,102 @@ export default function KanbanPage() {
   const groupSession = useWorktreeGroupSessionState();
   const unauthorized = groupSession.status === "invalidated";
   const hostConnected = groupApi !== null;
+
+  // ---- 服务端真源通道 (per P1: Backlog/Sprint/Kanban 共享同一任务 ID/状态规则/写入路径) ----
+  // serverMode = 宿主会话 + 当前 Worktree 上下文 (navStore.selectedWorktreeId) 齐备;
+  // 缺其一即退化为「本地模式」并明确标注, 不冒充服务端数据。
+  const runDirectory = useRunDirectory();
+  const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+  const [serverItems, setServerItems] = useState<UnifiedWorkItem[] | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [serverRefreshKey, setServerRefreshKey] = useState(0);
+  const serverMode = hostConnected && runDirectory.client !== null && selectedWorktreeId !== "";
   const createDisabled = unauthorized || !hostConnected;
+
+  // 每次进入页面/上下文切换都重新 fetch 服务端真源 (不依赖 persist 旧数据, per P1 刷新一致)
+  useEffect(() => {
+    if (!serverMode || !groupApi) return;
+    const controller = new AbortController();
+    setServerError(null);
+    listUnifiedWorkItems(groupApi, selectedWorktreeId, controller.signal)
+      .then((items) => {
+        setServerItems(items);
+        syncStoreCache(items);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const unified = toUnifiedError(error);
+        setServerError(unified.message);
+        setServerItems(null);
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverMode, groupApi, selectedWorktreeId, serverRefreshKey]);
+
+  // store 只读缓存水合 (per P1 复用清单: WorkItemDetailDrawer 读 store.workItems, 不可改共享文件;
+  // 此处用既有 addWorkItem/transitionWorkItem 幂等水合, 供详情抽屉展示服务端真源; 写操作一律不走 store)
+  const syncStoreCache = (items: UnifiedWorkItem[]) => {
+    for (const item of items) {
+      const current = useStore.getState().workItems.find((w) => w.id === item.id);
+      if (!current) {
+        addWorkItem(toStoreWorkItem(item));
+      } else if (current.status !== item.column) {
+        transitionWorkItem(item.id, item.column);
+      }
+    }
+  };
+
+  // 服务端真源 → store 形状 (仅缓存水合/看板渲染; 状态/版本仍以服务端为准)
+  const toStoreWorkItem = (item: UnifiedWorkItem): WorkItem => ({
+    id: item.id,
+    tenant_id: project?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
+    project_id: projectId || "00000000-0000-0000-0000-000000000000",
+    key: item.id,
+    title: item.title,
+    description: item.description,
+    kind: item.kind as WorkItem["kind"],
+    status: item.column,
+    priority: toStorePriority(item.priority),
+    reporter_id: item.reporterId || "usr-002",
+    labels: item.labels,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    worktree_id: item.worktreeId,
+  });
 
   const handleCreateTaskCard = async () => {
     const title = draftTitle.trim();
     if (!title) return;
     // 未接入/未授权: 禁止写本地 seed (per 2026-11-16, 本地 seed 不冒充正式任务)
     if (createDisabled) return;
+    if (serverMode && runDirectory.client) {
+      // 服务端真源写入: 创建挂当前 worktree (branch) — 与 Backlog/Sprint 入口同一写入路径
+      try {
+        const runContext =
+          runDirectory.focus ?? (await runDirectory.client.getWorktreeRunContext(selectedWorktreeId));
+        await createUnifiedWorkItem(runDirectory.client, runContext, selectedWorktreeId, {
+          title,
+          description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : "",
+          priority: "medium",
+          idempotencyKey: `kanban-create-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        });
+        setDraftTitle("");
+        setDraftIpaFlow("ipa-s05-002 ソースコード作成");
+        setDraftWorkflow("");
+        setDraftFile("");
+        setDraftPoints("3");
+        setServerRefreshKey((k) => k + 1);
+        toast.success("任务卡已创建 (服务端真源)");
+      } catch (error) {
+        const unified = toUnifiedError(error);
+        if (unified.isForbidden()) {
+          toast.error("越权写入被拒绝 — 当前会话没有创建任务卡的授权");
+        } else {
+          toast.error(`创建失败: ${unified.message}`);
+        }
+      }
+      return;
+    }
     try {
       addWorkItem({
         tenant_id: "tn-001",
@@ -138,6 +252,50 @@ export default function KanbanPage() {
       setActiveView("IPA 流程图");
     } catch {
       /* 创建失败静默 (store 本地) */
+    }
+  };
+
+  // 服务端移动 (kanban/sprint 同一 moveUnifiedWorkItem 写入路径; 乐观更新 + 失败回滚 + 冲突反馈)
+  const handleServerTransition = async (workItemId: string, toStatus: WorkItem["status"]) => {
+    if (!groupApi || !serverMode || !serverItems) return;
+    if (!(UNIFIED_KANBAN_COLUMNS as readonly string[]).includes(toStatus)) {
+      toast.error("该列没有服务端状态语义 — 评审请走评审流程 (review 状态由服务端 review 流程驱动)");
+      return;
+    }
+    const target = toStatus as UnifiedKanbanColumn;
+    const item = serverItems.find((w) => w.id === workItemId);
+    if (!item) return;
+    // 乐观更新
+    setServerItems((cur) =>
+      cur
+        ? cur.map((w) =>
+            w.id === workItemId
+              ? { ...w, column: target, lifecycleStatus: UNIFIED_COLUMN_STATUS[target] }
+              : w,
+          )
+        : null,
+    );
+    try {
+      const updated = await moveUnifiedWorkItem(
+        groupApi,
+        selectedWorktreeId,
+        item,
+        target,
+        `kanban-move-${workItemId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      );
+      setServerItems((cur) => (cur ? cur.map((w) => (w.id === updated.id ? updated : w)) : null));
+      transitionWorkItem(updated.id, updated.column);
+    } catch (error) {
+      const unified = toUnifiedError(error);
+      if (unified.isConflict()) {
+        toast.error("版本冲突, 已刷新最新状态");
+      } else if (unified.isForbidden()) {
+        toast.error("越权写入被拒绝 — 当前会话没有移动任务卡的授权");
+      } else {
+        toast.error(`移动失败: ${unified.message}`);
+      }
+      // 失败回滚: 重新拉取服务端真源 (乐观更新作废)
+      setServerRefreshKey((k) => k + 1);
     }
   };
 
@@ -194,9 +352,38 @@ export default function KanbanPage() {
   const nemaTasks = useNemaStore((s) => s.nemaTasks);
   const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
 
-  const lifecycleCols = board?.columns && board.columns.length > 0
-    ? board.columns.map((c) => ({ id: c.status, label: LIFECYCLE_LABEL[c.status] ?? c.name ?? c.status }))
-    : KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
+  // ---- 列定义 (per P1): 服务端无 board 列配置, 列闭集来自统一域常量
+  //      UNIFIED_KANBAN_COLUMNS (镜像 group_api `unified_column_status`, 与
+  //      groupProjection 读侧映射互逆); 不再依赖 mocks/data/kanban。 ----
+  const lifecycleCols = serverMode
+    ? UNIFIED_KANBAN_COLUMNS.map((id) => ({ id, label: UNIFIED_COLUMN_LABELS[id]["zh-CN"] }))
+    : board?.columns && board.columns.length > 0
+      ? board.columns.map((c) => ({ id: c.status, label: LIFECYCLE_LABEL[c.status] ?? c.name ?? c.status }))
+      : UNIFIED_KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
+
+  // 服务端模式的看板投影 (列 = 统一闭集; work_item_ids 从服务端真源派生, 非本地事实)
+  const unifiedBoard = useMemo<Board>(() => ({
+    id: "00000000-0000-0000-0000-000000000000",
+    tenant_id: project?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
+    project_id: projectId || "00000000-0000-0000-0000-000000000000",
+    name: "统一服务端看板 (worktree 真源)",
+    columns: UNIFIED_KANBAN_COLUMNS.map((status) => ({
+      status,
+      name: UNIFIED_COLUMN_LABELS[status]["zh-CN"],
+      work_item_ids: (serverItems ?? []).filter((w) => w.column === status).map((w) => w.id),
+    })),
+  }), [serverItems, projectId, project?.tenant_id]);
+
+  // 服务端模式看板卡片 (WorkItem 形状仅用于 KanbanBoard 渲染/筛选; 状态以服务端为准)
+  const serverBoardItems = useMemo(
+    () => (serverItems ?? []).map((item) => toStoreWorkItem(item)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [serverItems, projectId, project?.tenant_id],
+  );
+  const filteredServerBoardItems = useMemo(
+    () => applyBoardFilters(serverBoardItems, boardFilter),
+    [serverBoardItems, boardFilter],
+  );
 
   return (
     <div className="flex h-full bg-bg">
@@ -268,11 +455,36 @@ export default function KanbanPage() {
           </span>
         </div>
 
-        {/* 数据来源标识 (per 2026-11-15 Phase 3.2: 预览/seed 数据不得冒充正式管理视图) */}
-        <div data-testid="kanban-data-source" className="flex items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn">
-          <span className="size-1.5 rounded-full bg-warn" />
-          预览数据模式 — 当前看板展示本地 seed 数据, 非授权服务端任务事实。宿主会话接入后自动切换为授权投影。
+        {/* 数据来源标识 (per P1: 服务端真源 / 本地模式 明确区分, 不冒充) */}
+        <div
+          data-testid="kanban-data-source"
+          className={clsx(
+            "flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px]",
+            serverMode
+              ? "border-ok/40 bg-ok/10 text-ok"
+              : "border-warn/40 bg-warn/10 text-warn",
+          )}
+        >
+          <span className={clsx("size-1.5 rounded-full", serverMode ? "bg-ok" : "bg-warn")} />
+          {serverMode ? (
+            <span>
+              服务端真源模式 — 任务卡来自授权服务端投影 (worktree {selectedWorktreeId}), 每次进入页面重新拉取; 创建/移动/状态转换与 Backlog·Sprint 共享同一任务 ID 与写入路径。
+            </span>
+          ) : (
+            <span>
+              本地模式 — 当前看板展示本地状态, 非授权服务端任务事实; 宿主会话与 Worktree 上下文接入后自动切换为服务端真源。
+            </span>
+          )}
         </div>
+        {serverMode && serverError && (
+          <div
+            data-testid="kanban-server-error"
+            className="flex items-center gap-2 rounded-lg border border-err/40 bg-err/10 px-3 py-2 text-[11px] text-err"
+          >
+            <span className="size-1.5 rounded-full bg-err" />
+            服务端数据加载失败: {serverError}
+          </div>
+        )}
 
         {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
         <div data-testid="kanban-create-bar" className="flex items-center gap-2 flex-wrap rounded-xl border border-line bg-bg-card p-2.5">
@@ -406,29 +618,35 @@ export default function KanbanPage() {
               value={boardFilter}
               onChange={setBoardFilter}
               assignees={identities}
-              total={boardWorkItems.length}
-              shown={filteredBoardWorkItems.length}
+              total={serverMode ? serverBoardItems.length : boardWorkItems.length}
+              shown={serverMode ? filteredServerBoardItems.length : filteredBoardWorkItems.length}
             />
             <KanbanBoard
-              board={board}
-              workItems={filteredBoardWorkItems}
+              board={serverMode ? unifiedBoard : board}
+              workItems={serverMode ? filteredServerBoardItems : filteredBoardWorkItems}
               identities={identities}
-              onTransition={transitionWorkItem}
+              onTransition={serverMode ? (id, to) => void handleServerTransition(id, to) : transitionWorkItem}
               onWorkItemClick={(wi) => setDrawerMode({ kind: "view", workItemId: wi.id })}
-              onRequestNewWorkItem={(status) => setDrawerMode({ kind: "new", defaultStatus: status })}
-              onAddColumn={addBoardColumn}
-              onRemoveColumn={removeBoardColumn}
-              onRenameColumn={renameBoardColumn}
-              onReorderColumns={reorderBoardColumns}
+              // 服务端模式: 列编辑与列内新建是本地 board 语义 (服务端无列配置),
+              // 不渲染以免产生与真源分裂的本地写 (诚实隐藏); 创建走顶部统一创建栏
+              onRequestNewWorkItem={
+                serverMode ? undefined : (status) => setDrawerMode({ kind: "new", defaultStatus: status })
+              }
+              onAddColumn={serverMode ? undefined : addBoardColumn}
+              onRemoveColumn={serverMode ? undefined : removeBoardColumn}
+              onRenameColumn={serverMode ? undefined : renameBoardColumn}
+              onReorderColumns={serverMode ? undefined : reorderBoardColumns}
               // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入/空数据不渲染本地 seed 任务卡
               unavailableState={
                 unauthorized
                   ? "unauthorized"
                   : !hostConnected
                     ? "disconnected"
-                    : boardWorkItems.length === 0
+                    : serverMode && serverError
                       ? "empty"
-                      : null
+                      : serverMode && (serverItems ?? []).length === 0
+                        ? "empty"
+                        : null
               }
             />
           </section>
