@@ -140,7 +140,7 @@ async fn lane_read_rejects_garbage_token_401() {
     )
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    assert_eq!(body["error"], json!("BEARER_INVALID_FORMAT"));
+    assert_eq!(body["error"], json!("BEARER_INVALID_TOKEN"));
 }
 
 #[tokio::test]
@@ -223,22 +223,28 @@ async fn lane_create_legacy_session_without_device_context_401() {
 #[tokio::test]
 async fn lane_routes_mounted_in_production_router() {
     let jwt = route_test_jwt_config();
-    let token = route_test_token(&jwt, Uuid::new_v4(), Uuid::new_v4(), "project:read", None);
     let pool = sqlx::PgPool::connect_lazy("postgresql://dummy:***@localhost/lane_mount_test")
         .expect("lazy pool");
     let state = GroupApiState::new(jwt, pool);
     let app = build_group_router(state);
+    // 只用不触达 DB 的前置判定探测挂载 (本机 5432 可能有无关 PG 监听,
+    // 带有效 token 的请求会真实连库 — 避免)。404 = 未挂载; 401 = 已挂载 (fail-closed)。
     for path in [
         format!("/api/v1/projects/{PROJECT}/lanes"),
         format!("/api/v1/projects/{PROJECT}/lanes/{LANE}"),
         format!("/api/v1/projects/{PROJECT}/lanes/{LANE}/worktrees"),
     ] {
-        // lazy pool 无连接 → 500 (或更早的 400/401); 404 = 未挂载
-        let (status, _) = send(&app, get_uri(&path, &token)).await;
+        let req = Request::builder().uri(&path).body(Body::empty()).unwrap();
+        let (status, _) = send(&app, req).await;
         assert_ne!(
             status,
             StatusCode::NOT_FOUND,
             "lane endpoint {path} should be mounted (got 404)"
+        );
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "lane endpoint {path} should fail closed without authentication"
         );
     }
 }
