@@ -55,7 +55,25 @@ MERGE (createTask)-[:CALLS]->(insertEntityRef)
 MERGE (createTask)-[:CALLS]->(append)
 MERGE (createTask)-[:CALLS]->(saveIdempotency)
 
-MERGE (createTask)-[:USES_TYPE]->(taskAdapter)@endcypher
+MERGE (createTask)-[:USES_TYPE]->(taskAdapter)
+MERGE (resolveCanvas:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::get_worktree_canvas",kind:"function"})
+MERGE (conflictPayload:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::conflict_with_both_sides",kind:"function"})
+MERGE (currentProjection:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::current_element_projection",kind:"function"})
+MERGE (canvasRow:Type {id:"crates/star-api-rest/src/group_api/canvas.rs::CurrentCanvasRow",kind:"struct"})
+MERGE (resolveEndpoint:Endpoint {id:"GET /api/v1/worktrees/{worktree_id}/canvas",kind:"http_route"})
+MERGE (route)-[:EXPOSES]->(resolveEndpoint)
+MERGE (resolveEndpoint)-[:HANDLES]->(resolveCanvas)
+MERGE (resolveCanvas)-[:CALLS]->(scope)
+MERGE (resolveCanvas)-[:CALLS]->(worktree)
+MERGE (resolveCanvas)-[:READS]->(:Table {name:"canvas.group_canvas_registry",type:"table"})
+MERGE (resolveCanvas)-[:USES_TYPE]->(canvasRow)
+MERGE (conflictPayload)-[:CALLS]->(currentProjection)
+MERGE (updateElement:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::update_element",kind:"function"})
+MERGE (deleteElement:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::delete_element",kind:"function"})
+MERGE (updateDoc:Symbol {id:"crates/star-api-rest/src/group_api/canvas.rs::update_document",kind:"function"})
+MERGE (updateElement)-[:CALLS]->(conflictPayload)
+MERGE (deleteElement)-[:CALLS]->(conflictPayload)
+MERGE (updateDoc)-[:CALLS]->(conflictPayload)@endcypher
 */
 //! Cypher structural manifest.
 //! CREATE
@@ -117,7 +135,8 @@ use std::collections::HashSet;
 
 use axum::{
     extract::{Path, Query, State},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post, put},
     Json, Router,
 };
@@ -359,6 +378,18 @@ struct CurrentCanvasVersion {
 }
 
 #[derive(Debug, FromRow)]
+struct CurrentCanvasRow {
+    canvas_id: Uuid,
+    title: String,
+    version: i64,
+    created_by: Uuid,
+    created_at: DateTime<Utc>,
+    viewport: Value,
+    frames: Value,
+    connectors: Value,
+}
+
+#[derive(Debug, FromRow)]
 struct CurrentElement {
     kind: String,
     x: f64,
@@ -402,6 +433,10 @@ struct CanvasElementRow {
 
 pub(super) fn router() -> Router<GroupApiState> {
     Router::new()
+        .route(
+            "/api/v1/worktrees/{worktree_id}/canvas",
+            get(get_worktree_canvas),
+        )
         .route(
             "/api/v1/worktrees/{worktree_id}/canvases",
             get(list_canvases).post(create_canvas),
@@ -731,6 +766,120 @@ async fn create_work_item_on_canvas(
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
     Ok(Json(response))
 }
+/// 统一画布解析入口: 独立 `/canvas/[id]` 与 Group Canvas 共用同一授权数据源。
+/// 返回 worktree 当前默认画布 (创建时间最新) + 元素 + 写权限快照,
+/// 前端据此决定只读/可写按钮 (移动与新增走同一 can_write 判定)。
+async fn get_worktree_canvas(
+    State(state): State<GroupApiState>,
+    device_context: AuthenticatedDeviceContext,
+    Path(worktree_id): Path<String>,
+) -> Result<Json<Value>, GroupApiError> {
+    let actor = &device_context.actor;
+    let worktree_id = request_worktree(actor, &worktree_id, "canvas:read")?;
+    let (mut tx, scope) = authorize_group_scope(
+        &state.resolver.pool,
+        actor,
+        &device_context,
+        worktree_id,
+        false,
+    )
+    .await?;
+    let binding = active_binding(&mut tx, actor, scope.project_id).await?;
+    let run_scope = authorize_task_run_for_worktree(&mut tx, actor, worktree_id, &scope).await?;
+    let can_write = has_scope(actor, "canvas:write")
+        && require_task_writer(&binding.role).is_ok()
+        && require_task_writer(&run_scope.role).is_ok();
+
+    let canvas = sqlx::query_as::<_, CurrentCanvasRow>(
+        r#"
+        SELECT canvas_id,title,version,created_by,created_at,viewport,frames,connectors
+        FROM canvas.group_canvas_registry
+        WHERE tenant_id=$1 AND worktree_id=$2 AND is_current AND valid_to IS NULL
+        ORDER BY created_at DESC, canvas_id
+        LIMIT 1
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let elements = match &canvas {
+        Some(row) => query_elements(
+            &mut tx,
+            actor.tenant_id,
+            &scope,
+            worktree_id,
+            row.canvas_id,
+            None,
+            has_scope(actor, "work-item:read"),
+        )
+        .await?
+        .into_iter()
+        .map(element_projection)
+        .collect::<Vec<_>>(),
+        None => Vec::new(),
+    };
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    Ok(Json(json!({
+        "worktree_id": worktree_id,
+        "project_id": scope.project_id,
+        "canvas": canvas.map(|row| json!({
+            "canvas_id": row.canvas_id,
+            "title": row.title,
+            "version": row.version,
+            "created_by": row.created_by,
+            "created_at": row.created_at,
+            "document": {
+                "version": row.version,
+                "viewport": row.viewport,
+                "frames": row.frames,
+                "connectors": row.connectors,
+            },
+        })),
+        "elements": elements,
+        "permission": {
+            "can_write": can_write,
+            "can_create_canvas": can_write,
+            "actor_roles": [binding.role, run_scope.role],
+            "granted_scopes": actor.scope.split_ascii_whitespace().collect::<Vec<_>>(),
+        },
+    })))
+}
+
+/// 版本冲突响应: 携带服务端最新 (current) 与客户端提交 (submitted),
+/// 供前端「保留双方草稿可恢复」, 不静默覆盖。
+fn conflict_with_both_sides(code: &'static str, current: Value, submitted: Value) -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(json!({
+            "error": {"code": code, "message": "canvas_conflict_keep_both_drafts"},
+            "current": current,
+            "submitted": submitted,
+        })),
+    )
+        .into_response()
+}
+
+/// 锁行投影 (冲突响应里的服务端最新侧)。
+fn current_element_projection(element_id: Uuid, element: &CurrentElement) -> Value {
+    json!({
+        "element_id": element_id,
+        "kind": element.kind,
+        "x": element.x,
+        "y": element.y,
+        "width": element.width,
+        "height": element.height,
+        "rotation": element.rotation,
+        "z_index": element.z_index,
+        "content": element.content,
+        "locked": element.locked,
+        "hidden": element.hidden,
+        "version": element.version,
+    })
+}
+
 async fn list_canvases(
     State(state): State<GroupApiState>,
     device_context: AuthenticatedDeviceContext,
@@ -843,7 +992,7 @@ async fn update_document(
     Path((worktree_id, canvas_id)): Path<(String, String)>,
     headers: HeaderMap,
     Json(body): Json<CanvasDocumentBody>,
-) -> Result<Json<Value>, GroupApiError> {
+) -> Result<Response, GroupApiError> {
     let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
@@ -874,7 +1023,7 @@ async fn update_document(
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
+        return Ok(Json(response).into_response());
     }
     let current = sqlx::query_as::<_, CurrentCanvasDocument>(
         r#"SELECT version,title,created_by,created_at,viewport,frames,connectors
@@ -890,7 +1039,22 @@ async fn update_document(
     .map_err(|_| GroupApiError::internal())?
     .ok_or_else(GroupApiError::not_found)?;
     if current.version != body.expected_version {
-        return Err(GroupApiError::conflict("canvas_document_version_conflict"));
+        let submitted = json!({
+            "expected_version": body.expected_version,
+            "viewport": body.viewport,
+            "frames": body.frames,
+            "connectors": body.connectors,
+        });
+        return Ok(conflict_with_both_sides(
+            "canvas_document_version_conflict",
+            json!({
+                "version": current.version,
+                "viewport": current.viewport,
+                "frames": current.frames,
+                "connectors": current.connectors,
+            }),
+            submitted,
+        ));
     }
     validate_document_refs(&mut tx, actor.tenant_id, worktree_id, canvas_id, &body).await?;
     let next_version = current
@@ -954,7 +1118,7 @@ async fn update_document(
     .await?;
     save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+    Ok(Json(response).into_response())
 }
 
 fn validate_document(body: &CanvasDocumentBody) -> Result<(), GroupApiError> {
@@ -1211,7 +1375,7 @@ async fn update_element(
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<UpdateElementBody>,
-) -> Result<Json<Value>, GroupApiError> {
+) -> Result<Response, GroupApiError> {
     let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
@@ -1235,12 +1399,17 @@ async fn update_element(
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
+        return Ok(Json(response).into_response());
     }
     let current =
         lock_element(&mut tx, actor.tenant_id, worktree_id, canvas_id, element_id).await?;
     if current.version != body.expected_version {
-        return Err(GroupApiError::conflict("version_conflict"));
+        let submitted = serde_json::to_value(&body).unwrap_or_else(|_| json!({}));
+        return Ok(conflict_with_both_sides(
+            "version_conflict",
+            current_element_projection(element_id, &current),
+            submitted,
+        ));
     }
     let (x, y, width, height, rotation, content) = match body.update_mode {
         CanvasElementUpdateMode::Position => match (
@@ -1365,7 +1534,7 @@ async fn update_element(
     let response = json!({"element": load_element(&mut tx, actor.tenant_id, &scope, worktree_id, canvas_id, element_id, has_scope(&actor, "work-item:read")).await?});
     save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+    Ok(Json(response).into_response())
 }
 
 async fn set_entity_ref(
@@ -1603,7 +1772,7 @@ async fn delete_element(
     Path((worktree_id, canvas_id, element_id)): Path<(String, String, String)>,
     headers: HeaderMap,
     Json(body): Json<DeleteElementBody>,
-) -> Result<Json<Value>, GroupApiError> {
+) -> Result<Response, GroupApiError> {
     let actor = &device_context.actor;
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
@@ -1627,7 +1796,7 @@ async fn delete_element(
     require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
     if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(response));
+        return Ok(Json(response).into_response());
     }
     let current_document = sqlx::query_as::<_, CurrentCanvasDocument>(
         r#"SELECT version,title,created_by,created_at,viewport,frames,connectors
@@ -1645,7 +1814,13 @@ async fn delete_element(
     let current =
         lock_element(&mut tx, actor.tenant_id, worktree_id, canvas_id, element_id).await?;
     if current.version != body.expected_version {
-        return Err(GroupApiError::conflict("version_conflict"));
+        let submitted =
+            json!({"element_id": element_id, "expected_version": body.expected_version});
+        return Ok(conflict_with_both_sides(
+            "version_conflict",
+            current_element_projection(element_id, &current),
+            submitted,
+        ));
     }
     let mut frames =
         serde_json::from_value::<Vec<CanvasFrameBody>>(current_document.frames.clone())
@@ -1750,7 +1925,7 @@ async fn delete_element(
     });
     save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(response))
+    Ok(Json(response).into_response())
 }
 
 fn request_worktree(
