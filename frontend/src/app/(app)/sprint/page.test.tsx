@@ -1,6 +1,13 @@
 /*
 @cypher schema=1 source_sha256=5402ba45b84c1ddb4e90eb9d2cdfcc630b921909f296a44c4aa75900f163405c
 MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.test.tsx"})
+MERGE (localMode:Symbol {id:"frontend/src/app/(app)/sprint/page.test.tsx::local_mode_label",kind:"test"})
+MERGE (serverMode:Symbol {id:"frontend/src/app/(app)/sprint/page.test.tsx::server_mode_renders_hydrated_truth",kind:"test"})
+MERGE (conflict:Symbol {id:"frontend/src/app/(app)/sprint/page.test.tsx::conflict_toast_feedback",kind:"test"})
+MERGE (self)-[:DEFINES]->(localMode)
+MERGE (self)-[:DEFINES]->(serverMode)
+MERGE (self)-[:DEFINES]->(conflict)
+MERGE (conflict)-[:TESTS]->(:Symbol {id:"frontend/src/app/(app)/sprint/page.tsx::handleServerTransition",kind:"function"})
 @endcypher
 */
 // =====================================================================
@@ -20,10 +27,16 @@ MERGE (self:File {path:"frontend/src/app/(app)/sprint/page.test.tsx"})
 // =====================================================================
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import IssuesPage, { buildTree, type TreeNode } from "./page";
 import { I18nProvider } from "@/lib/i18n";
+import { WorktreeGroupApiProvider } from "@/lib/group/groupProjection";
+import { RunDirectoryProvider } from "@/lib/run/runDirectorySession";
+import { useNavStore } from "@/lib/nav/navStore";
+
+vi.mock("react-hot-toast", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+import { toast } from "react-hot-toast";
 
 // per 2026-08-31 i18n 补缺口: PageHeader / Sidebar 等含 useTranslation() 必须包 I18nProvider
 function renderWithI18n(ui: ReactNode) {
@@ -297,5 +310,127 @@ describe("buildTree (parent_id 层级)", () => {
 
   it("空数组安全", () => {
     expect(buildTree([])).toEqual([]);
+  });
+});
+
+// =====================================================================
+// P1: 服务端真源通道 (本地模式标注 / 服务端渲染 / 冲突反馈)
+// 不跑 (frontend worktree 无 node_modules), 父代理合并时统一跑 vitest。
+// mock 的是网络边界 (fetch), 不是业务数据 (per 共享约束前端纪律)。
+// =====================================================================
+const P1_WORKTREE_ID = "11111111-1111-4111-8111-111111111111";
+const P1_WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
+
+function p1ServerItem() {
+  return {
+    work_item_id: P1_WORK_ITEM_ID,
+    item_type: "task",
+    title: "P1 统一卡",
+    description: "",
+    priority: "medium",
+    labels: [],
+    reporter_user_id: "44444444-4444-4444-8444-444444444444",
+    lifecycle: {
+      status: "pending",
+      review_state: "none",
+      active_worktree_id: null,
+      version: 1,
+      updated_at: new Date().toISOString(),
+    },
+    metadata_updated_at: new Date().toISOString(),
+  };
+}
+
+function renderP1Harness(fetcher: typeof fetch) {
+  const token = "user-jwt";
+  return renderWithI18n(
+    <RunDirectoryProvider session={{ generation: "p1", getAccessToken: async () => token, fetcher }}>
+      <WorktreeGroupApiProvider getAccessToken={async () => token} sessionKey="p1" fetcher={fetcher}>
+        <IssuesPage />
+      </WorktreeGroupApiProvider>
+    </RunDirectoryProvider>,
+  );
+}
+
+describe("IssuesPage P1 统一通道", () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockPathname.mockReturnValue("/sprint");
+    mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "sprint" : null));
+    mockSearchParams.toString = () => "view=sprint";
+    resetStore();
+    useNavStore.setState({ selectedWorktreeId: "", selectedProjectId: "", selectedLaneId: "", selectedBranch: "" });
+    cleanup();
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("本地模式标注: 无宿主会话时明确标注「本地模式」, 不冒充服务端数据", () => {
+    renderWithI18n(<IssuesPage />);
+    const source = screen.getByTestId("sprint-data-source");
+    expect(source.textContent).toContain("本地模式");
+  });
+
+  it("服务端模式渲染: 宿主会话 + Worktree 上下文齐备时拉取服务端真源并水合共享视图", async () => {
+    useNavStore.setState({ selectedWorktreeId: P1_WORKTREE_ID });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes(`/api/v1/worktrees/${P1_WORKTREE_ID}/work-items`)) {
+        return new Response(
+          JSON.stringify({
+            worktree_id: P1_WORKTREE_ID,
+            project_id: "33333333-3333-4333-8333-333333333333",
+            work_items: [p1ServerItem()],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ error: { code: "not_found" } }), { status: 404 });
+    }) as unknown as typeof fetch;
+
+    renderP1Harness(fetcher);
+
+    const source = await screen.findByTestId("sprint-data-source");
+    expect(source.textContent).toContain("服务端真源模式");
+    expect(source.textContent).toContain(P1_WORKTREE_ID);
+    // 服务端真源水合进 store (SprintBoardView / List / Tree 共享视图读 store 渲染)
+    await waitFor(() => {
+      expect(useStore.getState().workItems.some((w) => w.id === P1_WORK_ITEM_ID)).toBe(true);
+    });
+    expect(useStore.getState().workItems.find((w) => w.id === P1_WORK_ITEM_ID)?.status).toBe("todo");
+  });
+
+  it("冲突反馈: 详情侧栏状态转换遇 409 → 明确 toast「版本冲突, 已刷新最新状态」", async () => {
+    useNavStore.setState({ selectedWorktreeId: P1_WORKTREE_ID });
+    mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "list" : null));
+    mockSearchParams.toString = () => "view=list";
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes(`/api/v1/worktrees/${P1_WORKTREE_ID}/work-items`) && init?.method !== "POST") {
+        return new Response(
+          JSON.stringify({
+            worktree_id: P1_WORKTREE_ID,
+            project_id: "33333333-3333-4333-8333-333333333333",
+            work_items: [p1ServerItem()],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/lifecycle") && init?.method === "POST") {
+        return new Response(JSON.stringify({ error: { code: "version_conflict" } }), { status: 409 });
+      }
+      return new Response(JSON.stringify({ error: { code: "not_found" } }), { status: 404 });
+    }) as unknown as typeof fetch;
+
+    renderP1Harness(fetcher);
+
+    // 水合后 List 行出现 → 点击选中 → 详情侧栏
+    const row = await screen.findByTestId(`issues-list-row-${P1_WORK_ITEM_ID}`);
+    fireEvent.click(row);
+    const sidebar = screen.getByTestId("issues-detail-sidebar");
+    fireEvent.click(within(sidebar).getByTestId("issues-detail-transition-in_progress"));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("版本冲突, 已刷新最新状态"));
   });
 });
