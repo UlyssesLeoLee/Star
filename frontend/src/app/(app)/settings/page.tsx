@@ -6,6 +6,8 @@ MERGE (hooksSettingsPanel:Symbol {id:"frontend/src/components/settings/HooksSett
 MERGE (self)-[:DEFINES]->(page)
 MERGE (self)-[:IMPORTS]->(hooksSettingsPanel)
 MERGE (page)-[:CALLS]->(hooksSettingsPanel)
+MERGE (advancedEntry:Symbol {id:"frontend/src/app/(app)/settings/page.tsx::advanced_settings_nav_entry",kind:"component"})
+MERGE (self)-[:DEFINES]->(advancedEntry)
 @endcypher
 */
 // =====================================================================
@@ -38,6 +40,7 @@ import {
   Search,
   Check,
   Brain,
+  SlidersHorizontal,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { IdentityPanel, ProfilePanel, PermissionPanel, TenantPanel } from "@/components/settings/IdentityPanels";
@@ -93,6 +96,7 @@ const NAV_GROUPS: { group: string; items: NavItem[] }[] = [
       { id: "skills", label: "Skills", icon: <Sparkles size={13} />, href: "" },
       { id: "plugins", label: "Plugins", icon: <Plug size={13} />, href: "" },
       { id: "hooks", label: "Hooks", icon: <Plug size={13} />, href: "" },
+      { id: "advanced", label: "高级设置", icon: <SlidersHorizontal size={13} />, href: "/settings/advanced/hooks" },
     ],
   },
   {
@@ -180,7 +184,7 @@ function SettingsInner() {
               {g.items.map((item) => (
                 <li key={item.id}>
                   <a
-                    href={`/settings?tab=${item.id}`}
+                    href={item.id === "advanced" && item.href ? item.href : `/settings?tab=${item.id}`}
                     data-testid={`settings-nav-${item.id}`}
                     className={clsx(
                       "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors",

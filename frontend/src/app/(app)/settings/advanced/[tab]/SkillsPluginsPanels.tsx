@@ -26,6 +26,7 @@ import {
   useCapabilityRegistry,
   type CapabilityScope,
 } from "@/lib/settings/capabilityRegistry";
+import { LocalOnlyConnectionNotice } from "./CapabilityConnectionStatus";
 import { useTranslation } from "@/lib/i18n";
 
 export function SkillsSettingsPanel() {
@@ -49,6 +50,7 @@ export function SkillsSettingsPanel() {
 
   return (
     <div className="space-y-4" data-testid="advanced-settings-skills-panel">
+      <LocalOnlyConnectionNotice capability="skills" />
       <div className="card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -150,6 +152,7 @@ export function PluginsSettingsPanel() {
 
   return (
     <div className="space-y-4" data-testid="advanced-settings-plugins-panel">
+      <LocalOnlyConnectionNotice capability="plugins" />
       <div className="card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
