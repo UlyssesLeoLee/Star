@@ -1,6 +1,10 @@
 /*
 @cypher schema=1 source_sha256=81a4059f4383fb1dba6d9e309249d1e7a9b00786b63e67392018026cae5d66e0
 MERGE (self:File {path:"crates/sandboxd/tests/integration/test_backend_smoke.rs"})
+MERGE (nema_e2e:Symbol {id:"crates/sandboxd/tests/integration/test_backend_smoke.rs::nema_worker_digest_gate_and_restricted_session_end_to_end",kind:"test"})
+MERGE (self)-[:DEFINES]->(nema_e2e)
+MERGE (worker:File {path:"crates/sandboxd/src/nema_worker.rs"})
+MERGE (nema_e2e)-[:TESTS]->(worker)
 @endcypher
 */
 //! tests/integration/test_backend_smoke.rs — 真实平台 backend 冒烟 (per FR-5)
@@ -199,6 +203,63 @@ async fn enforcement_reports_platform() {
     assert!(reports
         .iter()
         .any(|r| matches!(r.dim, sandboxd::backend::EnforcementDim::Capability)));
+}
+
+/// P0 .nema lane: 真实 worker 可执行文件 (sandboxd 自身 fixture 模式) 走
+/// digest 门禁 + 受限 session 的完整生命周期 (per nema_worker 模块)。
+#[tokio::test]
+async fn nema_worker_digest_gate_and_restricted_session_end_to_end() {
+    use sandboxd::nema_worker::{
+        run_nema_worker, sha256_hex, verify_artifact_digest, NemaWorkerLaunch, NemaWorkerLimits,
+        NemaWorkerPolicy,
+    };
+
+    let worker = std::path::PathBuf::from(env!("CARGO_BIN_EXE_sandboxd"));
+    let worker_bytes = tokio::fs::read(&worker).await.unwrap();
+    let digest = sha256_hex(&worker_bytes);
+
+    // 篡改副本必须被 digest 门禁拒绝 (加载前校验)。
+    let dir = tempfile::tempdir().unwrap();
+    let tampered = dir.path().join("tampered-worker.exe");
+    let mut payload = worker_bytes.clone();
+    payload.push(0u8);
+    tokio::fs::write(&tampered, &payload).await.unwrap();
+    assert!(matches!(
+        verify_artifact_digest(&tampered, &digest).await,
+        Err(SandboxdError::DigestMismatch { .. })
+    ));
+
+    // 原始二进制通过门禁后, 在受限 session 内以 fixture worker 模式运行。
+    verify_artifact_digest(&worker, &digest).await.unwrap();
+    let workdir = dir.path().to_string_lossy().to_string();
+    let launch = NemaWorkerLaunch {
+        program: worker.to_string_lossy().to_string(),
+        args: vec!["nema-worker-fixture".to_string()],
+        env: Vec::new(),
+        cwd: workdir.clone(),
+    };
+    let limits = NemaWorkerLimits::default();
+    let policy = NemaWorkerPolicy::restricted(&limits, &workdir);
+    let backend = DefaultBackendFactory.create().unwrap();
+    let request = r#"{"protocol_version":1,"profile":{"format_id":"nema","plugin_id":"org.star.nema.demoplugin","grammar_revision":"matrix-2026-11-15","plugin_version":"1.0.0","abi_version":1,"ast_schema_version":1,"grammar_source_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","artifact_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"source":" \\1 1\nx\n","limits":{"max_input_bytes":16777216}}"#;
+    let result = run_nema_worker(
+        &*backend,
+        &policy,
+        &launch,
+        request.as_bytes(),
+        dir.path(),
+        &limits,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.returncode, 0, "stderr: {}", result.stderr);
+    // 响应是合法 JSON, 且 cell 值证明请求真实送达 worker (携带请求字节长度)。
+    let value: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+    assert_eq!(value["protocol_version"], 1);
+    assert_eq!(
+        value["ast"]["domains"][0]["records"][0][0]["value"],
+        format!("fixture-ok:{}", request.len())
+    );
 }
 
 /// 供 cfg 对齐检查: BackendHandle 为 dyn-safe (trait object 已用)

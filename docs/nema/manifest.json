@@ -1,0 +1,48 @@
+{
+  "schema": "nema-grammar-manifest",
+  "schema_version": 1,
+  "captured_at": "2026-11-20T12:00:00+08:00",
+  "capture_source": "https://nema-sigma.vercel.app/website/grammar.html (HTTP 200, 5281 bytes)",
+  "capture_method": "curl -sS -L (git-bash), 原文逐字节保存, sha256sum 校验",
+  "files": {
+    "grammar-snapshot-2026-11-20.html": "67110ac289dfd520c43e6c6055c042f9d5a0c18049471d066395a92177f94cde",
+    "grammar-snapshot-2026-11-20.md": "9e111b2318c15edbf736cb59f4c4e264154d2221d1566233fb3d253d5bcd8058",
+    "README.md": "5229fcae323232d8143f0da42dca1c9ef91bff43b0cc2affb44f2ba4256cd420",
+    "KNOWN-GAPS.md": "4702fd3ed8b5f71567c5456ce0f7afd01f3a7dad87871b0b133cfbdc14dd15fc",
+    "examples/v1-values.nema": "0e18f3f0f648198681488319c1097573d69ad56a7964b0610e6a06d4d03aec77",
+    "examples/v1-null.nema": "78f4d43490425044e505e153e020e639becac53aba74789d3d5482d6e1f3433e",
+    "examples/v1-empty.nema": "b279f781113f990138512f56a2418acd0bfc4b1204bb1c9b63e55cf12d29ee90",
+    "examples/v1-missing.nema": "94b89532a41ba129eb5667e05859914a8b9cc34533d1d30e9e120ff80f479d04",
+    "examples/v1-graph-continuation.nema": "e25c3b137b0212c8ce55d07e6da93881b8507952f3aa86ce7f0a654645322057",
+    "examples/v2-values.nema": "0e18f3f0f648198681488319c1097573d69ad56a7964b0610e6a06d4d03aec77",
+    "examples/v2-null.nema": "78f4d43490425044e505e153e020e639becac53aba74789d3d5482d6e1f3433e",
+    "examples/v2-empty.nema": "b279f781113f990138512f56a2418acd0bfc4b1204bb1c9b63e55cf12d29ee90",
+    "examples/v2-missing.nema": "94b89532a41ba129eb5667e05859914a8b9cc34533d1d30e9e120ff80f479d04",
+    "examples/v2-graph-continuation.nema": "54a2e0274b00f72051997756a6d707a32df186d2d9e407180f372d7da17c7599",
+    "examples/expected/v1-values.ast.json": "24032f0dbe232a21855b8a1b04d25d35c8b44145acabf16df37c8e40bb4a1108",
+    "examples/expected/v1-null.ast.json": "46ad2a05289ee5c188d605c3ceea8c4c5b77d605a43ee774c540286e37da513c",
+    "examples/expected/v1-empty.ast.json": "742e1deda8959d7a55970b449dabc3d05d58efd59fe4ffe2695eeed4633aebbc",
+    "examples/expected/v1-missing.ast.json": "9c5b92d775654c4a30652e84ff19e4d0c33fb1ddbed76b9c41257503eb3e0310",
+    "examples/expected/v1-graph-continuation.ast.json": "2979279941dd1b95a2ac13679b5af1f02fa24800f58ea9b51e878ad4de2fe0d2",
+    "examples/expected/v2-values.ast.json": "24032f0dbe232a21855b8a1b04d25d35c8b44145acabf16df37c8e40bb4a1108",
+    "examples/expected/v2-null.ast.json": "46ad2a05289ee5c188d605c3ceea8c4c5b77d605a43ee774c540286e37da513c",
+    "examples/expected/v2-empty.ast.json": "742e1deda8959d7a55970b449dabc3d05d58efd59fe4ffe2695eeed4633aebbc",
+    "examples/expected/v2-missing.ast.json": "9c5b92d775654c4a30652e84ff19e4d0c33fb1ddbed76b9c41257503eb3e0310",
+    "examples/expected/v2-graph-continuation.ast.json": "6b13192c2585434934e86d66749759f7fb535a08af0a9fbd22326478a8821654"
+  },
+  "provenance": {
+    "live_page_matches_local_pin": true,
+    "live_page_sha256": "67110ac289dfd520c43e6c6055c042f9d5a0c18049471d066395a92177f94cde",
+    "pinned_in_contract": {
+      "grammar_html_snapshot": "67110ac289dfd520c43e6c6055c042f9d5a0c18049471d066395a92177f94cde",
+      "matrix_2026_11_10": "0e1ae91167227f595f7586fa2174b19cb0eab4458c72e00c5790de770130f7b3",
+      "matrix_2026_11_15": "ec274eda324c8fc88edc88a4bbc5afe3b508d4b4ca953ead173809aca6ae058a",
+      "reference_parser_2026_11_15": "d2f2d2fead79c4f3127a695e8ef5906880c42f5811e7c14c4be5aed5cd851fe8",
+      "rust_parser_source_artifact": "4ae855e1da4c595d0d146183c304bee966c5fb2f34a846fd0da3d224d7311707"
+    },
+    "notes": [
+      "HTML 壳页为线上实时抓取; 矩阵数据 (rule-matrix-data.js) 与参考解析器未二次抓取, 沿用仓库内已 pin 的本地输入。",
+      "examples/v2-*.nema 与 v1-*.nema 在表格四值构造上字节相同 (哈希一致) — 有意为之: 证明两个 profile 对这些构造给出相同 AST; 续行差异由 v1/v2-graph-continuation 样例区分。"
+    ]
+  }
+}

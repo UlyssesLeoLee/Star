@@ -22,6 +22,12 @@ MERGE (dispatch_format:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::
 MERGE (validate:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::InterpreterProfile.validate",kind:"method"})
 MERGE (valid_digest:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::valid_sha256",kind:"function"})
 MERGE (budget:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::validate_document_budget",kind:"function"})
+MERGE (unregister:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::NemaInterpreterRegistry.unregister",kind:"method"})
+MERGE (digest_error:Type {id:"crates/nema-codec/src/interpreter_plugin.rs::InterpreterError.DigestMismatch",kind:"enum"})
+MERGE (limit_error:Type {id:"crates/nema-codec/src/interpreter_plugin.rs::InterpreterError.ResourceLimit",kind:"enum"})
+MERGE (protocol_error:Type {id:"crates/nema-codec/src/interpreter_plugin.rs::InterpreterError.ProtocolViolation",kind:"enum"})
+MERGE (runtime_file:File {path:"crates/nema-codec/src/plugin_runtime.rs"})
+MERGE (self)-[:IMPORTS]->(runtime_file)
 MERGE (profiles:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::NemaInterpreterRegistry.profiles",kind:"method"})
 MERGE (bundled:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::NemaInterpreterRegistry.bundled",kind:"method"})
 MERGE (bundled_profile:Symbol {id:"crates/nema-codec/src/interpreter_plugin.rs::bundled_profile_for_revision",kind:"function"})
@@ -186,7 +192,7 @@ impl InterpreterProfile {
     }
 }
 
-fn valid_sha256(value: &str) -> bool {
+pub(crate) fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -205,8 +211,46 @@ pub enum InterpreterError {
     OutputTooLarge,
     DocumentOverBudget,
     NonRoundTrippingFormat,
-    Parser { line: usize, message: String },
-    PluginExecution { code: String, detail: String },
+    Parser {
+        line: usize,
+        message: String,
+    },
+    PluginExecution {
+        code: String,
+        detail: String,
+    },
+    /// A plugin artifact failed its pinned SHA-256 verification.
+    DigestMismatch {
+        expected: String,
+        actual: String,
+    },
+    /// A resource budget (input/output bytes, domains, records, cells, or a
+    /// host-reported memory/CPU/time limit) was exceeded.
+    ResourceLimit {
+        resource: String,
+        limit: u64,
+        actual: u64,
+    },
+    /// The worker response violated the fixed plugin protocol.
+    ProtocolViolation {
+        detail: String,
+    },
+    /// The plugin artifact itself was rejected before any execution.
+    ArtifactRejected {
+        detail: String,
+    },
+    /// A `plugin_id@version` is already installed.
+    AlreadyInstalled(String),
+    /// The referenced plugin version is not installed.
+    NotInstalled(String),
+    /// An installation lifecycle transition is not allowed.
+    InvalidLifecycle {
+        detail: String,
+    },
+    /// A migration was requested for an identical profile or otherwise refused.
+    MigrationRefused {
+        detail: String,
+    },
 }
 
 impl fmt::Display for InterpreterError {
@@ -229,6 +273,35 @@ impl fmt::Display for InterpreterError {
             Self::PluginExecution { code, detail } => {
                 write!(f, "interpreter plugin failed ({code}): {detail}")
             }
+            Self::DigestMismatch { expected, actual } => write!(
+                f,
+                "artifact digest mismatch: expected sha256 {expected}, actual sha256 {actual}"
+            ),
+            Self::ResourceLimit {
+                resource,
+                limit,
+                actual,
+            } => write!(
+                f,
+                "resource limit exceeded: {resource} (limit {limit}, actual {actual})"
+            ),
+            Self::ProtocolViolation { detail } => {
+                write!(f, "worker protocol violation: {detail}")
+            }
+            Self::ArtifactRejected { detail } => {
+                write!(f, "plugin artifact rejected: {detail}")
+            }
+            Self::AlreadyInstalled(key) => {
+                write!(f, "interpreter plugin already installed: {key}")
+            }
+            Self::NotInstalled(key) => write!(f, "interpreter plugin not installed: {key}"),
+            Self::InvalidLifecycle { detail } => {
+                write!(
+                    f,
+                    "invalid interpreter plugin lifecycle transition: {detail}"
+                )
+            }
+            Self::MigrationRefused { detail } => write!(f, "migration refused: {detail}"),
         }
     }
 }
@@ -284,6 +357,21 @@ impl NemaInterpreterRegistry {
     /// Lists available identities without choosing one implicitly.
     pub fn profiles(&self) -> Vec<InterpreterProfile> {
         self.adapters.keys().cloned().collect()
+    }
+
+    /// Removes one exact profile from the registry.
+    ///
+    /// Used by [`crate::plugin_runtime::NemaPluginInstaller::uninstall`] so an
+    /// uninstalled plugin version becomes unregistered again. An unknown
+    /// profile yields [`InterpreterError::UnregisteredProfile`] — there is no
+    /// silent fallback to another adapter.
+    pub fn unregister(
+        &mut self,
+        profile: &InterpreterProfile,
+    ) -> Result<Arc<dyn NemaInterpreterAdapter>, InterpreterError> {
+        self.adapters
+            .remove(profile)
+            .ok_or(InterpreterError::UnregisteredProfile)
     }
 
     /// Creates the two Rust interpreters bundled with this crate. The caller
@@ -383,7 +471,7 @@ fn validate_bundled_profile(
     Ok(())
 }
 
-fn validate_document_budget(document: &Document) -> Result<(), InterpreterError> {
+pub(crate) fn validate_document_budget(document: &Document) -> Result<(), InterpreterError> {
     if document.domains.len() > crate::strict::MAX_DOMAINS {
         return Err(InterpreterError::DocumentOverBudget);
     }

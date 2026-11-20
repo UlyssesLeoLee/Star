@@ -73,6 +73,15 @@ pub enum SandboxdError {
         max: usize,
     },
 
+    /// NEMA worker 制品 digest 校验失败 (加载前门禁, P0 .nema lane)
+    #[error("artifact digest mismatch: expected sha256 {expected}, actual sha256 {actual}")]
+    DigestMismatch {
+        /// 安装时 pin 的期望 digest
+        expected: String,
+        /// 实际计算得到的 digest
+        actual: String,
+    },
+
     /// 内部错误 (兜底)
     #[error("internal error: {0}")]
     Internal(String),
@@ -92,6 +101,7 @@ impl SandboxdError {
             SandboxdError::AuditLogWriteFailed(_) => "audit_write_failed",
             SandboxdError::InvalidPolicy(_) => "invalid_policy",
             SandboxdError::CapacityExceeded { .. } => "capacity_exceeded",
+            SandboxdError::DigestMismatch { .. } => "digest_mismatch",
             SandboxdError::Internal(_) => "internal",
         }
     }
@@ -109,6 +119,7 @@ impl SandboxdError {
             SandboxdError::AuditLogWriteFailed(_) => 503,
             SandboxdError::InvalidPolicy(_) => 422,
             SandboxdError::CapacityExceeded { .. } => 429,
+            SandboxdError::DigestMismatch { .. } => 422,
             SandboxdError::Internal(_) => 500,
         }
     }
@@ -166,6 +177,9 @@ impl From<SandboxdError> for tonic::Status {
             SandboxdError::InvalidPolicy(_) => tonic::Status::invalid_argument(e.to_string()),
             SandboxdError::CapacityExceeded { .. } => {
                 tonic::Status::resource_exhausted(e.to_string())
+            }
+            SandboxdError::DigestMismatch { .. } => {
+                tonic::Status::failed_precondition(e.to_string())
             }
             SandboxdError::Internal(_) => tonic::Status::internal(e.to_string()),
         }

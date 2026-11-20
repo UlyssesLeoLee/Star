@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <meta content="#071524" name="theme-color"/>
+  <title>语法规范 · .NEMA</title>
+  <link href="assets/nema-app-icon.svg" rel="icon"/>
+  <link href="premier.css" rel="stylesheet"/>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap navline">
+    <a class="wordmark" href="index.html">
+      <div class="wordmark-brand">
+        <svg class="wordmark-seal" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <circle cx="16" cy="16" r="14" fill="none" stroke="#d4af37" stroke-width="1.2" opacity="0.6"/>
+          <circle cx="16" cy="16" r="10.5" fill="none" stroke="#f5cf62" stroke-width="0.8" stroke-dasharray="2 3"/>
+          <polygon points="16,3 29,16 16,29 3,16" fill="none" stroke="#d4af37" stroke-width="1" opacity="0.8"/>
+          <path d="M12 16 H20 M16 12 V20" stroke="#ffe899" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="2.2" fill="#ffe899"/>
+        </svg>
+        <div>
+          <div class="wordmark-title"><span class="gold-dot">.</span>NEMA</div>
+          <small class="wordmark-sub">νῆμα · ARIADNE'S THREAD</small>
+        </div>
+      </div>
+    </a>
+    <button aria-expanded="false" aria-label="展开导航" class="menubtn" id="menuBtn">☰</button>
+    <nav aria-label="主导航" class="navlinks" id="navLinks">
+      <a href="index.html">典籍首页</a>
+      <a class="active" href="grammar.html">语法规范</a>
+      <a href="playground.html">几何效果</a>
+      <a href="downloads.html">文献下载</a>
+    </nav>
+    <a class="top-cta" href="playground.html">进入工作台 ↗</a>
+  </div>
+</header>
+
+<main>
+<section class="pagehero">
+  <div class="wrap">
+    <div class="kicker">TABULA CANONICA · 规范矩阵</div>
+    <h1>每条语法，皆有确凿的因果。</h1>
+    <p>全景七维矩阵：语法、释义、金石范式、设计理由、防范异常、写法变体与解析结果。涵盖表格、5W1H 与拓扑图；支持查验每一条规则的 AST 解析。</p>
+  </div>
+</section>
+
+<div class="wrap main-page grammar-wrap">
+  <section class="panel">
+    <div aria-label="语法类别" class="tabs" id="filters" role="tablist">
+      <button aria-selected="true" class="active" data-filter="table" role="tab" type="button">表格矩阵</button>
+      <button aria-selected="false" data-filter="5w1h" role="tab" type="button">5W1H 六维</button>
+      <button aria-selected="false" data-filter="graph" role="tab" type="button">Node–Edge 拓扑</button>
+    </div>
+    <details class="syntax-extras">
+      <summary>共通典章：转义规范与字典压缩</summary>
+      <button data-filter="common" role="button" type="button">共通转义</button>
+      <button data-filter="transport" role="button" type="button">压缩字典</button>
+    </details>
+    <div class="controls">
+      <input aria-label="搜索语法" id="search" placeholder="检索规范、异常防范、变体、结果…"/>
+      <span class="mini" id="count"></span>
+    </div>
+    <div class="tablewrap">
+      <table class="matrix">
+        <colgroup>
+          <col class="col-syntax" style="width: 9.5%;">
+          <col class="col-desc" style="width: 17%;">
+          <col class="col-example" style="width: 14%;">
+          <col class="col-reason" style="width: 13.5%;">
+          <col class="col-anomaly" style="width: 15%;">
+          <col class="col-variant" style="width: 15%;">
+          <col class="col-render" style="width: 16%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">语法</th>
+            <th scope="col">说明</th>
+            <th scope="col">金石例子</th>
+            <th scope="col">设计理由</th>
+            <th scope="col">避免的异常</th>
+            <th scope="col">变化写法</th>
+            <th scope="col">渲染解析</th>
+          </tr>
+        </thead>
+        <tbody id="matrixRows"></tbody>
+      </table>
+    </div>
+    <p class="mini">收录完整 139 条严密语法案例。规范中的前导空格均为标准 ASCII U+0020。</p>
+  </section>
+</div>
+</main>
+
+<dialog class="ng-modal" id="ruleDialog">
+  <div class="ng-modal-body">
+    <div class="ng-modal-head">
+      <h2 id="dialogTitle">语法细节</h2>
+      <button aria-label="关闭弹窗" class="btn" id="dialogClose">✕</button>
+    </div>
+    <p class="ng-lead" id="dialogDesc"></p>
+    <h3>典章写法</h3>
+    <pre id="dialogCode"></pre>
+    <div class="controls">
+      <button class="btn" id="copyRule">复制样例</button>
+      <button class="btn primary" id="runRule">在工作台运行 ↗</button>
+    </div>
+    <h3>几何解析 / 结构化渲染</h3>
+    <pre class="ng-ast" id="dialogAST"></pre>
+    <p class="mini" id="dialogRisk"></p>
+  </div>
+</dialog>
+
+<footer class="footer">
+  <div class="wrap">
+    <strong>.NEMA</strong>
+    <span>形式源自纯粹 · 秩序始于真理</span>
+    <a href="index.html">返回典籍首页 ↑</a>
+  </div>
+</footer>
+
+<script src="rule-matrix-data.js"></script>
+<script src="strict-parser.js"></script>
+<script src="js/ui.js"></script>
+<script src="grammar-page.js"></script>
+<script src="premier.js"></script>
+</body>
+</html>

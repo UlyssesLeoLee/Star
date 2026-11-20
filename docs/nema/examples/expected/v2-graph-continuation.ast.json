@@ -1,0 +1,18 @@
+{
+  "domains": [
+    {
+      "mode": "graph",
+      "id": 1,
+      "revision": 1,
+      "columns": null,
+      "explicit_header": false,
+      "declared_width": null,
+      "records": [
+        [
+          {"kind": "value", "value": "A"},
+          {"kind": "value", "value": "LoginAPIV2"}
+        ]
+      ]
+    }
+  ]
+}
