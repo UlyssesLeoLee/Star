@@ -395,3 +395,138 @@ describe("RunDirectoryApiClient Run Task Cards", () => {
     fixture.client.dispose();
   });
 });
+
+// =====================================================================
+// P0-lane: Lane 服务端实体 API (listLanes / createLane / listLaneWorktrees / attach)
+// =====================================================================
+const LANE_ID = "10000000-0000-4000-8000-00000000000a";
+const LANE_WT_ID = "10000000-0000-4000-8000-00000000000b";
+
+function laneFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    lane_id: LANE_ID,
+    project_id: PROJECT_ID,
+    name: "core-runtime",
+    description: null,
+    created_by: "10000000-0000-4000-8000-000000000006",
+    lock_version: 1,
+    created_at: "2026-11-20T00:00:00Z",
+    updated_at: "2026-11-20T00:00:00Z",
+    repository_binding: null,
+    branch_binding: null,
+    ...overrides,
+  };
+}
+
+function laneWorktreeFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    worktree_id: LANE_WT_ID,
+    lane_id: LANE_ID,
+    project_id: PROJECT_ID,
+    repository_id: REPOSITORY_ID,
+    name: "wt-core-checkout",
+    branch: "feat/core",
+    human_state: "active",
+    machine_state: "ready",
+    runtime_id: null,
+    agent_id: null,
+    agent_session_id: null,
+    archived: false,
+    version: 1,
+    binding_id: "10000000-0000-4000-8000-00000000000c",
+    binding_version: 1,
+    engineering_run_id: null,
+    ...overrides,
+  };
+}
+
+describe("RunDirectoryApiClient Lanes (P0-lane)", () => {
+  it("lists server Lanes for a Project with scope validation", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lanes: [laneFixture()], limit: 50, next_cursor: null });
+
+    const result = await fixture.client.listLanes(PROJECT_ID);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ lane_id: LANE_ID, name: "core-runtime", repository_binding: null });
+    expect(String(fixture.fetcher.mock.calls[0]?.[0])).toBe(`/api/v1/projects/${PROJECT_ID}/lanes?limit=${RUN_DIRECTORY_PAGE_SIZE}`);
+    fixture.client.dispose();
+  });
+
+  it("rejects Lane pages returned for another Project", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lanes: [laneFixture({ project_id: "10000000-0000-4000-8000-000000000099" })], limit: 50, next_cursor: null });
+
+    await expect(fixture.client.listLanes(PROJECT_ID)).rejects.toMatchObject({ code: "scope_mismatch" });
+    fixture.client.dispose();
+  });
+
+  it("creates a Lane without any remote repository/branch fields", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lane: laneFixture({ name: "new-lane" }) });
+
+    const result = await fixture.client.createLane(PROJECT_ID, "new-lane", "lane-create-key", "10000000-0000-4000-8000-000000000008");
+
+    expect(result.name).toBe("new-lane");
+    expect(result.repository_binding).toBeNull();
+    expect(result.branch_binding).toBeNull();
+    const [url, init] = fixture.fetcher.mock.calls[0] ?? [];
+    expect(String(url)).toBe(`/api/v1/projects/${PROJECT_ID}/lanes`);
+    expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("lane-create-key");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      name: "new-lane", correlation_id: "10000000-0000-4000-8000-000000000008",
+    });
+    fixture.client.dispose();
+  });
+
+  it("rejects a create response that forges remote bindings", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lane: laneFixture({ name: "fake-remote", repository_binding: "10000000-0000-4000-8000-0000000000aa" }) });
+
+    await expect(fixture.client.createLane(PROJECT_ID, "fake-remote", "lane-create-key-2", "10000000-0000-4000-8000-000000000008"))
+      .rejects.toMatchObject({ code: "invalid_projection" });
+    fixture.client.dispose();
+  });
+
+  it("lists Lane Worktrees with honest null engineering_run_id", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lane_id: LANE_ID, worktrees: [laneWorktreeFixture()], limit: 50, next_cursor: null });
+    const lane = {
+      lane_id: LANE_ID, project_id: PROJECT_ID, name: "core-runtime", description: null,
+      created_by: "10000000-0000-4000-8000-000000000006", lock_version: 1,
+      created_at: "2026-11-20T00:00:00Z", updated_at: "2026-11-20T00:00:00Z",
+      repository_binding: null, branch_binding: null,
+    };
+
+    const result = await fixture.client.listLaneWorktrees(lane);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ worktree_id: LANE_WT_ID, lane_id: LANE_ID, engineering_run_id: null });
+    expect(String(fixture.fetcher.mock.calls[0]?.[0])).toBe(`/api/v1/projects/${PROJECT_ID}/lanes/${LANE_ID}/worktrees?limit=${RUN_DIRECTORY_PAGE_SIZE}`);
+    fixture.client.dispose();
+  });
+
+  it("rejects Lane Worktree pages for another Lane", async () => {
+    const fixture = clientFixture({ project_id: PROJECT_ID, lane_id: LANE_ID, worktrees: [laneWorktreeFixture({ lane_id: "10000000-0000-4000-8000-0000000000aa" })], limit: 50, next_cursor: null });
+    const lane = {
+      lane_id: LANE_ID, project_id: PROJECT_ID, name: "core-runtime", description: null,
+      created_by: "10000000-0000-4000-8000-000000000006", lock_version: 1,
+      created_at: "2026-11-20T00:00:00Z", updated_at: "2026-11-20T00:00:00Z",
+      repository_binding: null, branch_binding: null,
+    };
+
+    await expect(fixture.client.listLaneWorktrees(lane)).rejects.toMatchObject({ code: "scope_mismatch" });
+    fixture.client.dispose();
+  });
+
+  it("attaches an existing Worktree to a Lane with idempotency", async () => {
+    const fixture = clientFixture({
+      project_id: PROJECT_ID, lane_id: LANE_ID, worktree_id: LANE_WT_ID,
+      binding_id: "10000000-0000-4000-8000-00000000000d",
+    });
+
+    const result = await fixture.client.attachWorktreeToLane(PROJECT_ID, LANE_ID, LANE_WT_ID, "lane-attach-key");
+
+    expect(result.binding_id).toBe("10000000-0000-4000-8000-00000000000d");
+    const [url, init] = fixture.fetcher.mock.calls[0] ?? [];
+    expect(String(url)).toBe(`/api/v1/projects/${PROJECT_ID}/lanes/${LANE_ID}/worktrees`);
+    expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("lane-attach-key");
+    expect(JSON.parse(String(init?.body))).toEqual({ worktree_id: LANE_WT_ID });
+    fixture.client.dispose();
+  });
+});
