@@ -730,9 +730,9 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
         title={branchName ? `${statusLabels.branchRecord} · ${node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}: ${branchName}` : statusLabels.branchUnavailable}
         className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
         onNavigate={() => { if (branchName) onSelectBranch(laneId, worktreeId, branchName); }}>
-        <span className="flex shrink-0 items-center"><GitBranch size={13} /></span>
+        <span className="flex shrink-0 items-center"><GitBranch size={14} /></span>
         <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span>
-          <span className="block truncate text-[9px] text-ink-mute" title={node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}>本地 Branch</span></span>
+          <span className="block truncate text-[10px] text-ink-mute" title={node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}>本地 Branch</span></span>
       </Link>
     </div>;
   }
