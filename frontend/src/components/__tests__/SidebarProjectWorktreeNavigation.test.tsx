@@ -98,15 +98,17 @@ vi.mock("next/navigation", () => ({
 
 describe("Project Worktree Index sidebar navigation", () => {
   it("exposes the Worktree 控制中心 through the Home 核心区 (per ui-3pane-arch §1.2)", () => {
-    useNavStore.setState({
-      sidebarItemIds: ["inbox", "issues", "projects", "agents"],
-      pinnedViewIds: ["kanban", "timeline"],
-      headerTabIds: ["inbox", "issues", "projects", "agents", "analytics"],
-      sidebarFold: "expanded",
-      sidebarScope: "main",
-      selectedProjectId: projectId,
-      isMatrixOpen: false,
-    });
+      useNavStore.setState({
+        sidebarItemIds: ["inbox", "issues", "projects", "agents"],
+        pinnedViewIds: ["kanban", "timeline"],
+        headerTabIds: ["inbox", "issues", "projects", "agents", "analytics"],
+        sidebarFold: "expanded",
+        sidebarScope: "main",
+        selectedProjectId: projectId,
+        sidebarTab: "directory",
+        taskStatusFilter: "all",
+        isMatrixOpen: false,
+      });
 
     render(
       <I18nProvider initialLanguage="zh-CN">
@@ -130,83 +132,89 @@ describe("Project Worktree Index sidebar navigation", () => {
   });
 
   it("Run Worktree rows distinguish lifecycle and binding facts without exposing identifiers", async () => {
-    const runProjectId = "11111111-1111-4111-8111-111111111111";
-    const repositoryId = "22222222-2222-4222-8222-222222222222";
-    const runId = "33333333-3333-4333-8333-333333333333";
-    const assignedWorktreeId = "44444444-4444-4444-8444-444444444444";
-    const unassignedWorktreeId = "55555555-5555-4555-8555-555555555555";
-    const unknownWorktreeId = "f1111111-f111-4111-8111-111111111111";
-    const agentId = "66666666-6666-4666-8666-666666666666";
-    const sessionId = "77777777-7777-4777-8777-777777777777";
-    const runtimeId = "88888888-8888-4888-8888-888888888888";
-    const projectBindingId = "99999999-9999-4999-8999-999999999999";
-    const runBindingId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-    const futureMachineState = `future-${"x".repeat(50)}`;
-    const worktrees = [
-      {
-        worktree_id: assignedWorktreeId, engineering_run_id: runId, project_id: runProjectId, repository_id: repositoryId,
-        workspace_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "assigned-checkout", branch: "agent/assigned",
-        human_state: "waiting", machine_state: "agent_executing", agent_id: agentId, agent_session_id: sessionId,
-        runtime_id: runtimeId, archived: true, version: 4, binding_id: runBindingId, binding_version: 2,
-        project_binding_id: projectBindingId, project_binding_version: 3,
-      },
-      {
-        worktree_id: unassignedWorktreeId, engineering_run_id: runId, project_id: runProjectId, repository_id: repositoryId,
-        workspace_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "unassigned-checkout", branch: "agent/unassigned",
-        human_state: "ready", machine_state: "git_clean", agent_id: null, agent_session_id: null,
-        runtime_id: null, archived: false, version: 5, binding_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", binding_version: 6,
-        project_binding_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", project_binding_version: 7,
-      },
-      {
-        worktree_id: unknownWorktreeId, engineering_run_id: runId, project_id: runProjectId, repository_id: repositoryId,
-        workspace_id: "f2222222-f222-4222-8222-222222222222", name: "future-state-checkout", branch: "agent/future-state",
-        human_state: "ready", machine_state: futureMachineState, agent_id: null, agent_session_id: null,
-        runtime_id: null, archived: false, version: 8, binding_id: "f3333333-f333-4333-8333-333333333333", binding_version: 9,
-        project_binding_id: "f4444444-f444-4444-8444-444444444444", project_binding_version: 10,
-      },
-    ];
-    const directoryStatusFetcher: typeof fetch = async (input) => {
-      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
-      let body: Record<string, unknown>;
-      if (url.pathname === "/api/v1/projects") {
-        body = { projects: [{ project_id: runProjectId, role: "owner" }], limit: 10, next_cursor: null };
-      } else if (url.pathname === `/api/v1/projects/${runProjectId}/engineering-runs`) {
-        body = {
-          project_id: runProjectId,
-          engineering_runs: [{ engineering_run_id: runId, project_id: runProjectId, repository_id: repositoryId,
-            branch_id: null, title: "Run Alpha", state: "active", owner_user_id: null, version: 1 }],
-          limit: 10, next_cursor: null,
-        };
-      } else if (url.pathname === `/api/v1/engineering-runs/${runId}/worktrees`) {
-        body = { project_id: runProjectId, branch_id: null, engineering_run_id: runId, worktrees, limit: 10, next_cursor: null };
-      } else {
-        return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
-      }
-      return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
-    };
+      const runProjectId = "11111111-1111-4111-8111-111111111111";
+      const laneId = "22222222-2222-4222-8222-222222222222";
+      const repositoryId = "33333333-3333-4333-8333-333333333333";
+      const assignedWorktreeId = "44444444-4444-4444-8444-444444444444";
+      const unassignedWorktreeId = "55555555-5555-4555-8555-555555555555";
+      const unknownWorktreeId = "f1111111-f111-4111-8111-111111111111";
+      const agentId = "66666666-6666-4666-8666-666666666666";
+      const sessionId = "77777777-7777-4777-8777-777777777777";
+      const runtimeId = "88888888-8888-4888-8888-888888888888";
+      const projectBindingId = "99999999-9999-4999-8999-999999999999";
+      const runBindingId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const futureMachineState = `future-${"x".repeat(50)}`;
+      const worktrees = [
+        {
+          worktree_id: assignedWorktreeId, lane_id: laneId, project_id: runProjectId, repository_id: repositoryId,
+          workspace_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "assigned-checkout", branch: "agent/assigned",
+          human_state: "waiting", machine_state: "agent_executing", agent_id: agentId, agent_session_id: sessionId,
+          runtime_id: runtimeId, archived: true, version: 4, binding_id: runBindingId, binding_version: 2,
+          project_binding_id: projectBindingId, project_binding_version: 3,
+          engineering_run_id: null,
+        },
+        {
+          worktree_id: unassignedWorktreeId, lane_id: laneId, project_id: runProjectId, repository_id: repositoryId,
+          workspace_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "unassigned-checkout", branch: "agent/unassigned",
+          human_state: "ready", machine_state: "git_clean", agent_id: null, agent_session_id: null,
+          runtime_id: null, archived: false, version: 5, binding_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", binding_version: 6,
+          project_binding_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", project_binding_version: 7,
+          engineering_run_id: null,
+        },
+        {
+          worktree_id: unknownWorktreeId, lane_id: laneId, project_id: runProjectId, repository_id: repositoryId,
+          workspace_id: "f2222222-f222-4222-8222-222222222222", name: "future-state-checkout", branch: "agent/future-state",
+          human_state: "ready", machine_state: futureMachineState, agent_id: null, agent_session_id: null,
+          runtime_id: null, archived: false, version: 8, binding_id: "f3333333-f333-4333-8333-333333333333", binding_version: 9,
+          project_binding_id: "f4444444-f444-4444-8444-444444444444", project_binding_version: 10,
+          engineering_run_id: null,
+        },
+      ];
+      const directoryStatusFetcher: typeof fetch = async (input) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
+        let body: Record<string, unknown>;
+        if (url.pathname === "/api/v1/projects") {
+          body = { projects: [{ project_id: runProjectId, role: "owner" }], limit: 10, next_cursor: null };
+        } else if (url.pathname === `/api/v1/projects/${runProjectId}/lanes`) {
+          body = {
+            project_id: runProjectId,
+            lanes: [{ lane_id: laneId, project_id: runProjectId, repository_id: repositoryId,
+              name: "core-runtime", description: null, created_by: "f0000000-f000-4000-8000-011111100001", lock_version: 1,
+              created_at: "2026-11-20T00:00:00Z", updated_at: "2026-11-20T00:00:00Z",
+              repository_binding: null, branch_binding: null }],
+            limit: 10, next_cursor: null,
+          };
+        } else if (url.pathname === `/api/v1/projects/${runProjectId}/lanes/${laneId}/worktrees`) {
+          body = { project_id: runProjectId, lane_id: laneId, worktrees, limit: 10, next_cursor: null };
+        } else {
+          return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+        }
+        return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+      };
 
-    render(
-      <I18nProvider initialLanguage="en">
-        <RunDirectoryProvider session={{
-          generation: "directory-status-test", getAccessToken: async () => "test-token",
-          baseUrl: "https://star.test", trustedOrigins: ["https://star.test"], fetcher: directoryStatusFetcher,
-        }}>
-          <ProjectRunTree collapsed={false} />
-        </RunDirectoryProvider>
-      </I18nProvider>,
-    );
+      render(
+        <I18nProvider initialLanguage="en">
+          <RunDirectoryProvider session={{
+            generation: "directory-status-test", getAccessToken: async () => "test-token",
+            baseUrl: "https://star.test", trustedOrigins: ["https://star.test"], fetcher: directoryStatusFetcher,
+          }}>
+            <ProjectRunTree collapsed={false} />
+          </RunDirectoryProvider>
+        </I18nProvider>,
+      );
 
-    fireEvent.click(await screen.findByRole("button", { name: `Expand Project ${runProjectId}` }));
-    fireEvent.click(await screen.findByRole("button", { name: "Expand Run Alpha" }));
-    const assignedRow = await screen.findByRole("treeitem", { name: /^assigned-checkout/ });
+      fireEvent.click(await screen.findByRole("button", { name: `Expand Project ${runProjectId}` }));
+      fireEvent.click(await screen.findByRole("button", { name: "Expand core-runtime" }));
+      const assignedRow = await screen.findByRole("treeitem", { name: /^assigned-checkout/ });
     const assignedDescription = assignedRow.getAttribute("aria-label") ?? "";
     expect(assignedDescription).toContain("Human: Waiting");
     expect(assignedDescription).toContain("Machine: Agent executing");
     expect(assignedDescription).toContain("Session bound");
     expect(assignedDescription).toContain("Runtime bound");
     expect(assignedDescription).toContain("Archived");
-    expect(assignedDescription).toContain("LANE binding v2");
-    expect(assignedDescription).toContain("Project binding v3");
+    expect(assignedDescription).toContain("Lane binding v2");
+    expect(assignedDescription).not.toContain("Project binding");
+    expect(assignedDescription).not.toContain(projectBindingId);
     expect(assignedDescription).toContain("Lock status unknown");
     expect(assignedDescription).toContain("Dirty change details unknown");
     expect(assignedDescription).toContain("Observation time unknown");

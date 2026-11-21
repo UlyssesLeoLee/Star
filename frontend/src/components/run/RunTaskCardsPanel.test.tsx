@@ -81,9 +81,10 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.test.tsx",ty
 */
 
 import "fake-indexeddb/auto";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RunTaskCardsPanel } from "./RunTaskCardsPanel";
+import { useNavStore } from "@/lib/nav/navStore";
 import {
   createTaskCardCreateRecoveryStore,
   taskCardCreateRecoveryScopeKey,
@@ -199,6 +200,11 @@ async function clickNewTaskCard() {
 }
 
 describe("RunTaskCardsPanel", () => {
+  beforeEach(() => {
+    // 全局底部筛选是跨用例共享状态: 每条用例从「全部」开始
+    act(() => { useNavStore.getState().setTaskStatusFilter("all"); });
+  });
+
   it("does not request or display tasks while LANE Apps are unavailable", () => {
     const fixture = clientFixture();
     render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available={false} recoveryStore={recoveryStoreFixture()} />);
@@ -588,5 +594,64 @@ describe("RunTaskCardsPanel", () => {
     expect(fixture.reviewRunTaskCard.mock.calls[0]?.[2]).toMatchObject({
       action: "reject", reason: "请补充独立验证证据", expected_version: 1,
     });
+  });
+
+  it("filters loaded rows by the global bottom task-status filter and restores on all", async () => {
+    const context = contextFixture();
+    const todoCard = cardFixture(); // pending → todo
+    const doneCard = {
+      ...cardFixture(),
+      work_item_id: "20000000-0000-4000-8000-000000000002",
+      title: "Done LANE task",
+      lifecycle: { ...cardFixture().lifecycle, status: "completed" },
+    };
+    const fixture = clientFixture();
+    fixture.listRunWorkItems.mockResolvedValue({ rows: [todoCard, doneCard], limit: RUN_TASK_CARD_PAGE_SIZE, next_after: null });
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real LANE task");
+    expect(screen.getByText("Done LANE task")).toBeInTheDocument();
+
+    act(() => { useNavStore.getState().setTaskStatusFilter("done"); });
+    expect(screen.queryByText("Real LANE task")).not.toBeInTheDocument();
+    expect(screen.getByText("Done LANE task")).toBeInTheDocument();
+
+    act(() => { useNavStore.getState().setTaskStatusFilter("blocked"); });
+    expect(screen.queryByText("Done LANE task")).not.toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("当前状态筛选下本页没有匹配的任务卡");
+
+    act(() => { useNavStore.getState().setTaskStatusFilter("all"); });
+    expect(screen.getByText("Real LANE task")).toBeInTheDocument();
+    expect(screen.getByText("Done LANE task")).toBeInTheDocument();
+  });
+
+  it("review filter matches pending_review regardless of lifecycle column", async () => {
+    const context = contextFixture();
+    const reviewCard = {
+      ...cardFixture(),
+      lifecycle: { ...cardFixture().lifecycle, status: "in_progress", review_state: "pending_review" },
+    };
+    const plainCard = {
+      ...cardFixture(),
+      work_item_id: "20000000-0000-4000-8000-000000000003",
+      title: "Plain in-progress task",
+      lifecycle: { ...cardFixture().lifecycle, status: "in_progress" },
+    };
+    const fixture = clientFixture();
+    fixture.listRunWorkItems.mockResolvedValue({ rows: [reviewCard, plainCard], limit: RUN_TASK_CARD_PAGE_SIZE, next_after: null });
+    render(<RunTaskCardsPanel client={fixture.client} context={context} available recoveryStore={recoveryStoreFixture()} />);
+
+    await screen.findByText("Real LANE task");
+    act(() => { useNavStore.getState().setTaskStatusFilter("review"); });
+    expect(screen.getByText("Real LANE task")).toBeInTheDocument();
+    expect(screen.queryByText("Plain in-progress task")).not.toBeInTheDocument();
+  });
+
+  it("task card title deep-links to the unified Backlog drawer via /kanban?work_item=", async () => {
+    const fixture = clientFixture();
+    render(<RunTaskCardsPanel client={fixture.client} context={contextFixture()} available recoveryStore={recoveryStoreFixture()} />);
+
+    const link = await screen.findByRole("link", { name: "打开任务卡详情：Real LANE task" });
+    expect(link).toHaveAttribute("href", `/kanban?work_item=${cardFixture().work_item_id}`);
   });
 });

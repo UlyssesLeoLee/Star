@@ -89,7 +89,7 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import { useFallbackRunDirectory } from "@/lib/run/useFallbackRunDirectory";
 import { directoryErrorMessage, RunDirectoryTree, type DirectoryNode, type DirectoryTreeRow } from "@/lib/run/runDirectoryTree";
-import { useTranslation, type Dictionary } from "@/lib/i18n";
+import { useTranslation, type Dictionary, type Language } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
 import type { Worktree } from "@/types/ids";
 
@@ -159,7 +159,7 @@ const LANE_DIRECTORY_COPY = {
     demoCheckoutStatus: "デモ checkout",
   },
 } as const;
-type LaneCopy = (typeof LANE_DIRECTORY_COPY)["zh-CN"];
+type LaneCopy = (typeof LANE_DIRECTORY_COPY)[Language];
 
 export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
   const session = useRunDirectory();

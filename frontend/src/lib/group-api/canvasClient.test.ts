@@ -158,6 +158,7 @@ describe("permission — can_write 派生与只读", () => {
           }),
         );
       }
+      if (url.includes("/elements")) return jsonResponse(elementsPayload());
       return jsonResponse(canvasListPayload());
     });
     const snapshot = await new GroupCanvasClient(api, WORKTREE).loadCanvas();
@@ -175,6 +176,7 @@ describe("permission — can_write 派生与只读", () => {
           }),
         );
       }
+      if (url.includes("/elements")) return jsonResponse(elementsPayload());
       return jsonResponse(canvasListPayload());
     });
     const snapshot = await new GroupCanvasClient(api, WORKTREE).loadCanvas();

@@ -93,8 +93,9 @@ export const UNIFIED_COLUMN_STATUS: Record<UnifiedKanbanColumn, RunTaskCardTarge
   wontfix: "cancelled",
 };
 
-/** 读侧映射: 生命周期状态 → 统一列 (与 groupProjection.mapWorkItems 同表). */
-const LIFECYCLE_COLUMN: Record<string, UnifiedKanbanColumn> = {
+/** 读侧映射: 生命周期状态 → 统一列 (与 groupProjection.mapWorkItems 同表).
+ *  export: LANE Task Cards 面板的全局任务状态筛选复用同一张表, 不另造映射。 */
+export const LIFECYCLE_COLUMN: Record<string, UnifiedKanbanColumn> = {
   pending: "todo",
   claimed: "in_progress",
   in_progress: "in_progress",
@@ -224,15 +225,48 @@ export async function listUnifiedWorkItems(
   worktreeId: string,
   signal?: AbortSignal,
 ): Promise<UnifiedWorkItem[]> {
+  // 服务端 group_api/work_items.rs `project_work_item` 输出的是原始行
+  // (work_item_id + lifecycle{...}), 不是 GroupWorkItemView 形状;
+  // 这里做与 groupProjection.mapWorkItems 同表的归一, 不改共享文件。
   const response = await client.listWorkItems<{
     worktree_id: string;
     project_id: string;
-    work_items: GroupWorkItemView[];
+    work_items: Array<Record<string, unknown>>;
   }>(worktreeId, signal);
   if (response.worktree_id !== worktreeId) {
     throw new Error("Group API returned a projection outside the active Worktree.");
   }
-  return normalizeGroupWorkItems(response.work_items, worktreeId);
+  const views: GroupWorkItemView[] = response.work_items.map((raw) => {
+    const lifecycle = (raw.lifecycle ?? {}) as Record<string, unknown>;
+    const status = String(lifecycle.status ?? "");
+    const version = Number(lifecycle.version);
+    if (!status || !Number.isSafeInteger(version) || version < 1) {
+      throw new Error("Group API returned an unsupported WorkItem lifecycle projection.");
+    }
+    const id = String(raw.work_item_id ?? raw.id ?? "");
+    if (!id) throw new Error("Group API returned a WorkItem without an id.");
+    return {
+      id,
+      project_id: response.project_id,
+      worktree_id: worktreeId,
+      key: id,
+      title: String(raw.title ?? ""),
+      description: typeof raw.description === "string" ? raw.description : "",
+      kind: normalizeKind(String(raw.item_type ?? "task")),
+      status: LIFECYCLE_COLUMN[status] === "done" ? "done"
+        : LIFECYCLE_COLUMN[status] === "blocked" ? "blocked"
+        : LIFECYCLE_COLUMN[status] === "wontfix" ? "wontfix"
+        : LIFECYCLE_COLUMN[status] === "in_progress" ? "in_progress" : "todo",
+      priority: normalizePriority(String(raw.priority ?? "medium")),
+      lifecycle_status: status as GroupWorkItemView["lifecycle_status"],
+      lifecycle_version: version,
+      review_state: typeof lifecycle.review_state === "string" ? lifecycle.review_state : "none",
+      active_worktree_id: typeof lifecycle.active_worktree_id === "string" ? lifecycle.active_worktree_id : null,
+      labels: Array.isArray(raw.labels) ? raw.labels.filter((l): l is string => typeof l === "string") : [],
+      reporter_id: String(raw.reporter_user_id ?? ""),
+    };
+  });
+  return normalizeGroupWorkItems(views, worktreeId);
 }
 
 /** 创建任务卡, 挂当前 worktree (branch) — 与 sprint/backlog 入口同一服务端写入路径. */

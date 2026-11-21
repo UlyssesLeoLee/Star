@@ -146,20 +146,32 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
   });
 
   it("persists fold/scope/selectedProjectId via localStorage star-nav-store:v2", () => {
-    // jsdom 默认有 localStorage; 写入并模拟刷新 (重新读)
-    const { setSidebarFold, setSidebarScope, setSelectedProjectId } = useNavStore.getState();
-    setSidebarFold("collapsed");
-    setSidebarScope("project");
-    setSelectedProjectId("proj-persist-test");
+      // jsdom 默认有 localStorage; 写入并模拟刷新 (重新读)
+      const { setSidebarFold, setSidebarScope, setSelectedProjectId } = useNavStore.getState();
+      setSidebarFold("collapsed");
+      setSidebarScope("project");
+      setSelectedProjectId("proj-persist-test");
 
-    // 读 localStorage 验证
-    const raw = window.localStorage.getItem("star-nav-store:v2");
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw ?? "{}");
-    expect(parsed.state.sidebarFold).toBe("collapsed");
-    expect(parsed.state.sidebarScope).toBe("project");
-    expect(parsed.state.selectedProjectId).toBe("proj-persist-test");
-  });
+      // 读 localStorage 验证
+      const raw = window.localStorage.getItem("star-nav-store:v2");
+      expect(raw).not.toBeNull();
+      const parsed = JSON.parse(raw ?? "{}");
+      expect(parsed.state.sidebarFold).toBe("collapsed");
+      expect(parsed.state.sidebarScope).toBe("project");
+      expect(parsed.state.selectedProjectId).toBe("proj-persist-test");
+    });
+
+    it("persists sidebarTab and taskStatusFilter via localStorage", () => {
+      const { setSidebarTab, setTaskStatusFilter } = useNavStore.getState();
+      setSidebarTab("aiUpdates");
+      setTaskStatusFilter("review");
+
+      const raw = window.localStorage.getItem("star-nav-store:v2");
+      expect(raw).not.toBeNull();
+      const parsed = JSON.parse(raw ?? "{}");
+      expect(parsed.state.sidebarTab).toBe("aiUpdates");
+      expect(parsed.state.taskStatusFilter).toBe("review");
+    });
 
   it("adds Advanced Settings once when migrating saved sidebar preferences", async () => {
     window.localStorage.setItem(

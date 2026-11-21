@@ -210,7 +210,17 @@ vi.mock("../components/GitCanvas", () => ({
 import CanvasDetailPage from "./page";
 
 function renderPage() {
-  return render(<CanvasDetailPage params={Promise.resolve({ id: "canvas-1" })} />);
+  // Next App Router 在把 params 交给客户端组件前已解开 Promise
+  // (React thenable 协议: status/value)。测试直渲没有 router, 这里按同一
+  // 协议预置 fulfilled 状态, 使 use(params) 同步取值, 不依赖 Suspense 重试
+  // (jsdom + React 19.3 下纯 Promise 的 use() 恢复在本环境不触发重渲)。
+  const params = Promise.resolve({ id: "canvas-1" }) as Promise<{ id: string }> & {
+    status?: string;
+    value?: { id: string };
+  };
+  params.status = "fulfilled";
+  params.value = { id: "canvas-1" };
+  return render(<CanvasDetailPage params={params} />);
 }
 
 describe("/canvas/[id] — group 模式接线", () => {

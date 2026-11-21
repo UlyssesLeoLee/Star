@@ -65,6 +65,9 @@ import { GitCanvas } from "../components/GitCanvas";
 import { CanvasScopeSelector, type CanvasScope } from "@/components/canvas/CanvasScopeSelector";
 import { useNavStore } from "@/lib/nav/navStore";
 import { createCanvasLocal, resolveCanvasSource } from "@/lib/canvas-entry";
+import { useContext } from "react";
+import { I18nContext } from "@/lib/i18n/I18nProvider";
+import { uiLangOf } from "@/components/context-menu/messages";
 import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import {
   CanvasConflictError,
@@ -148,6 +151,10 @@ interface CanvasConflictView {
 
 export default function CanvasDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  // 独立路由可能不在 I18nProvider 内 (深链/测试直渲): 缺 ctx 时回退 zh-CN, 不抛错
+  const i18n = useContext(I18nContext);
+  const uiLang = uiLangOf(i18n?.language);
+  const text = UI_TEXT[uiLang === "zh-CN" ? "zh" : uiLang];
   const [activeTab, setActiveTab] = useState<typeof CANVAS_SUB_TABS[number]>("画布");
 
   // ?tab= 深链 (per 2026-11-15 Agent 中心并入: /agent-view → ?tab=agent)

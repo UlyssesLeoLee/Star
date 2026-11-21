@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=07d0a4ed45e65d0c2d4bb742dc81a2873cf4a2253861b39fac9c1024c7dc020f
+@cypher schema=1 source_sha256=0000000000000000000000000000000000000000000000000000000000000000
 MERGE (self:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -23,20 +23,23 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
+  Bell,
+  MessageSquare,
+  Inbox,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback } from "react";
-import { useNavStore } from "@/lib/nav/navStore";
-import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type ModuleCategory, type NavGroupId } from "@/lib/nav/registry";
+import { useNavStore, type SidebarTabId } from "@/lib/nav/navStore";
+import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 // =====================================================================
-// Sidebar — Project-first navigation.
-// Project → Lane → Worktree → Branch is the primary hierarchy (per 2026-11-15 Lane 统一命名).
-// Existing pages remain reachable in a secondary, collapsible section.
+// Sidebar — Project-first navigation with Directory / AI Updates tabs.
+// Project → Lane → Worktree → Branch is the primary hierarchy.
 // =====================================================================
 
 const SIDEBAR_WIDTH = {
@@ -55,6 +58,9 @@ export function Sidebar() {
   const sidebarFold = useNavStore((s) => s.sidebarFold);
   const toggleSidebarFold = useNavStore((s) => s.toggleSidebarFold);
   const setSidebarFold = useNavStore((s) => s.setSidebarFold);
+  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
+  const sidebarScope = useNavStore((s) => s.sidebarScope);
+  const setSidebarScope = useNavStore((s) => s.setSidebarScope);
 
   useEffect(() => setMounted(true), []);
 
@@ -62,29 +68,29 @@ export function Sidebar() {
   const isCollapsed = sidebarFold === "collapsed";
 
   // =====================================================================
-  // per 2026-11-14 artifact 参考 UI: 左侧 = 项目列表(LANE 树) + 底部全局组,
-  // 用户钉选(pinned/sidebarItemIds)不再在侧栏渲染 — 入口统一走顶栏 App Matrix
+  // Tabs state (Directory / AI Updates) - persisted in navStore
+  // =====================================================================
+  const sidebarTab = useNavStore((s) => s.sidebarTab);
+  const setSidebarTab = useNavStore((s) => s.setSidebarTab);
+  const taskStatusFilter = useNavStore((s) => s.taskStatusFilter);
+  const setTaskStatusFilter = useNavStore((s) => s.setTaskStatusFilter);
+
+  // Sync activeTab from navStore on mount (could be extended to persist)
+  useEffect(() => {
+    // initial sync - navStore already has persisted values
+  }, []);
+
+  // =====================================================================
+  // Module active check
   // =====================================================================
   const isModuleActive = useCallback(
     (item: ModuleDefinition) => moduleHrefMatches(item.href, pathname, searchParams),
     [pathname, searchParams]
   );
 
-  // =====================================================================
-  // 5 组结构分组解析 (per ui-3pane-arch §1.2 v0.2)
-  // =====================================================================
-  // 组内模块: 按 NAV_GROUPS id 映射
-  // (worktree 保留在 Home 核心区, per ui-3pane-arch §1.2.1 "保留独立路由, 仅导航位置上移")
-  const groupModules = (groupId: NavGroupId): ModuleDefinition[] =>
-    NAV_GROUPS[groupId]
-      .map((id) => MODULE_MAP.get(id))
-      .filter((m): m is ModuleDefinition => Boolean(m));
-
-  // 键盘快捷键 Ctrl+B 折叠/展开 (per 守门 #11 缺标比错标: shortcut 是 power user
-  // 必备延伸, 不强制; 这里落地)
+  // Keyboard shortcut Ctrl+B
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ctrl+B / Cmd+B
       if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
         toggleSidebarFold();
@@ -94,10 +100,7 @@ export function Sidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleSidebarFold]);
 
-  // 发布折叠态到 <html data-fold> — CSS 变量 --sidebar-w 的单一驱动源
-  // (per INV-LAYOUT-03: 所有 fixed 全宽 dock 读 var(--sidebar-w)，禁止硬编码 px/rem)。
-  // 不用 :root[data-fold=...] 是因为 Tailwind v4 的 cascade 顺序无法保证，
-  // 挂在 <html> 上语义最直白，devtools 里也一眼能看到当前宽度状态。
+  // Publish fold state to <html data-fold>
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.fold = sidebarFold;
@@ -106,20 +109,121 @@ export function Sidebar() {
     };
   }, [sidebarFold]);
 
+  // =====================================================================
+  // Render Directory tab content (Project tree)
+  // =====================================================================
+  const renderDirectoryTab = () => (
+    <ProjectRunTree collapsed={isCollapsed} />
+  );
+
+  // =====================================================================
+  // Render AI Updates tab content
+  // =====================================================================
+  const renderAIUpdatesTab = () => {
+    const aiTitle = t.sidebar.aiUpdates.title;
+    const empty = t.sidebar.aiUpdates.empty;
+    const disconnected = t.sidebar.aiUpdates.disconnected;
+    const unauthorized = t.sidebar.aiUpdates.unauthorized;
+
+    // TODO: Replace with real API when available
+    // For now show "not connected" state per requirements
+    return (
+      <div className="flex-1 overflow-y-auto p-3 space-y-3" data-testid="sidebar-ai-updates">
+        <div className="text-center text-ink-mute py-8">
+          <div className="rounded-full bg-warn/10 border border-warn/30 p-3 w-12 h-12 mx-auto mb-2 flex items-center justify-center">
+            <MessageSquare size={20} className="text-warn" />
+          </div>
+          <p className="text-sm font-medium">{aiTitle}</p>
+          <p className="text-[11px] mt-1">{disconnected}</p>
+          <p className="text-[11px] text-ink-dim mt-1">{unauthorized}</p>
+        </div>
+        <div className="border-t border-line/60 pt-3">
+          <p className="text-[10px] text-ink-mute text-center">{empty}</p>
+        </div>
+      </div>
+    );
+  };
+
+  // =====================================================================
+  // Task Status Filter Dropdown
+  // =====================================================================
+  const renderTaskStatusFilter = () => {
+    const label = t.sidebar.taskStatus.label;
+    const statuses = [
+      { value: "all", label: t.sidebar.taskStatus.all },
+      { value: "todo", label: t.sidebar.taskStatus.todo },
+      { value: "in_progress", label: t.sidebar.taskStatus.inProgress },
+      { value: "blocked", label: t.sidebar.taskStatus.blocked },
+      { value: "review", label: t.sidebar.taskStatus.review },
+      { value: "done", label: t.sidebar.taskStatus.done },
+    ] as const;
+
+    return (
+      <div className="relative" data-testid="sidebar-task-status-filter">
+        <select
+          value={taskStatusFilter}
+          onChange={(e) => setTaskStatusFilter(e.target.value)}
+          className="w-full appearance-none rounded border border-line bg-bg px-2 py-1.5 pr-8 text-xs text-ink focus:outline focus:outline-1 focus:outline-accent cursor-pointer"
+          aria-label={label}
+        >
+          {statuses.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-ink-mute pointer-events-none" aria-hidden="true" />
+        <span className="sr-only">{label}</span>
+      </div>
+    );
+  };
+
+  // =====================================================================
+  // Quick Entries (Inbox, Notifications, Chat)
+  // =====================================================================
+  const renderQuickEntries = () => {
+    const entries = [
+      { id: "inbox", icon: Inbox, label: t.sidebar.quickEntries.inbox, href: "/inbox" },
+      { id: "notifications", icon: Bell, label: t.sidebar.quickEntries.notifications, href: "/notification" },
+      { id: "chat", icon: MessageSquare, label: t.sidebar.quickEntries.chat, href: "/inbox?type=chat" },
+    ] as const;
+
+    return (
+      <div className="space-y-1 pt-2 border-t border-line/60" data-testid="sidebar-quick-entries">
+        {entries.map((entry) => (
+          <Link
+            key={entry.id}
+            href={entry.href}
+            data-testid={`sidebar-quick-${entry.id}`}
+            className={clsx(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+              isCollapsed ? "justify-center" : "gap-2.5",
+              "text-ink-dim hover:bg-bg-soft/60 hover:text-ink"
+            )}
+            title={isCollapsed ? entry.label : undefined}
+            aria-label={isCollapsed ? entry.label : undefined}
+          >
+            <span className="size-8 rounded-lg grid place-items-center border border-transparent text-ink-mute shrink-0">
+              <entry.icon size={14} strokeWidth={2} />
+            </span>
+            {!isCollapsed && <span className="flex-1 truncate font-medium">{entry.label}</span>}
+          </Link>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <aside
       data-testid="app-sidebar"
       data-fold={sidebarFold}
       data-nav-model="project-run"
-      // 桌面: 256/64 sticky; <768px: 隐藏 (由 MobileBottomNav + AppMatrixDrawer 抽屉替代, per 2026-09-01 PHASE-MOBILE-PWA)
-      // z-40: 侧栏是结构性骨架层, 必须高于所有内容级 dock (L3 z-[35])
-      // (per INV-LAYOUT-01/04: 修复方式是提高 Sidebar 层级, 不是降低 dock 层级)
       className={clsx(
         "hidden md:flex shrink-0 border-r border-line bg-bg-card/95 backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-40 transition-all duration-200 ease-out text-ink",
         SIDEBAR_WIDTH[sidebarFold]
       )}
     >
-      {/* === Star Anime Cyber Crest (Brand Block) + Fold Toggle === */}
+      {/* === Brand Block + Fold Toggle === */}
       <div
         data-testid="sidebar-brand-block"
         className={clsx(
@@ -128,12 +232,8 @@ export function Sidebar() {
         )}
       >
         <Link
-          // per ui-3pane-arch §1.2.1: Home 落地页 = Worktree 控制中心首屏
           href="/worktree"
-          className={clsx(
-            "flex items-center group",
-            isCollapsed ? "" : "gap-3"
-          )}
+          className={clsx("flex items-center group", isCollapsed ? "" : "gap-3")}
           data-testid="sidebar-brand"
           aria-label={t.ariaLabels.starHome}
         >
@@ -141,13 +241,7 @@ export function Sidebar() {
             aria-hidden="true"
             className="size-9 overflow-hidden border-2 border-ink shrink-0 transition-transform duration-200 group-hover:scale-105 bg-black"
           >
-            <img
-              src="/sidebar-icon.png"
-              width={36}
-              height={36}
-              alt=""
-              className="block w-full h-full object-cover"
-            />
+            <img src="/sidebar-icon.png" width={36} height={36} alt="" className="block w-full h-full object-cover" />
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
@@ -166,7 +260,7 @@ export function Sidebar() {
           )}
         </Link>
 
-        {/* Fold toggle button — 始终可见, 折叠态下显示在 icon 下方 */}
+        {/* Fold toggle button */}
         {isCollapsed ? (
           <button
             type="button"
@@ -195,77 +289,166 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* === Scope Toggle (Main / Project) — 仅展开态可见 === */}
-      {/* per 2026-09-03 12:36 JST 拍板 #2: 顶部 brand block 下方 */}
-      {/* === Navigation Groups (per ui-3pane-arch §1.2 v0.2: 5 组结构) === */}
+      {/* === Fixed Top Tabs: Directory | AI Updates === */}
+      {!isCollapsed && (
+        <div className="border-b border-line/60 bg-bg-card/50 px-2 py-1.5" data-testid="sidebar-top-tabs" role="tablist" aria-label={t.sidebar.projectNavigation}>
+          <button
+            role="tab"
+            aria-selected={sidebarTab === "directory"}
+            aria-controls="sidebar-directory-panel"
+            id="sidebar-tab-directory"
+            onClick={() => setSidebarTab("directory")}
+            className={clsx(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all",
+              sidebarTab === "directory"
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "text-ink-dim hover:bg-bg-soft hover:text-ink"
+            )}
+            data-testid="sidebar-tab-directory"
+          >
+            <span>{t.sidebar.tabs.directory}</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={sidebarTab === "aiUpdates"}
+            aria-controls="sidebar-ai-updates-panel"
+            id="sidebar-tab-ai-updates"
+            onClick={() => setSidebarTab("aiUpdates")}
+            className={clsx(
+              "flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all",
+              sidebarTab === "aiUpdates"
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "text-ink-dim hover:bg-bg-soft hover:text-ink"
+            )}
+            data-testid="sidebar-tab-ai-updates"
+          >
+            <span>{t.sidebar.tabs.aiUpdates}</span>
+          </button>
+        </div>
+      )}
+
+      {/* === Middle Area (scrollable) === */}
       <nav
         className={clsx(
           "flex-1 overflow-y-auto text-sm scrollbar-none",
           isCollapsed ? "px-2 py-3 space-y-2" : "px-3 py-4 space-y-5"
         )}
         aria-label={t.sidebar.projectNavigation}
+        role="tabpanel"
+        aria-labelledby={sidebarTab === "directory" ? "sidebar-tab-directory" : "sidebar-tab-ai-updates"}
       >
-        {/* Project → LANE → Worktree → Branch 层级树 (per 2026-11-14 用户发令:
-            恢复 LANE 层级设计; 无宿主会话时降级为可达的演示目录, 不显示死块) */}
-        <ProjectRunTree collapsed={isCollapsed} />
-        {/* 全局组 (per 2026-11-14 用户发令: 参考设计带标签页形式 —
-            竖向 tab pills: icon + label + count 徽标, 激活态 accent 左条) */}
-        <div className="mt-auto border-t border-line/60 pt-3" data-testid="sidebar-group-global">
-          {!isCollapsed && (
+        <div
+          id="sidebar-directory-panel"
+          data-testid="sidebar-directory-panel"
+          className={sidebarTab === "directory" ? "block" : "hidden"}
+        >
+          {renderDirectoryTab()}
+        </div>
+        <div
+          id="sidebar-ai-updates-panel"
+          data-testid="sidebar-ai-updates-panel"
+          className={sidebarTab === "aiUpdates" ? "block" : "hidden"}
+        >
+          {renderAIUpdatesTab()}
+        </div>
+
+        {/* Global section at bottom (collapsed into quick entries in new design) */}
+        {!isCollapsed && sidebarTab === "directory" && (
+          <div className="mt-auto border-t border-line/60 pt-3" data-testid="sidebar-group-global">
             <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-mute">
               {t.sidebar.navGlobal}
             </div>
-          )}
-          <ul className={clsx(isCollapsed ? "space-y-1.5" : "mt-1.5 space-y-1")}>
-            {groupModules("home-personal").map((item) => {
-              const active = isModuleActive(item);
-              const Icon = item.icon;
-              return (
-                <li key={item.id} className="relative">
-                  <Link
-                    href={item.href}
-                    data-testid={`sidebar-item-${item.id}`}
-                    data-active={active ? "true" : "false"}
-                    aria-current={active ? "page" : undefined}
-                    title={isCollapsed ? useModuleTranslation(item).label : undefined}
-                    className={clsx(
-                      "flex items-center rounded-lg transition-colors",
-                      isCollapsed ? "justify-center p-1.5" : "gap-2.5 px-2.5 py-2",
-                      active
-                        ? "bg-accent/10 text-accent font-semibold"
-                        : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink",
-                    )}
-                  >
-                    {/* tab 左条 (激活态) */}
-                    {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded bg-accent" aria-hidden="true" />}
-                    <span
+            <ul className="mt-1.5 space-y-1">
+              {NAV_GROUPS["home-personal"].map((id) => {
+                const item = MODULE_MAP.get(id);
+                if (!item) return null;
+                const active = isModuleActive(item);
+                const Icon = item.icon;
+                return (
+                  <li key={item.id} className="relative">
+                    <Link
+                      href={item.href}
+                      data-testid={`sidebar-item-${item.id}`}
+                      data-active={active ? "true" : "false"}
+                      aria-current={active ? "page" : undefined}
                       className={clsx(
-                        "rounded-md grid place-items-center shrink-0 border",
-                        isCollapsed ? "size-9" : "size-7",
-                        active ? "bg-accent/15 border-accent/50 text-accent" : "border-transparent text-ink-mute",
+                        "flex items-center rounded-lg transition-colors",
+                        "gap-2.5 px-2.5 py-2",
+                        active
+                          ? "bg-accent/10 text-accent font-semibold"
+                          : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink"
                       )}
                     >
-                      <Icon size={isCollapsed ? 15 : 13} />
-                    </span>
-                    {!isCollapsed && (
-                      <>
-                        <span className="flex-1 truncate tracking-tight">{useModuleTranslation(item).label}</span>
-                        {item.count !== undefined && item.count > 0 && (
-                          <span className="min-w-[18px] h-4.5 rounded-full bg-err text-white text-[10px] font-mono grid place-items-center px-1 font-bold">
-                            {item.count}
-                          </span>
+                      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded bg-accent" aria-hidden="true" />}
+                      <span
+                        className={clsx(
+                          "rounded-md grid place-items-center shrink-0 border",
+                          "size-7",
+                          active ? "bg-accent/15 border-accent/50 text-accent" : "border-transparent text-ink-mute"
                         )}
-                      </>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                      >
+                        <Icon size={13} />
+                      </span>
+                      <span className="flex-1 truncate tracking-tight">{useModuleTranslation(item).label}</span>
+                      {item.count !== undefined && item.count > 0 && (
+                        <span className="min-w-[18px] h-4.5 rounded-full bg-err text-white text-[10px] font-mono grid place-items-center px-1 font-bold">
+                          {item.count}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </nav>
 
+      {/* === Fixed Bottom: Task Status Filter + Quick Entries === */}
+      {!isCollapsed && (
+        <div className="border-t border-line shrink-0 bg-bg-card/50 p-3 space-y-3" data-testid="sidebar-bottom-fixed" role="region" aria-label={t.sidebar.taskStatus.label}>
+          {sidebarTab === "directory" && (
+            <>
+              <div data-testid="sidebar-task-status-wrapper">
+                <label htmlFor="sidebar-task-status-select" className="block text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-1">
+                  {t.sidebar.taskStatus.label}
+                </label>
+                {renderTaskStatusFilter()}
+              </div>
+              {renderQuickEntries()}
+            </>
+          )}
+          {sidebarTab === "aiUpdates" && (
+            <div data-testid="sidebar-ai-updates-bottom" className="text-center text-[11px] text-ink-mute">
+              {t.sidebar.aiUpdates.empty}
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Collapsed mode: show quick entries at bottom */}
+      {isCollapsed && (
+        <div className="mt-auto border-t border-line/60 pt-2 pb-3 px-2 space-y-1.5" data-testid="sidebar-collapsed-quick-entries">
+          {[
+            { id: "inbox", icon: Inbox, label: t.sidebar.quickEntries.inbox, href: "/inbox" },
+            { id: "notifications", icon: Bell, label: t.sidebar.quickEntries.notifications, href: "/notification" },
+            { id: "chat", icon: MessageSquare, label: t.sidebar.quickEntries.chat, href: "/inbox?type=chat" },
+          ].map((entry) => (
+            <Link
+              key={entry.id}
+              href={entry.href}
+              data-testid={`sidebar-collapsed-quick-${entry.id}`}
+              title={entry.label}
+              aria-label={entry.label}
+              className="flex items-center justify-center p-1.5 rounded-lg text-ink-dim hover:bg-bg-soft/60 hover:text-ink transition-colors"
+            >
+              <span className="size-8 rounded-lg grid place-items-center border border-transparent text-ink-mute">
+                <entry.icon size={16} strokeWidth={2} />
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

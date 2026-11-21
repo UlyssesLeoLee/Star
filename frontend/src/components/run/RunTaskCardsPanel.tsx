@@ -77,6 +77,9 @@ CREATE (f:File {name:"frontend/src/components/run/RunTaskCardsPanel.tsx",type:"f
 
 import { useEffect, useState, type FormEvent } from "react";
 import { clsx } from "clsx";
+import Link from "next/link";
+import { useNavStore, type TaskStatusFilter } from "@/lib/nav/navStore";
+import { LIFECYCLE_COLUMN } from "@/app/(app)/kanban/unifiedWorkItems";
 import { directoryErrorMessage } from "@/lib/run/runDirectoryTree";
 import {
   getTaskCardCreateRecoveryStore,
@@ -127,6 +130,14 @@ function taskCardCreateErrorMessage(reason: unknown): string {
   return reason instanceof TaskCardCreateRecoveryError ? reason.message : directoryErrorMessage(reason);
 }
 
+/** 底部筛选值 → 卡片是否可见。复用 kanban LIFECYCLE_COLUMN 同一张读侧映射;
+ *  review = review_state 待审 (服务端无独立 review 生命周期列)。 */
+function taskCardMatchesStatusFilter(card: RunTaskCard, filter: TaskStatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "review") return card.lifecycle.review_state === "pending_review";
+  return LIFECYCLE_COLUMN[card.lifecycle.status] === filter;
+}
+
 export function RunTaskCardsPanel({ client, context, available, recoveryStore: suppliedRecoveryStore }: RunTaskCardsPanelProps) {
   const recoveryStore = suppliedRecoveryStore ?? getTaskCardCreateRecoveryStore();
   const run = context.engineering_run;
@@ -152,6 +163,9 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
   const [terminalCardId, setTerminalCardId] = useState<string | null>(null);
   const [shellSelections, setShellSelections] = useState<Record<string, TaskCardShellKind>>({});
   const [pendingCreate, setPendingCreate] = useState<PendingTaskCardCreate | null>(null);
+  // 全局底部任务状态筛选 (导航底栏写入 navStore, 跨「目录 ↔ AI 更新」往返保留);
+  // 只筛当前已加载页的行 — 服务端列表无状态过滤参数, 不伪造跨页全集。
+  const taskStatusFilter = useNavStore((s) => s.taskStatusFilter);
   const [recoveryState, setRecoveryState] = useState<{
     scope_key: string | null;
     phase: "loading" | "ready" | "error";
@@ -234,6 +248,7 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
 
   const canGoNext = page?.next_after !== null && page?.next_after !== undefined && pageIndex + 1 < RUN_TASK_CARD_MAX_PAGE_COUNT;
   const canGoPrevious = pageIndex > 0;
+  const visibleRows = page ? page.rows.filter((card) => taskCardMatchesStatusFilter(card, taskStatusFilter)) : [];
   function goNextTaskCardPage() {
     if (!page?.next_after || !canGoNext) return;
     setCursorStack([...cursorStack.slice(0, pageIndex + 1), page.next_after]);
@@ -454,13 +469,22 @@ export function RunTaskCardsPanel({ client, context, available, recoveryStore: s
     {phase === "loading" && <p className="mt-4 text-sm text-ink-mute" role="status">正在读取 LANE 任务…</p>}
     {phase === "error" && <div className="mt-4 text-sm" role="alert"><p>{error}</p><button type="button" onClick={retryTaskCardPage} className="mt-2 rounded border border-line px-3 py-1 text-xs">重试</button></div>}
     {phase === "ready" && page?.rows.length === 0 && <p className="mt-4 text-sm text-ink-mute">此 LANE 当前没有已归属的任务。未归属历史任务不会自动迁入。</p>}
-    {phase === "ready" && page && page.rows.length > 0 && <>
+    {phase === "ready" && page && page.rows.length > 0 && visibleRows.length === 0 && <p className="mt-4 text-sm text-ink-mute" role="note">当前状态筛选下本页没有匹配的任务卡；筛选只作用于已加载页，翻页或切回「全部」可看到其余任务。</p>}
+    {phase === "ready" && visibleRows.length > 0 && <>
       <ul className="mt-4 grid gap-3">
-        {page.rows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-card p-3 shadow-soft" data-work-item-id={card.work_item_id}>
+        {visibleRows.map((card) => <li key={card.work_item_id} className="rounded border border-line bg-bg-card p-3 shadow-soft" data-work-item-id={card.work_item_id}>
           <article>
             <header className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="break-words font-medium">{card.title}</h3>
+                <h3 className="break-words font-medium">
+                  {/* 任务卡详情复用统一 Backlog Drawer: 深链 /kanban?work_item=<id>,
+                      kanban 页水合服务端真源后开 WorkItemDetailDrawer, 不另造详情面板 */}
+                  <Link
+                    href={`/kanban?work_item=${encodeURIComponent(card.work_item_id)}`}
+                    aria-label={`打开任务卡详情：${card.title}`}
+                    className="hover:text-accent hover:underline"
+                  >{card.title}</Link>
+                </h3>
                 <p className="mt-1 text-xs text-ink-mute">{card.item_type} · {card.priority} · {card.lifecycle.status} · Review {card.lifecycle.review_state}</p>
               </div>
               <button

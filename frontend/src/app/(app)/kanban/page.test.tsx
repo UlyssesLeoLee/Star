@@ -83,6 +83,7 @@ beforeEach(() => {
     workItems: [],
     board: { id: "b-1", tenant_id: "t-1", project_id: "p-1", name: "board", columns: [] },
   });
+  window.history.replaceState(null, "", "/kanban");
 });
 
 afterEach(() => {
@@ -155,5 +156,33 @@ describe("KanbanPage P1 统一通道", () => {
     fireEvent.drop(screen.getByTestId("kanban-column-in_progress"), { dataTransfer });
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("版本冲突, 已刷新最新状态"));
+  });
+
+  it("深链 ?work_item= : 服务端真源水合后打开统一详情 Drawer (Lane 任务卡入口)", async () => {
+    useNavStore.setState({ selectedWorktreeId: WORKTREE_ID });
+    window.history.replaceState(null, "", `/kanban?work_item=${WORK_ITEM_ID}`);
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes(`/api/v1/worktrees/${WORKTREE_ID}/work-items`)) {
+        return new Response(JSON.stringify(listEnvelope([serverItem()])), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: { code: "not_found" } }), { status: 404 });
+    }) as unknown as typeof fetch;
+
+    renderServerHarness(fetcher);
+
+    // 水合完成后 Drawer 打开, 展示同一张服务端真源卡
+    const drawer = await screen.findByTestId("work-item-drawer-root", {}, { timeout: 5000 });
+    expect(drawer).toBeInTheDocument();
+    expect(await screen.findByTestId("work-item-drawer-title")).toHaveValue("P1 统一卡");
+  });
+
+  it("深链 ?work_item= 指向未水合的卡时不开空 Drawer (本地模式诚实留痕)", async () => {
+    window.history.replaceState(null, "", `/kanban?work_item=${WORK_ITEM_ID}`);
+    renderWithI18n(<KanbanPage />);
+    expect(screen.getByTestId("kanban-data-source").textContent).toContain("本地模式");
+    // 给 effect 充分时间; store 无此卡 → 不开 Drawer
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId("work-item-drawer-root")).not.toBeInTheDocument();
   });
 });

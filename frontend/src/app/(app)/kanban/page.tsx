@@ -317,13 +317,20 @@ export default function KanbanPage() {
     priority: "all",
   });
 
-  // 深链 ?view= (client-only 解析; 不用 useSearchParams — dev 下与页面级
+  // 深链 ?view= + ?work_item= (client-only 解析; 不用 useSearchParams — dev 下与页面级
   // Suspense 组合会产生双份 DOM 渲染)
+  // ?work_item=<id> = Lane 任务卡「打开详情」深链: 服务端真源水合 store 后开 Drawer;
+  // 未水合 (本地模式/拉取失败/无此卡) 时不开空 Drawer, 诚实留痕。
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const v = new URLSearchParams(window.location.search).get("view");
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("view");
     if (isViewTab(v)) setActiveView(v as ViewTab);
-  }, []);
+    const wi = params.get("work_item");
+    if (wi && useStore.getState().workItems.some((w) => w.id === wi)) {
+      setDrawerMode({ kind: "view", workItemId: wi });
+    }
+  }, [serverItems]);
 
   // ---- 真实数据源 (store) ----
   const workItems = useStore((s) => s.workItems);

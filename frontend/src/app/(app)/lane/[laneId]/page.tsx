@@ -18,7 +18,7 @@ MERGE (self)-[:DEFINES]->(page)
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { CheckCircle, Layers, Link2, Monitor, Plus, RefreshCw } from "lucide-react";
+import { Layers, Link2, Monitor, Plus, RefreshCw } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useRunDirectory } from "@/lib/run/runDirectorySession";
 import {
@@ -30,6 +30,7 @@ import {
   type LaneWorktree,
 } from "@/lib/run/runDirectoryApi";
 import { useTranslation } from "@/lib/i18n";
+import { RunWorkspaceShell } from "@/components/run/RunWorkspaceShell";
 
 // =====================================================================
 // 局部三语文案 (共享 dictionary 不碰; 新增 i18n key 清单见报告父代理待办)
@@ -242,7 +243,7 @@ export default function LaneDetailPage() {
         <h2 className="font-semibold">{copy.laneMeta}</h2>
         <dl className="mt-3 grid gap-2 break-all text-xs">
           <div><dt className="text-ink-mute">{copy.version}</dt><dd>{demoLane ? "—" : copy.version}</dd></div>
-          <div><dt className="text-ink-mute">Project</dt><dd>{demoProject?.name ?? realProjectId || "—"}</dd></div>
+          <div><dt className="text-ink-mute">Project</dt><dd>{demoProject?.name ?? (realProjectId || "—")}</dd></div>
           <div>
             <dt className="text-ink-mute">Git</dt>
             <dd>{demoLane?.git_remote_url ?? copy.unboundRemote}</dd>
@@ -304,11 +305,25 @@ export default function LaneDetailPage() {
             ))}
           </div>
         )}
-        {selectedWorktree && <section data-testid="lane-selected-worktree" className="mt-4 rounded border border-line bg-bg-soft p-4">
-          <h3 className="flex items-center gap-1 text-sm font-semibold"><CheckCircle size={14} />{copy.selectedWorktree}</h3>
-          <p className="mt-1 break-all text-xs text-ink-mute">{selectedWorktree.name} · {selectedWorktree.branch}</p>
-          <p className="mt-2 text-xs text-ink-mute">{copy.appTabsPending}</p>
-        </section>}
+        {selectedWorktree && (
+          selectedWorktree.engineering_run_id !== null && !demo ? (
+            // 复用根级 RunDirectoryProvider 的已认证会话 (layout → Providers);
+            // RunWorkspaceShell 内部 getRunContext + setFocus 设置 checkout/CLI 焦点。
+            <RunWorkspaceShell
+              route={{
+                project_id: selectedWorktree.project_id,
+                engineering_run_id: selectedWorktree.engineering_run_id,
+                worktree_id: selectedWorktree.worktree_id,
+              }}
+            />
+          ) : (
+            <p data-testid="lane-workspace-unavailable" role="note" className="mt-3 rounded border border-line bg-bg-soft p-3 text-xs text-ink-mute">
+              {selectedWorktree.engineering_run_id === null
+                ? "该 Worktree 未挂 Run; Lane App 页签与 CLI 焦点不可用 (诚实空态, 不伪造授权)。"
+                : copy.noSession}
+            </p>
+          )
+        )}
       </main>
     </div>
   </section>;

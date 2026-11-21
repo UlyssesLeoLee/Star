@@ -215,7 +215,7 @@ describe("ProjectRunTree behavior and localization", () => {
     renderTree();
 
     await screen.findByRole("treeitem", { name: `Select Project ${projectId}` });
-    fireEvent.click(screen.getByRole("button", { name: `${projectId}: New Lane` }));
+    fireEvent.click(screen.getByRole("button", { name: `Project ${projectId}: New Lane` }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Lane name"), { target: { value: "new-lane" } });

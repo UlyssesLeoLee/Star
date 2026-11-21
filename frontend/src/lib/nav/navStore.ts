@@ -36,6 +36,13 @@ export type SidebarFoldState = "expanded" | "collapsed";
  */
 export type SidebarScope = "main" | "project";
 
+/** 左栏固定顶部页签 (per 2026-11-20 导航验收: 目录 / AI 更新, 持久化) */
+export type SidebarTabId = "directory" | "aiUpdates";
+
+/** 底部任务状态筛选 (取值对齐 WorkItemStatus + all, per 2026-11-20 导航验收) */
+export const TASK_STATUS_FILTER_VALUES = ["all", "todo", "in_progress", "blocked", "review", "done"] as const;
+export type TaskStatusFilter = (typeof TASK_STATUS_FILTER_VALUES)[number];
+
 export interface NavState {
   // 纵向侧栏定制 (默认仅核心功能)
   sidebarItemIds: string[];
@@ -57,6 +64,9 @@ export interface NavState {
   selectedLaneId: string;
   selectedWorktreeId: string;
   selectedBranch: string;
+  /** 左栏顶部页签 + 底部任务状态筛选 (per 2026-11-20 导航验收, 持久化) */
+  sidebarTab: SidebarTabId;
+  taskStatusFilter: TaskStatusFilter;
 
   // Actions
   openMatrix: () => void;
@@ -81,6 +91,8 @@ export interface NavState {
   setSelectedProjectId: (id: string) => void;
   /** Lane/Worktree/Branch 上下文一键设置 (per 2026-11-15) */
   setLaneContext: (laneId: string, worktreeId: string, branch: string) => void;
+  setSidebarTab: (tab: SidebarTabId) => void;
+  setTaskStatusFilter: (filter: TaskStatusFilter) => void;
 
   resetToDefault: () => void;
 }
@@ -107,6 +119,8 @@ type PersistedNavState = Pick<
   | "selectedLaneId"
   | "selectedWorktreeId"
   | "selectedBranch"
+  | "sidebarTab"
+  | "taskStatusFilter"
 >;
 
 function migratePersistedNavState(persistedState: unknown): PersistedNavState {
@@ -149,6 +163,10 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
       typeof persisted?.selectedWorktreeId === "string" ? persisted.selectedWorktreeId : "",
     selectedBranch:
       typeof persisted?.selectedBranch === "string" ? persisted.selectedBranch : "",
+    sidebarTab: persisted?.sidebarTab === "aiUpdates" ? "aiUpdates" : "directory",
+    taskStatusFilter: TASK_STATUS_FILTER_VALUES.includes(persisted?.taskStatusFilter as TaskStatusFilter)
+      ? (persisted!.taskStatusFilter as TaskStatusFilter)
+      : "all",
   };
 }
 
@@ -243,9 +261,11 @@ export const useNavStore = create<NavState>()(
             : {}),
         })),
       setLaneContext: (laneId, worktreeId, branch) =>
-        set({ selectedLaneId: laneId, selectedWorktreeId: worktreeId, selectedBranch: branch }),
+              set({ selectedLaneId: laneId, selectedWorktreeId: worktreeId, selectedBranch: branch }),
+            setSidebarTab: (tab) => set({ sidebarTab: tab }),
+            setTaskStatusFilter: (filter) => set({ taskStatusFilter: filter }),
 
-      resetToDefault: () => {
+            resetToDefault: () => {
         set({
           sidebarItemIds: DEFAULT_SIDEBAR_ITEMS,
           pinnedViewIds: DEFAULT_PINNED_VIEWS,
@@ -266,16 +286,18 @@ export const useNavStore = create<NavState>()(
         removeItem: () => {},
       })),
       partialize: (s) => ({
-        sidebarItemIds: s.sidebarItemIds,
-        pinnedViewIds: s.pinnedViewIds,
-        headerTabIds: s.headerTabIds,
-        sidebarFold: s.sidebarFold,
-        sidebarScope: s.sidebarScope,
-        selectedProjectId: s.selectedProjectId,
-        selectedLaneId: s.selectedLaneId,
-        selectedWorktreeId: s.selectedWorktreeId,
-        selectedBranch: s.selectedBranch,
-      }),
+              sidebarItemIds: s.sidebarItemIds,
+              pinnedViewIds: s.pinnedViewIds,
+              headerTabIds: s.headerTabIds,
+              sidebarFold: s.sidebarFold,
+              sidebarScope: s.sidebarScope,
+              selectedProjectId: s.selectedProjectId,
+              selectedLaneId: s.selectedLaneId,
+              selectedWorktreeId: s.selectedWorktreeId,
+              selectedBranch: s.selectedBranch,
+              sidebarTab: s.sidebarTab,
+              taskStatusFilter: s.taskStatusFilter,
+            }),
     }
   )
 );

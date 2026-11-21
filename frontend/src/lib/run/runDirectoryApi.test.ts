@@ -55,7 +55,7 @@ CREATE (f:File {name:"frontend/src/lib/run/runDirectoryApi.test.ts",type:"file",
 */
 
 import { describe, expect, it, vi } from "vitest";
-import { RUN_TASK_CARD_PAGE_SIZE, RunDirectoryApiClient, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunTaskCardLifecycleCommand } from "./runDirectoryApi";
+import { RUN_DIRECTORY_PAGE_SIZE, RUN_TASK_CARD_PAGE_SIZE, RunDirectoryApiClient, type CreateRunTaskCardInput, type EngineeringRun, type RunContextEnvelope, type RunTaskCardLifecycleCommand } from "./runDirectoryApi";
 
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const PROJECT_ID = "10000000-0000-4000-8000-000000000002";
