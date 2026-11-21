@@ -31,7 +31,7 @@ import {
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useCallback } from "react";
-import { useNavStore, type SidebarTabId } from "@/lib/nav/navStore";
+import { useNavStore, type SidebarTabId, type TaskStatusFilter } from "@/lib/nav/navStore";
 import { MODULE_MAP, NAV_GROUPS, getCategoryStyles, type ModuleDefinition, type NavGroupId } from "@/lib/nav/registry";
 import { moduleHrefMatches } from "@/lib/nav/activeMatch";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
@@ -162,7 +162,7 @@ export function Sidebar() {
       <div className="relative" data-testid="sidebar-task-status-filter">
         <select
           value={taskStatusFilter}
-          onChange={(e) => setTaskStatusFilter(e.target.value)}
+          onChange={(e) => setTaskStatusFilter(e.target.value as TaskStatusFilter)}
           className="w-full appearance-none rounded border border-line bg-bg px-2 py-1.5 pr-8 text-xs text-ink focus:outline focus:outline-1 focus:outline-accent cursor-pointer"
           aria-label={label}
         >

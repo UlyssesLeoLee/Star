@@ -183,6 +183,8 @@ export const useNavStore = create<NavState>()(
       selectedLaneId: "",
       selectedWorktreeId: "",
       selectedBranch: "",
+      sidebarTab: "directory",
+      taskStatusFilter: "all",
 
       openMatrix: () => set({ isMatrixOpen: true }),
       closeMatrix: () => set({ isMatrixOpen: false }),
