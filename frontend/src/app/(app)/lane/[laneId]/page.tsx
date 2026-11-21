@@ -16,7 +16,7 @@ MERGE (self)-[:DEFINES]->(page)
 
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Layers, Link2, Monitor, Plus, RefreshCw } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -117,7 +117,16 @@ const LANE_PAGE_COPY = {
 } as const;
 type LanePageCopy = (typeof LANE_PAGE_COPY)["zh-CN"];
 
+// per 2026-11-21: useSearchParams 需要页面级 Suspense boundary (Next 16 prerender bailout)
 export default function LaneDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <LaneDetailPageInner />
+    </Suspense>
+  );
+}
+
+function LaneDetailPageInner() {
   const params = useParams<{ laneId: string }>();
   const search = useSearchParams();
   const laneId = typeof params?.laneId === "string" ? params.laneId : "";

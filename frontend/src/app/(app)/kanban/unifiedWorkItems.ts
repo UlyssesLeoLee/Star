@@ -191,6 +191,9 @@ export function normalizeGroupWorkItems(
     activeWorktreeId: item.active_worktree_id,
     reporterId: item.reporter_id,
     worktreeId,
+    // GroupWorkItemView 投影暂未含 branch 字段 — 诚实置 null (未绑定, 全局可见)
+    branchId: null,
+    branchName: null,
   }));
 }
 

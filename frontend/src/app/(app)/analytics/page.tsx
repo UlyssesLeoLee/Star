@@ -319,7 +319,17 @@ function ServerBiSection({ scope }: { scope: BiAnalyticsScope }) {
   );
 }
 
+// per 2026-11-21: useBiAnalyticsScope 内部用 useSearchParams — Next 16 静态
+// prerender 要求页面级 Suspense boundary (否则 Vercel build 报 missing-suspense-with-csr-bailout)
 export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AnalyticsPageInner />
+    </Suspense>
+  );
+}
+
+function AnalyticsPageInner() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("概览");
   const biScope = useBiAnalyticsScope();
