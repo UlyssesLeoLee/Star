@@ -403,7 +403,7 @@ export default function NemaPage() {
           </button>
 
           {showForm && (
-            <div data-testid="nema-register-form" className="rounded-lg border border-accent/40 bg-accent/10/50 p-2.5 space-y-2">
+            <div data-testid="nema-register-form" className="rounded-lg border border-accent/40 bg-accent/10/50 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-accent">注册共享文件（共同编辑 ≥2 人）</span>
                 <button type="button" onClick={() => setShowForm(false)} className="text-ink-mute hover:text-ink-dim"><X size={12} /></button>
@@ -444,7 +444,7 @@ export default function NemaPage() {
             <div key={error} role="status" className="text-[10px] text-err font-mono truncate">{error}</div>
           ))}
 
-          <p className="text-[11px] text-ink-dim leading-relaxed bg-bg rounded-lg p-2.5 border border-line">
+          <p className="text-xs text-ink-dim leading-relaxed bg-bg rounded-lg p-3 border border-line">
             每个文件可配 .nema 侧车。多人和多个 Agent 优先在 .nema 上并行编辑，汇总后再生成代码。
           </p>
         </div>
@@ -519,7 +519,7 @@ export default function NemaPage() {
         {/* 协作组 */}
         <div className="grid grid-cols-2 gap-3">
           <section data-testid="nema-group-a" className="bg-bg-card rounded-xl border border-line shadow-soft p-3">
-            <header className="text-xs font-semibold text-ink mb-2">协作组 A · 同一文件 <span className="font-mono text-ink-dim">bfs.rs.nema</span>，按段和记录分区并行 <span className="text-[9px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
+            <header className="text-xs font-semibold text-ink mb-2">协作组 A · 同一文件 <span className="font-mono text-ink-dim">bfs.rs.nema</span>，按段和记录分区并行 <span className="text-[10px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
             <ul className="space-y-1.5">
               {[
                 { who: "A1", tag: "Agent A1", branch: "feat/A1", part: "§1 · 回边判定" },
@@ -537,7 +537,7 @@ export default function NemaPage() {
           </section>
 
           <section data-testid="nema-group-b" className="bg-bg-card rounded-xl border border-line shadow-soft p-3">
-            <header className="text-xs font-semibold text-ink mb-2">独立组 B · 不同文件 <span className="text-ink-dim font-normal">各自分支推进，跨文件契约已冻结</span> <span className="text-[9px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
+            <header className="text-xs font-semibold text-ink mb-2">独立组 B · 不同文件 <span className="text-ink-dim font-normal">各自分支推进，跨文件契约已冻结</span> <span className="text-[10px] text-warn font-normal">(示意, 实时协作未接入)</span></header>
             <ul className="space-y-1.5">
               {[
                 { who: "B1", tag: "Agent B1", branch: "feat/B1", part: "bfs_test.rs" },
@@ -606,7 +606,7 @@ export default function NemaPage() {
                       <span className="text-ink truncate">{editor}</span>
                       {identity && (
                         <span
-                          className="text-[9px] font-mono text-ink-mute shrink-0"
+                          className="text-[10px] font-mono text-ink-mute shrink-0"
                           title={`${identity.email} · ${identity.type ?? "human"}`}
                         >
                           本地身份 {identity.id}
@@ -616,7 +616,7 @@ export default function NemaPage() {
                         data-testid={`nema-presence-${editor}`}
                         title={`来源: ${presence.source}`}
                         className={clsx(
-                          "ml-auto rounded-full border px-1.5 py-0.5 text-[9px] shrink-0",
+                          "ml-auto rounded-full border px-2 py-0.5 text-[10px] shrink-0",
                           presence.kind === "editing" && "border-ok/40 bg-ok/10 text-ok",
                           presence.kind === "offline" && "border-warn/40 bg-warn/10 text-warn",
                           presence.kind === "not_started" && "border-line text-ink-mute",
@@ -661,7 +661,7 @@ export default function NemaPage() {
                   {collaborationError}
                 </p>
               )}
-              <div data-testid="nema-edit-trail" className="rounded-lg border border-line bg-bg-soft/50 p-2">
+              <div data-testid="nema-edit-trail" className="rounded-lg border border-line bg-bg-soft/50 p-3">
                 <div className="text-[10px] font-mono text-ink-mute mb-1">
                   编辑痕迹 (.nema 侧车 Field/Value 表, strict v2)
                 </div>

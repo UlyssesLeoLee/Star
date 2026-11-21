@@ -172,14 +172,17 @@ describe("IssuesPage (U2)", () => {
     expect(screen.getByTestId("sprint-backlog")).toBeTruthy();
   });
 
-  // ---- Test 5: "+ New issue" button ----
-  it("renders '+ New issue' button with primary styling", () => {
+  // ---- Test 5: 独立 New issue 按钮已移除 (per 2026-11-21 用户发令:
+  //      "backlog栏可以直接增加issue，不需要单独的new issue按钮") ----
+  it("has no standalone New issue button; backlog quick-add replaces it", () => {
+    mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "sprint" : null));
+    mockSearchParams.toString = () => "view=sprint";
     renderWithI18n(<IssuesPage />);
-    const btn = screen.getByTestId("issues-new-button");
-    expect(btn).toBeTruthy();
-    expect(btn.textContent).toContain("New");
-    // 按钮可点 (不报错)
-    fireEvent.click(btn);
+    expect(screen.queryByTestId("issues-new-button")).toBeNull();
+    // Backlog 内联新增入口存在
+    expect(screen.getByTestId("sprint-backlog-quick-add")).toBeTruthy();
+    expect(screen.getByTestId("sprint-backlog-quick-input")).toBeTruthy();
+    expect(screen.getByTestId("sprint-backlog-quick-submit")).toBeTruthy();
   });
 
   // ---- Test 6: "🔍" 搜索 button ----
@@ -224,8 +227,9 @@ describe("IssuesPage (U2)", () => {
     expect(screen.queryByTestId("issues-detail-sidebar")).toBeNull();
   });
 
-  // ---- Test 8: 新建模式 ?new=true 触发 banner ----
-  it("shows new-issue banner when ?new=true is present in URL", () => {
+  // ---- Test 8: ?new=true 深链不再渲染独立表单 (per 2026-11-21 用户发令:
+  //      Backlog 内联新增替代独立 new issue 表单) ----
+  it("?new=true no longer renders standalone banner; backlog quick-add is available", () => {
     mockSearchParamsGet.mockImplementation((k: string) => {
       // Per 2026-09-05 19:13 JST: view 默认 sprint, kanban 已删
       if (k === "view") return "sprint";
@@ -234,9 +238,11 @@ describe("IssuesPage (U2)", () => {
     });
     mockSearchParams.toString = () => "view=sprint&new=true";
     renderWithI18n(<IssuesPage />);
-    // banner 出现
-    expect(screen.getByTestId("issues-new-banner")).toBeTruthy();
-    expect(screen.getByTestId("issues-new-title-input")).toBeTruthy();
+    // 旧独立表单缺席
+    expect(screen.queryByTestId("issues-new-banner")).toBeNull();
+    expect(screen.queryByTestId("issues-new-title-input")).toBeNull();
+    // 内联新增入口在 Backlog 中可用
+    expect(screen.getByTestId("sprint-backlog-quick-add")).toBeTruthy();
   });
 });
 

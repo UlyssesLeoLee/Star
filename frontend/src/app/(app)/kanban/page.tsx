@@ -560,7 +560,7 @@ export default function KanbanPage() {
                 <span
                   key={who.id ?? i}
                   title={who.display_name}
-                  className="size-5 rounded-full border border-line bg-accent/15 text-accent text-[9px] font-bold grid place-items-center"
+                  className="size-5 rounded-full border border-line bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
                 >
                   {who.display_name?.slice(0, 1) ?? "?"}
                 </span>
@@ -602,7 +602,7 @@ export default function KanbanPage() {
         )}
 
         {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
-        <div data-testid="kanban-create-bar" className="flex items-center gap-2 flex-wrap rounded-xl border border-line bg-bg-card p-2.5">
+        <div data-testid="kanban-create-bar" className="flex items-center gap-2 flex-wrap rounded-xl border border-line bg-bg-card p-3">
           <input
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}

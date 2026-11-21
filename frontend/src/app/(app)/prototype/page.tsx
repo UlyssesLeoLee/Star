@@ -249,15 +249,15 @@ export default function PrototypePage() {
           <div data-testid="prototype-preview-ui" className={clsx("mx-auto rounded-xl border-2 border-line bg-bg overflow-hidden", device === "mobile" ? "w-[200px]" : "w-full")}>
             <div className="bg-bg-card border-b border-line px-3 py-2 flex items-center justify-between">
               <span className="text-[11px] font-bold text-ink">关系查询</span>
-              <span className="text-[9px] text-ink-mute">A → B</span>
+              <span className="text-[10px] text-ink-mute">A → B</span>
             </div>
-            <div className="p-2.5 space-y-1.5">
+            <div className="p-3 space-y-2">
               {[
                 { tab: "出边", rows: ["A → B 依赖", "A → D 引用"] },
                 { tab: "入边", rows: ["C → A 依赖"] },
                 { tab: "环路径", rows: ["查询环路径"] },
               ].map((g) => (
-                <div key={g.tab} className="rounded-lg bg-bg-card border border-line p-2">
+                <div key={g.tab} className="rounded-lg bg-bg-card border border-line p-3">
                   <div className="text-[10px] font-semibold text-accent">{g.tab}</div>
                   {g.rows.map((r) => (
                     <div key={r} className="text-[10px] font-mono text-ink-dim mt-0.5">{r}</div>
@@ -268,7 +268,7 @@ export default function PrototypePage() {
           </div>
 
           <div className="mt-3 space-y-2 text-xs">
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">2D · 节点关系</div>
               <div className="mt-1.5 flex items-center justify-center gap-3 font-mono text-[11px] text-ink-dim">
                 <span className="size-7 rounded-full bg-accent/15 text-accent grid place-items-center">A</span>
@@ -279,12 +279,12 @@ export default function PrototypePage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">3D · 机房 → 机柜 → 服务</div>
               <div className="mt-1 text-[11px] text-ink-dim">机柜 A2 · canvas-realtime ×3</div>
             </div>
 
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">4D · 事件随时间传播</div>
               <div className="mt-1.5 flex items-center gap-1 font-mono text-[10px]">
                 {["postgres", "api", "realtime", "告警"].map((n, i) => (
@@ -297,7 +297,7 @@ export default function PrototypePage() {
               <div className="mt-1 text-[10px] text-ok">t = 0 · 正常</div>
             </div>
 
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">5D · 反事实对照</div>
               <div className="mt-1 space-y-0.5 text-[11px] font-mono">
                 <div className="text-ink-dim">屏蔽「队列」模块</div>
@@ -307,7 +307,7 @@ export default function PrototypePage() {
               <div className="mt-1 text-[10px] text-ink-mute">按显式规则推演，不是一般意义的因果推断</div>
             </div>
 
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">1D · 结构化说明</div>
               <ol className="mt-1 space-y-0.5 text-[11px] text-ink-dim list-decimal list-inside">
                 <li>输入起点节点</li>
@@ -316,7 +316,7 @@ export default function PrototypePage() {
               </ol>
             </div>
 
-            <div className="rounded-lg border border-line p-2.5">
+            <div className="rounded-lg border border-line p-3">
               <div className="font-semibold text-ink">动效 · 合并成功提示</div>
               <div className="mt-1 flex items-center gap-1.5 text-[11px] text-ok">
                 <Check size={12} /> 已合并到 dev

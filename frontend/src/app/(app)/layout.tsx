@@ -38,7 +38,9 @@ const WORKSPACE_FULL_HEIGHT_PREFIXES = [
 ];
 // 宽屏页面 — 保留 padding 但去掉 max-w-[1440px] mx-auto 居中, 避免宽屏下
 // 左侧出现过大留白 (per 2026-09-07 反馈: 项目页面左边距过大, 应接近 agent-view 贴边观感)
-const WIDE_PREFIXES = ["/projects"];
+// per 2026-11-21 UI/UX 规范化: agents/agent-windows/review 同为内容型宽页,
+// 与 /projects 一致去掉 1440 居中收窄 (宽屏左侧大留白问题同类)
+const WIDE_PREFIXES = ["/projects", "/agents", "/agent-windows", "/review"];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();

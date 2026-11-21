@@ -75,7 +75,7 @@ function DeveloperSettingsInner() {
   const [tab, setTab] = useState<"api" | "webhooks">(initialTab);
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full p-4 sm:p-6">
       <PageHeader
         title="Developer Console"
         subtitle="Developer API (REST + MCP) 参考与出站 Webhook 管理 (per 2026-09-02 拍板)"

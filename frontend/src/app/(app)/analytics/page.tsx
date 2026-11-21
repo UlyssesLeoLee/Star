@@ -439,9 +439,9 @@ function AnalyticsPageInner() {
         ))}
       </nav>
 
-      <main className="flex-1 overflow-auto bg-bg p-4">
+      <main className="flex-1 overflow-auto bg-bg p-4 sm:p-6">
         {activeTab === "概览" && (
-          <div className="max-w-7xl mx-auto space-y-4">
+          <div className="space-y-4">
             <ServerBiSection scope={biScope} />
 
             <div
@@ -529,7 +529,7 @@ function AnalyticsPageInner() {
         )}
 
         {activeTab === "运维" && (
-          <div className="max-w-7xl mx-auto space-y-4">
+          <div className="space-y-4">
             <section className="bg-bg-card rounded-xl border border-line p-4">
               <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">运维指标 (对接 MetricsTab / LogAITab)
                 <span data-testid="analytics-ops-demo-badge" className="text-[10px] px-1.5 py-0.5 rounded border border-warn/40 bg-warn/10 text-warn">演示数据 — 未接入服务端指标</span>
@@ -553,7 +553,7 @@ function AnalyticsPageInner() {
         )}
 
         {activeTab === "审计日志" && (
-          <div className="max-w-7xl mx-auto space-y-4">
+          <div className="space-y-4">
             <section className="bg-bg-card rounded-xl border border-line p-4">
               <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">审计日志
                 <span data-testid="analytics-audit-demo-badge" className="text-[10px] px-1.5 py-0.5 rounded border border-warn/40 bg-warn/10 text-warn">演示数据 — 未接入服务端审计日志</span>

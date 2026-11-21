@@ -82,7 +82,7 @@ export default function AgentWindowsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)]">
+    <div className="flex flex-col h-[calc(100vh-76px)]">
       <PageHeader
         title={t.pageTitles['/agent-windows'].title}
         description="多 CLI Agent 并行任务窗口 · 三触发上传到 Worktree"
@@ -115,11 +115,11 @@ export default function AgentWindowsPage() {
       />
 
       {/* 状态条 */}
-      <div className="flex items-center gap-4 px-6 py-2 text-xs text-[color:var(--color-text-dim)] border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]">
-        <Stat label="Tabs" value={tabs.length} />
-        <Stat label="Running" value={tabs.filter((t) => t.state === "running").length} accent="primary" />
-        <Stat label="Files" value={tabs.reduce((s, t) => s + (t.filesChanged || 0), 0)} accent="success" />
-        <Stat label="Worktree" value={selectedWorktree} icon={GitBranch} />
+      <div className="flex items-center gap-6 px-6 py-3 text-xs text-[color:var(--color-text-dim)] border-b border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]">
+        <Stat bare label="Tabs" value={tabs.length} />
+        <Stat bare label="Running" value={tabs.filter((t) => t.state === "running").length} accent="primary" />
+        <Stat bare label="Files" value={tabs.reduce((s, t) => s + (t.filesChanged || 0), 0)} accent="success" />
+        <Stat bare label="Worktree" value={selectedWorktree} icon={GitBranch} />
         <div className="ml-auto text-[10px]">
           Cmd+Shift+T 切换主题 · Cmd+K 搜索
         </div>

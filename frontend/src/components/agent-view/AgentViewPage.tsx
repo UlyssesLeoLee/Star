@@ -213,7 +213,7 @@ function AgentViewContent({ variant }: {
   // ---- 空状态 ----
   if (agents.length === 0) {
     return (
-      <div className="max-w-3xl">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <PageHeader
           title={t.pageTitles['/agent-view'].title}
           subtitle="查看当前 Agent、Worktree 与关联任务。此页面不启动 Agent 执行。"
@@ -233,7 +233,7 @@ function AgentViewContent({ variant }: {
 
   if (!resolution) {
     return (
-      <div className="max-w-3xl">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <PageHeader
           title={t.pageTitles['/agent-view'].title}
           subtitle="查看当前 Agent、Worktree 与关联任务。此页面不启动 Agent 执行。"
@@ -250,7 +250,7 @@ function AgentViewContent({ variant }: {
 
   const { agent } = resolution;
   return (
-    <div className="w-full h-[calc(100vh-5rem)] flex flex-col">
+    <div className="w-full h-[calc(100vh-76px)] flex flex-col">
       {/* Header (per 2026-11-15: agent 信息行只在 Agent 中心渲染 — canvas 画布内不显示) */}
       {variant !== "canvas-only" && (
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between gap-4">
@@ -391,7 +391,7 @@ function AgentViewContent({ variant }: {
           )}
         </>
       ) : viewMode === "workflow" ? (
-        <div className="flex-1 min-h-0 p-2" data-testid="agent-view-workflow">
+        <div className="flex-1 min-h-0 p-4" data-testid="agent-view-workflow">
           <WorkflowBuilder />
         </div>
       ) : viewMode === "relationships" ? (
@@ -405,7 +405,7 @@ function AgentViewContent({ variant }: {
       )}
 
       {/* 说明 footer */}
-      <div className="border-t border-line bg-bg-soft/40 px-6 py-1.5 text-[10px] text-ink-mute font-mono flex items-center justify-between">
+      <div className="border-t border-line bg-bg-soft/40 px-6 py-2.5 text-xs text-ink-mute font-mono flex items-center justify-between gap-4">
         <span>
           V/H 切换 select/pan · +/- 缩放 · 1 适配 · 双击节点打开关联详情
         </span>

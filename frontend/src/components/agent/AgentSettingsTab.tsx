@@ -128,7 +128,7 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
           <div className="text-center text-ink-mute text-xs py-12">选择左侧 agent 配置 API</div>
         ) : (
           <div className="max-w-2xl mx-auto" data-testid="agent-settings-form">
-            <div id="agent-settings-notice" role="note" className="mb-4 rounded border border-warn/30 bg-warn/5 p-3 text-xs text-ink-dim">
+            <div id="agent-settings-notice" role="note" className="mb-4 rounded border border-warn/30 bg-warn/5 p-4 text-xs text-ink-dim leading-relaxed">
               这是本地配置草稿，不会启动 Agent 或调用模型。当前没有安全凭据存储；请勿输入真实 API 密钥。
             </div>
             <div className="flex items-center justify-between mb-4">
@@ -258,7 +258,7 @@ export function AgentSettingsTab({ initialAgentId = null }: AgentSettingsTabProp
 
               {/* 校验提示 */}
               {!validation.ok && (
-                <div data-testid="agent-settings-validation-errors" className="border border-err/40 bg-err/10 rounded p-2">
+                <div data-testid="agent-settings-validation-errors" className="border border-err/40 bg-err/10 rounded p-3">
                   <div className="text-[10px] text-err font-semibold flex items-center gap-1 mb-1">
                     <AlertCircle size={11} /> Validation Errors
                   </div>

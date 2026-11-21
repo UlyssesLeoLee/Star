@@ -398,9 +398,9 @@ export function WorkflowBuilder() {
           </button>
         </div>
         {paletteOpen && (
-          <div className="flex-1 overflow-y-auto p-2 space-y-4">
+          <div className="flex-1 overflow-y-auto p-3 space-y-4">
             {/* 工作流持久化 (per WBS 8.6.2): 命名保存/加载/删除 */}
-            <div data-testid="workflow-persistence" className="rounded border border-line bg-bg-soft/40 p-2 space-y-1.5">
+            <div data-testid="workflow-persistence" className="rounded border border-line bg-bg-soft/40 p-3 space-y-2">
               <div className="text-[10px] font-mono uppercase tracking-wider text-ink-dim">工作流持久化</div>
               <div className="flex gap-1">
                 <input

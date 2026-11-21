@@ -200,12 +200,12 @@ export default function AgentsPage() {
   const actionsReachable = phase === "ready";
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6" data-testid="agents-page">
+    <div className="space-y-6" data-testid="agents-page">
       {argoCli !== null && (
-        <div data-testid="agents-cli-badge" className="mb-3 flex items-center gap-1.5 flex-wrap text-[11px] font-mono">
+        <div data-testid="agents-cli-badge" className="mb-4 flex items-center gap-2 flex-wrap text-xs font-mono">
           <span className="text-ink-mute">Argo CLI 支持:</span>
           {argoCli.map((c) => (
-            <span key={c} className="px-1.5 py-0.5 rounded border border-accent/40 bg-accent/10 text-accent">{c}</span>
+            <span key={c} className="px-2 py-1 rounded border border-accent/40 bg-accent/10 text-accent">{c}</span>
           ))}
         </div>
       )}
@@ -224,16 +224,16 @@ export default function AgentsPage() {
       {/* KPI Stats Deck (3渲2 触觉物理卡片, 真实运行时行驱动) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <CelCard3D className="h-full">
-          <Stat label="Total Agents" value={rows.length} hint="全域代理人注册" tone="info" />
+          <Stat bare label="Total Agents" value={rows.length} hint="全域代理人注册" tone="info" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Active Nodes" value={active} hint="并发执行中" tone="ok" />
+          <Stat bare label="Active Nodes" value={active} hint="并发执行中" tone="ok" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Standby / Paused" value={paused} tone="warn" />
+          <Stat bare label="Standby / Paused" value={paused} tone="warn" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Failed / Blocked" value={failed} tone="err" />
+          <Stat bare label="Failed / Blocked" value={failed} tone="err" />
         </CelCard3D>
       </div>
 
@@ -257,7 +257,7 @@ export default function AgentsPage() {
             {dataNote !== null && rows.length > 0 && (
               <div
                 data-testid="agents-data-note"
-                className="mb-2 flex items-center gap-1.5 rounded border border-warn/30 bg-warn/5 px-2 py-1 text-[10px] font-mono text-warn"
+                className="mb-3 flex items-center gap-2 rounded border border-warn/30 bg-warn/5 px-3 py-1.5 text-xs font-mono text-warn"
               >
                 {t.agentCenter.dataNoteLabel}: {dataNote}
               </div>
@@ -265,14 +265,14 @@ export default function AgentsPage() {
 
             {notice !== null ? (
               /* 加载中 / 未接入 / 未授权 / 失败 / 空 — 诚实展示, 绝不回落 mock */
-              <div data-testid="agents-notice-wrap" className="py-4 space-y-2">
+              <div data-testid="agents-notice-wrap" className="py-6 space-y-3">
                 <StatusNotice state={notice.state} title={notice.title} hint={notice.hint} />
                 {phase === "error" && (
                   <button
                     type="button"
                     data-testid="agents-retry"
                     onClick={() => void loadAgents()}
-                    className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
+                    className="inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
                   >
                     <RefreshCw size={12} /> {t.agentCenter.retry}
                   </button>
@@ -320,7 +320,7 @@ export default function AgentsPage() {
             </SectionTitle>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
+              <div className="border-2 border-black p-4 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
                 <CelToggle3D
                   label="AUTONOMOUS SAGA GUARD"
                   sublabel="IDEMPOTENT RECOVERY"
@@ -329,7 +329,7 @@ export default function AgentsPage() {
                 />
               </div>
 
-              <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
+              <div className="border-2 border-black p-4 bg-[var(--cel-surface-sub, var(--color-surface))] shadow-soft">
                 <CelToggle3D
                   label="HARD MEMORY LOCK"
                   sublabel="ZERO LEAK VECTOR"
@@ -358,7 +358,7 @@ export default function AgentsPage() {
               action={
                 <span
                   data-testid="agents-comms-placeholder"
-                  className="text-[10px] font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
+                  className="text-xs font-mono font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
                 >
                   {t.agentCenter.commsPlaceholder}
                 </span>
@@ -366,7 +366,7 @@ export default function AgentsPage() {
             >
               Comms Stream 〔通信ログ・指令ストリーム〕
             </SectionTitle>
-            <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage, var(--color-surface))] shadow-soft text-sm space-y-2.5">
+            <div className="border-2 border-black p-5 bg-[var(--cel-surface-stage, var(--color-surface))] shadow-soft text-sm space-y-3">
               <div className="flex items-center justify-between border-b border-black pb-1.5 text-xs font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]">
                 <span className="text-[var(--cel-crimson, var(--err-DEFAULT))] font-bold">// TACTICAL SPEECH STREAM</span>
                 <span>CH-01 SECURE</span>
@@ -453,7 +453,7 @@ export default function AgentsPage() {
             </div>
 
             {/* Live Palette Selector Tuning Bar — 5 Themes Complete Coverage */}
-            <div className="mt-3 bg-[var(--cel-surface-stage, var(--color-surface))] border-2 border-black p-3 space-y-2.5 text-xs">
+            <div className="mt-4 bg-[var(--cel-surface-stage, var(--color-surface))] border-2 border-black p-4 space-y-3 text-xs">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] uppercase font-mono">
@@ -482,7 +482,7 @@ export default function AgentsPage() {
                     <button
                       key={item.id}
                       onClick={() => setCelPalette(item.id as CelPalette)}
-                      className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border border-black transition-all ${
+                      className={`px-2.5 py-1.5 text-xs font-mono font-bold uppercase border border-black transition-all ${
                         celPalette === item.id
                           ? "bg-[var(--cel-primary, var(--color-primary))] text-white border-white shadow-sm"
                           : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))] hover:text-white"
@@ -501,7 +501,7 @@ export default function AgentsPage() {
                     <button
                       key={b}
                       onClick={() => setCelBands(b)}
-                      className={`w-6 h-6 text-[11px] font-mono font-bold border border-black flex items-center justify-center ${
+                      className={`w-7 h-7 text-xs font-mono font-bold border border-black flex items-center justify-center ${
                         celBands === b ? "bg-[var(--cel-cyan, var(--accent-DEFAULT))] text-black" : "bg-[var(--cel-surface-sub, var(--color-surface))] text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
                       }`}
                     >
@@ -535,7 +535,7 @@ export default function AgentsPage() {
               {!actionsReachable && (
                 <span
                   data-testid="agents-actions-disabled-hint"
-                  className="text-[10px] font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
+                  className="text-xs font-mono text-[var(--cel-text-secondary, color-mix(in srgb, var(--color-text) 70%, transparent))]"
                 >
                   {t.agentCenter.actionsDisabledHint}
                 </span>
@@ -543,7 +543,7 @@ export default function AgentsPage() {
               {actionResult !== null && (
                 <div
                   data-testid="agents-action-result"
-                  className="w-full text-center text-[11px] font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] border border-[var(--cel-cyan, var(--accent-DEFAULT))]/40 bg-[var(--cel-cyan, var(--accent-DEFAULT))]/10 px-2 py-1.5 rounded"
+                  className="w-full text-center text-xs font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] border border-[var(--cel-cyan, var(--accent-DEFAULT))]/40 bg-[var(--cel-cyan, var(--accent-DEFAULT))]/10 px-3 py-2 rounded"
                 >
                   {actionResult}
                 </div>

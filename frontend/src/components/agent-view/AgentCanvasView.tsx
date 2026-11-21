@@ -1128,7 +1128,7 @@ export function AgentCanvasView({
         data-testid="agent-canvas-minimap"
         className="absolute bottom-3 right-3 z-20 w-44 h-32 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black shadow-soft overflow-hidden"
       >
-        <div className="absolute top-1 left-2 text-[9px] font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] uppercase tracking-wider z-10">
+        <div className="absolute top-1.5 left-2 text-[10px] font-mono font-bold text-[var(--cel-cyan, var(--accent-DEFAULT))] uppercase tracking-wider z-10">
           OVERVIEW // CANVAS
         </div>
         <svg viewBox={`${bbox.minX} ${bbox.minY} ${bbox.maxX - bbox.minX} ${bbox.maxY - bbox.minY}`} className="w-full h-full bg-[#050811]">
@@ -1196,7 +1196,7 @@ export function AgentCanvasView({
 
       {/* 底部状态条 */}
       <div
-        className="absolute bottom-3 left-3 z-20 text-[11px] text-ink-dim font-mono flex items-center gap-3 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black px-3 py-1 shadow-soft"
+        className="absolute bottom-3 left-3 z-20 text-xs text-ink-dim font-mono flex items-center gap-3 bg-[var(--cel-surface-card, var(--color-surface-2))] border-2 border-black px-3 py-1.5 shadow-soft"
         data-testid="agent-canvas-statusbar"
       >
         <span className="flex items-center gap-1">

@@ -43,7 +43,7 @@ export function PageHeader({
 }
 
 export function Stat({
-  label, value, hint, tone, accent, icon: Icon,
+  label, value, hint, tone, accent, icon: Icon, bare = false,
 }: {
   label: string;
   value: string | number;
@@ -53,6 +53,9 @@ export function Stat({
   // React 19 兼容: ElementType 默认变窄, 这里给 icon 一个 component type
   // with size + className props.
   icon?: React.ComponentType<{ size?: number; className?: string }>;
+  /** bare=true: 纯内容无 .card 外壳 — 供 CelCard3D 包裹 (避免双卡套娃)
+   *  或状态条内联统计 (per 2026-11-21 UI/UX 内边距规范化) */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const effectiveTone = tone ?? (accent === "primary" ? "info" : accent === "success" ? "ok" : "default");
@@ -64,7 +67,7 @@ export function Stat({
     default: "text-ink",
   }[effectiveTone];
   return (
-    <div className="card group hover:border-accent/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all duration-200">
+    <div className={bare ? "group min-w-0" : "card group hover:border-accent/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all duration-200"}>
       <div className="text-xs uppercase tracking-wider text-ink-mute flex items-center justify-between font-mono font-bold">
         <span className="flex items-center gap-1.5">
           {Icon && <Icon size={13} className="text-accent" />}

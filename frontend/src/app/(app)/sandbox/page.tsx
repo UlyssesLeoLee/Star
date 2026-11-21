@@ -143,7 +143,7 @@ export default function SandboxPage() {
                   <div className="flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-warn" />
                     <span className="font-mono font-semibold text-ink flex-1 truncate">{h.host}</span>
-                    <span className="text-[9px] text-warn">{h.state}</span>
+                    <span className="text-[10px] text-warn">{h.state}</span>
                   </div>
                   <div className="text-[10px] text-ink-mute mt-0.5">{h.os || "系统待探测"} · {h.via}</div>
                 </div>
@@ -178,7 +178,7 @@ export default function SandboxPage() {
             </div>
           ))}
 
-          <p data-testid="sandbox-observation-note" className="text-[11px] text-ink-dim leading-relaxed bg-bg rounded-lg p-2.5 border border-line">
+          <p data-testid="sandbox-observation-note" className="text-xs text-ink-dim leading-relaxed bg-bg rounded-lg p-3 border border-line">
             {backendInfo?.observationLevels && (
               <span data-testid="sandbox-obs-levels" className="block mb-1 text-accent font-mono">
                 观测四级: {backendInfo.observationLevels.join(" → ")} (sandtree-core)

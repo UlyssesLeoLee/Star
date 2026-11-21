@@ -546,16 +546,16 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {/* ---- Project Telemetry Deck (3渲2 触觉物理卡片) ---- */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <CelCard3D className="h-full">
-          <Stat label="Open Tasks" value={kpis.open} hint="待处理 / 进行中" tone="info" />
+          <Stat bare label="Open Tasks" value={kpis.open} hint="待处理 / 进行中" tone="info" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Completed" value={kpis.closed} hint="已闭环事项" tone="ok" />
+          <Stat bare label="Completed" value={kpis.closed} hint="已闭环事项" tone="ok" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Active Agents" value={kpis.activeAgents} hint="自律代理人" tone="warn" />
+          <Stat bare label="Active Agents" value={kpis.activeAgents} hint="自律代理人" tone="warn" />
         </CelCard3D>
         <CelCard3D className="h-full">
-          <Stat label="Worktrees" value={kpis.worktrees} hint="隔离工作区分支" tone="default" />
+          <Stat bare label="Worktrees" value={kpis.worktrees} hint="隔离工作区分支" tone="default" />
         </CelCard3D>
       </div>
 
@@ -1009,7 +1009,7 @@ function ProjectMembers({
     <div data-testid="projects-members-tab" className="space-y-3">
       <DomainMarker domain="player" label="player 域 (用户/identity/workspace)" />
       <CelCard3D>
-        <div className="card">
+        <div>
           <div className="flex items-center justify-between mb-2">
           <div>
             <div className="text-sm font-semibold">{project.name} — Members</div>

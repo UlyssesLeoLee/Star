@@ -114,7 +114,7 @@ export default function ReviewPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="w-full">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-ink">{t.review.title}</h1>
         <p className="mt-1 text-sm text-ink-dim">{t.review.subtitle}</p>

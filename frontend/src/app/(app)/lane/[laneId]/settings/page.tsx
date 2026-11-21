@@ -260,11 +260,11 @@ function WorktreeTable({ worktrees, onGitOp }: WorktreeTableProps) {
               <td className="text-[10px] text-ink-mute font-mono">{wt.last_event_at?.slice(0, 16).replace("T", " ")}</td>
               <td>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => onGitOp(wt.id, "pull")} className="btn text-[9px] px-1.5 py-0.5" title="Pull"><Download size={10} /></button>
-                  <button onClick={() => onGitOp(wt.id, "push")} className="btn text-[9px] px-1.5 py-0.5" title="Push"><Upload size={10} /></button>
-                  <button onClick={() => onGitOp(wt.id, "fetch")} className="btn text-[9px] px-1.5 py-0.5" title="Fetch"><RefreshCw size={10} /></button>
-                  <button onClick={() => onGitOp(wt.id, "status")} className="btn text-[9px] px-1.5 py-0.5" title="Status"><GitCommitHorizontal size={10} /></button>
-                  <button onClick={() => onGitOp(wt.id, "branch")} className="btn text-[9px] px-1.5 py-0.5" title="分支管理"><GitFork size={10} /></button>
+                  <button onClick={() => onGitOp(wt.id, "pull")} className="btn text-[10px] px-2 py-1" title="Pull"><Download size={10} /></button>
+                  <button onClick={() => onGitOp(wt.id, "push")} className="btn text-[10px] px-2 py-1" title="Push"><Upload size={10} /></button>
+                  <button onClick={() => onGitOp(wt.id, "fetch")} className="btn text-[10px] px-2 py-1" title="Fetch"><RefreshCw size={10} /></button>
+                  <button onClick={() => onGitOp(wt.id, "status")} className="btn text-[10px] px-2 py-1" title="Status"><GitCommitHorizontal size={10} /></button>
+                  <button onClick={() => onGitOp(wt.id, "branch")} className="btn text-[10px] px-2 py-1" title="分支管理"><GitFork size={10} /></button>
                 </div>
               </td>
             </tr>

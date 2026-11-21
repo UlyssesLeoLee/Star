@@ -106,7 +106,7 @@ export function CelCard3D({
       {...rest}
     >
       <div
-        className={`relative border-2 border-[var(--cel-ink, var(--color-border))] bg-[var(--cel-surface-card, var(--color-surface-2))] text-[var(--cel-text-primary, var(--color-text))] ${shadowClass} ${
+        className={`relative border-2 border-[var(--cel-ink, var(--color-border))] bg-[var(--cel-surface-card, var(--color-surface-2))] text-[var(--cel-text-primary, var(--color-text))] p-4 sm:p-5 ${shadowClass} ${
           chamfer ? "clip-hud-corner" : ""
         } ${className}`}
         style={{

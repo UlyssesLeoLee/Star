@@ -338,7 +338,7 @@ function IssuesPageInner() {
             <div
               role="tablist"
               aria-label={t.ariaLabels.issueViewTabs ?? 'Sprint view tabs'}
-              className="anime-panel anime-chamfer inline-flex items-center gap-1 p-1.5"
+              className="anime-panel anime-chamfer inline-flex items-center gap-1.5 p-2"
               data-testid="issues-view-tabs"
             >
               {VIEWS.map((v) => {
