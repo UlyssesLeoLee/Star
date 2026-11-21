@@ -154,6 +154,30 @@ export const ja: Dictionary = {
       projectDisabledHint: "プロジェクトスコープは /projects ルートでのみ利用可能",
     },
     activeHint: "現在: {scope}",
+    tabs: {
+      directory: "ディレクトリ",
+      aiUpdates: "AI 更新",
+    },
+    aiUpdates: {
+      title: "AI 更新",
+      empty: "AI 更新はまだありません",
+      disconnected: "未接続",
+      unauthorized: "未認可",
+    },
+    taskStatus: {
+      label: "タスク状態",
+      all: "すべて",
+      todo: "未着手",
+      inProgress: "進行中",
+      blocked: "ブロック中",
+      review: "レビュー待ち",
+      done: "完了",
+    },
+    quickEntries: {
+      inbox: "受信トレイ",
+      notifications: "通知",
+      chat: "チャット",
+    },
   },
   appMatrix: {
     title: "APP MATRIX // タクティカルマトリクスとナビゲーションカスタマイズ",

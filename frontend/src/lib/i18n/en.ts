@@ -153,6 +153,30 @@ export const en: Dictionary = {
       projectDisabledHint: "Project scope is only available on /projects route",
     },
     activeHint: "Active: {scope}",
+    tabs: {
+      directory: "Directory",
+      aiUpdates: "AI Updates",
+    },
+    aiUpdates: {
+      title: "AI Updates",
+      empty: "No AI updates yet",
+      disconnected: "Not connected",
+      unauthorized: "Not authorized",
+    },
+    taskStatus: {
+      label: "Task status",
+      all: "All",
+      todo: "To do",
+      inProgress: "In progress",
+      blocked: "Blocked",
+      review: "In review",
+      done: "Done",
+    },
+    quickEntries: {
+      inbox: "Inbox",
+      notifications: "Notifications",
+      chat: "Chat",
+    },
   },
   appMatrix: {
     title: "APP MATRIX // Tactical Matrix & Navigation Customization",

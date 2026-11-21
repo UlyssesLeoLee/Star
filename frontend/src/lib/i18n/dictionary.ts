@@ -236,6 +236,31 @@ export interface Dictionary {
       projectDisabledHint: string; // "项目专属导航仅在 /projects 路径下可用"
     };
     activeHint: string;            // "当前: {scope}"
+    // 顶部固定页签 + 底部固定筛选/快捷入口 (2026-11-20 导航改造)
+    tabs: {
+      directory: string;           // "目录"
+      aiUpdates: string;           // "AI 更新"
+    };
+    aiUpdates: {
+      title: string;               // "AI 更新"
+      empty: string;               // 暂无更新
+      disconnected: string;        // 未接入 (诚实空态)
+      unauthorized: string;        // 无授权
+    };
+    taskStatus: {
+      label: string;               // "任务状态"
+      all: string;
+      todo: string;
+      inProgress: string;
+      blocked: string;
+      review: string;
+      done: string;
+    };
+    quickEntries: {
+      inbox: string;
+      notifications: string;
+      chat: string;
+    };
   };
   appMatrix: {
     title: string;                 // "APP MATRIX // ..."

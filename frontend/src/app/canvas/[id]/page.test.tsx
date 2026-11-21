@@ -117,11 +117,16 @@ vi.mock("@/lib/nav/navStore", () => ({
     }),
 }));
 
-vi.mock("@/lib/group/groupProjection", () => ({
-  useWorktreeGroupApi: () => (mocks.groupApiPresent ? { worktreeId: "wt-001" } : null),
-  useWorktreeGroupSessionState: () =>
-    mocks.groupApiPresent ? { status: "ready" } : { status: "unavailable" },
-}));
+vi.mock("@/lib/group/groupProjection", () => {
+  // 真实 hook 返回 memoized 稳定引用; mock 若每次渲染新建对象,
+  // page 的加载 effect (deps 含 groupApi) 会无限重跑 → OOM。
+  const stableApi = { worktreeId: "wt-001" };
+  return {
+    useWorktreeGroupApi: () => (mocks.groupApiPresent ? stableApi : null),
+    useWorktreeGroupSessionState: () =>
+      mocks.groupApiPresent ? { status: "ready" } : { status: "unavailable" },
+  };
+});
 
 vi.mock("@/lib/group-api/canvasClient", () => {
   class CanvasConflictErrorMock extends Error {
@@ -210,10 +215,9 @@ vi.mock("../components/GitCanvas", () => ({
 import CanvasDetailPage from "./page";
 
 function renderPage() {
-  // Next App Router 在把 params 交给客户端组件前已解开 Promise
-  // (React thenable 协议: status/value)。测试直渲没有 router, 这里按同一
-  // 协议预置 fulfilled 状态, 使 use(params) 同步取值, 不依赖 Suspense 重试
-  // (jsdom + React 19.3 下纯 Promise 的 use() 恢复在本环境不触发重渲)。
+  // Next App Router 把 params 作为已兑现 thenable 交给客户端组件
+  // (React trackUsedThenable 读 status/value)。测试直渲没有 router,
+  // 按同一协议预置 fulfilled 状态; 探针已验证此形态在本环境同步取值。
   const params = Promise.resolve({ id: "canvas-1" }) as Promise<{ id: string }> & {
     status?: string;
     value?: { id: string };
@@ -277,16 +281,11 @@ describe("/canvas/[id] — group 模式接线", () => {
   });
 
   it("移动冲突 → 冲突对话框展示双方内容, 保留双方草稿可关闭", async () => {
-    class Conflict extends Error {
-      readonly status = 409;
-      readonly code = "version_conflict";
-      constructor() {
-        super("conflict");
-        this.name = "CanvasConflictError";
-      }
-    }
+    // 必须抛 mock 模块导出的同一个 CanvasConflictError 类 —
+    // page 用 instanceof 判定, 测试本地另定义的类不会命中冲突分支。
+    const { CanvasConflictError } = await import("@/lib/group-api/canvasClient");
     mocks.moveImpl = vi.fn(async () => {
-      throw new Conflict();
+      throw new CanvasConflictError("version_conflict", "conflict");
     });
     renderPage();
     await waitFor(() => expect(mocks.lastCanvasViewProps).not.toBeNull());

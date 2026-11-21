@@ -164,6 +164,30 @@ export const zhCN: Dictionary = {
       projectDisabledHint: "项目专属导航仅在 /projects 路径下可用",
     },
     activeHint: "当前: {scope}",
+    tabs: {
+      directory: "目录",
+      aiUpdates: "AI 更新",
+    },
+    aiUpdates: {
+      title: "AI 更新",
+      empty: "暂无 AI 更新",
+      disconnected: "未接入",
+      unauthorized: "无授权",
+    },
+    taskStatus: {
+      label: "任务状态",
+      all: "全部",
+      todo: "待办",
+      inProgress: "进行中",
+      blocked: "受阻",
+      review: "待审",
+      done: "已完成",
+    },
+    quickEntries: {
+      inbox: "收件箱",
+      notifications: "通知",
+      chat: "聊天",
+    },
   },
   appMatrix: {
     title: "APP MATRIX // 战术功能矩阵与导航定制",
