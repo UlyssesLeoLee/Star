@@ -92,11 +92,14 @@ afterEach(() => {
 });
 
 describe("KanbanPage P1 统一通道", () => {
-  it("本地模式标注: 无宿主会话时明确标注「本地模式」, 不冒充服务端数据", () => {
+  it("本地模式标注: 无宿主会话时显示本地全局数据 (store.workItems), 不再显示 unavailable 占位", () => {
     renderWithI18n(<KanbanPage />);
     const source = screen.getByTestId("kanban-data-source");
     expect(source.textContent).toContain("本地模式");
-    expect(screen.getByTestId("kanban-unavailable")).toBeInTheDocument();
+    // per 2026-11-22 用户发令: 未接入时显示本地全局数据，不显示 unavailable 提示
+    expect(screen.queryByTestId("kanban-unavailable")).not.toBeInTheDocument();
+    // 看板仍渲染 (可能显示本地 seed 数据)
+    expect(screen.getByTestId("kanban-board-view")).toBeInTheDocument();
   });
 
   it("服务端模式渲染: 宿主会话 + Worktree 上下文齐备时渲染授权服务端投影", async () => {

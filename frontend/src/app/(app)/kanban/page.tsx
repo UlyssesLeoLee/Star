@@ -773,20 +773,17 @@ export default function KanbanPage() {
               onAddColumn={serverMode ? undefined : addBoardColumn}
               onRemoveColumn={serverMode ? undefined : removeBoardColumn}
               onRenameColumn={serverMode ? undefined : renameBoardColumn}
-              onReorderColumns={serverMode ? undefined : reorderBoardColumns}
-              // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入/空数据不渲染本地 seed 任务卡
-              unavailableState={
-                unauthorized
-                  ? "unauthorized"
-                  : !hostConnected
-                    ? "disconnected"
-                    : serverMode && serverError
-                      ? "empty"
-                      : serverMode && (serverItems ?? []).length === 0
-                        ? "empty"
-                        : null
-              }
-            />
+                            onReorderColumns={serverMode ? undefined : reorderBoardColumns}
+                            // 诚实态 (per 2026-11-16 清 seed/mock): 未授权/未接入时显示本地全局数据 (store.workItems)
+                            // 仅当服务端模式且服务端无数据、本地也无数据时才显示 empty
+                            unavailableState={
+                              serverMode && serverError
+                                ? "empty"
+                                : serverMode && (serverItems ?? []).length === 0 && boardWorkItems.length === 0
+                                  ? "empty"
+                                  : null
+                            }
+                          />
           </section>
         )}
 
