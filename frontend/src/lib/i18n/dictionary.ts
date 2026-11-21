@@ -1,6 +1,6 @@
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=38abeb94873a51791f349bf3935614bfd867aa9c48c8b5fca0cc6324a7b3437e
+@cypher schema=1 source_sha256=b4fb31bc912c13a4343946760c089eee940c9e03a7af2c82d0036242cc089b23
 MERGE (self:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (category:Type {id:"frontend/src/lib/i18n/dictionary.ts::CategoryDef",kind:"interface"})
 MERGE (module:Type {id:"frontend/src/lib/i18n/dictionary.ts::ModuleI18n",kind:"interface"})
@@ -256,6 +256,7 @@ export interface Dictionary {
       review: string;
       done: string;
     };
+    shortcuts: { label: string; add: string };
     quickEntries: {
       inbox: string;
       notifications: string;

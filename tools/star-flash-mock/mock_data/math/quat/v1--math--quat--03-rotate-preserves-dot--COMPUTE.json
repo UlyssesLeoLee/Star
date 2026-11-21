@@ -1,0 +1,49 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "quat",
+  "case": "03-rotate-preserves-dot",
+  "method": "COMPUTE",
+  "scenario": "math-quat-03-rotate-preserves-dot",
+  "description": "数学不变量 rotation_preserves_inner_product (quat 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/quat.rs::rotate",
+  "invariant": "rotation_preserves_inner_product",
+  "tolerance": 1e-06,
+  "input": {
+    "q": [
+      0.0,
+      0.0,
+      0.7071067811865476,
+      0.7071067811865476
+    ],
+    "u": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "w": [
+      -2.0,
+      0.5,
+      1.0
+    ]
+  },
+  "expected": {
+    "dot_before": 2.0,
+    "dot_after": 2.0000000000000013,
+    "rotated_u": [
+      -2.0000000000000004,
+      1.0,
+      3.0000000000000004
+    ],
+    "rotated_w": [
+      -0.5000000000000001,
+      -2.0000000000000004,
+      1.0000000000000002
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

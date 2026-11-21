@@ -1,0 +1,39 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "quat",
+  "case": "05-rotate-preserves-length",
+  "method": "COMPUTE",
+  "scenario": "math-quat-05-rotate-preserves-length",
+  "description": "数学不变量 rotation_preserves_length (quat 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/quat.rs::rotate",
+  "invariant": "rotation_preserves_length",
+  "tolerance": 1e-06,
+  "input": {
+    "q": [
+      0.7071067811865476,
+      0.0,
+      0.0,
+      0.7071067811865476
+    ],
+    "v": [
+      3.0,
+      -4.0,
+      12.0
+    ]
+  },
+  "expected": {
+    "length_before": 13.0,
+    "length_after": 13.000000000000004,
+    "rotated": [
+      3.0000000000000004,
+      -12.000000000000004,
+      -4.000000000000001
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

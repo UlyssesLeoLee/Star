@@ -187,6 +187,10 @@ export interface RunTaskCard {
     updated_at: string;
   };
   metadata_updated_at: string;
+  // per 2026-11-21: branch 隔离 — 服务端下发 branch_id (UUID) + 当前分支名;
+  // 旧服务端未下发时为 null (未绑定, 全局可见)
+  branch_id: string | null;
+  branch_name: string | null;
 }
 export interface RunTaskCardPage { rows: RunTaskCard[]; limit: number; next_after: string | null }
 export type RunTaskCardPriority = "low" | "medium" | "high" | "urgent";
@@ -492,6 +496,9 @@ function mapRunTaskCard(value: unknown): RunTaskCard {
       updated_at: boundedText(lifecycle.updated_at, 64),
     },
     metadata_updated_at: boundedText(row.metadata_updated_at, 64),
+    // per 2026-11-21: branch 隔离投影 (旧服务端无此字段 → null, 向后兼容)
+    branch_id: row.branch_id === undefined || row.branch_id === null ? null : uuid(row.branch_id),
+    branch_name: row.branch_name === undefined || row.branch_name === null ? null : boundedText(row.branch_name, 255),
   };
   if (!Number.isFinite(Date.parse(task.lifecycle.updated_at)) || !Number.isFinite(Date.parse(task.metadata_updated_at))) {
     throw new RunDirectoryError(0, "invalid_projection", "Task Card 时间字段无效。");
@@ -1071,12 +1078,20 @@ export class RunDirectoryApiClient {
     return result;
   }
   async getWorktreeRunContext(worktreeId: string, signal?: AbortSignal): Promise<RunContextEnvelope> {
-    const id = uuid(worktreeId);
-    const result = mapRunContext(await this.request(`/api/v1/worktrees/${id}/run-context`, signal));
-    if (result.focus?.worktree_id !== id) throw new RunDirectoryError(0, "scope_mismatch", "兼容目录返回了其他 Worktree。");
-    return result;
+      const id = uuid(worktreeId);
+      const result = mapRunContext(await this.request(`/api/v1/worktrees/${id}/run-context`, signal));
+      if (result.focus?.worktree_id !== id) throw new RunDirectoryError(0, "scope_mismatch", "兼容目录返回了其他 Worktree。");
+      return result;
+    }
+    async listWorktreeBranches(worktreeId: string, signal?: AbortSignal): Promise<string[]> {
+      const id = uuid(worktreeId);
+      const result = record(await this.request(`/api/v1/worktrees/${id}/branches`, signal)) as { worktree_id: string; branches: string[] };
+      if (uuid(result.worktree_id) !== id) {
+        throw new RunDirectoryError(0, "scope_mismatch", "Branch 列表不属于请求的 Worktree。");
+      }
+      return result.branches;
+    }
   }
-}
 
 export function canonicalRunHref(projectId: string, runId: string): string {
   return `/projects/${uuid(projectId)}/runs/${uuid(runId)}`;

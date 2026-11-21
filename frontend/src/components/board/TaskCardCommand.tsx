@@ -60,13 +60,23 @@ MERGE (self)-[:DEFINES]->(loadD)
 import { useEffect, useRef, useState } from "react";
 import { History, Send, UserRound } from "lucide-react";
 
+/** 命令发送目标 (per 2026-11-21 用户发令: 只有手动指定才发送;
+ *  默认 "card" = 内容只保留在任务卡, 不进聊天) */
+export type TaskCardSendTarget = "card" | "worktree" | "global";
+export const SEND_TARGETS: ReadonlyArray<{ value: TaskCardSendTarget; label: string }> = [
+  { value: "card", label: "仅任务卡 (默认)" },
+  { value: "worktree", label: "Worktree 聊天" },
+  { value: "global", label: "Global 聊天" },
+];
+
 export interface TaskCardCommandProps {
   /** 任务卡 id (workItem.id) — 右侧聊天话题 (task scope) 的 refId */
   taskId: string;
   /** 任务卡 key (如 T-142) — 显示用 */
   taskKey: string;
-  /** 提交回调 — 父组件在此接线把命令写入右侧聊天话题 */
-  onSubmitCommand: (cmd: string) => void;
+  /** 提交回调 — 父组件在此接线把命令写入右侧聊天话题;
+   *  target 由用户在发送目标下拉中手动指定 (默认 "card" 时父组件不写聊天) */
+  onSubmitCommand: (cmd: string, target: TaskCardSendTarget) => void;
   /** 交接回调 — 可选; 点击交接按钮时调用并清空输入 */
   onHandoff?: (target: string) => void;
 }
@@ -159,8 +169,10 @@ export function TaskCardCommand({
   const [history, setHistory] = useState<string[]>([]);
   /** null = 正在编辑; 非 null = 正在浏览历史第 N 条 (最新 = 0) */
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
-  const [sentHint, setSentHint] = useState(false);
+  const [sentHint, setSentHint] = useState<"" | "card" | "worktree" | "global">("");
   const [handoffTarget, setHandoffTarget] = useState<string>(HANDOFF_TARGETS[0]);
+  /** 发送目标 (per 2026-11-21: 默认仅任务卡, 手动选 Worktree/Global 才进聊天) */
+  const [sendTarget, setSendTarget] = useState<TaskCardSendTarget>("card");
   /** 进入历史浏览前的输入内容, 供 ↓ 越过最新一条时恢复 */
   const preHistoryRef = useRef("");
   const hintTimerRef = useRef<number | null>(null);
@@ -186,18 +198,18 @@ export function TaskCardCommand({
     if (draftReady) saveDraft(taskId, input);
   }, [draftReady, taskId, input]);
 
-  // ---- 发送 (接线点: onSubmitCommand 由父组件写入右侧聊天话题) ----
+  // ---- 发送 (接线点: onSubmitCommand 由父组件按 target 决定是否写入聊天) ----
   const handleSend = () => {
     const cmd = input.trim();
     if (!cmd) return;
-    onSubmitCommand(cmd);
+    onSubmitCommand(cmd, sendTarget);
     setHistory(saveCommandHistory(taskId, cmd));
     setInput("");
     setHistoryIdx(null);
     preHistoryRef.current = "";
-    setSentHint(true);
+    setSentHint(sendTarget);
     if (hintTimerRef.current !== null) window.clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = window.setTimeout(() => setSentHint(false), 3000);
+    hintTimerRef.current = window.setTimeout(() => setSentHint(""), 3000);
   };
 
   // ---- 交接: 调 onHandoff(target) 并清空输入 (草稿随之清除) ----
@@ -207,7 +219,7 @@ export function TaskCardCommand({
     setInput("");
     setHistoryIdx(null);
     preHistoryRef.current = "";
-    setSentHint(false);
+    setSentHint("");
   };
 
   // ---- 键盘: Enter 发送, ↑↓ 调历史 ----
@@ -287,6 +299,26 @@ export function TaskCardCommand({
         </button>
       </div>
 
+      {/* 发送目标 (per 2026-11-21: 默认仅任务卡; 手动指定才发送到聊天) */}
+      <div className="mt-1.5 flex items-center gap-2">
+        <label htmlFor={`tcc-send-target-${taskId}`} className="shrink-0 text-xs text-ink-mute">
+          发送到
+        </label>
+        <select
+          id={`tcc-send-target-${taskId}`}
+          data-testid="tcc-send-target"
+          value={sendTarget}
+          onChange={(e) => setSendTarget(e.target.value as TaskCardSendTarget)}
+          className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink focus:border-info focus:outline-none"
+        >
+          {SEND_TARGETS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* ③ 草稿指示 (当前输入未发送 = 已自动存草稿) */}
       {input.length > 0 && (
         <div className="mt-1.5 text-xs text-ink-mute">
@@ -294,13 +326,17 @@ export function TaskCardCommand({
         </div>
       )}
 
-      {/* ⑤ 已发送提示 */}
+      {/* ⑤ 已发送提示 (按目标区分: 默认仅任务卡, 手动选择才进聊天) */}
       {sentHint && (
         <div
           data-testid="tcc-sent-hint"
           className="mt-1.5 inline-block rounded bg-warn/15 px-2 py-0.5 text-xs text-warn"
         >
-          已发送到右侧聊天
+          {sentHint === "card"
+            ? "已保留在任务卡 (未发送到聊天)"
+            : sentHint === "worktree"
+              ? "已发送到 Worktree 聊天"
+              : "已发送到 Global 聊天"}
         </div>
       )}
 

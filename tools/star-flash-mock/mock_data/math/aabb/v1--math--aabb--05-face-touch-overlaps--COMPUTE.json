@@ -1,0 +1,58 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "aabb",
+  "case": "05-face-touch-overlaps",
+  "method": "COMPUTE",
+  "scenario": "math-aabb-05-face-touch-overlaps",
+  "description": "数学不变量 face_touching_boxes_overlap (aabb 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/aabb.rs::overlaps",
+  "invariant": "face_touching_boxes_overlap",
+  "tolerance": 1e-06,
+  "input": {
+    "a": {
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    "e": {
+      "min": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        4.0,
+        2.0,
+        2.0
+      ]
+    }
+  },
+  "expected": {
+    "overlaps": true,
+    "intersection": {
+      "min": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    }
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

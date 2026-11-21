@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d14ef1cbf7e72f8858596ff0eff0a2183fcad23345c1e408ad938781d141f969
+@cypher schema=1 source_sha256=341fc85657ec3e25634fae70bfd6133b298baf745d8761942fbd942bf473b543
 MERGE (self:File {path:"frontend/src/components/__tests__/SidebarProjectWorktreeNavigation.test.tsx"})
 MERGE (sidebar:File {path:"frontend/src/components/Sidebar.tsx"})
 MERGE (tree:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
@@ -116,7 +116,7 @@ describe("Project Worktree Index sidebar navigation", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByTestId("app-sidebar")).toHaveAttribute("data-nav-model", "project-run");
+    expect(screen.getByTestId("app-sidebar")).toHaveAttribute("data-nav-model", "project-lane");
     // per 2026-11-14 用户发令: 恢复 LANE 层级树 (无宿主时降级为可达演示目录)
     expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
     expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
@@ -124,11 +124,8 @@ describe("Project Worktree Index sidebar navigation", () => {
     expect(screen.queryByTestId("sidebar-group-project")).toBeNull();
     expect(screen.queryByTestId("sidebar-group-view")).toBeNull();
     expect(screen.queryByTestId("sidebar-group-admin")).toBeNull();
-    // 全局组 = 收件箱/Agent 中心/分析
-    const globalGroup = screen.getByTestId("sidebar-group-global");
-    expect(within(globalGroup).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
-    expect(within(globalGroup).getByTestId("sidebar-item-agents")).toBeInTheDocument();
-    expect(within(globalGroup).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-shortcuts-panel")).not.toBeVisible();
+    expect(within(screen.getByTestId("sidebar-directory-panel")).queryByTestId("sidebar-item-inbox")).toBeNull();
   });
 
   it("Run Worktree rows distinguish lifecycle and binding facts without exposing identifiers", async () => {

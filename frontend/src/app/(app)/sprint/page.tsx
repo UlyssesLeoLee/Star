@@ -101,6 +101,8 @@ function IssuesPageInner() {
   // per 2026-11-17 功能补齐: Sprint 视图项目范围 (null = 全局旧行为)
   const selectedProjectId = useNavStore((s) => s.selectedProjectId);
   const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+  // per 2026-11-21: branch 级隔离随四级树选择联动
+  const selectedBranch = useNavStore((s) => s.selectedBranch);
 
   // ---- 服务端真源通道 (per P1: Sprint 与 Kanban/Backlog 共享同一服务端任务真源) ----
   const groupApi = useWorktreeGroupApi();
@@ -205,8 +207,8 @@ function IssuesPageInner() {
   const rawView = searchParams.get("view");
   const view: View = isView(rawView) ? rawView : "sprint";
 
-  // ---- new issue 模式 (?new=true) ----
-  const newMode = searchParams.get("new") === "true";
+  // per 2026-11-21: ?new=true 深链不再渲染独立表单 (Backlog 内联新增替代),
+  // newMode/dismissNewMode 已删除。
 
   // ---- 详情侧栏 ----
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -247,12 +249,7 @@ function IssuesPageInner() {
     [router, pathname, searchParams],
   );
 
-  // ---- new issue 模式切回 ----
-  const dismissNewMode = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("new");
-    router.push(`${pathname}?${params.toString()}`);
-  }, [router, pathname, searchParams]);
+  // per 2026-11-21: dismissNewMode 已删除 (New issue 表单移除, Backlog 内联新增替代)
 
   // ---- drag transition 处理 (与 board/page.tsx 一致, 同步 workItem.status + board.columns) ----
   // per P1: 服务端模式走统一写入路径 (乐观更新 + 冲突反馈); 本地模式保留 store 行为
@@ -394,54 +391,13 @@ function IssuesPageInner() {
               >
                 <Search size={12} /> Search
               </button>
-              <button
-                type="button"
-                data-testid="issues-new-button"
-                onClick={() => handleSwitchView(view) /* keep view, toggle new via URL */}
-                className="btn-primary text-xs"
-                aria-label={t.ariaLabels.createNewIssue}
-              >
-                <Plus size={12} /> New issue
-              </button>
+              {/* per 2026-11-21 用户发令: 去掉独立 New issue 按钮 —
+                  issue 直接在 Backlog 栏内联新增 (SprintBoardView quick-add) */}
             </div>
           </div>
 
-          {/* new issue 表单 (per ?new=true) */}
-          {newMode && (
-            <div
-              data-testid="issues-new-banner"
-              className="card mb-4 border-accent/40 bg-accent/5 flex items-start justify-between gap-2"
-            >
-              <div className="text-xs">
-                <div className="text-accent font-medium mb-1">+ New issue</div>
-                <div className="text-ink-dim">
-                  创建表单 (Phase 2+ 接后端 API). 临时表单:
-                </div>
-                <form
-                  className="mt-2 flex gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    dismissNewMode();
-                  }}
-                >
-                  <input
-                    data-testid="issues-new-title-input"
-                    type="text"
-                    placeholder="Issue title (stub)"
-                    className="bg-bg-soft border border-line rounded px-2 py-1 text-xs flex-1"
-                  />
-                  <button type="submit" className="btn-primary text-xs">Create</button>
-                </form>
-              </div>
-              <button
-                onClick={dismissNewMode}
-                className="text-ink-mute hover:text-ink"
-                aria-label={t.ariaLabels.dismissNewIssue}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
+          {/* per 2026-11-21 用户发令: ?new=true stub 表单移除 — issue 直接在
+              Backlog 栏内联新增 (SprintBoardView quick-add), 不再需要独立表单 */}
 
           {/* search 输入 (per 搜索 button 切换) */}
           {searchOpen && (
@@ -478,11 +434,16 @@ function IssuesPageInner() {
               <IssuesTreeView items={filtered} identities={identities} onSelect={setSelectedId} />
             )}
             {view === "sprint" && (
-              // Per 2026-09-05 19:32 JST 拍板: Sprint 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
-              // per 2026-11-17 功能补齐: 传入 navStore 选中项目, SprintBoardView 按
-              //   project_id 过滤 (未选项目时保持全局旧行为)。
-              <SprintBoardView onSelect={setSelectedId} projectId={selectedProjectId ?? undefined} />
-            )}
+                          // Per 2026-09-05 19:32 JST 拍板: Sprint 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
+                          // per 2026-11-17 功能补齐: 传入 navStore 选中项目, SprintBoardView 按
+                          //   project_id 过滤 (未选项目时保持全局旧行为)。
+                          <SprintBoardView
+                            onSelect={setSelectedId}
+                            projectId={selectedProjectId ?? undefined}
+                            worktreeId={selectedWorktreeId ?? undefined}
+                            branch={selectedBranch || undefined}
+                          />
+                        )}
           </div>
 
           {/* 视图小贴士 (状态机 + 视图映射) */}

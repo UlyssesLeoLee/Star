@@ -570,6 +570,8 @@ const initialState = (set: any, get?: any): StoreState => ({
         workflow_id: input.workflow_id ?? "wf-default",
         due_date: input.due_date,
         worktree_id: input.worktree_id,
+        // per 2026-11-21: branch 级隔离字段透传 (缺省 null = 未绑定 branch)
+        branch_id: input.branch_id ?? null,
         documents: input.documents ?? [],
         parent_id: input.parent_id,
         ipa_skill_ids: input.ipa_skill_ids,

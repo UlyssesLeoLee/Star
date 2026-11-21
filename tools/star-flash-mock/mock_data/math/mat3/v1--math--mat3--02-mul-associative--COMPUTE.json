@@ -1,0 +1,106 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "mat3",
+  "case": "02-mul-associative",
+  "method": "COMPUTE",
+  "scenario": "math-mat3-02-mul-associative",
+  "description": "数学不变量 matrix_multiplication_associativity (mat3 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/mat3.rs::mul_mat3",
+  "invariant": "matrix_multiplication_associativity",
+  "tolerance": 1e-06,
+  "input": {
+    "a": [
+      [
+        2.0,
+        1.0,
+        0.5
+      ],
+      [
+        0.0,
+        3.0,
+        1.0
+      ],
+      [
+        1.0,
+        0.0,
+        4.0
+      ]
+    ],
+    "b": [
+      [
+        1.0,
+        2.0,
+        0.0
+      ],
+      [
+        0.5,
+        1.0,
+        3.0
+      ],
+      [
+        2.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "c": [
+      [
+        0.0,
+        1.0,
+        2.0
+      ],
+      [
+        1.0,
+        0.0,
+        1.0
+      ],
+      [
+        3.0,
+        1.0,
+        0.0
+      ]
+    ]
+  },
+  "expected": {
+    "ab_times_c": [
+      [
+        15.5,
+        7.0,
+        12.0
+      ],
+      [
+        33.0,
+        13.5,
+        10.0
+      ],
+      [
+        14.0,
+        13.0,
+        20.0
+      ]
+    ],
+    "a_times_bc": [
+      [
+        15.5,
+        7.0,
+        12.0
+      ],
+      [
+        33.0,
+        13.5,
+        10.0
+      ],
+      [
+        14.0,
+        13.0,
+        20.0
+      ]
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

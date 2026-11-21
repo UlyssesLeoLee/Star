@@ -84,6 +84,8 @@ use super::{
     WorktreeArchiveReadinessQuery, WorktreeGitLockObservation, WorktreeGitLockObserver,
     WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow,
 };
+use star_git_core::list_branches;
+use std::path::Path as StdPath;
 
 #[derive(Debug, Deserialize)]
 struct IndexQuery {
@@ -247,6 +249,10 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/projects/{project_id}/lanes/{lane_id}/worktrees",
             get(list_lane_worktrees).post(attach_worktree_to_lane),
+        )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/branches",
+            get(list_worktree_branches),
         )
 }
 
@@ -1964,6 +1970,49 @@ async fn list_lane_worktrees(
         "worktrees": rows.iter().map(lane_worktree_projection).collect::<Vec<_>>(),
         "limit": limit,
         "next_cursor": null,
+    })))
+}
+
+/// GET /api/v1/worktrees/{worktree_id}/branches
+/// Enumerate branches from the worktree's local git checkout.
+async fn list_worktree_branches(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(worktree_id): Path<String>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let worktree_id = Uuid::parse_str(&worktree_id).map_err(|_| GroupApiError::bad_request())?;
+
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    let _scope = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    // Get the worktree's local path from the canvas worktree table
+    let worktree_path = sqlx::query_scalar::<_, String>(
+        "SELECT path FROM worktree_canvas_worktree WHERE id = $1 AND tenant_id = $2",
+    )
+    .bind(worktree_id)
+    .bind(actor.tenant_id)
+    .fetch_optional(&state.resolver.pool)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+
+    let path = StdPath::new(&worktree_path);
+    let branches = list_branches(path).map_err(|e| {
+        tracing::error!("list_branches failed for worktree {}: {}", worktree_id, e);
+        GroupApiError::feature_unavailable("branch_enumeration_unavailable")
+    })?;
+
+    Ok(Json(json!({
+        "worktree_id": worktree_id,
+        "branches": branches,
     })))
 }
 

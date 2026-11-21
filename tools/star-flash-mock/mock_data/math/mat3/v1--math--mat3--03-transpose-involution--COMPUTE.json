@@ -1,0 +1,72 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "mat3",
+  "case": "03-transpose-involution",
+  "method": "COMPUTE",
+  "scenario": "math-mat3-03-transpose-involution",
+  "description": "数学不变量 transpose_is_involution (mat3 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/mat3.rs::transpose",
+  "invariant": "transpose_is_involution",
+  "tolerance": 1e-06,
+  "input": {
+    "m": [
+      [
+        2.0,
+        1.0,
+        0.5
+      ],
+      [
+        0.0,
+        3.0,
+        1.0
+      ],
+      [
+        1.0,
+        0.0,
+        4.0
+      ]
+    ]
+  },
+  "expected": {
+    "transpose": [
+      [
+        2.0,
+        0.0,
+        1.0
+      ],
+      [
+        1.0,
+        3.0,
+        0.0
+      ],
+      [
+        0.5,
+        1.0,
+        4.0
+      ]
+    ],
+    "double_transpose": [
+      [
+        2.0,
+        1.0,
+        0.5
+      ],
+      [
+        0.0,
+        3.0,
+        1.0
+      ],
+      [
+        1.0,
+        0.0,
+        4.0
+      ]
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

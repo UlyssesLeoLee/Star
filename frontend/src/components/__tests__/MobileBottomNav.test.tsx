@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=184107123b7ce641c654a74e83e07e62e0ca6f29f35a1fe4ec0a4ff38cab017d
+@cypher schema=1 source_sha256=e327684d147e669e186cabc3235a29a469ffe6d4a809a0a6b6e3857deb30cc8a
 MERGE (self:File {path:"frontend/src/components/__tests__/MobileBottomNav.test.tsx"})
 MERGE (suite:Symbol {id:"frontend/src/components/__tests__/MobileBottomNav.test.tsx::Mobile Project navigation",kind:"suite"})
 MERGE (openDirectory:Symbol {id:"frontend/src/components/__tests__/MobileBottomNav.test.tsx::opens the Project hierarchy and renders its authorized tree",kind:"test"})
@@ -34,11 +34,11 @@ import { MobileBottomNav } from "../MobileBottomNav";
 
 const mocks = vi.hoisted(() => ({ pathname: "/worktree" }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => mocks.pathname }));
+vi.mock("next/navigation", () => ({ usePathname: () => mocks.pathname, useSearchParams: () => new URLSearchParams("") }));
 vi.mock("@/components/run/ProjectRunTree", () => ({
   ProjectRunTree: ({ collapsed }: { collapsed: boolean }) => (
     <div data-testid="authorized-project-run-tree" data-collapsed={String(collapsed)}>
-      Project → Engineering Run → Worktree → Branch
+      Project → Lane → Worktree → Branch
     </div>
   ),
 }));
@@ -94,6 +94,21 @@ describe("Mobile Project navigation", () => {
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
     expect(screen.queryByText("Feedback")).not.toBeInTheDocument();
     expect(screen.queryByText("更多")).not.toBeInTheDocument();
+  });
+
+  it("opens app shortcuts by tap and dismisses them before closing the directory", () => {
+    renderNavigation();
+    fireEvent.click(screen.getByTestId("mobile-nav-project"));
+    const trigger = screen.getByTestId("sidebar-shortcuts-trigger");
+    expect(screen.getByTestId("mobile-project-top-tabs")).toBeVisible();
+    expect(screen.getByTestId("mobile-project-bottom-fixed")).toBeVisible();
+
+    fireEvent.click(trigger);
+    const panel = screen.getByTestId("sidebar-shortcuts-panel");
+    expect(panel).toBeVisible();
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(panel).not.toBeVisible();
+    expect(screen.getByTestId("mobile-project-directory")).toBeVisible();
   });
 
   it("Escape closes the directory and restores focus", () => {

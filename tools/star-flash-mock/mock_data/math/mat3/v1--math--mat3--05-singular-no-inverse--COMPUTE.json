@@ -1,0 +1,40 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "mat3",
+  "case": "05-singular-no-inverse",
+  "method": "COMPUTE",
+  "scenario": "math-mat3-05-singular-no-inverse",
+  "description": "数学不变量 singular_matrix_has_no_inverse (mat3 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/mat3.rs::inverse",
+  "invariant": "singular_matrix_has_no_inverse",
+  "tolerance": 1e-06,
+  "input": {
+    "m": [
+      [
+        1.0,
+        2.0,
+        3.0
+      ],
+      [
+        2.0,
+        4.0,
+        6.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "expected": {
+    "inverse": null,
+    "determinant": 0.0
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

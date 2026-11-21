@@ -24,3 +24,4 @@ pub use repo::conflict::{
     ConflictSet, Disposition, LineRange, ParsedMerge, ParsedRegion, Region, RegionChoice,
     RegionConfidence, Scope, ScopeConfidence, ScopeKind, ScopeMap, ScopeRef, Segment,
 };
+pub use repo::refs::list_branches;

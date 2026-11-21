@@ -1,0 +1,54 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "transform",
+  "case": "03-identity-element",
+  "method": "COMPUTE",
+  "scenario": "math-transform-03-identity-element",
+  "description": "数学不变量 identity_transform_is_neutral (transform 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/transform.rs::identity",
+  "invariant": "identity_transform_is_neutral",
+  "tolerance": 1e-06,
+  "input": {
+    "t": {
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "translation": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    },
+    "v": [
+      0.5,
+      -1.0,
+      2.0
+    ]
+  },
+  "expected": {
+    "identity_apply": [
+      0.5,
+      -1.0,
+      2.0
+    ],
+    "compose_identity": [
+      2.0,
+      2.5,
+      5.0
+    ],
+    "original_apply": [
+      2.0,
+      2.5,
+      5.0
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=7afb6b8f911cfa0c5fff57730926bea85e6fe25f037b94a250095e788c25c332
+@cypher schema=1 source_sha256=843199b200623a34605a8ce731d5e3b1855220ff7b3dfe56550bbb9036be73d2
 MERGE (self:File {path:"frontend/src/components/run/ProjectRunTree.tsx"})
 MERGE (tree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
 MERGE (live:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::AuthenticatedProjectRunTree",kind:"component"})
@@ -52,6 +52,8 @@ MERGE (copy:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::LANE_DIR
 MERGE (self)-[:DEFINES]->(copy)
 MERGE (row)-[:CALLS]->(laneHref)
 MERGE (row)-[:CALLS]->(laneWtHref)
+MERGE (measure:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::observeTreeViewport",kind:"function"})
+MERGE (self)-[:DEFINES]->(measure)
 @endcypher
 */
 
@@ -165,7 +167,7 @@ export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
   const session = useRunDirectory();
   const { t } = useTranslation();
   if (collapsed) return <div className="flex justify-center py-2" title={t.sidebar.openProjectDirectory}><FolderKanban size={20} aria-label={t.sidebar.projectNavigation} /></div>;
-  return <section aria-label={t.sidebar.projectDirectory} data-testid="project-run-directory" className="border-b border-line pb-3">
+  return <section aria-label={t.sidebar.projectDirectory} data-testid="project-run-directory" className="flex min-h-0 flex-1 flex-col">
     <div className="px-2 py-1 text-xs font-bold">{t.sidebar.projectNavigation}</div>
     <p className="px-2 pb-2 text-[10px] text-ink-mute">{t.runDirectory.hierarchyHint}</p>
     {session.status === "ready" && session.client ? <AuthenticatedProjectRunTree client={session.client} /> :
@@ -238,7 +240,7 @@ function FallbackProjectRunTree() {
         {t.runDirectory.emptyHint}
       </p>
     )}
-    <ul role="tree" aria-label={t.sidebar.projectDirectory} className="max-h-[288px] overflow-y-auto">
+    <ul role="tree" aria-label={t.sidebar.projectDirectory} className="min-w-0">
       {projects.map((project) => {
         const laneWorktrees = byProject.get(project.id) ?? [];
         const expanded = Boolean(expandedProjects[project.id]);
@@ -368,26 +370,41 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   const setSidebarScope = useNavStore((state) => state.setSidebarScope);
   const selectedLaneId = useNavStore((state) => state.selectedLaneId);
   const selectedWorktreeId = useNavStore((state) => state.selectedWorktreeId);
+  const selectedBranch = useNavStore((state) => state.selectedBranch);
   const setLaneContext = useNavStore((state) => state.setLaneContext);
   const lanes = useStore((s) => s.lanes);
   const model = useMemo(() => new RunDirectoryTree(client), [client]);
   const rows = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(VIEWPORT_HEIGHT);
   const [createTarget, setCreateTarget] = useState<{ project: ProjectNode; wasExpanded: boolean } | null>(null);
   const [createTitle, setCreateTitle] = useState("");
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const pendingCreate = useRef<{ projectId: string; title: string; idempotencyKey: string; correlationId: string } | null>(null);
   useEffect(function mountDirectoryTree() { setScrollTop(0); model.start(); return () => model.dispose(); }, [model]);
+  useEffect(function observeTreeViewport() {
+    const element = viewport.current;
+    if (!element) return;
+    function measure() {
+      // Keep the last visible size when the Directory tab is hidden.
+      if (element && element.clientHeight > 0) setViewportHeight(element.clientHeight);
+    }
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   useEffect(function clampTreeViewport() {
     const element = viewport.current;
     if (!element) return;
-    const maximum = Math.max(0, rows.length * ROW_HEIGHT - VIEWPORT_HEIGHT);
+    const maximum = Math.max(0, rows.length * ROW_HEIGHT - viewportHeight);
     if (element.scrollTop > maximum) { element.scrollTop = maximum; setScrollTop(maximum); }
-  }, [rows.length]);
+  }, [rows.length, viewportHeight]);
   const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const visible = rows.slice(start, start + Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + 2 * OVERSCAN);
+  const visible = rows.slice(start, start + Math.ceil(viewportHeight / ROW_HEIGHT) + 2 * OVERSCAN);
   function selectProject(projectId: string) {
     setSelectedProjectId(projectId);
     setSidebarScope("project");
@@ -400,6 +417,11 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   /** Worktree 点选: Lane + Worktree + Branch 一键进入统一授权上下文 */
   function selectWorktree(laneId: string, worktreeId: string, branch: string) {
     setLaneContext(laneId, worktreeId, branch);
+  }
+  /** Branch 点选 (per 2026-11-21): 进入该 branch 的隔离视图 — 横向导航按树形路径过滤 */
+  function selectBranch(laneId: string, worktreeId: string, branch: string) {
+    setLaneContext(laneId, worktreeId, branch);
+    setSidebarScope("project");
   }
   function moveTreeFocus(event: KeyboardEvent<HTMLDivElement>) {
     const target = (event.target as HTMLElement).closest<HTMLElement>("[data-directory-index]");
@@ -425,7 +447,7 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     const element = viewport.current;
     if (!element) return;
     if (next * ROW_HEIGHT < element.scrollTop) element.scrollTop = next * ROW_HEIGHT;
-    else if ((next + 1) * ROW_HEIGHT > element.scrollTop + VIEWPORT_HEIGHT) element.scrollTop = (next + 1) * ROW_HEIGHT - VIEWPORT_HEIGHT;
+    else if ((next + 1) * ROW_HEIGHT > element.scrollTop + viewportHeight) element.scrollTop = (next + 1) * ROW_HEIGHT - viewportHeight;
     setScrollTop(element.scrollTop);
     requestAnimationFrame(() => element.querySelector<HTMLElement>(`[data-directory-index="${next}"]`)?.focus());
   }
@@ -468,12 +490,12 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
   return <>
     <button type="button" onClick={() => { model.refresh(); if (viewport.current) viewport.current.scrollTop = 0; setScrollTop(0); }} className="mb-1 flex items-center gap-1 px-2 text-[10px] text-ink-mute hover:text-ink"><RefreshCw size={11} />{t.runDirectory.refreshDirectory}</button>
     <div ref={viewport} role="tree" aria-label={t.sidebar.projectDirectory} onKeyDown={moveTreeFocus}
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative overflow-y-auto overflow-x-hidden" style={{ height: VIEWPORT_HEIGHT }}>
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
       <div role="presentation" style={{ height: rows.length * ROW_HEIGHT }}>
         {visible.map((row, offset) => <DirectoryRow key={row.key} row={row} index={start + offset} model={model}
           selectedWorktreeId={focus?.focus?.worktree_id} clearFocus={clearFocus} onCreateLane={openCreateLane}
-          selectedProjectId={selectedProjectId} selectedLaneId={selectedLaneId} pathname={pathname}
-          onSelectProject={selectProject} onSelectLane={selectLane}
+          selectedProjectId={selectedProjectId} selectedLaneId={selectedLaneId} selectedBranch={selectedBranch} pathname={pathname}
+          onSelectProject={selectProject} onSelectLane={selectLane} onSelectBranch={selectBranch}
           newLaneLabel={copy.newLane} laneCopy={copy} statusLabels={t.runDirectory} />)}
       </div>
     </div>
@@ -566,10 +588,11 @@ function nodeScopeLabel(node: DirectoryNode, labels: RunDirectoryLabels, copy: L
       : labels.branchUnavailable;
   }
 }
-function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selectedProjectId, selectedLaneId, pathname, onSelectProject, onSelectLane, onCreateLane, newLaneLabel, laneCopy, statusLabels }: {
+function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selectedProjectId, selectedLaneId, selectedBranch, pathname, onSelectProject, onSelectLane, onSelectBranch, onCreateLane, newLaneLabel, laneCopy, statusLabels }: {
   row: DirectoryTreeRow; index: number; model: RunDirectoryTree; selectedWorktreeId?: string; clearFocus: () => void;
-  selectedProjectId: string; selectedLaneId: string; pathname: string; onSelectProject: (projectId: string) => void;
-  onSelectLane: (laneId: string) => void; onCreateLane: (project: ProjectNode, expanded: boolean) => void;
+  selectedProjectId: string; selectedLaneId: string; selectedBranch: string; pathname: string; onSelectProject: (projectId: string) => void;
+  onSelectLane: (laneId: string) => void; onSelectBranch: (laneId: string, worktreeId: string, branch: string) => void;
+  onCreateLane: (project: ProjectNode, expanded: boolean) => void;
   newLaneLabel: string; laneCopy: LaneCopy; statusLabels: RunDirectoryLabels;
 }) {
   const depth = row.kind === "node" ? row.node.depth : row.depth;
@@ -689,13 +712,29 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
         onNavigate={() => { onSelectProject(node.entity.project_id); clearFocus(); }}>{contents}</Link>
     </div>;
   }
-  if (node.kind === "branch") return <div role="treeitem" aria-level={depth + 1} tabIndex={-1}
-    data-directory-index={index} style={style}
-    title={node.entity.name ? `${statusLabels.branchRecord} · ${node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}: ${node.entity.name}` : statusLabels.branchUnavailable}
-    className={className}>
-    <span className="flex shrink-0 items-center"><GitBranch size={13} /></span>
-    <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span>
-      <span className="block truncate text-[9px] text-ink-mute">{node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}</span></span>
-  </div>;
+  if (node.kind === "branch") {
+    // per 2026-11-21 用户发令: branch 从 worktree 的 git 枚举, 点选进入该 branch
+    // 的隔离视图 (navStore.setLaneContext 统一授权上下文, 横向导航随之过滤)。
+    // 祖先 lane/worktree 从 parentKey 路径解析 (key 形如 …/lane:<id>/laneWorktree:<id>/branch:<name>)。
+    const branchName = node.entity.name;
+    const laneMatch = /\/lane:([^/]+)/.exec(node.parentKey);
+    const wtMatch = /\/(?:laneWorktree|worktree):([^/]+)/.exec(node.parentKey);
+    const laneId = laneMatch?.[1] ?? "";
+    const worktreeId = wtMatch?.[1] ?? "";
+    const selected = selectedBranch === branchName && useNavStore.getState().selectedWorktreeId === worktreeId;
+    const href = `/kanban?lane_id=${encodeURIComponent(laneId)}&worktree_id=${encodeURIComponent(worktreeId)}&branch=${encodeURIComponent(branchName)}`;
+    return <div role="presentation" style={style} className="flex items-center">
+      <Link role="treeitem" aria-level={depth + 1} aria-selected={selected}
+        data-directory-index={index} href={href} prefetch={false}
+        aria-label={`${statusLabels.selectNode} ${branchName}`}
+        title={branchName ? `${statusLabels.branchRecord} · ${node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}: ${branchName}` : statusLabels.branchUnavailable}
+        className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        onNavigate={() => { if (branchName) onSelectBranch(laneId, worktreeId, branchName); }}>
+        <span className="flex shrink-0 items-center"><GitBranch size={13} /></span>
+        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span>
+          <span className="block truncate text-[9px] text-ink-mute" title={node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}>本地 Branch</span></span>
+      </Link>
+    </div>;
+  }
   return null;
 }

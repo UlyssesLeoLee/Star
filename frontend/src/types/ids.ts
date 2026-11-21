@@ -262,6 +262,9 @@ export interface WorkItem {
   //   Worktree → AgentSession (1:1) → WorkItem (N:1) 三层关联
   //   关联 wt 后可在 Drawer 展示 17 状态机 + 跳 wt 详情 (Phase 2+)
   worktree_id?: Uuid;
+  // per 2026-11-21 用户发令: branch 级数据隔离 — 每个 branch 独立一套数据,
+  // 不传时各自独立; 跨 branch 互传走显式交接。null/缺省 = 未绑定 branch (全局可见)。
+  branch_id?: string | null;
   // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
   // 缺省: kind → WT_M_FROM_KIND 派生. 但允许 WorkItem 显式 override (例如 promotion: spike → M 后被改派为 task → T)
   w_t_m?: WtmCategory;

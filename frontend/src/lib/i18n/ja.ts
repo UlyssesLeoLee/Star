@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=780a362498a95f095be790f3b6fc972cae620c0c2565ea86c111cb2dfadc5958
+@cypher schema=1 source_sha256=7d9e415b1c677216aed93809bc112288e8c60445af32a1eac9decc7b0cd55ca8
 MERGE (self:File {path:"frontend/src/lib/i18n/ja.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -173,6 +173,7 @@ export const ja: Dictionary = {
       review: "レビュー待ち",
       done: "完了",
     },
+    shortcuts: { label: "アプリのショートカット", add: "アプリを追加" },
     quickEntries: {
       inbox: "受信トレイ",
       notifications: "通知",
@@ -181,21 +182,21 @@ export const ja: Dictionary = {
   },
   appMatrix: {
     title: "APP MATRIX // タクティカルマトリクスとナビゲーションカスタマイズ",
-    subtitle: "デフォルトではコア機能のみ表示。任意のモジュールをワンクリックでサイドバーまたはヘッダーにピン留めできます。",
+    subtitle: "よく使うアプリをショートカットやヘッダータブにピン留めできます。",
     capabilities: "25+ 機能",
     searchPlaceholder: "25+ モジュール、コード (例: KB, SCM, WT, AUD) を検索...",
     resetDefault: "デフォルトに戻す",
     resetDefaultTitle: "システムデフォルトのナビゲーションに戻す",
     done: "完了",
-    pinToSidebar: "サイドバーにピン留め",
-    unpinFromSidebar: "サイドバーから削除",
+    pinToSidebar: "ショートカットにピン留め",
+    unpinFromSidebar: "ショートカットから削除",
     indexOwnedHint: "このモジュールは Project Worktree Index が管轄します — 左のプロジェクトツリーから開いてください",
     pinToHeader: "ヘッダーにピン留め",
     unpinFromHeader: "ヘッダーから削除",
     openNow: "このモジュールを開く",
-    sidebarLabel: "サイドバー",
+    sidebarLabel: "ショートカット",
     headerLabel: "ヘッダー",
-    footerPinnedSidebar: "サイドバー ピン留め:",
+    footerPinnedSidebar: "固定済みショートカット",
     footerPinnedHeader: "ヘッダー ピン留め:",
     categories: {
       all: { label: "全モジュール", tag: "ALL" },

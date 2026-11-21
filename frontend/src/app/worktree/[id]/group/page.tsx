@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=94cc23dca3a5263fd1a89d11a09f1d82e22e54083bcada0590c2ce0897849c15
+@cypher schema=1 source_sha256=ccbd684210b3d87fab0b10457f12a8974a059f50fe48596519b2a64c39b8ebd2
 MERGE (self:File {path:"frontend/src/app/worktree/[id]/group/page.tsx"})
 MERGE (page:Function {name:"GroupWorkspacePage", language:"typescript", visibility:"public"})
 MERGE (resolveTaskCliUiState:Function {name:"resolveTaskCliUiState", language:"typescript", visibility:"public"})
@@ -16,6 +16,10 @@ MERGE (page)-[:CALLS]->(resolveAppId)
 MERGE (page)-[:CALLS]->(appHref)
 MERGE (page)-[:CALLS]->(resolveTaskCliUiState)
 MERGE (page)-[:USES]->(legacyAppCanonicalization)
+MERGE (projectNav:Symbol {id:"frontend/src/components/nav/ProjectNavigation.tsx::ProjectNavigation",kind:"component"})
+MERGE (navigationState:Symbol {id:"frontend/src/lib/nav/navStore.ts::useNavStore",kind:"hook"})
+MERGE (self)-[:IMPORTS]->(projectNav)
+MERGE (self)-[:IMPORTS]->(navigationState)
 @endcypher
 */
 /*
@@ -410,7 +414,6 @@ MATCH (file:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"}),
       (appHref:Function {name:"appHref"}),
       (items:Variable {name:"projectWorkItems"});
 CREATE (closeTaskCard:Function {name:"closeTaskCard",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
-       (leftPanelTab:Variable {name:"leftPanelTab",type:"variable",language:"typescript"}),
        (rightPanelTab:Variable {name:"rightPanelTab",type:"variable",language:"typescript"}),
        (rightPanelOpen:Variable {name:"rightPanelOpen",type:"variable",language:"typescript"}),
        (workflowFilter:Variable {name:"workflowFilter",type:"variable",language:"typescript"}),
@@ -422,7 +425,7 @@ CREATE (closeTaskCard:Function {name:"closeTaskCard",type:"function",language:"t
        (taskList:Variable {name:"taskList",type:"variable",language:"typescript"});
 CREATE (file)-[:CONTAINS]->(closeTaskCard),
        (page)-[:CONTAINS]->(closeTaskCard),
-       (page)-[:USES]->(leftPanelTab),(page)-[:USES]->(rightPanelTab),
+       (page)-[:USES]->(rightPanelTab),
        (page)-[:USES]->(rightPanelOpen),
        (page)-[:USES]->(workflowFilter),(page)-[:USES]->(workspaceSearch),
        (page)-[:USES]->(worktreeDetailsOpen),(page)-[:USES]->(items),
@@ -507,6 +510,8 @@ import {
   type GroupWorkItemView,
 } from "@/lib/group/groupProjection";
 import { projectGroupAppsForNavigation } from "@/lib/group/groupAppsRegistry";
+import { ProjectNavigation } from "@/components/nav/ProjectNavigation";
+import { useNavStore } from "@/lib/nav/navStore";
 import type {
   GroupAppNavigationEntry,
   ScopedChatTarget,
@@ -526,7 +531,6 @@ interface PageProps {
 type AppId = "backlog" | "sprint" | "task-flow" | "board" | "task-card" | "canvas" | "workflow" | "bi" | "plugins" | `plugin:${string}`;
 type ChatScope = "WORKTREE" | "GLOBAL";
 type WorkspacePanel = "chat" | "worktree" | "team";
-type WorkflowFilter = "all" | "in_progress" | "review" | "blocked" | "done";
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (review:Function {name:"reviewLiveWorkItem"}),
       (reviewCommands:Variable {name:"reviewCommands"}),
@@ -702,13 +706,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope: ChatScope = searchParams.get("scope") === "GLOBAL" ? "GLOBAL" : "WORKTREE";
-  const [leftPanelTab, setLeftPanelTab] = useState<"tree" | "updates">("tree");
   const [rightPanelTab, setRightPanelTab] = useState<WorkspacePanel>("chat");
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   useEffect(() => {
     setRightPanelOpen(window.matchMedia("(min-width: 1536px)").matches);
   }, []);
-  const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>("all");
+  const workflowFilter = useNavStore((state) => state.taskStatusFilter);
 
   const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [worktreeDetailsOpen, setWorktreeDetailsOpen] = useState(false);
@@ -2623,18 +2626,11 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       </header>
 
       <div className={`grid min-h-0 flex-1 ${rightPanelOpen ? "grid-cols-[232px_minmax(0,1fr)_minmax(220px,304px)_44px] 2xl:grid-cols-[252px_minmax(0,1fr)_304px_52px]" : "grid-cols-[232px_minmax(0,1fr)_44px] 2xl:grid-cols-[252px_minmax(0,1fr)_52px]"}`}>
-        <aside className="flex min-h-0 flex-col border-r border-line bg-bg-card/70" aria-label="Project LANE Worktree Branch 导航">
-          <div className="grid grid-cols-2 gap-1 border-b border-line p-2" role="tablist" aria-label="任务与 AI 更新">
-            <button type="button" role="tab" aria-selected={leftPanelTab === "tree"} onClick={() => setLeftPanelTab("tree")} className={`rounded px-2 py-1.5 text-[11px] font-medium ${leftPanelTab === "tree" ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft"}`}>
-              <GitBranch size={12} className="mr-1 inline" />导航
-            </button>
-            <button type="button" role="tab" aria-selected={leftPanelTab === "updates"} onClick={() => setLeftPanelTab("updates")} className={`rounded px-2 py-1.5 text-[11px] font-medium ${leftPanelTab === "updates" ? "bg-accent/15 text-accent" : "text-ink-mute hover:bg-bg-soft"}`}>
-              <Inbox size={12} className="mr-1 inline" />AI 更新
-            </button>
-          </div>
-
-          {leftPanelTab === "tree" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3" role="tree" aria-label="LANE Worktree Branch 任务树">
+        <aside className="flex min-h-0 flex-col border-r border-line bg-bg-card/70">
+          <ProjectNavigation
+            testIdPrefix="group-project-navigation"
+            directory={
+            <div role="tree" aria-label="Lane Worktree Branch 任务树">
               <div className="mb-2 flex items-center gap-2 rounded px-2 py-1.5 text-xs font-semibold text-ink">
                 <span className="size-2 rounded-sm bg-accent" />{project?.name ?? "当前 Project"}
               </div>
@@ -2642,10 +2638,19 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 <div className="flex items-center gap-2 rounded px-2 py-1.5 text-[11px] font-medium text-ink-dim" role="treeitem" aria-expanded="true">
                   <ChevronRight size={12} className="rotate-90 text-ink-mute" />
                   <span className="size-2 rounded-full border border-warning/70" />
-                  <span className="min-w-0 flex-1 truncate">LANE · {activeLane?.name ?? "未归类"}</span>
+                  <span className="min-w-0 flex-1 truncate">Lane · {activeLane?.name ?? "未归类"}</span>
                   {activeLane && !activeLane.git_remote_url && (
                     <span title="未绑定远端" className="shrink-0 rounded border border-warn/40 bg-warn/10 px-1 text-[8px] text-warn">未绑定</span>
                   )}
+                  <Link
+                    href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`}
+                    className="grid size-6 shrink-0 place-items-center rounded text-ink-mute hover:bg-bg-soft hover:text-accent focus-visible:outline focus-visible:outline-accent"
+                    title="新建 / 管理 Worktree"
+                    aria-label="新建 / 管理 Worktree"
+                    data-testid="new-worktree-shortcut"
+                  >
+                    <Plus size={13} aria-hidden="true" />
+                  </Link>
                 </div>
                 <div className="ml-2 border-l border-line pl-2">
                   <div className="flex items-center gap-2 rounded bg-accent/10 px-2 py-1.5 text-[11px] font-medium text-accent" role="treeitem" aria-expanded="true">
@@ -2684,35 +2689,8 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="ai-update-inbox">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-xs font-semibold">AI 更新</h2>
-                <span className="text-[9px] text-ink-mute">最新优先</span>
-              </div>
-              <div className="rounded-lg border border-dashed border-line p-4 text-center">
-                <MessageSquareText size={18} className="mx-auto mb-2 text-ink-mute" />
-                <p className="text-[10px] font-medium text-ink-dim">暂无可读取的 AI 回复</p>
-                <p className="mt-1 text-[9px] leading-relaxed text-ink-mute">Group Chat transcript 与事件流尚未接入；不会用示例消息填充收件箱。</p>
-              </div>
-            </div>
-          )}
-
-          <div className="shrink-0 border-t border-line p-2">
-            <div className="mb-1 px-1 text-[9px] font-semibold uppercase tracking-widest text-ink-mute">工作流筛选</div>
-            <div className="flex flex-wrap gap-1">
-              {([
-                ["all", "全部"], ["in_progress", "进行中"], ["review", "评审"], ["blocked", "阻塞"], ["done", "完成"],
-              ] as const).map(([value, label]) => (
-                <button key={value} type="button" aria-pressed={workflowFilter === value} onClick={() => setWorkflowFilter(value)} className={`rounded border px-1.5 py-1 text-[9px] ${workflowFilter === value ? "border-accent/40 bg-accent/10 text-accent" : "border-line text-ink-mute hover:text-ink"}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border border-accent/30 bg-accent/10 text-[11px] font-semibold text-accent hover:bg-accent/15" data-testid="new-worktree-shortcut">
-              <Plus size={13} />新建 / 管理 Worktree
-            </Link>
-          </div>
+            }
+          />
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-col">

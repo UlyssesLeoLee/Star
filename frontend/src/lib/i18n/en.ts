@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=faafbb5097c9ac0ac0ab4f98640ea45766914530d836407345a63b22c7cdfa94
+@cypher schema=1 source_sha256=f3e3d10003a0aba4f696d19b7bb3e3361faee9f67220e36287959df65f2392fa
 MERGE (self:File {path:"frontend/src/lib/i18n/en.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -172,6 +172,7 @@ export const en: Dictionary = {
       review: "In review",
       done: "Done",
     },
+    shortcuts: { label: "App shortcuts", add: "Add an app" },
     quickEntries: {
       inbox: "Inbox",
       notifications: "Notifications",
@@ -180,21 +181,21 @@ export const en: Dictionary = {
   },
   appMatrix: {
     title: "APP MATRIX // Tactical Matrix & Navigation Customization",
-    subtitle: "Only core features are shown by default. Pin any module to the left sidebar or top header in one click.",
+    subtitle: "Pin frequently used apps to the shortcuts or header tabs.",
     capabilities: "25+ CAPABILITIES",
     searchPlaceholder: "Search 25+ modules, short codes (e.g. KB, SCM, WT, AUD)...",
     resetDefault: "Reset Default",
     resetDefaultTitle: "Restore system default navigation",
     done: "Done",
-    pinToSidebar: "Pin to sidebar",
-    unpinFromSidebar: "Remove from sidebar",
+    pinToSidebar: "Pin to app shortcuts",
+    unpinFromSidebar: "Remove from app shortcuts",
     indexOwnedHint: "This module is owned by the Project Worktree Index — open it from the project tree on the left",
     pinToHeader: "Pin to header",
     unpinFromHeader: "Remove from header tabs",
     openNow: "Open this module now",
-    sidebarLabel: "Sidebar",
+    sidebarLabel: "Shortcuts",
     headerLabel: "Header",
-    footerPinnedSidebar: "Sidebar pinned:",
+    footerPinnedSidebar: "Pinned shortcuts",
     footerPinnedHeader: "Header pinned:",
     categories: {
       all: { label: "All Modules", tag: "ALL" },

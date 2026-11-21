@@ -1,0 +1,72 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "mat3",
+  "case": "04-rotation-inverse-transpose",
+  "method": "COMPUTE",
+  "scenario": "math-mat3-04-rotation-inverse-transpose",
+  "description": "数学不变量 rotation_inverse_equals_transpose (mat3 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/mat3.rs::inverse",
+  "invariant": "rotation_inverse_equals_transpose",
+  "tolerance": 1e-06,
+  "input": {
+    "m": [
+      [
+        0.8660254037844387,
+        -0.49999999999999994,
+        0.0
+      ],
+      [
+        0.49999999999999994,
+        0.8660254037844387,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "expected": {
+    "inverse": [
+      [
+        0.8660254037844387,
+        0.49999999999999994,
+        -0.0
+      ],
+      [
+        -0.49999999999999994,
+        0.8660254037844387,
+        -0.0
+      ],
+      [
+        0.0,
+        -0.0,
+        1.0
+      ]
+    ],
+    "transpose": [
+      [
+        0.8660254037844387,
+        0.49999999999999994,
+        0.0
+      ],
+      [
+        -0.49999999999999994,
+        0.8660254037844387,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

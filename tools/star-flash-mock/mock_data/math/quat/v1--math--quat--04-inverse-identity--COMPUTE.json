@@ -1,0 +1,39 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "quat",
+  "case": "04-inverse-identity",
+  "method": "COMPUTE",
+  "scenario": "math-quat-04-inverse-identity",
+  "description": "数学不变量 quaternion_inverse_identity (quat 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/quat.rs::inverse",
+  "invariant": "quaternion_inverse_identity",
+  "tolerance": 1e-06,
+  "input": {
+    "q": [
+      0.0,
+      0.0,
+      0.7071067811865476,
+      0.7071067811865476
+    ]
+  },
+  "expected": {
+    "q_inverse": [
+      -0.0,
+      -0.0,
+      -0.7071067811865476,
+      0.7071067811865476
+    ],
+    "q_times_qinv": [
+      0.0,
+      0.0,
+      0.0,
+      1.0000000000000002
+    ]
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

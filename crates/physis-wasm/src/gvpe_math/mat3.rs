@@ -148,14 +148,23 @@ impl Mat3 {
     }
 
     /// 矩阵 × 矩阵。
+    ///
+    /// 2026-11-21 修复: 原实现按 `self × rhs 的列` 组装结果, 但 `m` 是行优先
+    /// 存储 (`m[i]` = 第 i 行), 导致乘积实际是 `(self × rhsᵀ)ᵀ` —— 对称矩阵
+    /// (如单轴旋转) 恰好掩盖了错误, 非对称复合即暴露 (数学扩展 proptest
+    /// mat3_mul_associative_on_vec 捕获)。正确语义: 结果第 i 行第 j 列 =
+    /// self 第 i 行 · rhs 第 j 列。
     #[inline]
     #[must_use]
     pub fn mul_mat3(self, rhs: Self) -> Self {
+        let c0 = super::Vec3::new(rhs.m[0].x, rhs.m[1].x, rhs.m[2].x);
+        let c1 = super::Vec3::new(rhs.m[0].y, rhs.m[1].y, rhs.m[2].y);
+        let c2 = super::Vec3::new(rhs.m[0].z, rhs.m[1].z, rhs.m[2].z);
         Self {
             m: [
-                self.mul_vec3(super::Vec3::new(rhs.m[0].x, rhs.m[1].x, rhs.m[2].x)),
-                self.mul_vec3(super::Vec3::new(rhs.m[0].y, rhs.m[1].y, rhs.m[2].y)),
-                self.mul_vec3(super::Vec3::new(rhs.m[0].z, rhs.m[1].z, rhs.m[2].z)),
+                super::Vec3::new(self.m[0].dot(c0), self.m[0].dot(c1), self.m[0].dot(c2)),
+                super::Vec3::new(self.m[1].dot(c0), self.m[1].dot(c1), self.m[1].dot(c2)),
+                super::Vec3::new(self.m[2].dot(c0), self.m[2].dot(c1), self.m[2].dot(c2)),
             ],
         }
     }
@@ -194,26 +203,38 @@ impl Mat3 {
         let h = m[2].y;
         let i = m[2].z;
 
-        // 行列式 = a(ei - fh) - b(di - fg) + c(dh - eg)
-        let det = a.mul_add(
-            f.mul_add(-h, e * i),
-            c.mul_add(f.mul_add(-g, d * h), -(b * f.mul_add(-g, d * i))),
-        );
+        // 2026-11-21 重写: 原 mul_add 链式写法存在符号/参数序错误 (det 第三项
+        // 与伴随矩阵多个余子式), 对角矩阵测试掩盖了问题。改为直白的余子式展开,
+        // 由数学扩展 proptest (mat3_inverse_definition 等) 守护。
+        // 余子式 (cofactor C_ij = (-1)^(i+j) * minor):
+        let c00 = e * i - f * h;
+        let c01 = -(d * i - f * g);
+        let c02 = d * h - e * g;
+        let c10 = -(b * i - c * h);
+        let c11 = a * i - c * g;
+        let c12 = -(a * h - b * g);
+        let c20 = b * f - c * e;
+        let c21 = -(a * f - c * d);
+        let c22 = a * e - b * d;
+
+        // det = 第一行展开
+        let det = a * c00 + b * c01 + c * c02;
         if det.abs() < f32::EPSILON {
             return None;
         }
         let inv_det = 1.0 / det;
 
+        // 逆 = 伴随 / det = 余子式矩阵的转置 / det
         Some(Self::new(
-            f.mul_add(-h, e * i) * inv_det,
-            b.mul_add(-i, c * h) * inv_det,
-            c.mul_add(-e, b * f) * inv_det,
-            d.mul_add(-i, f * g) * inv_det,
-            c.mul_add(-g, a * i) * inv_det,
-            a.mul_add(-f, c * d) * inv_det,
-            e.mul_add(-g, d * h) * inv_det,
-            a.mul_add(-h, b * g) * inv_det,
-            b.mul_add(-d, a * e) * inv_det,
+            c00 * inv_det,
+            c10 * inv_det,
+            c20 * inv_det,
+            c01 * inv_det,
+            c11 * inv_det,
+            c21 * inv_det,
+            c02 * inv_det,
+            c12 * inv_det,
+            c22 * inv_det,
         ))
     }
 }

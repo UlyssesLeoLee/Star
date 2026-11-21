@@ -67,20 +67,59 @@ pub fn write_ref(repo: &Path, full_ref: &str, sha: &str) -> Result<()> {
     Ok(())
 }
 
+
+/// List all branch names (refs/heads/*) in a bare repository.
+pub fn list_branches(repo: &Path) -> Result<Vec<String>> {
+    let heads = repo.join("refs").join("heads");
+    if !heads.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut branches = Vec::new();
+    for entry in std::fs::read_dir(&heads)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                branches.push(name.to_string());
+            }
+        } else if path.is_dir() {
+            // Recurse into nested directories (e.g., refs/heads/feature/xyz)
+            let nested = list_branches_nested(&path, &heads)?;
+            branches.extend(nested);
+        }
+    }
+    branches.sort();
+    Ok(branches)
+}
+
+fn list_branches_nested(base: &Path, heads_root: &Path) -> Result<Vec<String>> {
+    let mut branches = Vec::new();
+    for entry in std::fs::read_dir(base)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(_name) = path.file_name().and_then(|n| n.to_str()) {
+                // Build full branch name relative to refs/heads/
+                if let Ok(rel) = path.strip_prefix(&heads_root) {
+                    if let Some(s) = rel.to_str() {
+                        branches.push(s.replace("\\", "/"));
+                    }
+                }
+            }
+        } else if path.is_dir() {
+            let nested = list_branches_nested(&path, heads_root)?;
+            branches.extend(nested);
+        }
+    }
+    Ok(branches)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    /// Build a fresh, unique temp directory under the OS temp dir. Each
-    /// call returns a path that no other concurrently-running test should
-    /// touch, because we mix in the process id and an atomic counter.
-    ///
-    /// We intentionally do not depend on the `tempfile` crate (per the
-    /// 0-new-external-deps rule extended from 8/27 D.5+): the test cleanup
-    /// contract is "the OS may recycle `temp_dir()` later, but the unique
-    /// subdirectory is ours alone until the process exits".
     fn unique_temp(label: &str) -> std::path::PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -96,11 +135,12 @@ mod tests {
         dir
     }
 
-    /// Lay down a minimal bare-repo layout under `dir`: just a `HEAD` file
-    /// pointing at `refs/heads/main`. Refs are populated by the test.
     fn lay_bare_with_head(dir: &Path, head_target: &str) {
-        std::fs::write(dir.join("HEAD"), format!("ref: {head_target}\n")).unwrap();
+        std::fs::write(dir.join("HEAD"), format!("ref: {head_target}
+")).unwrap();
     }
+
+
 
     #[test]
     fn read_head_returns_symbolic_target() {
@@ -109,6 +149,8 @@ mod tests {
         let got = read_head(&dir).unwrap();
         assert_eq!(got, "refs/heads/main");
     }
+
+
 
     #[test]
     fn read_head_rejects_detached() {
@@ -123,6 +165,8 @@ mod tests {
         assert!(msg.contains("HEAD is detached"), "got: {msg}");
     }
 
+
+
     #[test]
     fn read_ref_resolves_short_name() {
         let dir = unique_temp("refs-short");
@@ -132,6 +176,8 @@ mod tests {
         let got = read_ref(&dir, "main").unwrap();
         assert_eq!(got.as_deref(), Some(sha));
     }
+
+
 
     #[test]
     fn read_ref_passes_through_full_name() {
@@ -143,6 +189,8 @@ mod tests {
         assert_eq!(got.as_deref(), Some(sha));
     }
 
+
+
     #[test]
     fn read_ref_missing_returns_none() {
         let dir = unique_temp("refs-missing");
@@ -150,6 +198,8 @@ mod tests {
         let got = read_ref(&dir, "nope").unwrap();
         assert!(got.is_none());
     }
+
+
 
     #[test]
     fn write_ref_rejects_non_refs_prefix() {
@@ -159,6 +209,8 @@ mod tests {
         let msg = format!("{err}");
         assert!(msg.contains("not a ref"), "got: {msg}");
     }
+
+
 
     #[test]
     fn write_ref_creates_nested_dirs() {
@@ -170,4 +222,39 @@ mod tests {
         let got = read_ref(&dir, "refs/heads/feature/deep/nested").unwrap();
         assert_eq!(got.as_deref(), Some(sha));
     }
+
+
+
+    #[test]
+    fn list_branches_single() {
+        let dir = unique_temp("list-single");
+        lay_bare_with_head(&dir, "refs/heads/main");
+        std::fs::create_dir_all(dir.join("refs").join("heads")).unwrap();
+        std::fs::write(dir.join("refs").join("heads").join("main"), "abc123
+").unwrap();
+        let branches = list_branches(&dir).unwrap();
+        assert_eq!(branches, vec!["main"]);
+    }
+
+
+
+    #[test]
+    fn list_branches_multiple() {
+        let dir = unique_temp("list-multi");
+        lay_bare_with_head(&dir, "refs/heads/main");
+        let heads = dir.join("refs").join("heads");
+        std::fs::create_dir_all(&heads).unwrap();
+        std::fs::write(heads.join("main"), "abc123
+").unwrap();
+        std::fs::write(heads.join("develop"), "def456
+").unwrap();
+        std::fs::create_dir_all(heads.join("feature")).unwrap();
+        std::fs::write(heads.join("feature").join("xyz"), "ghi789
+").unwrap();
+        let branches = list_branches(&dir).unwrap();
+        assert_eq!(branches, vec!["develop", "feature/xyz", "main"]);
+    
+
+}
+
 }

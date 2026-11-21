@@ -1,0 +1,60 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "transform",
+  "case": "05-double-inverse",
+  "method": "COMPUTE",
+  "scenario": "math-transform-05-double-inverse",
+  "description": "数学不变量 double_inverse_is_original (transform 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/transform.rs::inverse",
+  "invariant": "double_inverse_is_original",
+  "tolerance": 1e-06,
+  "input": {
+    "t": {
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "translation": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    }
+  },
+  "expected": {
+    "double_inverse": {
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "translation": [
+        1.0,
+        2.0000000000000004,
+        3.0000000000000004
+      ]
+    },
+    "original": {
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "translation": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    }
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

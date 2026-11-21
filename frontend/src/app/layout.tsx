@@ -1,12 +1,15 @@
 /*
-@cypher schema=1 source_sha256=304bce187c7724a41622ad000cc0a51d60795ab78cab6b8dfea85ca08a8265ec
+@cypher schema=1 source_sha256=7325fc285672b5b206a34a2f85592a9608fa806c2ab481040dabab05b4d4b1e6
 MERGE (self:File {path:"frontend/src/app/layout.tsx"})
+MERGE (appMatrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
+MERGE (self)-[:IMPORTS]->(appMatrix)
 @endcypher
 */
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
+import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { Providers } from "./providers";
 import { I18nProvider } from "@/lib/i18n";
 import { Toaster } from "react-hot-toast";
@@ -97,6 +100,7 @@ export default function RootLayout({
                 fixed bottom-0 + z-[9999] 保证不被 inbox 列表等内 stacking 拦截,
                 main 区域 height: 100dvh + overflowY auto 让 list 自身滚动 */}
             <MobileBottomNav />
+            <AppMatrixDrawer />
             {/* PWA Service Worker 注册 (production only) */}
             <PwaBoot />
             {/* PWA 更新提示 toast (监听 star:pwa-updated) */}

@@ -52,7 +52,8 @@ MERGE (workItemDetailDrawer)-[:CALLS]->(useTerminalStackWs)
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { TaskCardCommand } from "@/components/board/TaskCardCommand";
+import { TaskCardCommand, type TaskCardSendTarget } from "@/components/board/TaskCardCommand";
+import { useNavStore } from "@/lib/nav/navStore";
 import { useChatStore } from "@/lib/chat/chatStore";
 import { clsx } from "clsx";
 import {
@@ -98,7 +99,8 @@ const PRIORITIES: WorkItemPriority[] = ["p0", "p1", "p2", "p3"];
 const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
 // ---- Drawer width (480px, 便于 board 仍可见) ----
-const DRAWER_W = 480;
+// per 2026-11-21 用户发令: 创建任务卡的子窗口改成大的 (480 → 760)
+const DRAWER_W = 760;
 
 export function WorkItemDetailDrawer({
   open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
@@ -264,8 +266,27 @@ export function WorkItemDetailDrawer({
   // ---- Submit handlers ----
   const titleRef = useRef<HTMLInputElement | null>(null);
   const canSave = !!draft && draft.title.trim().length > 0;
+  // per 2026-11-21 用户发令: 无法创建 → 屏幕顶端失败原因 + 完善建议链接
+  const [createFailure, setCreateFailure] = useState<{ reason: string; hint: string; link?: string } | null>(null);
   const handleCreate = () => {
-    if (!draft || !canSave || !projectId || !tenantId || !reporterId) return;
+    if (!draft || !canSave) {
+      setCreateFailure({ reason: "标题必填", hint: "填写任务卡标题后再创建。" });
+      return;
+    }
+    if (!projectId || !tenantId || !reporterId) {
+      const missing = [
+        !projectId && "项目 (先在左侧目录树选择 Project)",
+        !tenantId && "租户上下文",
+        !reporterId && "报告人身份",
+      ].filter(Boolean).join("、");
+      setCreateFailure({
+        reason: `缺少创建上下文: ${missing}`,
+        hint: "完善工作区上下文后再创建任务卡。",
+        link: "/settings",
+      });
+      return;
+    }
+    setCreateFailure(null);
     const newId = addWorkItem({
       tenant_id: tenantId,
       project_id: projectId,
@@ -278,6 +299,8 @@ export function WorkItemDetailDrawer({
       assignee_id: draft.assignee_id,
       labels: draft.labels,
       worktree_id: draft.worktree_id,
+      // per 2026-11-21: 创建即绑定当前 branch (branch 级数据隔离)
+      branch_id: useNavStore.getState().selectedBranch || null,
     });
     // 关闭后让父组件切到 view 模式显示新建的卡
     onClose();
@@ -336,7 +359,7 @@ export function WorkItemDetailDrawer({
       {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
       <div
         data-testid="work-item-drawer-panel"
-        className="relative h-[86vh] max-h-[720px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
+        className="relative h-[88vh] max-h-[860px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
         style={{ width: DRAWER_W, maxWidth: "92vw" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -367,6 +390,31 @@ export function WorkItemDetailDrawer({
             <X size={14} />
           </button>
         </div>
+
+        {/* per 2026-11-21 用户发令: 无法创建 → 弹窗顶端失败原因 + 完善建议链接 */}
+        {isNew && createFailure && (
+          <div
+            data-testid="work-item-drawer-create-failure"
+            className="shrink-0 flex items-start gap-2 border-b border-err/40 bg-err/10 px-4 py-2.5 text-xs text-err"
+            role="alert"
+          >
+            <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-err" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">无法创建任务卡: {createFailure.reason}</div>
+              <div className="mt-0.5 text-err/90">
+                {createFailure.hint}
+                {createFailure.link && (
+                  <a href={createFailure.link} className="ml-1.5 font-semibold underline underline-offset-2" data-testid="work-item-drawer-create-failure-link">
+                    完善建议 →
+                  </a>
+                )}
+              </div>
+            </div>
+            <button type="button" onClick={() => setCreateFailure(null)} className="shrink-0 text-err/70 hover:text-err" aria-label="关闭失败提示">
+              <X size={12} />
+            </button>
+          </div>
+        )}
 
         {/* === Body (scrollable) === */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
@@ -971,16 +1019,35 @@ export function WorkItemDetailDrawer({
             <TaskCardCommand
               taskId={currentWi?.id ?? ""}
               taskKey={currentWi?.key ?? ""}
-              onSubmitCommand={(cmd) => {
+              onSubmitCommand={(cmd, target: TaskCardSendTarget) => {
                 // 命令文本 append 到 CLI 终端滚动缓冲 (star-api-rest writeLine;
                 // 失败自动回退 preview, mode='error' 诚实标注 — 只加调用不重构)
                 void writeLine(cmd);
-                const topicId = useChatStore.getState().openTopicForTask(currentWi?.id ?? "", currentWi?.title ?? "");
-                useChatStore.getState().reply(topicId, "Ulysses", "human", cmd);
+                // per 2026-11-21 用户发令: 默认仅保留任务卡; 只有手动指定
+                // Worktree/Global 才写入聊天话题 (branch 级隔离: 话题 refId
+                // 带 branch 维度, 不同 branch 各自独立, 互传需显式交接)。
+                if (target === "card") return;
+                const chat = useChatStore.getState();
+                if (target === "worktree") {
+                  const branch = useNavStore.getState().selectedBranch;
+                  const refId = branch ? `${currentWi?.id ?? ""}@${branch}` : (currentWi?.id ?? "");
+                  const topicId = chat.openTopicForTask(refId, currentWi?.title ?? "");
+                  chat.setChatScope("WORKTREE");
+                  chat.reply(topicId, "Ulysses", "human", cmd);
+                } else {
+                  // Global: 复用全局会话通道; 未选会话时开一个以任务卡命名的会话
+                  const sessionId = chat.globalSessions[0]?.id ?? chat.createSession(`任务 ${currentWi?.key ?? ""} 讨论`);
+                  const topicId = chat.openTopicForSession(sessionId);
+                  chat.setChatScope("GLOBAL");
+                  chat.reply(topicId, "Ulysses", "human", `[任务卡 ${currentWi?.key ?? ""}] ${cmd}`);
+                }
               }}
               onHandoff={(target) => {
-                const topicId = useChatStore.getState().openTopicForTask(currentWi?.id ?? "", currentWi?.title ?? "");
-                useChatStore.getState().reply(topicId, "Ulysses", "human", `[交接] 任务 ${currentWi?.key} 交接给 ${target}`);
+                // 交接 = 显式跨 branch 互传通道 (per 2026-11-21: 不传时各自独立)
+                const branch = useNavStore.getState().selectedBranch;
+                const refId = branch ? `${currentWi?.id ?? ""}@${branch}` : (currentWi?.id ?? "");
+                const topicId = useChatStore.getState().openTopicForTask(refId, currentWi?.title ?? "");
+                useChatStore.getState().reply(topicId, "Ulysses", "human", `[交接] 任务 ${currentWi?.key} 交接给 ${target}${branch ? ` (branch: ${branch})` : ""}`);
               }}
             />
           </div>

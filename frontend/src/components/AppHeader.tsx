@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=2e88c6115dff3a5b345da2b4e5b9f01569047a23bb4c1ebe65bb656e4065186e
+@cypher schema=1 source_sha256=0a323eda4eda34dc215fe691de5c95e63de76ab8367f5a050f27668d11ce6498
 MERGE (self:File {path:"frontend/src/components/AppHeader.tsx"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:IMPORTS]->(guardedLink)
@@ -26,7 +26,6 @@ import { UserMenu } from "@/components/UserMenu";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
-import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 // Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
@@ -185,7 +184,6 @@ export function AppHeader() {
       </header>
 
       {/* App Matrix Modal / Drawer */}
-      <AppMatrixDrawer />
     </>
   );
 }

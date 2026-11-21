@@ -1,0 +1,44 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "vec3",
+  "case": "01-reflect",
+  "method": "COMPUTE",
+  "scenario": "math-vec3-01-reflect",
+  "description": "数学不变量 reflect_preserves_length_and_involution (vec3 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/vec3.rs::reflect",
+  "invariant": "reflect_preserves_length_and_involution",
+  "tolerance": 1e-06,
+  "input": {
+    "v": [
+      1.0,
+      -2.0,
+      3.0
+    ],
+    "n": [
+      0.0,
+      1.0,
+      0.0
+    ]
+  },
+  "expected": {
+    "reflect": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "length_v": 3.7416573867739413,
+    "length_reflect": 3.7416573867739413,
+    "double_reflect": [
+      1.0,
+      -2.0,
+      3.0
+    ],
+    "involution_error": 0.0
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "aabb",
+  "case": "02-intersection-commutative",
+  "method": "COMPUTE",
+  "scenario": "math-aabb-02-intersection-commutative",
+  "description": "数学不变量 intersection_commutative (aabb 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/aabb.rs::intersection",
+  "invariant": "intersection_commutative",
+  "tolerance": 1e-06,
+  "input": {
+    "a": {
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    "b": {
+      "min": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "max": [
+        3.0,
+        3.0,
+        3.0
+      ]
+    }
+  },
+  "expected": {
+    "a_intersect_b": {
+      "min": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    "b_intersect_a": {
+      "min": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    }
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

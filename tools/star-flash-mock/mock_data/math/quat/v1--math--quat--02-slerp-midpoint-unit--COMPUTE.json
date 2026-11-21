@@ -1,0 +1,43 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "quat",
+  "case": "02-slerp-midpoint-unit",
+  "method": "COMPUTE",
+  "scenario": "math-quat-02-slerp-midpoint-unit",
+  "description": "数学不变量 slerp_endpoints_and_unit_norm (quat 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/quat.rs::slerp",
+  "invariant": "slerp_endpoints_and_unit_norm",
+  "tolerance": 1e-06,
+  "input": {
+    "a": [
+      0.0,
+      0.0,
+      0.7071067811865476,
+      0.7071067811865476
+    ],
+    "b": [
+      0.7071067811865476,
+      0.0,
+      0.0,
+      0.7071067811865476
+    ],
+    "t_values": [
+      0.5
+    ]
+  },
+  "expected": {
+    "slerp_t0.5": [
+      0.408248290463863,
+      0.0,
+      0.408248290463863,
+      0.816496580927726
+    ],
+    "norm_t0.5": 1.0
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

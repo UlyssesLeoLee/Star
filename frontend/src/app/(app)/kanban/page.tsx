@@ -67,6 +67,7 @@ import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { KanbanFilters, applyBoardFilters, type KanbanFiltersValue } from "@/components/board/KanbanFilters";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { IdeFileWorkspace } from "@/components/ide/IdeFileWorkspace";
@@ -115,6 +116,8 @@ export default function KanbanPage() {
   const [draftWorkflow, setDraftWorkflow] = useState("");
   const [draftFile, setDraftFile] = useState("");
   const [draftPoints, setDraftPoints] = useState("3");
+  // per 2026-11-21 用户发令: 无法创建时屏幕顶端显示原因 + 完善建议链接
+  const [createFailure, setCreateFailure] = useState<{ reason: string; hint: string; link?: string } | null>(null);
   const ipaFlows = useMemo(
     () => ["ipa-s05-002 ソースコード作成", "ipa-s06-ut-005 単体試験実施"],
     [],
@@ -135,12 +138,13 @@ export default function KanbanPage() {
   // serverMode = 宿主会话 + 当前 Worktree 上下文 (navStore.selectedWorktreeId) 齐备;
   // 缺其一即退化为「本地模式」并明确标注, 不冒充服务端数据。
   const runDirectory = useRunDirectory();
-  const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
-  const [serverItems, setServerItems] = useState<UnifiedWorkItem[] | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [serverRefreshKey, setServerRefreshKey] = useState(0);
-  const serverMode = hostConnected && runDirectory.client !== null && selectedWorktreeId !== "";
-  const createDisabled = unauthorized || !hostConnected;
+    const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+    const selectedBranch = useNavStore((s) => s.selectedBranch);
+    const [serverItems, setServerItems] = useState<UnifiedWorkItem[] | null>(null);
+    const [serverError, setServerError] = useState<string | null>(null);
+    const [serverRefreshKey, setServerRefreshKey] = useState(0);
+    const serverMode = hostConnected && runDirectory.client !== null && selectedWorktreeId !== "";
+    const createDisabled = unauthorized || !hostConnected;
 
   // 每次进入页面/上下文切换都重新 fetch 服务端真源 (不依赖 persist 旧数据, per P1 刷新一致)
   useEffect(() => {
@@ -191,13 +195,28 @@ export default function KanbanPage() {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     worktree_id: item.worktreeId,
+    // per 2026-11-21: 服务端 branch 真源透传 (分支名匹配目录树 git 枚举名)
+    branch_id: item.branchName ?? item.branchId,
   });
 
   const handleCreateTaskCard = async () => {
     const title = draftTitle.trim();
-    if (!title) return;
+    if (!title) {
+      setCreateFailure({ reason: "标题为空", hint: "请先填写任务卡标题再开卡。" });
+      return;
+    }
     // 未接入/未授权: 禁止写本地 seed (per 2026-11-16, 本地 seed 不冒充正式任务)
-    if (createDisabled) return;
+    if (createDisabled) {
+      setCreateFailure({
+        reason: unauthorized ? "当前会话未授权 (401)" : "宿主会话未接入",
+        hint: unauthorized
+          ? "会话已失效 — 重新登录后再创建任务卡。"
+          : "需要宿主接入授权会话后才能创建服务端任务卡。",
+        link: "/settings",
+      });
+      return;
+    }
+    setCreateFailure(null);
     if (serverMode && runDirectory.client) {
       // 服务端真源写入: 创建挂当前 worktree (branch) — 与 Backlog/Sprint 入口同一写入路径
       try {
@@ -219,8 +238,18 @@ export default function KanbanPage() {
       } catch (error) {
         const unified = toUnifiedError(error);
         if (unified.isForbidden()) {
+          setCreateFailure({
+            reason: "越权写入被拒绝 — 当前会话没有创建任务卡的授权",
+            hint: "检查当前 Project/Lane 的成员权限, 或切换到有写权限的会话。",
+            link: "/settings",
+          });
           toast.error("越权写入被拒绝 — 当前会话没有创建任务卡的授权");
         } else {
+          setCreateFailure({
+            reason: `创建失败: ${unified.message}`,
+            hint: "检查服务端连接与 Worktree 上下文后重试; 持续失败请查看服务端日志。",
+            link: "/worktree",
+          });
           toast.error(`创建失败: ${unified.message}`);
         }
       }
@@ -243,6 +272,8 @@ export default function KanbanPage() {
         ],
         workflow_id: draftWorkflow || undefined,
         description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
+        // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据)
+        branch_id: selectedBranch || null,
       });
       setDraftTitle("");
       setDraftIpaFlow("ipa-s05-002 ソースコード作成");
@@ -251,7 +282,10 @@ export default function KanbanPage() {
       setDraftPoints("3");
       setActiveView("IPA 流程图");
     } catch {
-      /* 创建失败静默 (store 本地) */
+      setCreateFailure({
+        reason: "本地创建失败",
+        hint: "本地 store 写入异常 — 刷新页面后重试。",
+      });
     }
   };
 
@@ -326,6 +360,14 @@ export default function KanbanPage() {
     const params = new URLSearchParams(window.location.search);
     const v = params.get("view");
     if (isViewTab(v)) setActiveView(v as ViewTab);
+    // per 2026-11-21: 目录树 branch 点选深链 ?lane_id=&worktree_id=&branch=
+    // → 恢复四级树选择 (navStore 统一授权上下文), 横向导航随之过滤
+    const laneParam = params.get("lane_id");
+    const wtParam = params.get("worktree_id");
+    const branchParam = params.get("branch");
+    if (branchParam || wtParam || laneParam) {
+      useNavStore.getState().setLaneContext(laneParam ?? "", wtParam ?? "", branchParam ?? "");
+    }
     const wi = params.get("work_item");
     if (wi && useStore.getState().workItems.some((w) => w.id === wi)) {
       setDrawerMode({ kind: "view", workItemId: wi });
@@ -344,12 +386,36 @@ export default function KanbanPage() {
   const projectId = selectedProjectId || projects[0]?.id || "";
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
+  // ---- 四级工作区树上下文 (per 2026-11-21 用户发令: Project → Lane → Worktree → Branch,
+  //      选定后所有横向导航按该树形路径过滤) ----
+  const selectedLaneId = useNavStore((s) => s.selectedLaneId);
+  const lanes = useStore((s) => s.lanes);
+  const worktrees = useStore((s) => s.worktrees);
+  const selectedLane = lanes.find((l) => l.id === selectedLaneId) ?? null;
+  const selectedWorktree = worktrees.find((w) => w.id === selectedWorktreeId) ?? null;
+  // Lane 过滤: 该 Lane 名下 worktree 的任务 (+ 未绑定 worktree 的任务保持可见)
+  const laneWorktreeIds = useMemo(
+    () => new Set(worktrees.filter((w) => w.lane_id === selectedLaneId).map((w) => w.id)),
+    [worktrees, selectedLaneId],
+  );
+
   // ---- 任务看板数据 (per 2026-11-17 去重合并): 从 /projects?tab=kanban 合并进来的
   //      project 范围语义 — 选中项目时按 project_id 过滤, 未选中时保持全局旧行为。
-  const boardWorkItems = useMemo(
-    () => (selectedProjectId ? workItems.filter((w) => w.project_id === selectedProjectId) : workItems),
-    [workItems, selectedProjectId],
-  );
+  //      per 2026-11-21: 叠加 Lane / Worktree / Branch 三级过滤 (branch 隔离:
+  //      未绑定 branch 的任务全局可见, 绑定其他 branch 的任务在本 branch 不可见)。
+  const boardWorkItems = useMemo(() => {
+    let items = selectedProjectId ? workItems.filter((w) => w.project_id === selectedProjectId) : workItems;
+    if (selectedLaneId) {
+      items = items.filter((w) => !w.worktree_id || laneWorktreeIds.has(w.worktree_id));
+    }
+    if (selectedWorktreeId) {
+      items = items.filter((w) => !w.worktree_id || w.worktree_id === selectedWorktreeId);
+    }
+    if (selectedBranch) {
+      items = items.filter((w) => !w.branch_id || w.branch_id === selectedBranch);
+    }
+    return items;
+  }, [workItems, selectedProjectId, selectedLaneId, selectedWorktreeId, selectedBranch, laneWorktreeIds]);
   const filteredBoardWorkItems = useMemo(
     () => applyBoardFilters(boardWorkItems, boardFilter),
     [boardWorkItems, boardFilter],
@@ -387,34 +453,70 @@ export default function KanbanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [serverItems, projectId, project?.tenant_id],
   );
+  // per 2026-11-21: 服务端投影同样按 Branch 隔离 (服务端 branch_id 尚未下发时
+  // 全部视为未绑定 → 保持可见, 诚实不隐藏真源)
+  const branchScopedServerItems = useMemo(
+    () => selectedBranch
+      ? serverBoardItems.filter((w) => !w.branch_id || w.branch_id === selectedBranch)
+      : serverBoardItems,
+    [serverBoardItems, selectedBranch],
+  );
   const filteredServerBoardItems = useMemo(
-    () => applyBoardFilters(serverBoardItems, boardFilter),
-    [serverBoardItems, boardFilter],
+    () => applyBoardFilters(branchScopedServerItems, boardFilter),
+    [branchScopedServerItems, boardFilter],
   );
 
   return (
     <div className="flex h-full bg-bg">
       {/* ============ 主区 ============ */}
       <main className="flex-1 min-w-0 overflow-y-auto p-4 space-y-4">
-        {/* 面包屑: Project → LANE → Worktree → Branch */}
+        {/* per 2026-11-21 用户发令: 无法创建 → 屏幕顶端失败原因 + 完善建议链接 */}
+        {createFailure && (
+          <div
+            data-testid="kanban-create-failure-banner"
+            className="flex items-start gap-2 rounded-lg border border-err/50 bg-err/10 px-3 py-2.5 text-xs text-err"
+            role="alert"
+          >
+            <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-err" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">无法创建任务卡: {createFailure.reason}</div>
+              <div className="mt-0.5 text-err/90">
+                {createFailure.hint}
+                {createFailure.link && (
+                  <a href={createFailure.link} className="ml-1.5 font-semibold underline underline-offset-2" data-testid="kanban-create-failure-link">
+                    完善建议 →
+                  </a>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreateFailure(null)}
+              className="shrink-0 text-err/70 hover:text-err"
+              aria-label="关闭失败提示"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {/* 面包屑: Project → LANE → Worktree → Branch (per 2026-11-21: 真实 navStore 选择, 非静态 mock) */}
         <nav data-testid="kanban-breadcrumb" className="flex items-center gap-1.5 text-xs text-ink-dim flex-wrap">
           <button type="button" className="flex items-center gap-1 hover:text-ink">
-            <span className="font-medium">{project?.name ?? "Physis / GVPE"}</span> <ChevronDown size={12} />
+            <span className="font-medium">{project?.name ?? "未选择项目"}</span> <ChevronDown size={12} />
           </button>
           <span className="text-ink-mute">▸</span>
           <button type="button" className="flex items-center gap-1 hover:text-ink">
-            LANE · auth-refactor <ChevronDown size={12} />
+            {selectedLane ? `LANE · ${selectedLane.name}` : "LANE · 全部"} <ChevronDown size={12} />
           </button>
           <span className="text-ink-mute">▸</span>
           <button type="button" className="flex items-center gap-1 hover:text-ink">
-            wt-relation-bfs <ChevronDown size={12} />
+            {selectedWorktree?.name ?? "Worktree · 全部"} <ChevronDown size={12} />
           </button>
-          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-bg-card font-mono hover:border-line">
-            <GitBranch size={11} /> feat/relation-bfs
-          </button>
-          <button type="button" className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-bg-card font-mono hover:border-line">
-            <GitBranch size={11} /> fix/bfs-cycle
-          </button>
+          {selectedBranch && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-bg-card font-mono">
+              <GitBranch size={11} /> {selectedBranch}
+            </span>
+          )}
         </nav>
 
         {/* 视图 tabs (?view= 深链) */}
@@ -439,9 +541,15 @@ export default function KanbanPage() {
 
         {/* Branch 上下文条 (per 2026-11-15 用户发令: 不放右侧栏位, 内容进中心区域) */}
         <div data-testid="kanban-branch-context" className="flex items-center gap-2 flex-wrap text-[11px]">
-          <a href="/worktree" className="flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 font-semibold text-ok hover:bg-ok/20 transition-colors">
-            <GitBranch size={11} /> feat/relation-bfs · 干净
-          </a>
+          {selectedBranch ? (
+            <a href="/worktree" className="flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 font-semibold text-ok hover:bg-ok/20 transition-colors">
+              <GitBranch size={11} /> {selectedBranch}{selectedWorktree ? ` · ${selectedWorktree.name}` : ""}
+            </a>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full border border-line bg-bg-card px-2.5 py-1 text-ink-dim">
+              <GitBranch size={11} /> 未选择 Branch — 在左侧目录树选择 Worktree → Branch 进入隔离视图
+            </span>
+          )}
           <a href="/canvas/canvas-001" className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent hover:bg-accent/20 transition-colors">
             <PenTool size={11} /> 画布
           </a>
@@ -596,25 +704,16 @@ export default function KanbanPage() {
 
         {/* ============ 视图内容 = 原有真实功能 ============ */}
         {activeView === "Sprint" && (
-          <section data-testid="kanban-sprint-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
-            {/* per 2026-11-17 去重: SprintBoardView 收敛到 /sprint 独立模块
-                (同一组件 + 同一数据 + 同一组操作不在两处渲染), 本 tab 变为直达入口卡。
-                沿用"时间线→/analytics"入口卡模式, 不另起炉灶。 */}
-            <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-center">
-              <p className="text-xs font-semibold text-ink">Sprint 规划已收敛到 Sprint 主面板</p>
-              <p className="text-[11px] text-ink-dim">
-                Backlog 拖入 / 创建 / 启动 / 完成 / 删除 Sprint 与
-                List · Tree 视图现在统一在
-                <a
-                  href="/sprint?view=sprint"
-                  className="mx-1 font-semibold text-accent underline underline-offset-2"
-                  data-testid="kanban-sprint-open-issues"
-                >
-                  Sprint 主面板
-                </a>
-                打开 (per 2026-11-17 去重)
-              </p>
-            </div>
+          <section data-testid="kanban-sprint-view" className="flex min-h-[480px] flex-col bg-bg-card rounded-xl border border-line shadow-soft p-4">
+            {/* per 2026-11-21 用户发令: sprint 主面板合并进看板 sprint —
+                直接内嵌 SprintBoardView (同一组件/数据/写入路径), 不再跳 /sprint;
+                branch 隔离随四级树选择联动 */}
+            <SprintBoardView
+              onSelect={(id) => setDrawerMode({ kind: "view", workItemId: id })}
+              projectId={selectedProjectId || undefined}
+              worktreeId={selectedWorktreeId || undefined}
+              branch={selectedBranch || undefined}
+            />
           </section>
         )}
 

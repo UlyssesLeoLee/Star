@@ -1,0 +1,56 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "coords",
+  "case": "05-roundtrip",
+  "method": "COMPUTE",
+  "scenario": "math-coords-05-roundtrip",
+  "description": "数学不变量 client_world_roundtrip_identity (coords 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "frontend/src/lib/canvas/coords.ts::clientToWorld",
+  "invariant": "client_world_roundtrip_identity",
+  "tolerance": 1e-06,
+  "input": {
+    "rect": {
+      "left": 0,
+      "top": 0,
+      "width": 2400,
+      "height": 1600
+    },
+    "viewBox": {
+      "x": 0,
+      "y": 0,
+      "width": 1200,
+      "height": 800
+    },
+    "viewport": {
+      "x": -5,
+      "y": 7,
+      "zoom": 0.8
+    },
+    "client": {
+      "clientX": 1200,
+      "clientY": 800
+    }
+  },
+  "expected": {
+    "world": {
+      "x": 745.0,
+      "y": 507.0
+    },
+    "roundtrip_client": {
+      "clientX": 1200.0,
+      "clientY": 800.0
+    },
+    "letterbox": {
+      "s": 0.5,
+      "ox": 0.0,
+      "oy": 0.0
+    },
+    "roundtrip_error": 0.0
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

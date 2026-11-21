@@ -1,17 +1,19 @@
 "use client";
 
 /*
-@cypher schema=1 source_sha256=c82801401ea5673e2b86442dd9e065ee38164476fcc16378e14e6b2912487700
+@cypher schema=1 source_sha256=cf53c0980d8898399dd6d2db86b18ea5378036c11aeef81b47cbbab83b23923b
 MERGE (self:File {path:"frontend/src/components/nav/AppMatrixDrawer.tsx"})
 MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
 MERGE (guardedLink:Symbol {id:"frontend/src/components/navigation/GuardedLink.tsx::GuardedLink",kind:"component"})
 MERGE (self)-[:DEFINES]->(matrix)
 MERGE (self)-[:IMPORTS]->(guardedLink)
 MERGE (matrix)-[:CALLS]->(guardedLink)
+MERGE (keyboard:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::handleDialogKey",kind:"function"})
+MERGE (matrix)-[:DEFINES]->(keyboard)
 @endcypher
 */
 
-import { useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, type KeyboardEvent } from "react";
 import { ALL_MODULES, CATEGORY_STYLES, MODULE_GROUPS, SETTINGS_DOMAIN_IDS, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
 import { useNavStore, WORKTREE_INDEX_OWNED_MODULES } from "@/lib/nav/navStore";
 import {
@@ -101,17 +103,52 @@ export function AppMatrixDrawer() {
     });
   }, [query, selectedCat, t.modules]);
 
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement;
+    searchInput.current?.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  }, [isOpen]);
+
+  function handleDialogKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = event.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled]), input, a[href]");
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-bg-soft/65 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[10001] flex items-center justify-center p-4 md:p-6 bg-bg-soft/65 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) close();
       }}
     >
       <div
         data-testid="app-matrix-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.appMatrix.title}
+        onKeyDown={handleDialogKey}
         className="w-full max-w-5xl max-h-[86vh] border border-line bg-bg-card text-[var(--cel-text-primary, var(--color-text))] shadow-soft flex flex-col overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-200 relative"
       >
         {/* === Header (3渲2 战术指令台顶部) === */}
@@ -172,7 +209,7 @@ export function AppMatrixDrawer() {
               }}
               placeholder={t.appMatrix.searchPlaceholder}
               className="w-full pl-10 pr-4 py-2 text-xs border border-line bg-bg-card text-ink placeholder:text-ink-mute focus:outline-none focus:border-[var(--cel-cyan, var(--accent-DEFAULT))] shadow-soft font-mono"
-              autoFocus
+              ref={searchInput}
             />
           </div>
 
@@ -415,7 +452,7 @@ function MatrixCard({
 
       <div className="border-t border-line/60 pt-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {/* 钉选到左侧 */}
+          {/* 固定到应用快捷导航 */}
           <button
             type="button"
             onClick={onToggleSidebar}

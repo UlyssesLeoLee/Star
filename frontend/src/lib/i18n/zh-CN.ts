@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=d4fa2a63ff96515708972d3b266d5f1f47b1e72c7b540fddc220b7f0492b66db
+@cypher schema=1 source_sha256=c6b65e564192d30940427bd2721cad9e0e9d040f3722f87af2ef7af73fd6d351
 MERGE (self:File {path:"frontend/src/lib/i18n/zh-CN.ts"})
 MERGE (dictionary:File {path:"frontend/src/lib/i18n/dictionary.ts"})
 MERGE (self)-[:IMPORTS]->(dictionary)
@@ -183,6 +183,7 @@ export const zhCN: Dictionary = {
       review: "待审",
       done: "已完成",
     },
+    shortcuts: { label: "应用快捷导航", add: "添加应用" },
     quickEntries: {
       inbox: "收件箱",
       notifications: "通知",
@@ -191,21 +192,21 @@ export const zhCN: Dictionary = {
   },
   appMatrix: {
     title: "APP MATRIX // 战术功能矩阵与导航定制",
-    subtitle: "默认仅展示核心功能，按需将任何模块一键钉选至左侧纵向或顶部横向导航。",
+    subtitle: "把常用应用固定到快捷导航或顶部标签。",
     capabilities: "25+ CAPABILITIES",
     searchPlaceholder: "快速检索 25+ 业务模块、简码代码 (例: KB, SCM, WT, AUD)...",
     resetDefault: "重置默认",
     resetDefaultTitle: "恢复系统默认导航",
     done: "完成定制 (Done)",
-    pinToSidebar: "钉选到左侧导航",
-    unpinFromSidebar: "从左侧导航移除",
+    pinToSidebar: "固定到快捷导航",
+    unpinFromSidebar: "从快捷导航移除",
     indexOwnedHint: "该模块由 Project Worktree Index 承载，请从左侧项目树进入",
     pinToHeader: "钉选到顶部标签",
     unpinFromHeader: "从顶部标签移除",
     openNow: "立即打开该模块",
-    sidebarLabel: "左侧",
+    sidebarLabel: "快捷",
     headerLabel: "顶部",
-    footerPinnedSidebar: "左侧已钉选:",
+    footerPinnedSidebar: "快捷导航已固定",
     footerPinnedHeader: "顶部已钉选:",
     categories: {
       all: { label: "全部模块", tag: "ALL" },

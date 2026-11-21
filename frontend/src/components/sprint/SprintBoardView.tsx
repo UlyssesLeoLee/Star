@@ -161,8 +161,10 @@ function DroppableSprintColumn({
 // =====================================================================
 // Backlog (整个左列是 1 个 drop zone, 拖到 backlog = removeFromSprint)
 // =====================================================================
-function BacklogDropZone({ children, count }: { children: React.ReactNode; count: number }) {
+function BacklogDropZone({ children, count, onQuickAdd }: { children: React.ReactNode; count: number; onQuickAdd?: (title: string) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: "backlog", data: { type: "backlog" } });
+  // per 2026-11-21 用户发令: backlog 栏直接增加 issue, 不需要单独的 new issue 按钮
+  const [quickTitle, setQuickTitle] = useState("");
   return (
     <div
       ref={setNodeRef}
@@ -179,6 +181,35 @@ function BacklogDropZone({ children, count }: { children: React.ReactNode; count
         <h3 className="text-sm font-bold text-ink-DEFAULT">Backlog</h3>
         <span className="anime-hud-tag ml-auto">{count}</span>
       </div>
+      {onQuickAdd && (
+        <form
+          data-testid="sprint-backlog-quick-add"
+          className="mb-3 flex gap-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const t = quickTitle.trim();
+            if (!t) return;
+            onQuickAdd(t);
+            setQuickTitle("");
+          }}
+        >
+          <input
+            data-testid="sprint-backlog-quick-input"
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            placeholder="直接新增 issue, 回车创建…"
+            className="min-w-0 flex-1 rounded border border-line bg-bg-soft px-2 py-1 text-xs text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none"
+          />
+          <button
+            type="submit"
+            data-testid="sprint-backlog-quick-submit"
+            disabled={!quickTitle.trim()}
+            className="shrink-0 rounded bg-accent px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        </form>
+      )}
       <p className="text-[10px] text-ink-mute font-mono mb-3">
         拖动卡片到右侧 Sprint 加入计划
       </p>
@@ -488,11 +519,14 @@ function CompleteSprintDialog({ open, sprint, onClose, onComplete }: { open: boo
 // =====================================================================
 // 主组件
 // =====================================================================
-export function SprintBoardView({ onSelect, worktreeId, projectId }: {
+export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
   onSelect?: (id: string) => void;
   /** per 2026-11-15: Worktree 隔离 — 传入则只显示该 worktree 的任务/冲刺 */
   worktreeId?: string;
   projectId?: string;
+  /** per 2026-11-21 用户发令: branch 级隔离 — 传入则只显示该 branch 的任务;
+   *  未绑定 branch (branch_id=null) 的任务全局可见; 不传 = 不过滤 (旧行为) */
+  branch?: string;
 }) {
   const sprints = useStore((s) => s.sprints);
   const allWorkItems = useStore((s) => s.workItems);
@@ -503,9 +537,13 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
     ? allWorkItems.filter((w) => w.project_id === projectId)
     : allWorkItems;
   // per 2026-11-15: Worktree 隔离 (未传 worktreeId = 全局视图, 保持旧行为)
-  const workItems = worktreeId
+  const worktreeScoped = worktreeId
     ? scopedWorkItems.filter((w) => w.worktree_id === worktreeId)
     : scopedWorkItems;
+  // per 2026-11-21: branch 级隔离 — 选中 branch 时只显示该 branch + 未绑定的任务
+  const workItems = branch
+    ? worktreeScoped.filter((w) => !w.branch_id || w.branch_id === branch)
+    : worktreeScoped;
   const identities = useStore((s) => s.identities);
   const createSprint = useStore((s) => s.createSprint);
   const startSprint = useStore((s) => s.startSprint);
@@ -514,6 +552,9 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
   const renameSprint = useStore((s) => s.renameSprint);
   const addToSprint = useStore((s) => s.addToSprint);
   const removeFromSprint = useStore((s) => s.removeFromSprint);
+  // per 2026-11-21: backlog 内联新增 issue (同一 store 写入路径, branch 绑定当前选择)
+  const addWorkItem = useStore((s) => s.addWorkItem);
+  const projects = useStore((s) => s.projects);
 
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -599,7 +640,25 @@ export function SprintBoardView({ onSelect, worktreeId, projectId }: {
         <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
           {/* 左侧 Backlog */}
           <div className="col-span-12 lg:col-span-4">
-            <BacklogDropZone count={backlogItems.length}>
+            <BacklogDropZone
+              count={backlogItems.length}
+              onQuickAdd={(title) => {
+                // per 2026-11-21: backlog 直接新增 issue (无独立 New issue 按钮);
+                // branch 绑定当前选择 — 每个 branch 独立一套数据
+                const proj = projects.find((p) => p.id === projectId) ?? projects[0];
+                addWorkItem({
+                  tenant_id: proj?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
+                  project_id: proj?.id ?? "00000000-0000-0000-0000-000000000000",
+                  title,
+                  kind: "task",
+                  status: "todo",
+                  priority: "p2",
+                  reporter_id: proj?.owner_id ?? "usr-002",
+                  worktree_id: worktreeId,
+                  branch_id: branch ?? null,
+                });
+              }}
+            >
               {backlogItems.length === 0 ? (
                 <div className="text-center text-ink-mute italic py-6 text-xs">无 Backlog 卡片</div>
               ) : (

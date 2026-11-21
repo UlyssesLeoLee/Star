@@ -1,0 +1,72 @@
+{
+  "fixture_version": "v1",
+  "module": "math",
+  "family": "aabb",
+  "case": "03-overlaps-consistent",
+  "method": "COMPUTE",
+  "scenario": "math-aabb-03-overlaps-consistent",
+  "description": "数学不变量 overlaps_iff_intersection_nonempty (aabb 族, per 2026-11-21 数学测试扩展)",
+  "schema_ref": "crates/physis-wasm/src/gvpe_math/aabb.rs::overlaps",
+  "invariant": "overlaps_iff_intersection_nonempty",
+  "tolerance": 1e-06,
+  "input": {
+    "a": {
+      "min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    "b": {
+      "min": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "max": [
+        3.0,
+        3.0,
+        3.0
+      ]
+    },
+    "c": {
+      "min": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "max": [
+        6.0,
+        6.0,
+        6.0
+      ]
+    }
+  },
+  "expected": {
+    "overlaps_ab": true,
+    "overlaps_ac": false,
+    "intersection_ab": {
+      "min": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "max": [
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    "intersection_ac": null
+  },
+  "守门": [
+    "#5 无 secret",
+    "#11 缺标比错标",
+    "#19 Python 化累积规"
+  ]
+}

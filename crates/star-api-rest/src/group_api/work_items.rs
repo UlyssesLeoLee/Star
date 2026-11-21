@@ -288,6 +288,10 @@ struct WorkItemProjection {
     version: i32,
     lifecycle_updated_at: chrono::DateTime<chrono::Utc>,
     metadata_updated_at: chrono::DateTime<chrono::Utc>,
+    // per 2026-11-21: branch 隔离投影 — task_metadata.branch_id (服务端真源)
+    // + 当前 revision 名 (scm.cloud_branch_revision); 未绑定 branch 的任务两者皆 NULL
+    branch_id: Option<Uuid>,
+    branch_name: Option<String>,
 }
 
 pub(super) fn router() -> Router<GroupApiState> {
@@ -397,11 +401,14 @@ async fn list_work_items(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
                m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
-               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
+               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at,
+               m.branch_id, br.name AS branch_name
         FROM multica.work_item_worktree l
         JOIN multica.task_metadata m
           ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
          AND m.project_id = l.project_id AND m.valid_to IS NULL
+        LEFT JOIN scm.cloud_branch_revision br
+          ON br.tenant_id = m.tenant_id AND br.branch_id = m.branch_id AND br.valid_to IS NULL
         JOIN multica.engineering_run_worktree_binding run_binding
           ON run_binding.tenant_id = l.tenant_id AND run_binding.project_id = l.project_id
          AND run_binding.worktree_id = l.worktree_id AND run_binding.valid_to IS NULL
@@ -475,10 +482,13 @@ async fn list_run_work_items(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
                m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
-               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
+               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at,
+               m.branch_id, br.name AS branch_name
         FROM multica.task_metadata m
         JOIN multica.task_lifecycle_current c
           ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
+        LEFT JOIN scm.cloud_branch_revision br
+          ON br.tenant_id = m.tenant_id AND br.branch_id = m.branch_id AND br.valid_to IS NULL
         WHERE m.tenant_id = $1 AND m.project_id = $2 AND m.engineering_run_id = $3
           AND m.valid_to IS NULL AND ($4::UUID IS NULL OR m.work_item_id < $4)
         ORDER BY m.work_item_id DESC
@@ -1092,11 +1102,14 @@ pub(super) async fn load_work_item(
         r#"
         SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
                m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
-               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at
+               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at,
+               m.branch_id, br.name AS branch_name
         FROM multica.work_item_worktree l
         JOIN multica.task_metadata m
           ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
          AND m.project_id = l.project_id AND m.valid_to IS NULL
+        LEFT JOIN scm.cloud_branch_revision br
+          ON br.tenant_id = m.tenant_id AND br.branch_id = m.branch_id AND br.valid_to IS NULL
          JOIN multica.engineering_run_worktree_binding run_binding
           ON run_binding.tenant_id = l.tenant_id AND run_binding.project_id = l.project_id
          AND run_binding.worktree_id = l.worktree_id AND run_binding.valid_to IS NULL
@@ -1301,6 +1314,9 @@ fn project_work_item(row: WorkItemProjection) -> Value {
             "updated_at": row.lifecycle_updated_at,
         },
         "metadata_updated_at": row.metadata_updated_at,
+        // per 2026-11-21: branch 隔离 — 服务端真源下发 branch_id + 当前分支名
+        "branch_id": row.branch_id,
+        "branch_name": row.branch_name,
     })
 }
 

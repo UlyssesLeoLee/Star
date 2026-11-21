@@ -850,3 +850,449 @@ proptest! {
         prop_assert!((qqinv.w - 1.0).abs() < 1e-5, "q·q⁻¹.w={}", qqinv.w);
     }
 }
+
+// ============================================================================
+// 数学测试扩展 (2026-11-21, per "完善自动测试脚本和mock项目，加入数学测试的内容")
+//
+// 在既有 4 类 proptest 之上补齐以下不变量族：
+//   5. 反射 (Vec3::reflect): 保长 / 对合 / 法向分量翻转 / 切向分量不变
+//   6. 球面插值 (Quat::slerp): 端点 / 单位性 / 短弧 / 近同退化 nlerp
+//   7. 旋转保内积 / 保叉积 (SO(3) 群作用)
+//   8. 欧拉角往返 (非万向锁域)
+//   9. 矩阵代数: 转置 / 结合律 / 逆的定义式
+//  10. Transform 群: 复合 / 逆往返
+//  11. AABB 代数: 交集幂等 / 交换 / 与 overlaps 一致性
+//  12. 拉格朗日恒等式 |a×b|² = |a|²|b|² − (a·b)²
+//
+// 设计原则与上文一致: 仅追加、不改 src; prop_assume! 跳过退化输入;
+// 显式浮点容差, 不依赖 assert_eq!。
+// ============================================================================
+
+// ---- Category 5: 反射不变量 (示例测试) ----
+
+/// 反射保长: |reflect(v, n)| = |v| (n 为单位向量)。
+#[test]
+fn reflect_preserves_length_examples() {
+    let cases = [
+        (Vec3::new(1.0, -2.0, 3.0), Vec3::new(0.0, 1.0, 0.0)),
+        (Vec3::new(3.0, 4.0, 0.0), Vec3::new(1.0, 0.0, 0.0)),
+        (
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0).normalize(),
+        ),
+    ];
+    for (v, n) in cases {
+        let r = v.reflect(n);
+        assert!(
+            (r.length() - v.length()).abs() < 1e-5,
+            "反射应保长: |r|={} |v|={}",
+            r.length(),
+            v.length()
+        );
+    }
+}
+
+/// 反射对合: reflect(reflect(v, n), n) = v。
+#[test]
+fn reflect_is_involution() {
+    let v = Vec3::new(2.0, -3.0, 5.0);
+    let n = Vec3::new(0.0, 0.0, 1.0);
+    let back = v.reflect(n).reflect(n);
+    assert!((back - v).length() < 1e-5, "两次反射应还原: {:?}", back);
+}
+
+/// 法向入射反弹: v = -n 时 reflect = +n (垂直撞墙原路弹回)。
+#[test]
+fn reflect_head_on_reverses() {
+    let n = Vec3::new(0.0, 1.0, 0.0);
+    let r = (-n).reflect(n);
+    assert!((r - n).length() < 1e-6, "垂直入射应原路反弹: {:?}", r);
+}
+
+/// 切向入射不变: v ⊥ n 时 reflect(v, n) = v (擦墙而过不改变方向)。
+#[test]
+fn reflect_tangential_unchanged() {
+    let n = Vec3::new(0.0, 1.0, 0.0);
+    let v = Vec3::new(3.0, 0.0, -4.0);
+    let r = v.reflect(n);
+    assert!((r - v).length() < 1e-6, "切向分量不应改变: {:?}", r);
+}
+
+// ---- Category 6: slerp (示例测试) ----
+
+/// slerp 端点: t=0 → a, t=1 → b。
+#[test]
+fn slerp_endpoints() {
+    let a = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.3);
+    let b = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 1.2);
+    let s0 = Quat::slerp(a, b, 0.0);
+    let s1 = Quat::slerp(a, b, 1.0);
+    assert!((s0.x - a.x).abs() < 1e-6 && (s0.w - a.w).abs() < 1e-6);
+    assert!((s1.x - b.x).abs() < 1e-6 && (s1.w - b.w).abs() < 1e-6);
+}
+
+/// slerp 中点 = 半角旋转 (同轴时球面插值退化为角度线性插值)。
+#[test]
+fn slerp_midpoint_same_axis_is_half_angle() {
+    let axis = Vec3::new(0.0, 0.0, 1.0);
+    let a = Quat::from_axis_angle(axis, 0.0);
+    let b = Quat::from_axis_angle(axis, 1.0);
+    let mid = Quat::slerp(a, b, 0.5);
+    let expect = Quat::from_axis_angle(axis, 0.5);
+    let diff = (mid.x - expect.x).abs()
+        + (mid.y - expect.y).abs()
+        + (mid.z - expect.z).abs()
+        + (mid.w - expect.w).abs();
+    assert!(diff < 1e-5, "同轴 slerp 中点应为半角: diff={}", diff);
+}
+
+/// 短弧: b 与 -b 表示同一旋转, slerp(a, b) 与 slerp(a, -b) 结果一致 (至多差整体符号)。
+#[test]
+fn slerp_short_arc_sign_invariant() {
+    let a = Quat::from_axis_angle(Vec3::new(1.0, 0.0, 0.0), 0.2);
+    let b = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 2.5);
+    let nb = Quat::new(-b.x, -b.y, -b.z, -b.w);
+    let s1 = Quat::slerp(a, b, 0.4);
+    let s2 = Quat::slerp(a, nb, 0.4);
+    let same = (s1.x - s2.x).abs()
+        + (s1.y - s2.y).abs()
+        + (s1.z - s2.z).abs()
+        + (s1.w - s2.w).abs();
+    let flipped = (s1.x + s2.x).abs()
+        + (s1.y + s2.y).abs()
+        + (s1.z + s2.z).abs()
+        + (s1.w + s2.w).abs();
+    assert!(same.min(flipped) < 1e-5, "短弧选择应消除符号歧义");
+}
+
+/// 近同四元数 (dot > 0.9995) 走 nlerp 退化分支仍产出单位四元数。
+#[test]
+fn slerp_near_identical_stays_unit() {
+    let a = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.5);
+    let b = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.5001);
+    for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
+        let s = Quat::slerp(a, b, t);
+        assert!(
+            (s.length_squared() - 1.0).abs() < 1e-5,
+            "nlerp 分支应归一化: t={} |s|²={}",
+            t,
+            s.length_squared()
+        );
+    }
+}
+
+// ---- Category 7: 欧拉角往返 / Transform 复合 (示例测试) ----
+
+/// 欧拉角往返 (远离万向锁): to_euler(from_euler(ypr)) ≈ ypr。
+#[test]
+fn euler_ypr_roundtrip_non_gimbal() {
+    let cases = [
+        [0.3_f32, 0.2, -0.4],
+        [-0.7, 0.5, 0.9],
+        [1.2, -0.3, 0.1],
+        [0.0, 0.0, 0.0],
+    ];
+    for [y, p, r] in cases {
+        let q = Quat::from_euler_ypr(y, p, r);
+        let [y2, p2, r2] = q.to_euler_ypr();
+        assert!(
+            (y - y2).abs() < 1e-4 && (p - p2).abs() < 1e-4 && (r - r2).abs() < 1e-4,
+            "欧拉往返漂移: in=({y},{p},{r}) out=({y2},{p2},{r2})"
+        );
+    }
+}
+
+/// Transform 复合语义: 先旋转后平移, 与手动 q.rotate(v)+t 一致。
+#[test]
+fn transform_compose_matches_manual() {
+    let q = Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), 0.7);
+    let t = Vec3::new(10.0, -5.0, 3.0);
+    let tr = Transform::new(t, q);
+    let v = Vec3::new(1.0, 2.0, -3.0);
+    let got = tr.transform_vec3(v);
+    let expect = q.rotate_vec3(v) + t;
+    assert!((got - expect).length() < 1e-5);
+}
+
+/// Transform 逆往返: T⁻¹(T(v)) = v (平移+旋转联合)。
+#[test]
+fn transform_inverse_roundtrip_with_translation() {
+    let tr = Transform::new(
+        Vec3::new(100.0, -200.0, 50.0),
+        Quat::from_euler_ypr(0.8, -0.4, 1.1),
+    );
+    let v = Vec3::new(-7.0, 3.0, 12.0);
+    let back = tr.inverse().transform_vec3(tr.transform_vec3(v));
+    assert!((back - v).length() < 1e-3, "逆往返漂移: {:?}", back);
+}
+
+// ---- Category 8: AABB 代数 (示例测试) ----
+
+/// 交集幂等: (A∩B)∩B = A∩B。
+#[test]
+fn aabb_intersection_idempotent() {
+    let a = Aabb::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 10.0, 10.0));
+    let b = Aabb::new(Vec3::new(5.0, 5.0, 5.0), Vec3::new(15.0, 15.0, 15.0));
+    let ab = a.intersection(b).expect("应相交");
+    let abb = ab.intersection(b).expect("交集再交仍应存在");
+    assert_eq!(ab.min, abb.min);
+    assert_eq!(ab.max, abb.max);
+}
+
+/// 交集交换律: A∩B = B∩A。
+#[test]
+fn aabb_intersection_commutative() {
+    let a = Aabb::new(Vec3::new(-1.0, 2.0, 0.0), Vec3::new(4.0, 8.0, 6.0));
+    let b = Aabb::new(Vec3::new(2.0, -3.0, 1.0), Vec3::new(9.0, 5.0, 7.0));
+    let ab = a.intersection(b).unwrap();
+    let ba = b.intersection(a).unwrap();
+    assert_eq!(ab.min, ba.min);
+    assert_eq!(ab.max, ba.max);
+}
+
+/// 边界相切语义: 面相切时 intersection 返回零体积 Some (与 overlaps=true 一致)。
+#[test]
+fn aabb_touching_face_zero_volume_some() {
+    let a = Aabb::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 1.0, 1.0));
+    let b = Aabb::new(Vec3::new(1.0, 0.0, 0.0), Vec3::new(2.0, 1.0, 1.0));
+    assert!(a.overlaps(b), "面相切 overlaps 应为 true");
+    let inter = a.intersection(b).expect("相切应返回零体积 AABB");
+    assert_eq!(inter.half_extents().x, 0.0);
+}
+
+/// merged 包含双方: merge(A,B) 包含 A、B 的所有角点。
+#[test]
+fn aabb_merged_contains_both() {
+    let a = Aabb::new(Vec3::new(-5.0, 0.0, 1.0), Vec3::new(-1.0, 2.0, 3.0));
+    let b = Aabb::new(Vec3::new(2.0, -4.0, 0.0), Vec3::new(6.0, 1.0, 9.0));
+    let m = a.merged(b);
+    for corner in [a.min, a.max, b.min, b.max] {
+        assert!(m.contains(corner), "merged 应包含角点 {:?}", corner);
+    }
+}
+
+proptest! {
+    // ---- Category 5 (属性): 反射 ----
+
+    /// 反射保长 (属性版, 任意单位法向)。
+    #[test]
+    fn reflect_preserves_length(
+        vx in -100.0_f32..100.0, vy in -100.0_f32..100.0, vz in -100.0_f32..100.0,
+        nx in -1.0_f32..1.0, ny in -1.0_f32..1.0, nz in -1.0_f32..1.0,
+    ) {
+        let n_raw = Vec3::new(nx, ny, nz);
+        prop_assume!(n_raw.length_squared() > 1e-6);
+        let n = n_raw.normalize();
+        let v = Vec3::new(vx, vy, vz);
+        let r = v.reflect(n);
+        prop_assert!(
+            (r.length() - v.length()).abs() < 1e-3,
+            "反射保长失败: |r|={} |v|={}", r.length(), v.length()
+        );
+    }
+
+    /// 反射对合 (属性版)。
+    #[test]
+    fn reflect_involution(
+        vx in -100.0_f32..100.0, vy in -100.0_f32..100.0, vz in -100.0_f32..100.0,
+        nx in -1.0_f32..1.0, ny in -1.0_f32..1.0, nz in -1.0_f32..1.0,
+    ) {
+        let n_raw = Vec3::new(nx, ny, nz);
+        prop_assume!(n_raw.length_squared() > 1e-6);
+        let n = n_raw.normalize();
+        let v = Vec3::new(vx, vy, vz);
+        let back = v.reflect(n).reflect(n);
+        let diff = (back - v).length();
+        prop_assert!(diff < 1e-3, "反射对合失败: diff={}", diff);
+    }
+
+    /// 法向分量翻转、切向分量不变: reflect(v,n)·n = -(v·n)。
+    #[test]
+    fn reflect_flips_normal_component(
+        vx in -100.0_f32..100.0, vy in -100.0_f32..100.0, vz in -100.0_f32..100.0,
+        nx in -1.0_f32..1.0, ny in -1.0_f32..1.0, nz in -1.0_f32..1.0,
+    ) {
+        let n_raw = Vec3::new(nx, ny, nz);
+        prop_assume!(n_raw.length_squared() > 1e-6);
+        let n = n_raw.normalize();
+        let v = Vec3::new(vx, vy, vz);
+        let r = v.reflect(n);
+        prop_assert!(
+            (r.dot(n) + v.dot(n)).abs() < 1e-3,
+            "法向分量应翻转: r·n={} v·n={}", r.dot(n), v.dot(n)
+        );
+    }
+
+    // ---- Category 6 (属性): slerp ----
+
+    /// slerp 全程单位性 (任意单位四元数对, t ∈ [0,1])。
+    #[test]
+    fn slerp_stays_unit(
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        ta in -std::f32::consts::PI..std::f32::consts::PI,
+        bx in -1.0_f32..1.0, by in -1.0_f32..1.0, bz in -1.0_f32..1.0,
+        tb in -std::f32::consts::PI..std::f32::consts::PI,
+        t in 0.0_f32..1.0,
+    ) {
+        let a_axis = Vec3::new(ax, ay, az);
+        let b_axis = Vec3::new(bx, by, bz);
+        prop_assume!(a_axis.length_squared() > 1e-6 && b_axis.length_squared() > 1e-6);
+        let a = Quat::from_axis_angle(a_axis.normalize(), ta);
+        let b = Quat::from_axis_angle(b_axis.normalize(), tb);
+        let s = Quat::slerp(a, b, t);
+        prop_assert!(
+            (s.length_squared() - 1.0).abs() < 1e-4,
+            "slerp 应保单位性: t={} |s|²={}", t, s.length_squared()
+        );
+    }
+
+    // ---- Category 7 (属性): 旋转保内积 / 保叉积 ----
+
+    /// 旋转保内积: (Rv)·(Rw) = v·w (SO(3) 正交性)。
+    #[test]
+    fn rotation_preserves_dot(
+        vx in -50.0_f32..50.0, vy in -50.0_f32..50.0, vz in -50.0_f32..50.0,
+        wx in -50.0_f32..50.0, wy in -50.0_f32..50.0, wz in -50.0_f32..50.0,
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
+    ) {
+        let axis = Vec3::new(ax, ay, az);
+        prop_assume!(axis.length_squared() > 1e-6);
+        let q = Quat::from_axis_angle(axis.normalize(), angle);
+        let v = Vec3::new(vx, vy, vz);
+        let w = Vec3::new(wx, wy, wz);
+        let lhs = q.rotate_vec3(v).dot(q.rotate_vec3(w));
+        let rhs = v.dot(w);
+        // |v|,|w| ≤ 86.6, 内积 ≤ 7500, f32 相对误差 ~1e-7 → 绝对容差 1e-2
+        prop_assert!((lhs - rhs).abs() < 1e-2, "旋转应保内积: {} vs {}", lhs, rhs);
+    }
+
+    /// 旋转保叉积: R(v×w) = (Rv)×(Rw) (真旋转, det=+1)。
+    #[test]
+    fn rotation_preserves_cross(
+        vx in -50.0_f32..50.0, vy in -50.0_f32..50.0, vz in -50.0_f32..50.0,
+        wx in -50.0_f32..50.0, wy in -50.0_f32..50.0, wz in -50.0_f32..50.0,
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
+    ) {
+        let axis = Vec3::new(ax, ay, az);
+        prop_assume!(axis.length_squared() > 1e-6);
+        let q = Quat::from_axis_angle(axis.normalize(), angle);
+        let v = Vec3::new(vx, vy, vz);
+        let w = Vec3::new(wx, wy, wz);
+        let lhs = q.rotate_vec3(v.cross(w));
+        let rhs = q.rotate_vec3(v).cross(q.rotate_vec3(w));
+        // 叉积分量量级 ≤ 7500, 容差放宽到 1e-1
+        prop_assert!(
+            (lhs - rhs).length() < 1e-1,
+            "旋转应保叉积: lhs={:?} rhs={:?}", lhs, rhs
+        );
+    }
+
+    /// 拉格朗日恒等式: |a×b|² = |a|²|b|² − (a·b)²。
+    #[test]
+    fn lagrange_identity(
+        ax in -50.0_f32..50.0, ay in -50.0_f32..50.0, az in -50.0_f32..50.0,
+        bx in -50.0_f32..50.0, by in -50.0_f32..50.0, bz in -50.0_f32..50.0,
+    ) {
+        let a = Vec3::new(ax, ay, az);
+        let b = Vec3::new(bx, by, bz);
+        let lhs = a.cross(b).length_squared();
+        let rhs = a.length_squared() * b.length_squared() - a.dot(b).powi(2);
+        // 两侧量级可达 ~5.6e7, f32  catastrophic cancellation 风险 → 相对容差
+        let scale = lhs.abs().max(rhs.abs()).max(1.0);
+        prop_assert!(
+            (lhs - rhs).abs() < scale * 1e-4,
+            "拉格朗日恒等式失败: lhs={} rhs={}", lhs, rhs
+        );
+    }
+
+    // ---- Category 9 (属性): 矩阵代数 ----
+
+    /// 矩阵乘法结合律: (A·B)·v = A·(B·v)。
+    #[test]
+    fn mat3_mul_associative_on_vec(
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        ta in -std::f32::consts::PI..std::f32::consts::PI,
+        bx in -1.0_f32..1.0, by in -1.0_f32..1.0, bz in -1.0_f32..1.0,
+        tb in -std::f32::consts::PI..std::f32::consts::PI,
+        vx in -50.0_f32..50.0, vy in -50.0_f32..50.0, vz in -50.0_f32..50.0,
+    ) {
+        let a_axis = Vec3::new(ax, ay, az);
+        let b_axis = Vec3::new(bx, by, bz);
+        prop_assume!(a_axis.length_squared() > 1e-6 && b_axis.length_squared() > 1e-6);
+        let a = Mat3::from_quat(Quat::from_axis_angle(a_axis.normalize(), ta));
+        let b = Mat3::from_quat(Quat::from_axis_angle(b_axis.normalize(), tb));
+        let v = Vec3::new(vx, vy, vz);
+        let lhs = a.mul_mat3(b).mul_vec3(v);
+        let rhs = a.mul_vec3(b.mul_vec3(v));
+        prop_assert!(
+            (lhs - rhs).length() < 1e-2,
+            "矩阵结合律失败: lhs={:?} rhs={:?}", lhs, rhs
+        );
+    }
+
+    /// 逆的定义式: A⁻¹·(A·v) = v (旋转矩阵必可逆)。
+    #[test]
+    fn mat3_inverse_definition(
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
+        vx in -50.0_f32..50.0, vy in -50.0_f32..50.0, vz in -50.0_f32..50.0,
+    ) {
+        let axis = Vec3::new(ax, ay, az);
+        prop_assume!(axis.length_squared() > 1e-6);
+        let m = Mat3::from_quat(Quat::from_axis_angle(axis.normalize(), angle));
+        let inv = m.inverse().expect("旋转矩阵必可逆");
+        let v = Vec3::new(vx, vy, vz);
+        let back = inv.mul_vec3(m.mul_vec3(v));
+        prop_assert!(
+            (back - v).length() < 1e-2,
+            "逆定义式失败: back={:?} v={:?}", back, v
+        );
+    }
+
+    // ---- Category 10 (属性): Transform 群 ----
+
+    /// Transform 逆往返 (属性版, 任意平移+旋转)。
+    #[test]
+    fn transform_inverse_roundtrip_prop(
+        tx in -100.0_f32..100.0, ty in -100.0_f32..100.0, tz in -100.0_f32..100.0,
+        ax in -1.0_f32..1.0, ay in -1.0_f32..1.0, az in -1.0_f32..1.0,
+        angle in -std::f32::consts::PI..std::f32::consts::PI,
+        vx in -50.0_f32..50.0, vy in -50.0_f32..50.0, vz in -50.0_f32..50.0,
+    ) {
+        let axis = Vec3::new(ax, ay, az);
+        prop_assume!(axis.length_squared() > 1e-6);
+        let tr = Transform::new(
+            Vec3::new(tx, ty, tz),
+            Quat::from_axis_angle(axis.normalize(), angle),
+        );
+        let v = Vec3::new(vx, vy, vz);
+        let back = tr.inverse().transform_vec3(tr.transform_vec3(v));
+        prop_assert!(
+            (back - v).length() < 1e-2,
+            "Transform 逆往返失败: back={:?} v={:?}", back, v
+        );
+    }
+
+    // ---- Category 11 (属性): AABB 与 overlaps 一致性 ----
+
+    /// intersection 返回 None 当且仅当 overlaps 为 false。
+    #[test]
+    fn aabb_intersection_iff_overlaps(
+        aminx in -50.0_f32..50.0, aminy in -50.0_f32..50.0, aminz in -50.0_f32..50.0,
+        asx in 0.1_f32..50.0, asy in 0.1_f32..50.0, asz in 0.1_f32..50.0,
+        bminx in -50.0_f32..50.0, bminy in -50.0_f32..50.0, bminz in -50.0_f32..50.0,
+        bsx in 0.1_f32..50.0, bsy in 0.1_f32..50.0, bsz in 0.1_f32..50.0,
+    ) {
+        let a = Aabb::new(
+            Vec3::new(aminx, aminy, aminz),
+            Vec3::new(aminx + asx, aminy + asy, aminz + asz),
+        );
+        let b = Aabb::new(
+            Vec3::new(bminx, bminy, bminz),
+            Vec3::new(bminx + bsx, bminy + bsy, bminz + bsz),
+        );
+        prop_assert_eq!(a.intersection(b).is_some(), a.overlaps(b));
+    }
+}

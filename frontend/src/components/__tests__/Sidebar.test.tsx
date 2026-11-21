@@ -1,150 +1,141 @@
 /*
-@cypher schema=1 source_sha256=1446030f59650acfa7a15d4701fb667fe583d80838fb46724fcb1c7ebe4372e5
+@cypher schema=1 source_sha256=c00764d97600ea1e481df18a4fbf502d44a24da1fa529b8956243e8a8f3c732e
 MERGE (self:File {path:"frontend/src/components/__tests__/Sidebar.test.tsx"})
 MERGE (sidebar:Symbol {id:"frontend/src/components/Sidebar.tsx::Sidebar",kind:"component"})
-MERGE (suite:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::Sidebar Project-first navigation",kind:"suite"})
-MERGE (primaryTest:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::keeps Project hierarchy primary and secondary routes reachable",kind:"test"})
-MERGE (foldTest:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::keeps fold control available and removes static success indicator",kind:"test"})
-MERGE (projectTabsTest:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::shows Project workspace views without switching navigation scope",kind:"test"})
+MERGE (matrix:Symbol {id:"frontend/src/components/nav/AppMatrixDrawer.tsx::AppMatrixDrawer",kind:"component"})
+MERGE (projectViews:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::keeps the directory mounted and the filter shared between views",kind:"test"})
+MERGE (hover:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::opens the shortcuts on hover and keeps them outside the Project panels",kind:"test"})
+MERGE (pin:Symbol {id:"frontend/src/components/__tests__/Sidebar.test.tsx::pins a module from the shared picker and removes it from the shortcut list",kind:"test"})
 MERGE (self)-[:IMPORTS]->(sidebar)
-MERGE (self)-[:DEFINES]->(suite)
-MERGE (suite)-[:DEFINES]->(primaryTest)
-MERGE (suite)-[:DEFINES]->(foldTest)
-MERGE (suite)-[:DEFINES]->(projectTabsTest)
-MERGE (primaryTest)-[:TESTS]->(sidebar)
-MERGE (foldTest)-[:TESTS]->(sidebar)
-MERGE (projectTabsTest)-[:TESTS]->(sidebar)
+MERGE (self)-[:IMPORTS]->(matrix)
+MERGE (self)-[:DEFINES]->(projectViews)
+MERGE (self)-[:DEFINES]->(hover)
+MERGE (self)-[:DEFINES]->(pin)
+MERGE (projectViews)-[:TESTS]->(sidebar)
+MERGE (hover)-[:TESTS]->(sidebar)
+MERGE (pin)-[:TESTS]->(sidebar)
+MERGE (pin)-[:TESTS]->(matrix)
 @endcypher
 */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import type { ReactNode } from "react";
-
-const mockUsePathname = vi.fn(() => "/inbox");
-const mockUseSearchParams = vi.fn(() => new URLSearchParams(""));
-vi.mock("next/navigation", () => ({
-  usePathname: () => mockUsePathname(),
-  useSearchParams: () => mockUseSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-}));
-
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { Sidebar } from "../Sidebar";
+import { AppMatrixDrawer } from "../nav/AppMatrixDrawer";
 import { useNavStore } from "@/lib/nav/navStore";
 import { I18nProvider } from "@/lib/i18n";
 
-function renderWithI18n(ui: ReactNode) {
-  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/inbox",
+  useSearchParams: () => new URLSearchParams(""),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
+function renderSidebar() {
+  return render(
+    <I18nProvider initialLanguage="zh-CN">
+      <Sidebar />
+      <AppMatrixDrawer />
+    </I18nProvider>,
+  );
 }
 
-function resetNavStore() {
-  useNavStore.setState({
-    sidebarItemIds: [],
-    pinnedViewIds: [],
-    headerTabIds: ["kanban", "canvas", "nema", "sandbox", "prototype"],
-    sidebarFold: "expanded",
-    sidebarScope: "main",
-    selectedProjectId: "",
-    selectedLaneId: "",
-    selectedWorktreeId: "",
-    selectedBranch: "",
-    sidebarTab: "directory",
-    taskStatusFilter: "all",
-    isMatrixOpen: false,
-  });
-}
-
-describe("Sidebar Project-first navigation", () => {
+describe("Sidebar Project navigation", () => {
   beforeEach(() => {
-    cleanup();
-    mockUsePathname.mockReturnValue("/inbox");
-    mockUseSearchParams.mockReturnValue(new URLSearchParams(""));
-    resetNavStore();
     window.localStorage.clear();
+    useNavStore.setState({
+      sidebarItemIds: [],
+      sidebarFold: "expanded",
+      sidebarTab: "directory",
+      taskStatusFilter: "all",
+      isMatrixOpen: false,
+    });
   });
 
-  afterEach(() => {
-    resetNavStore();
+  afterEach(cleanup);
+
+  it("keeps the directory mounted and the filter shared between views", () => {
+    renderSidebar();
+
+    const tree = screen.getByTestId("project-run-directory");
+    const directory = screen.getByTestId("sidebar-directory-panel");
+    const directoryTab = screen.getByTestId("sidebar-tab-directory");
+    const updates = screen.getByTestId("sidebar-ai-updates-panel");
+    const blocked = screen.getByTestId("sidebar-status-blocked");
+    expect(directory).toBeVisible();
+    expect(screen.getByTestId("sidebar-brand")).toHaveAttribute("href", "/worktree");
+
+    fireEvent.click(blocked);
+    fireEvent.keyDown(directoryTab, { key: "ArrowRight" });
+    expect(updates).toBeVisible();
+    expect(directory).not.toBeVisible();
+    expect(screen.getByTestId("sidebar-tab-ai-updates")).toHaveFocus();
+    expect(blocked).toBeVisible();
+    expect(blocked).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByTestId("sidebar-status-review"));
+    fireEvent.click(directoryTab);
+    expect(screen.getByTestId("project-run-directory")).toBe(tree);
+    expect(directory).toBeVisible();
+    expect(screen.getByTestId("sidebar-status-review")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("renders reference UI sidebar: LANE 树 + 底部全局组 (收件箱/Agent中心/分析), 无其他组", () => {
-      renderWithI18n(<Sidebar />);
+  it("opens the shortcuts on hover and keeps them outside the Project panels", () => {
+    useNavStore.setState({ sidebarItemIds: ["scm"] });
+    renderSidebar();
 
-      const sidebar = screen.getByTestId("app-sidebar");
-      expect(sidebar).toHaveAttribute("data-nav-model", "project-run");
-      expect(sidebar).toHaveAttribute("data-fold", "expanded");
-      // tabpanel with testid exists
-      expect(screen.getByTestId("sidebar-directory-panel")).toBeInTheDocument();
-      expect(screen.getByTestId("sidebar-brand")).toHaveAttribute("href", "/worktree");
-      // per 2026-11-14 用户发令: 恢复 LANE 层级树 (无宿主时降级为可达演示目录)
-      expect(screen.getByTestId("project-run-directory")).toBeInTheDocument();
-      expect(screen.getByTestId("project-run-directory-fallback")).toBeInTheDocument();
-      // per 2026-11-14 artifact 参考 UI: 侧栏只保留 项目列表 + 全局组;
-      // Branch 功能 tabs 在顶栏, 项目/视图/管理/其他入口全部收敛 (App Matrix + 用户菜单)
-      expect(screen.queryByTestId("sidebar-group-home-core")).toBeNull();
-      expect(screen.queryByTestId("sidebar-group-project")).toBeNull();
-      expect(screen.queryByTestId("sidebar-group-view")).toBeNull();
-      expect(screen.queryByTestId("sidebar-group-admin")).toBeNull();
-      expect(screen.queryByTestId("sidebar-other-entries")).toBeNull();
+    const trigger = screen.getByTestId("sidebar-shortcuts-trigger");
+    const panel = screen.getByTestId("sidebar-shortcuts-panel");
+    expect(panel).not.toBeVisible();
+    fireEvent.pointerOver(trigger, { pointerType: "mouse" });
+    expect(panel).toBeVisible();
+    expect(within(panel).getByTestId("sidebar-item-scm")).toBeVisible();
+    expect(within(panel).getByTestId("sidebar-item-inbox")).toHaveAttribute("aria-current", "page");
+    expect(within(panel).getByTestId("sidebar-item-agents")).not.toHaveAttribute("aria-current");
 
-      // 全局组: 收件箱/Agent 中心/分析 (per artifact 左栏底部 全局)
-      const globalGroup = screen.getByTestId("sidebar-group-global");
-      expect(within(globalGroup).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
-      expect(within(globalGroup).getByTestId("sidebar-item-agents")).toBeInTheDocument();
-      expect(within(globalGroup).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
-    });
+    fireEvent.pointerOut(trigger, { relatedTarget: panel, pointerType: "mouse" });
+    expect(panel).toBeVisible();
+    expect(within(screen.getByTestId("sidebar-directory-panel")).queryByTestId("sidebar-item-scm")).toBeNull();
+    expect(within(screen.getByTestId("sidebar-bottom-fixed")).queryByTestId("sidebar-item-inbox")).toBeNull();
+    fireEvent.pointerOut(panel, { relatedTarget: document.body, pointerType: "mouse" });
+    expect(panel).not.toBeVisible();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
 
-  it("keeps the fold control available and removes the static success indicator", () => {
-      renderWithI18n(<Sidebar />);
+  it("pins a module from the shared picker and removes it from the shortcut list", () => {
+    renderSidebar();
 
-      const sidebar = screen.getByTestId("app-sidebar");
-      expect(sidebar.className).toMatch(/w-64/);
-      act(() => {
-        fireEvent.click(screen.getByTestId("sidebar-fold-toggle"));
-      });
-      expect(sidebar).toHaveAttribute("data-fold", "collapsed");
-      expect(sidebar.className).toMatch(/w-16/);
-      // In collapsed mode, global group is replaced by quick entries
-      expect(screen.getByTestId("sidebar-collapsed-quick-entries")).toBeInTheDocument();
-      expect(screen.queryByText("ALL GREEN")).toBeNull();
-    });
+    const trigger = screen.getByTestId("sidebar-shortcuts-trigger");
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByTestId("sidebar-add-shortcut"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "SCM" } });
+    fireEvent.click(within(dialog).getByTestId("pin-sidebar-scm"));
+    expect(useNavStore.getState().sidebarItemIds).toContain("scm");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
 
-  it("global group stays constant across page scopes (per reference UI)", () => {
-      mockUsePathname.mockReturnValue("/projects");
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=kanban"));
-      useNavStore.getState().setSidebarTab("directory");
-      renderWithI18n(<Sidebar />);
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("sidebar-item-scm")).toBeVisible();
+    fireEvent.click(screen.getByTestId("sidebar-remove-scm"));
+    expect(screen.queryByTestId("sidebar-item-scm")).toBeNull();
+    expect(useNavStore.getState().sidebarItemIds).not.toContain("scm");
+  });
 
-      // 全局组不受当前页 scope 影响, 恒为 3 项
-      const globalGroup = screen.getByTestId("sidebar-group-global");
-      expect(within(globalGroup).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
-      expect(within(globalGroup).getByTestId("sidebar-item-agents")).toBeInTheDocument();
-      expect(within(globalGroup).getByTestId("sidebar-item-analytics")).toBeInTheDocument();
-    });
+  it("keeps shortcuts available when the Project sidebar is folded", () => {
+    renderSidebar();
 
-  // per 2026-11-14 artifact 参考 UI: 侧栏不再渲染 pinned/视图组 — 全站只有一个全局组
-    it("does not render pinned or view modules anywhere in the sidebar", () => {
-      mockUsePathname.mockReturnValue("/projects");
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("tab=timeline"));
-      useNavStore.getState().setSidebarTab("directory");
-      renderWithI18n(<Sidebar />);
+    const sidebar = screen.getByTestId("app-sidebar");
+    fireEvent.click(screen.getByTestId("sidebar-fold-toggle"));
+    expect(sidebar).toHaveAttribute("data-fold", "collapsed");
+    expect(screen.queryByTestId("sidebar-top-tabs")).toBeNull();
 
-      expect(screen.queryByTestId("sidebar-item-timeline")).toBeNull();
-      expect(screen.queryByTestId("sidebar-item-kanban")).toBeNull();
-      expect(screen.queryByTestId("sidebar-item-projects")).toBeNull();
-      // 全局组恒在
-      expect(within(screen.getByTestId("sidebar-group-global")).getByTestId("sidebar-item-inbox")).toBeInTheDocument();
-    });
-
-    // per 2026-11-12 用户发令: 带 query 的模块按 query 精确判定 active
-    it("global group items activate by exact pathname match", () => {
-      mockUsePathname.mockReturnValue("/inbox");
-      mockUseSearchParams.mockReturnValue(new URLSearchParams(""));
-      useNavStore.getState().setSidebarTab("directory");
-      renderWithI18n(<Sidebar />);
-
-      const globalGroup = screen.getByTestId("sidebar-group-global");
-      // NavModuleRow 以 data-active 属性表示 active (非 active-dot)
-      expect(within(globalGroup).getByTestId("sidebar-item-inbox").getAttribute("data-active")).toBe("true");
-      expect(within(globalGroup).getByTestId("sidebar-item-agents").getAttribute("data-active")).toBe("false");
-    });
+    const trigger = screen.getByTestId("sidebar-shortcuts-trigger");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const link = screen.getByTestId("sidebar-item-agents");
+    link.focus();
+    fireEvent.keyDown(link, { key: "Escape" });
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
 });

@@ -1,5 +1,5 @@
 /*
-@cypher schema=1 source_sha256=852a06a8ad888dee8012e19c5f9d0c3476f7be352bcbfd8e889c61c40a34f131
+@cypher schema=1 source_sha256=e8862ea0fdf88ec51edf998a73b427f18775f7bb9602dec3a824928e9d396947
 MERGE (self:File {path:"frontend/src/components/MobileBottomNav.tsx"})
 MERGE (navigation:Symbol {id:"frontend/src/components/MobileBottomNav.tsx::MobileBottomNav",kind:"component"})
 MERGE (projectTree:Symbol {id:"frontend/src/components/run/ProjectRunTree.tsx::ProjectRunTree",kind:"component"})
@@ -24,11 +24,19 @@ MERGE (navigation)-[:READS]->(directoryLabel)
 MERGE (navigation)-[:READS]->(directoryTitle)
 MERGE (navigation)-[:READS]->(directoryHint)
 MERGE (navigation)-[:READS]->(closeDirectoryLabel)
+MERGE (projectNav:Symbol {id:"frontend/src/components/nav/ProjectNavigation.tsx::ProjectNavigation",kind:"component"})
+MERGE (shortcuts:Symbol {id:"frontend/src/components/nav/SidebarShortcuts.tsx::SidebarShortcuts",kind:"component"})
+MERGE (self)-[:IMPORTS]->(projectNav)
+MERGE (self)-[:IMPORTS]->(shortcuts)
+MERGE (navigation)-[:CALLS]->(projectNav)
+MERGE (navigation)-[:CALLS]->(shortcuts)
 @endcypher
 */
 "use client";
 
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
+import { ProjectNavigation } from "@/components/nav/ProjectNavigation";
+import { SidebarShortcuts } from "@/components/nav/SidebarShortcuts";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { ChevronDown, FolderTree } from "lucide-react";
@@ -59,7 +67,7 @@ export function MobileBottomNav() {
   }, [open]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape" && open) {
+    if (event.key === "Escape" && open && !event.defaultPrevented) {
       event.preventDefault();
       setOpen(false);
     }
@@ -99,16 +107,17 @@ export function MobileBottomNav() {
         aria-label={t.sidebar.projectDirectory}
         hidden={!open}
         onKeyDown={handleKeyDown}
-        className="md:hidden fixed inset-x-0 bottom-14 z-[9998] max-h-[min(70dvh,32rem)] overflow-y-auto border-t-2 border-[var(--cel-ink)] bg-bg-soft p-3 shadow-[0_-4px_0px_0px_var(--cel-shadow-color)]"
+        className="md:hidden fixed inset-x-0 bottom-14 z-[9998] flex h-[min(70dvh,32rem)] flex-col overflow-visible border-t-2 border-[var(--cel-ink)] bg-bg-soft p-3 shadow-[0_-4px_0px_0px_var(--cel-shadow-color)]"
         style={{ bottom: "calc(3.5rem + env(safe-area-inset-bottom))" }}
       >
-        <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">{t.sidebar.projectDirectoryTitle}</h2>
             <p className="text-[10px] text-ink-mute">
               {t.sidebar.projectDirectoryHint}
             </p>
           </div>
+          {open && <SidebarShortcuts inDrawer onCustomize={() => setOpen(false)} />}
           <button
             ref={closeRef}
             type="button"
@@ -119,7 +128,7 @@ export function MobileBottomNav() {
             {t.sidebar.closeProjectDirectory}
           </button>
         </div>
-        {open && <ProjectRunTree collapsed={false} />}
+        {open && <ProjectNavigation testIdPrefix="mobile-project" directory={<ProjectRunTree collapsed={false} />} />}
       </section>
     </>
   );
