@@ -54,6 +54,7 @@ ut_scripts=(
     "regression-test-five-domain.sh"
     "regression-test-five-domain-v2.sh"
     "regression-test-openclaw.sh"
+    "regression-test-math.sh"
 )
 
 ut_pass=0
@@ -149,12 +150,12 @@ report_file="$REPORT_DIR/regression-report-all-$(date -u +'%Y-%m-%d').md"
     echo ""
     echo "| 层 | 范围 | PASS | FAIL | 总 |"
     echo "|---|---|---|---|---|"
-    echo "| §UT (Unit Test) | tools/star-flash-mock/scripts/ 11 scripts | $ut_pass | $ut_fail | ${#ut_scripts[@]} |"
+    echo "| §UT (Unit Test) | tools/star-flash-mock/scripts/ 12 scripts | $ut_pass | $ut_fail | ${#ut_scripts[@]} |"
     echo "| §IT (Integration Test) | mock_data/uat/regression/ 1 runner (35 场景) | $it_pass | $it_fail | 1 |"
     echo "| §ST (System Test) | scripts/regression-test-system.sh 7 段 | $st_pass | $st_fail | 1 |"
-    echo "| **总计** | — | **$((ut_pass + it_pass + st_pass))** | **$((ut_fail + it_fail + st_fail))** | **$((11 + 1 + 1))** |"
+    echo "| **总计** | — | **$((ut_pass + it_pass + st_pass))** | **$((ut_fail + it_fail + st_fail))** | **$((12 + 1 + 1))** |"
     echo ""
-    echo "## 2. §UT (Unit Test) 11 scripts 详细"
+    echo "## 2. §UT (Unit Test) 12 scripts 详细"
     echo ""
     echo "| # | Script | 状态 |"
     echo "|---|---|---|"

@@ -309,7 +309,8 @@ interface StoreState {
   //   - 改 status 走 reconcileBoard 同步 board.columns
   //   - updated_at 自动刷
   //   - 字段白名单: title / description / status / priority / kind / assignee_id / labels / worktree_id
-  updateWorkItemField: <K extends "title" | "description" | "status" | "priority" | "kind" | "assignee_id" | "labels" | "worktree_id">(
+  //     + branch_id / branch_name / lifecycle_version (per 2026-11-21 跨 branch handoff 本地缓存同步)
+  updateWorkItemField: <K extends "title" | "description" | "status" | "priority" | "kind" | "assignee_id" | "labels" | "worktree_id" | "branch_id" | "branch_name" | "lifecycle_version">(
     id: string,
     field: K,
     value: WorkItem[K],

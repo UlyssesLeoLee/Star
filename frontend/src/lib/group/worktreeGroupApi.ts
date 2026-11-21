@@ -1050,6 +1050,25 @@ export class WorktreeGroupApiClient {
     );
   }
 
+  /** 跨 branch 显式互传 (handoff): 任务卡从源 worktree 转移到目标 branch。
+   *  每个 branch 独立一套数据; 不发起 handoff 时任务卡留在自己的 branch。
+   *  服务端走 task_metadata SCD2 关旧插新 + 解绑源 worktree + 审计 + 幂等。 */
+  handoffWorkItem<T>(
+    worktreeId: string,
+    workItemId: string,
+    body: { target_branch_id: string; expected_version: number; correlation_id?: string; reason?: string },
+    idempotencyKey: string,
+  ): Promise<T> {
+    return this.request(
+      `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items/${encodeURIComponent(workItemId)}/handoff`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
   startTaskCliSession(
     worktreeId: string,
     workItemId: string,

@@ -191,9 +191,9 @@ export function normalizeGroupWorkItems(
     activeWorktreeId: item.active_worktree_id,
     reporterId: item.reporter_id,
     worktreeId,
-    // GroupWorkItemView 投影暂未含 branch 字段 — 诚实置 null (未绑定, 全局可见)
-    branchId: null,
-    branchName: null,
+    // per 2026-11-21: branch 隔离 — 服务端真源投影已含 branch_id/branch_name, 直接透传
+    branchId: item.branch_id,
+    branchName: item.branch_name,
   }));
 }
 
@@ -272,6 +272,8 @@ export async function listUnifiedWorkItems(
       active_worktree_id: typeof lifecycle.active_worktree_id === "string" ? lifecycle.active_worktree_id : null,
       labels: Array.isArray(raw.labels) ? raw.labels.filter((l): l is string => typeof l === "string") : [],
       reporter_id: String(raw.reporter_user_id ?? ""),
+      branch_id: typeof raw.branch_id === "string" ? raw.branch_id : null,
+      branch_name: typeof raw.branch_name === "string" ? raw.branch_name : null,
     };
   });
   return normalizeGroupWorkItems(views, worktreeId);
@@ -369,6 +371,9 @@ export async function transitionUnifiedWorkItem(
         active_worktree_id: snapshot.lifecycle.active_worktree_id,
         labels: snapshot.labels,
         reporter_id: snapshot.reporter_user_id,
+        // 状态迁移不改变 branch 归属 — 保留原卡的 branch 真源
+        branch_id: item.branchId,
+        branch_name: item.branchName,
       },
     ],
     worktreeId,

@@ -29,6 +29,7 @@ export function MonthView({
   onEventMove,
   onMonthChange,
   today = new Date(),
+  onDayClick,
 }: {
   year: number;
   month: number;
@@ -36,6 +37,8 @@ export function MonthView({
   onEventMove: EventMoveHandler;
   onMonthChange?: (year: number, month: number) => void;
   today?: Date;
+  /** 点击空白日期创建任务 (yyyy-MM-dd 本地日期) */
+  onDayClick?: (dateKey: string) => void;
 }) {
   const router = useRouter();
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month]);
@@ -116,16 +119,18 @@ export function MonthView({
                 }
               }}
               onDrop={(e) => {
-                e.preventDefault();
-                const id = e.dataTransfer.getData("text/plain");
-                if (id) onEventMove(id, key);
-              }}
-              className={clsx(
-                "relative border-b border-r border-line last:border-r-0 min-h-[6.5rem] p-1.5 text-left",
-                !inMonth && "bg-bg-soft/30 text-ink-mute",
-                inMonth && "bg-bg-card",
-                isToday && "ring-1 ring-accent ring-inset",
-              )}
+                              e.preventDefault();
+                              const id = e.dataTransfer.getData("text/plain");
+                              if (id) onEventMove(id, key);
+                            }}
+                            onClick={onDayClick ? () => onDayClick(key) : undefined}
+                            className={clsx(
+                              "relative border-b border-r border-line last:border-r-0 min-h-[6.5rem] p-1.5 text-left",
+                              !inMonth && "bg-bg-soft/30 text-ink-mute",
+                              inMonth && "bg-bg-card",
+                              isToday && "ring-1 ring-accent ring-inset",
+                              onDayClick && "cursor-pointer hover:bg-accent/5",
+                            )}
             >
               <div className="flex items-center justify-between mb-1">
                 <span

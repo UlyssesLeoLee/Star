@@ -34,12 +34,14 @@ export interface CalendarViewProps {
   workItems: WorkItem[];
   /** 事件移动回调 (可选; 无则只读) */
   onEventMove?: (eventId: string, newDate: string) => void;
+  /** 点击空白日期创建任务 (yyyy-MM-dd 本地日期) */
+  onDayClick?: (dateKey: string) => void;
   /** 受控视图 (可选; 不传则组件内部自治, 供 FilterBar 月/周子标签控制) */
   view?: "month" | "week";
   onViewChange?: (v: "month" | "week") => void;
 }
 
-export function CalendarView({ sprints, milestones, workItems, onEventMove, view, onViewChange }: CalendarViewProps) {
+export function CalendarView({ sprints, milestones, workItems, onEventMove, onDayClick, view, onViewChange }: CalendarViewProps) {
   const [internalView, setInternalView] = useState<"month" | "week">("month");
   const calendarView = view ?? internalView;
   const setCalendarView = useCallback((v: "month" | "week") => {
@@ -105,21 +107,23 @@ export function CalendarView({ sprints, milestones, workItems, onEventMove, view
         userTimezone={timezone}
       />
       {calendarView === "month" ? (
-        <MonthView
-          year={calendarCursor.year}
-          month={calendarCursor.month}
-          events={events}
-          onEventMove={handleEventMove}
-          onMonthChange={(y, m) => setCalendarCursor({ year: y, month: m })}
-        />
-      ) : (
-        <WeekView
-          startDate={weekStart}
-          events={events}
-          onEventMove={handleEventMove}
-          userTimezone={timezone}
-        />
-      )}
+              <MonthView
+                year={calendarCursor.year}
+                month={calendarCursor.month}
+                events={events}
+                onEventMove={handleEventMove}
+                onMonthChange={(y, m) => setCalendarCursor({ year: y, month: m })}
+                onDayClick={onDayClick}
+              />
+            ) : (
+                    <WeekView
+                      startDate={weekStart}
+                      events={events}
+                      onEventMove={handleEventMove}
+                      userTimezone={timezone}
+                      onDayClick={onDayClick}
+                    />
+                  )}
       <CalendarLegend />
     </div>
   );

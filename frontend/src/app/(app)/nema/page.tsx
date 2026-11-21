@@ -85,6 +85,8 @@ import {
 import { useStore as useMainStore } from "@/lib/store";
 import { StatusNotice } from "@/components/status/StatusNotice";
 import { LocalFolderBrowser } from "@/components/nema/LocalFolderBrowser";
+import MonacoEditor from "@/components/editor/MonacoEditor";
+import { useIdeKernel } from "@/hooks/useIdeKernel";
 
 const PIPELINE = ["① 路由拆分", "② 并行编辑", "③ 语义合并", "④ 生成代码", "⑤ 验证"] as const;
 
@@ -126,6 +128,10 @@ export default function NemaPage() {
   const [selectedProfile, setSelectedProfile] = useState<NemaInterpreterProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [previewSource, setPreviewSource] = useState("");
+  // per 2026-11-21: 接 ide1.0 网页版编辑核心 (MonacoEditor + useIdeKernel) —
+  // 生成代码可编辑, .nema 规约可编辑; 内核未连接时诚实降级为本地预览。
+  const [generatedCode, setGeneratedCode] = useState(() => CODE_LINES.map((l) => l.text).join("\n"));
+  const ideKernel = useIdeKernel({ enabled: true });
 
   // ---- 共同编辑区块状态 (per 2026-11-17 用户发令) ----
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -187,11 +193,6 @@ export default function NemaPage() {
   // 复用既有身份机制 (store.identities) 解析当前编辑者, 不新造用户体系
   const identities = useMainStore((s) => s.identities);
   const actorName = resolveNemaActor(identities);
-  const nemaLines = previewSource.split(/\r?\n/).filter(Boolean).map((text, index) => ({
-    tag: String(index + 1),
-    cls: text.trimStart().startsWith("\\") ? "text-accent" : "text-ink",
-    text,
-  }));
 
   const taskRows = nemaTasks.filter((x) => x.workItemId).map((x) => ({
     id: x.workItemId ?? x.id,
@@ -480,14 +481,14 @@ export default function NemaPage() {
                 Rust profile · {selectedProfile?.grammar_revision ?? "loading"}
               </span>
             </header>
-            <div className="font-mono text-xs leading-relaxed">
-              {nemaLines.map((line, i) => (
-                <div key={i} className={clsx("flex gap-3 px-3 py-0.5 hover:bg-bg-soft/60", line.cls)}>
-                  <span className="w-6 text-right text-ink-mute select-none shrink-0">{line.tag}</span>
-                  <span className="flex-1 whitespace-pre-wrap break-all">{line.text}</span>
-                </div>
-              ))}
-            </div>
+            <MonacoEditor
+              value={previewSource}
+              language="markdown"
+              path="bfs.rs.nema"
+              height={320}
+              testId="nema-spec-editor"
+              onChange={(next) => setPreviewSource(next)}
+            />
           </section>
 
           {/* 生成代码 */}
@@ -499,21 +500,27 @@ export default function NemaPage() {
                 <span className="px-1.5 py-0.5 rounded bg-warn/10 text-warn font-semibold">与 .nema 有 1 处漂移</span>
               </span>
             </header>
-            <div className="font-mono text-xs leading-relaxed">
-              {CODE_LINES.map((line, i) => (
-                <div key={i} className="flex gap-3 px-3 py-0.5 hover:bg-bg-soft/60">
-                  <span className="w-6 text-right text-ink-mute select-none shrink-0">{line.n}</span>
-                  <span className="flex-1 whitespace-pre-wrap break-all text-ink">{line.text}</span>
-                  {line.who && <span className="text-[10px] text-accent shrink-0 self-center">{line.who}</span>}
-                </div>
-              ))}
-            </div>
+            <MonacoEditor
+              value={generatedCode}
+              language="rust"
+              path="bfs.rs"
+              height={320}
+              testId="nema-generated-editor"
+              onChange={(next) => { setGeneratedCode(next); ideKernel.syncText(next); }}
+            />
           </section>
         </div>
 
         {/* 租约说明 */}
         <p data-testid="nema-lease-note" className="text-[11px] text-ink-dim flex items-center gap-1.5">
           <Lock size={11} /> 写入需持有文件租约（带递增令牌）；租约过期自动释放，人可随时接管
+        </p>
+        <p data-testid="nema-ide-kernel-status" className="text-[10px] font-mono text-ink-mute">
+          {ideKernel.mode === "connected"
+            ? `● ide-kernel 已连接 · ${ideKernel.kernelVersion ?? ""} (编辑同步到内核)`
+            : ideKernel.mode === "error"
+              ? `○ ide-kernel 不可用 (${ideKernel.error ?? "连接失败"}) — 本地预览编辑, 未同步内核`
+              : "○ ide-kernel 探测中… 未连接时为本地预览编辑"}
         </p>
 
         {/* 协作组 */}

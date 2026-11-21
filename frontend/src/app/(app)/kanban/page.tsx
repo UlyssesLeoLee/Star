@@ -43,7 +43,11 @@ MERGE (page)-[:CALLS]->(serverTransition)
 //   任务看板 → KanbanBoard (真实拖拽 + transitionWorkItem)
 //   IPA 流程图 → IpaSkillWorkflowBoard (真实 IPA 技能工作流)
 //   按文件开卡 → nema 文件即任务 (真实 nemaStore + openNemaAsStarTask)
-//   时间线/日历 → 真实实现在 /projects?tab=timeline, 提供直达入口
+//   时间线 → GanttView (甘特图, per 2026-11-22 从分析界面迁回看板)
+//   日历 → CalendarView (点日期创建任务, 创建后看板可见)
+//   燃尽图 → Chart01Burndown (per 2026-11-22 从分析界面迁回看板)
+// per 2026-11-22 用户发令: 任务看板 = 唯一任务管理中心, 第一个标签页;
+//   sprint 启动 / IPA 开卡 / 按文件开卡 / 时间线 / 日历创建的任务全部在本页可见。
 // =====================================================================
 "use client";
 
@@ -65,6 +69,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useStore } from "@/lib/store";
+import { getSession } from "@/lib/auth";
 import { useNavStore } from "@/lib/nav/navStore";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { SprintBoardView } from "@/components/sprint/SprintBoardView";
@@ -72,6 +77,11 @@ import { KanbanFilters, applyBoardFilters, type KanbanFiltersValue } from "@/com
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { IdeFileWorkspace } from "@/components/ide/IdeFileWorkspace";
 import { CalendarView } from "@/components/calendar/CalendarView";
+import { localDateKey } from "@/components/calendar/events";
+import { GanttView } from "@/components/gantt/GanttView";
+import { ChartFrame } from "@/components/charts/shared/ChartFrame";
+import { Chart01Burndown } from "@/components/charts/Chart01Burndown";
+import { buildAnalyticsData } from "../analytics/chartData";
 import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
 import { useNemaStore } from "@/lib/nema/nemaStore";
 import { GuardedLink as Link } from "@/components/navigation/GuardedLink";
@@ -91,7 +101,9 @@ import {
   type UnifiedWorkItem,
 } from "./unifiedWorkItems";
 
-const VIEW_TABS = ["Sprint", "任务看板", "IPA 流程图", "按文件开卡", "时间线", "日历"] as const;
+// per 2026-11-22 用户发令: 任务看板是第一个标签页; 甘特图(时间线)/燃尽图从分析界面迁入,
+// 所有任务管理内容集中在看板。
+const VIEW_TABS = ["任务看板", "Sprint", "IPA 流程图", "按文件开卡", "时间线", "日历", "燃尽图"] as const;
 type ViewTab = (typeof VIEW_TABS)[number];
 
 // mockup 生命周期条 6 阶段 ← 真实 KANBAN_COLUMNS (todo/in_progress/review/blocked/done/wontfix)
@@ -122,10 +134,20 @@ export default function KanbanPage() {
     () => ["ipa-s05-002 ソースコード作成", "ipa-s06-ut-005 単体試験実施"],
     [],
   );
-  const workflows = useStore((s) => s.workflows);
-  const addWorkItem = useStore((s) => s.addWorkItem);
+  // per 2026-11-21: 真实会话身份 (reporter/tenant), 不再伪造 usr-002 / 全零 tenant
+    const session = getSession();
+    const workflows = useStore((s) => s.workflows);
+    const addWorkItem = useStore((s) => s.addWorkItem);
 
-  // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
+    // per 2026-11-22: 日历点击日期创建时预填 due_date (localDateKey)
+    const [dueDateOverride, setDueDateOverride] = useState<string | null>(null);
+    useEffect(() => {
+      const handler = (e: CustomEvent<string>) => setDueDateOverride(e.detail);
+      window.addEventListener("kanban:setDueDate", handler as EventListener);
+      return () => window.removeEventListener("kanban:setDueDate", handler as EventListener);
+    }, []);
+
+    // ---- 宿主数据通道信号 (per 2026-11-16 清 seed/mock 显示入口) ----
   // Group API 会话存在 = 宿主已接入; 网页预览模式为 null → 任务看板不渲染
   // 本地 seed 任务卡, 创建/移动等写操作禁用; 401 信号来自
   // useWorktreeGroupSessionState() (status === "invalidated")。
@@ -182,7 +204,7 @@ export default function KanbanPage() {
   // 服务端真源 → store 形状 (仅缓存水合/看板渲染; 状态/版本仍以服务端为准)
   const toStoreWorkItem = (item: UnifiedWorkItem): WorkItem => ({
     id: item.id,
-    tenant_id: project?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
+    tenant_id: project?.tenant_id ?? session?.payload.tenant_id ?? "00000000-0000-0000-0000-000000000001",
     project_id: projectId || "00000000-0000-0000-0000-000000000000",
     key: item.id,
     title: item.title,
@@ -190,13 +212,15 @@ export default function KanbanPage() {
     kind: item.kind as WorkItem["kind"],
     status: item.column,
     priority: toStorePriority(item.priority),
-    reporter_id: item.reporterId || "usr-002",
+    reporter_id: item.reporterId || session?.payload.user_id || "",
     labels: item.labels,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     worktree_id: item.worktreeId,
-    // per 2026-11-21: 服务端 branch 真源透传 (分支名匹配目录树 git 枚举名)
-    branch_id: item.branchName ?? item.branchId,
+    // per 2026-11-21: 服务端 branch 真源透传 — id (UUID) 与 name (git 枚举名) 分开存
+    branch_id: item.branchId,
+    branch_name: item.branchName,
+    lifecycle_version: item.lifecycleVersion,
   });
 
   const handleCreateTaskCard = async () => {
@@ -256,31 +280,35 @@ export default function KanbanPage() {
       return;
     }
     try {
-      addWorkItem({
-        tenant_id: "tn-001",
-        project_id: "prj-physis",
-        title,
-        kind: "task",
-        status: "todo",
-        priority: "p2",
-        reporter_id: "usr-002",
-        story_points: Number(draftPoints) || 3,
-        sprint_id: "sp-12",
-        labels: [
-          ...(draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : []),
-          ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
-        ],
-        workflow_id: draftWorkflow || undefined,
-        description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
-        // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据)
-        branch_id: selectedBranch || null,
-      });
+          addWorkItem({
+            tenant_id: session?.payload.tenant_id ?? "tn-001",
+            project_id: "prj-physis",
+            title,
+            kind: "task",
+            status: "todo",
+            priority: "p2",
+            reporter_id: session?.payload.user_id ?? "usr-002",
+            story_points: Number(draftPoints) || 3,
+            sprint_id: "sp-12",
+            labels: [
+              ...(draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : []),
+              ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
+            ],
+            workflow_id: draftWorkflow || undefined,
+            description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
+            // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据; 本地无 UUID, 按名绑定)
+            branch_id: selectedBranch || null,
+            branch_name: selectedBranch || null,
+            // per 2026-11-22: 日历点击日期创建时预填 due_date
+            due_date: dueDateOverride || undefined,
+          });
       setDraftTitle("");
-      setDraftIpaFlow("ipa-s05-002 ソースコード作成");
-      setDraftWorkflow("");
-      setDraftFile("");
-      setDraftPoints("3");
-      setActiveView("IPA 流程图");
+            setDraftIpaFlow("ipa-s05-002 ソースコード作成");
+            setDraftWorkflow("");
+            setDraftFile("");
+            setDraftPoints("3");
+            setDueDateOverride(null);
+            setActiveView("IPA 流程图");
     } catch {
       setCreateFailure({
         reason: "本地创建失败",
@@ -412,7 +440,8 @@ export default function KanbanPage() {
       items = items.filter((w) => !w.worktree_id || w.worktree_id === selectedWorktreeId);
     }
     if (selectedBranch) {
-      items = items.filter((w) => !w.branch_id || w.branch_id === selectedBranch);
+      // selectedBranch 是 git 分支名; 匹配 branch_name 或 branch_id (本地创建按名绑定)
+      items = items.filter((w) => !w.branch_id || w.branch_name === selectedBranch || w.branch_id === selectedBranch);
     }
     return items;
   }, [workItems, selectedProjectId, selectedLaneId, selectedWorktreeId, selectedBranch, laneWorktreeIds]);
@@ -422,10 +451,13 @@ export default function KanbanPage() {
   );
 
   // ---- nema 文件即任务 (真实 store) ----
-  const nemaTasks = useNemaStore((s) => s.nemaTasks);
-  const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
+    const nemaTasks = useNemaStore((s) => s.nemaTasks);
+    const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
 
-  // ---- 列定义 (per P1): 服务端无 board 列配置, 列闭集来自统一域常量
+    // ---- 统计图表数据 (per 2026-11-22: 燃尽图/甘特图等任务管理内容迁入看板, 复用 analytics/chartData.buildAnalyticsData) ----
+    const charts = useMemo(() => buildAnalyticsData(sprints, workItems), [sprints, workItems]);
+
+    // ---- 列定义 (per P1): 服务端无 board 列配置, 列闭集来自统一域常量
   //      UNIFIED_KANBAN_COLUMNS (镜像 group_api `unified_column_status`, 与
   //      groupProjection 读侧映射互逆); 不再依赖 mocks/data/kanban。 ----
   const lifecycleCols = serverMode
@@ -437,7 +469,7 @@ export default function KanbanPage() {
   // 服务端模式的看板投影 (列 = 统一闭集; work_item_ids 从服务端真源派生, 非本地事实)
   const unifiedBoard = useMemo<Board>(() => ({
     id: "00000000-0000-0000-0000-000000000000",
-    tenant_id: project?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
+    tenant_id: project?.tenant_id ?? session?.payload.tenant_id ?? "00000000-0000-0000-0000-000000000001",
     project_id: projectId || "00000000-0000-0000-0000-000000000000",
     name: "统一服务端看板 (worktree 真源)",
     columns: UNIFIED_KANBAN_COLUMNS.map((status) => ({
@@ -457,7 +489,7 @@ export default function KanbanPage() {
   // 全部视为未绑定 → 保持可见, 诚实不隐藏真源)
   const branchScopedServerItems = useMemo(
     () => selectedBranch
-      ? serverBoardItems.filter((w) => !w.branch_id || w.branch_id === selectedBranch)
+      ? serverBoardItems.filter((w) => !w.branch_id || w.branch_name === selectedBranch || w.branch_id === selectedBranch)
       : serverBoardItems,
     [serverBoardItems, selectedBranch],
   );
@@ -816,32 +848,46 @@ export default function KanbanPage() {
         )}
 
         {activeView === "时间线" && (
-          <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <p className="text-xs font-semibold text-ink">甘特图已合并进分析界面</p>
-              <p className="text-[11px] text-ink-dim">
-                排期甘特图现在
-                <a href="/analytics" className="mx-1 font-semibold text-accent underline underline-offset-2" data-testid="kanban-gantt-open-analytics">
-                  分析界面「甘特图」标签
-                </a>
-                打开 (per 2026-11-15)
-              </p>
-            </div>
-          </section>
-        )}
+                          <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
+                            <GanttView
+                              board={board}
+                              workItems={workItems}
+                              identities={identities}
+                            />
+                          </section>
+                        )}
         {activeView === "日历" && (
-          <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full overflow-auto">
-            {/* 老版本日历移植 (per 2026-11-14: 从 ProjectsClient 提取 CalendarView 合并复用) */}
-            <CalendarView
-              sprints={sprints}
-              milestones={milestones}
-              workItems={workItems}
-            />
-          </section>
-        )}
-      </main>
+                  <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full overflow-auto">
+                    {/* 老版本日历移植 (per 2026-11-14: 从 ProjectsClient 提取 CalendarView 合并复用)
+                        点击日期创建任务卡 → 打开 Drawer 并预填 due_date (localDateKey) */}
+                    <CalendarView
+                      sprints={sprints}
+                      milestones={milestones}
+                      workItems={workItems}
+                      onDayClick={(dateKey) => {
+                        // dateKey 形如 "2026-11-22" (localDateKey)
+                        setDrawerMode({ kind: "new", defaultStatus: "todo" });
+                        // 将 due_date 存入 draft 供下一步创建用 (store.addWorkItem 接受 due_date)
+                        // 这里通过全局状态或在创建时直接传 due_date 到 store
+                        window.dispatchEvent(new CustomEvent("kanban:setDueDate", { detail: dateKey }));
+                      }}
+                    />
+                  </section>
+                )}
+                {activeView === "燃尽图" && (
+                                  <section data-testid="kanban-burndown-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
+                                    <ChartFrame title="燃尽图" description="剩余故事点 vs 理想线" chartId="C01_BURNDOWN">
+                                      {charts.burndown ? (
+                                        <Chart01Burndown data={charts.burndown} />
+                                      ) : (
+                                        <p className="flex h-full items-center justify-center text-ink-dim">无冲刺数据 — 创建 Sprint 后自动生成</p>
+                                      )}
+                                    </ChartFrame>
+                                  </section>
+                                )}
+                      </main>
 
-      {/* 列内创建 Drawer (per 2026-11-15: 每列 +Add task → Drawer 新建) */}
+                      {/* 列内创建 Drawer (per 2026-11-15: 每列 +Add task → Drawer 新建) */}
       <WorkItemDetailDrawer
         open={drawerMode}
         onClose={() => setDrawerMode(null)}

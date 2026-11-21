@@ -133,6 +133,10 @@ export interface GroupWorkItemView {
   active_worktree_id: string | null;
   labels: string[];
   reporter_id: string;
+  // per 2026-11-21: branch 级数据隔离 — 服务端真源 branch_id + 当前 revision 名;
+  // null = 未绑定 branch (全局可见)。跨 branch 互传走显式 handoff 端点。
+  branch_id: string | null;
+  branch_name: string | null;
 }
 
 export type WorkItemLifecycleStatus = "pending" | "claimed" | "in_progress" | "completed" | "failed" | "cancelled";
@@ -371,6 +375,8 @@ function mapWorkItems(response: WorkItemEnvelope, worktreeId: string): GroupWork
       active_worktree_id: typeof activeWorktreeId === "string" ? activeWorktreeId : null,
       labels: Array.isArray(item.labels) ? item.labels.filter((label): label is string => typeof label === "string") : [],
       reporter_id: requiredString(item.reporter_user_id, "work_item.reporter_user_id"),
+      branch_id: typeof item.branch_id === "string" ? item.branch_id : null,
+      branch_name: typeof item.branch_name === "string" ? item.branch_name : null,
     };
   });
 }

@@ -23,7 +23,7 @@ import {
   type BiTaskSummary,
 } from "./serverAnalytics";
 import { ChartFrame } from "@/components/charts/shared/ChartFrame";
-import { Chart01Burndown } from "@/components/charts/Chart01Burndown";
+// import { Chart01Burndown } from "@/components/charts/Chart01Burndown"; // per 2026-11-22: 迁往 /kanban
 import { Chart02Burnup } from "@/components/charts/Chart02Burnup";
 import { Chart03Velocity } from "@/components/charts/Chart03Velocity";
 import { Chart04SprintReport } from "@/components/charts/Chart04SprintReport";
@@ -38,13 +38,15 @@ import { Chart12SlaCompliance } from "@/components/charts/Chart12SlaCompliance";
 import { Chart13CreatedVsResolved } from "@/components/charts/Chart13CreatedVsResolved";
 import { Chart14IssueTypeDist } from "@/components/charts/Chart14IssueTypeDist";
 import { Chart15PriorityDist } from "@/components/charts/Chart15PriorityDist";
-import { GanttView } from "@/components/gantt/GanttView";
+// import { GanttView } from "@/components/gantt/GanttView"; // per 2026-11-22: 迁往 /kanban
 import { Suspense } from "react";
 
+// per 2026-11-22 用户发令: 甘特图/燃尽图等任务管理内容全部迁往 /kanban 标签页,
+//   分析页只保留 BI/统计类图表 (任务相关内容集中在任务看板)。
 const ANALYTICS_TABS = [
-  "概览", "燃尽图", "燃起图", "速度", "Sprint 报告", "累计流图", "控制图",
+  "概览", "燃起图", "速度", "Sprint 报告", "累计流图", "控制图",
   "周期时间", "吞吐量", "预测", "时间跟踪", "解决时间", "SLA 合规",
-  "创建vs解决", "问题分布", "优先级分布", "甘特图", "运维", "审计日志",
+  "创建vs解决", "问题分布", "优先级分布", "运维", "审计日志",
 ] as const;
 type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
 
@@ -367,25 +369,24 @@ function AnalyticsPageInner() {
   );
 
   const renderChart = (tab: AnalyticsTab) => {
-    switch (tab) {
-      case "燃尽图": return <ChartFrame title="燃尽图" description="剩余故事点 vs 理想线" chartId="C01_BURNDOWN">{preview}<Chart01Burndown data={charts.burndown} /></ChartFrame>;
-      case "燃起图": return <ChartFrame title="燃起图" description="累计完成 vs 范围" chartId="C02_BURNUP">{preview}<Chart02Burnup data={charts.burnup} /></ChartFrame>;
-      case "速度": return <ChartFrame title="速度" description="每冲刺完成故事点" chartId="C03_VELOCITY">{preview}<Chart03Velocity data={charts.velocity} /></ChartFrame>;
-      case "Sprint 报告": return <ChartFrame title="Sprint 报告" description="完成 / 顺延 / 未完成" chartId="C04_SPRINT_REPORT">{preview}<Chart04SprintReport data={charts.sprintReport} /></ChartFrame>;
-      case "累计流图": return <ChartFrame title="累计流图 (CFD)" description="各状态任务随时间累计" chartId="C05_CFD">{preview}<Chart05Cfd data={charts.cfd} /></ChartFrame>;
-      case "控制图": return <ChartFrame title="控制图" description="周期时间稳定性" chartId="C06_CONTROL">{preview}<Chart06ControlChart data={charts.control} /></ChartFrame>;
-      case "周期时间": return <ChartFrame title="周期时间" description="任务从开始到完成的时长分布" chartId="C07_CYCLE_TIME">{preview}<Chart07CycleTime data={charts.cycleTime} /></ChartFrame>;
-      case "吞吐量": return <ChartFrame title="吞吐量" description="每周完成任务数" chartId="C08_THROUGHPUT">{preview}<Chart08Throughput data={charts.throughput} /></ChartFrame>;
-      case "预测": return <ChartFrame title="预测" description="按速度外推完成日期" chartId="C09_FORECAST">{preview}<Chart09Forecast data={charts.forecast} /></ChartFrame>;
-      case "时间跟踪": return <ChartFrame title="时间跟踪" description="预估 vs 实际工时" chartId="C10_TIME_TRACKING">{preview}<Chart10TimeTracking data={charts.timeTracking} /></ChartFrame>;
-      case "解决时间": return <ChartFrame title="解决时间" description="按优先级分组的平均解决时长" chartId="C11_RESOLUTION">{preview}<Chart11ResolutionTime data={charts.resolution} /></ChartFrame>;
-      case "SLA 合规": return <ChartFrame title="SLA 合规" description="各优先级 SLA 达成率" chartId="C12_SLA">{preview}<Chart12SlaCompliance data={charts.sla} /></ChartFrame>;
-      case "创建vs解决": return <ChartFrame title="创建 vs 解决" description="backlog 净变化" chartId="C13_CVR">{preview}<Chart13CreatedVsResolved data={charts.cvr} /></ChartFrame>;
-      case "问题分布": return <ChartFrame title="问题类型分布" description="task / bug / feature 占比" chartId="C14_ISSUE_DIST">{preview}<Chart14IssueTypeDist data={charts.issueDist} /></ChartFrame>;
-      case "优先级分布": return <ChartFrame title="优先级分布" description="critical / high / medium / low" chartId="C15_PRIORITY_DIST">{preview}<Chart15PriorityDist data={charts.priorityDist} /></ChartFrame>;
-      default: return null;
-    }
-  };
+      switch (tab) {
+        case "燃起图": return <ChartFrame title="燃起图" description="累计完成 vs 范围" chartId="C02_BURNUP">{preview}<Chart02Burnup data={charts.burnup} /></ChartFrame>;
+        case "速度": return <ChartFrame title="速度" description="每冲刺完成故事点" chartId="C03_VELOCITY">{preview}<Chart03Velocity data={charts.velocity} /></ChartFrame>;
+        case "Sprint 报告": return <ChartFrame title="Sprint 报告" description="完成 / 顺延 / 未完成" chartId="C04_SPRINT_REPORT">{preview}<Chart04SprintReport data={charts.sprintReport} /></ChartFrame>;
+        case "累计流图": return <ChartFrame title="累计流图 (CFD)" description="各状态任务随时间累计" chartId="C05_CFD">{preview}<Chart05Cfd data={charts.cfd} /></ChartFrame>;
+        case "控制图": return <ChartFrame title="控制图" description="周期时间稳定性" chartId="C06_CONTROL">{preview}<Chart06ControlChart data={charts.control} /></ChartFrame>;
+        case "周期时间": return <ChartFrame title="周期时间" description="任务从开始到完成的时长分布" chartId="C07_CYCLE_TIME">{preview}<Chart07CycleTime data={charts.cycleTime} /></ChartFrame>;
+        case "吞吐量": return <ChartFrame title="吞吐量" description="每周完成任务数" chartId="C08_THROUGHPUT">{preview}<Chart08Throughput data={charts.throughput} /></ChartFrame>;
+        case "预测": return <ChartFrame title="预测" description="按速度外推完成日期" chartId="C09_FORECAST">{preview}<Chart09Forecast data={charts.forecast} /></ChartFrame>;
+        case "时间跟踪": return <ChartFrame title="时间跟踪" description="预估 vs 实际工时" chartId="C10_TIME_TRACKING">{preview}<Chart10TimeTracking data={charts.timeTracking} /></ChartFrame>;
+        case "解决时间": return <ChartFrame title="解决时间" description="按优先级分组的平均解决时长" chartId="C11_RESOLUTION">{preview}<Chart11ResolutionTime data={charts.resolution} /></ChartFrame>;
+        case "SLA 合规": return <ChartFrame title="SLA 合规" description="各优先级 SLA 达成率" chartId="C12_SLA">{preview}<Chart12SlaCompliance data={charts.sla} /></ChartFrame>;
+        case "创建vs解决": return <ChartFrame title="创建 vs 解决" description="backlog 净变化" chartId="C13_CVR">{preview}<Chart13CreatedVsResolved data={charts.cvr} /></ChartFrame>;
+        case "问题分布": return <ChartFrame title="问题类型分布" description="task / bug / feature 占比" chartId="C14_ISSUE_DIST">{preview}<Chart14IssueTypeDist data={charts.issueDist} /></ChartFrame>;
+        case "优先级分布": return <ChartFrame title="优先级分布" description="critical / high / medium / low" chartId="C15_PRIORITY_DIST">{preview}<Chart15PriorityDist data={charts.priorityDist} /></ChartFrame>;
+        default: return null;
+      }
+    };
 
   return (
     <div className="flex h-full flex-col bg-bg">
@@ -508,27 +509,16 @@ function AnalyticsPageInner() {
                 </div>
               </div>
             </section>
-          </div>
-        )}
+                      </div>
+                    )}
 
-        {activeTab === "甘特图" && (
-          <div className="max-w-7xl mx-auto" data-testid="analytics-chart-甘特图">
-            <ChartFrame title="甘特图" description="冲刺 / 里程碑排期与任务时间轴" chartId="C16_GANTT">
-              {preview}
-              <Suspense fallback={<div className="flex h-full items-center justify-center text-ink-dim">Loading Gantt...</div>}>
-                <GanttView board={board} workItems={workItems} identities={identities} />
-              </Suspense>
-            </ChartFrame>
-          </div>
-        )}
+                    {activeTab !== "概览" && activeTab !== "运维" && activeTab !== "审计日志" && (
+                      <div className="max-w-7xl mx-auto" data-testid={`analytics-chart-${activeTab}`}>
+                        {renderChart(activeTab)}
+                      </div>
+                    )}
 
-        {activeTab !== "概览" && activeTab !== "运维" && activeTab !== "审计日志" && activeTab !== "甘特图" && (
-          <div className="max-w-7xl mx-auto" data-testid={`analytics-chart-${activeTab}`}>
-            {renderChart(activeTab)}
-          </div>
-        )}
-
-        {activeTab === "运维" && (
+                    {activeTab === "运维" && (
           <div className="space-y-4">
             <section className="bg-bg-card rounded-xl border border-line p-4">
               <h2 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">运维指标 (对接 MetricsTab / LogAITab)

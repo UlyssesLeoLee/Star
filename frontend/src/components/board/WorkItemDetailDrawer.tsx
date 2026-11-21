@@ -59,7 +59,7 @@ import { clsx } from "clsx";
 import {
   X, Trash2, Plus, Flag, Hash, Tag, FileText, User, Bot, Users,
   GitBranch, AlertTriangle, Save, ChevronDown, ListTodo, Workflow,
-  Terminal,
+  Terminal, ArrowRightLeft,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
@@ -68,6 +68,9 @@ import { openWorkItemDocument, DOCUMENT_KIND_META } from "@/lib/documents";
 import { useTerminalStackWs } from "@/hooks/useTerminalStackWs";
 import { searchIpaSkills } from "@/lib/ipa-skills/search";
 import { IPA_SKILL_BY_ID } from "@/lib/ipa-skills/catalog";
+import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
+import { useRunDirectory } from "@/lib/run/runDirectorySession";
+import type { CloudBranch } from "@/lib/run/runDirectoryApi";
 import type {
   WorkItem, WorkItemStatus, WorkItemKind, WorkItemPriority,
   Identity, AgentSession, Worktree,
@@ -130,6 +133,17 @@ export function WorkItemDetailDrawer({
   const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
   const [ipaQuery, setIpaQuery] = useState("");
 
+  // ---- 跨 branch 显式互传 (handoff) — per 2026-11-21 用户发令: 每个 branch 独立一套数据,
+  // 不传时各自独立; 互传必须用户手动指定目标 branch。服务端走 SCD2 + 审计 + 幂等。 ----
+  const groupApi = useWorktreeGroupApi();
+  const runDirectory = useRunDirectory();
+  const [handoffTarget, setHandoffTarget] = useState("");
+  const [handoffReason, setHandoffReason] = useState("");
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [handoffDone, setHandoffDone] = useState<string | null>(null);
+  const [handoffBranches, setHandoffBranches] = useState<CloudBranch[]>([]);
+
   // ---- CLI 面板接真实 terminal REST (per 2026-11-16 用户发令: star-api-rest pane 接线) ----
   // sessionId=null → 由 REST createPane 建 pane; 后端不可达自动回退 preview (mode 标注),
   // 只加调用不重构: 命令文本经 writeLine append 到终端滚动缓冲。
@@ -140,6 +154,20 @@ export function WorkItemDetailDrawer({
     if (!open || open.kind !== "view") return null;
     return workItems.find((w) => w.id === open.workItemId) ?? null;
   }, [open, workItems]);
+
+  // 目标 branch 列表来自服务端 SCM 真源 (同 Project 已注册 cloud_branch, 含 UUID);
+  // 绝不从本地 git 枚举名推断所有权 — handoff 需要 target_branch_id UUID。
+  useEffect(() => {
+    if (!currentWi || !projectId || runDirectory.status !== "ready" || !runDirectory.client) {
+      setHandoffBranches([]);
+      return;
+    }
+    const controller = new AbortController();
+    runDirectory.client.listBranches(projectId, undefined, controller.signal)
+      .then((page) => setHandoffBranches(page.rows))
+      .catch(() => { if (!controller.signal.aborted) setHandoffBranches([]); });
+    return () => controller.abort();
+  }, [currentWi, projectId, runDirectory.status, runDirectory.client]);
 
   // ---- 子任务 (per 2026-11-11 用户发令: parent_id 层级, 与父卡同一套内容模型) ----
   const subTasks = useMemo<WorkItem[]>(() => {
@@ -327,6 +355,58 @@ export function WorkItemDetailDrawer({
     if (typeof window !== "undefined" && !window.confirm(`删除任务卡 "${currentWi.title}"?`)) return;
     removeWorkItem(currentWi.id);
     onClose();
+  };
+  // 跨 branch 互传: 仅服务端卡 (有 worktree_id + lifecycle_version) 可用;
+  // 本地卡无服务端版本, 明确禁用并给出原因 (不冒充可互传)。
+  const handleHandoff = async () => {
+    if (!currentWi || !groupApi || !handoffTarget) return;
+    const sourceWorktreeId = currentWi.worktree_id;
+    const expectedVersion = currentWi.lifecycle_version;
+    if (!sourceWorktreeId || !expectedVersion) {
+      setHandoffError("该任务卡未绑定服务端 Worktree/版本, 无法跨 branch 互传。请先关联 Worktree 并从服务端刷新。");
+      return;
+    }
+    if (handoffTarget === currentWi.branch_id) {
+      setHandoffError("目标 branch 与当前 branch 相同, 无需互传。");
+      return;
+    }
+    setHandoffBusy(true);
+    setHandoffError(null);
+    setHandoffDone(null);
+    try {
+      const receipt = await groupApi.handoffWorkItem<{ handed_off: boolean; target_branch_id: string; task_card?: { branch_name?: string | null; lifecycle?: { version?: number } } }>(
+        sourceWorktreeId,
+        currentWi.id,
+        {
+          target_branch_id: handoffTarget,
+          expected_version: expectedVersion,
+          correlation_id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined,
+          reason: handoffReason.trim() || undefined,
+        },
+        typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `handoff-${Date.now()}`,
+      );
+      // 本地缓存同步新 branch/版本 (服务端真源已转移; 下次刷新会覆盖)
+      const targetName = handoffBranches.find((b) => b.branch_id === handoffTarget)?.name ?? receipt.task_card?.branch_name ?? null;
+      updateWorkItemField(currentWi.id, "branch_id", handoffTarget);
+      updateWorkItemField(currentWi.id, "branch_name", targetName);
+      if (receipt.task_card?.lifecycle?.version) {
+        updateWorkItemField(currentWi.id, "lifecycle_version", receipt.task_card.lifecycle.version);
+      }
+      setHandoffDone(`已互传到 branch「${targetName ?? handoffTarget}」`);
+      setHandoffTarget("");
+      setHandoffReason("");
+    } catch (err) {
+      const e = err as { status?: number; code?: string; message?: string };
+      setHandoffError(
+        e?.code === "version_conflict" || e?.status === 409
+          ? "版本冲突: 任务卡已被其他操作更新, 请刷新后重试。"
+          : e?.status === 403
+            ? "越权: 当前会话无目标 branch 的写入权限。"
+            : e?.message || "互传失败, 请重试。",
+      );
+    } finally {
+      setHandoffBusy(false);
+    }
   };
   // autoFocus title in new mode
   useEffect(() => {
@@ -576,6 +656,71 @@ export function WorkItemDetailDrawer({
               </div>
             )}
           </div>
+
+          {/* 4b. 跨 branch 显式互传 (handoff) — per 2026-11-21 branch 隔离 */}
+          {!isNew && currentWi && (
+            <div data-testid="work-item-drawer-handoff">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+                <ArrowRightLeft size={9} className="inline mr-1" /> 跨 Branch 互传 (Handoff)
+              </label>
+              <div className="text-[9px] text-ink-mute mb-1.5">
+                每个 branch 独立一套数据; 不互传时任务卡留在当前 branch。互传需手动指定目标 branch。
+              </div>
+              {currentWi.branch_name && (
+                <div className="text-[10px] font-mono text-ink-dim mb-1">
+                  当前 branch: <span className="text-info">{currentWi.branch_name}</span>
+                </div>
+              )}
+              {(!currentWi.worktree_id || !currentWi.lifecycle_version) ? (
+                <div className="text-[10px] text-ink-mute italic px-2 py-1.5 border border-dashed border-line rounded">
+                  本地任务卡 (无服务端 Worktree/版本) 不支持跨 branch 互传。请先关联 Worktree 并从服务端刷新。
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <select
+                    data-testid="work-item-drawer-handoff-target"
+                    value={handoffTarget}
+                    onChange={(e) => { setHandoffTarget(e.target.value); setHandoffError(null); setHandoffDone(null); }}
+                    disabled={handoffBusy || handoffBranches.length === 0}
+                    className="w-full text-xs bg-bg-soft border border-line rounded px-2 py-1.5 text-ink outline-none focus:border-accent disabled:opacity-50"
+                  >
+                    <option value="">{handoffBranches.length === 0 ? "无可用目标 branch (需服务端会话)" : "选择目标 branch…"}</option>
+                    {handoffBranches
+                      .filter((b) => b.branch_id !== currentWi.branch_id)
+                      .map((b) => (
+                        <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                      ))}
+                  </select>
+                  <input
+                    data-testid="work-item-drawer-handoff-reason"
+                    value={handoffReason}
+                    onChange={(e) => setHandoffReason(e.target.value)}
+                    placeholder="互传原因 (可选)"
+                    maxLength={4000}
+                    disabled={handoffBusy}
+                    className="w-full text-xs bg-bg-soft border border-line rounded px-2 py-1.5 text-ink placeholder:text-ink-mute outline-none focus:border-accent disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    data-testid="work-item-drawer-handoff-submit"
+                    onClick={handleHandoff}
+                    disabled={handoffBusy || !handoffTarget || !groupApi}
+                    className="w-full text-xs font-mono px-2 py-1.5 rounded border border-accent text-accent hover:bg-accent/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {handoffBusy ? "互传中…" : "确认互传到目标 branch"}
+                  </button>
+                  {handoffError && (
+                    <div data-testid="work-item-drawer-handoff-error" className="text-[10px] text-err flex items-start gap-1">
+                      <AlertTriangle size={10} className="mt-0.5 shrink-0" /> {handoffError}
+                    </div>
+                  )}
+                  {handoffDone && (
+                    <div data-testid="work-item-drawer-handoff-done" className="text-[10px] text-ok">{handoffDone}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 5. Description */}
           <div>

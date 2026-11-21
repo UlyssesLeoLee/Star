@@ -49,6 +49,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { getSession } from "@/lib/auth";
 import type { WorkItem, Sprint, Identity } from "@/types/ids";
 
 // =====================================================================
@@ -542,9 +543,12 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
     : scopedWorkItems;
   // per 2026-11-21: branch 级隔离 — 选中 branch 时只显示该 branch + 未绑定的任务
   const workItems = branch
-    ? worktreeScoped.filter((w) => !w.branch_id || w.branch_id === branch)
+    ? worktreeScoped.filter((w) => !w.branch_id || w.branch_name === branch || w.branch_id === branch)
     : worktreeScoped;
   const identities = useStore((s) => s.identities);
+  // per 2026-11-21: 真实会话身份替换占位 UUID — reporter/tenant 从已验证 JWT 取;
+  // 无会话时 reporter 留空 (后端从会话注入), 不再伪造 usr-002 / 全零 tenant。
+  const session = getSession();
   const createSprint = useStore((s) => s.createSprint);
   const startSprint = useStore((s) => s.startSprint);
   const completeSprint = useStore((s) => s.completeSprint);
@@ -647,13 +651,13 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
                 // branch 绑定当前选择 — 每个 branch 独立一套数据
                 const proj = projects.find((p) => p.id === projectId) ?? projects[0];
                 addWorkItem({
-                  tenant_id: proj?.tenant_id ?? "00000000-0000-0000-0000-000000000001",
-                  project_id: proj?.id ?? "00000000-0000-0000-0000-000000000000",
+                  tenant_id: session?.payload.tenant_id ?? proj?.tenant_id ?? "",
+                  project_id: proj?.id ?? "",
                   title,
                   kind: "task",
                   status: "todo",
                   priority: "p2",
-                  reporter_id: proj?.owner_id ?? "usr-002",
+                  reporter_id: session?.payload.user_id ?? proj?.owner_id ?? "",
                   worktree_id: worktreeId,
                   branch_id: branch ?? null,
                 });

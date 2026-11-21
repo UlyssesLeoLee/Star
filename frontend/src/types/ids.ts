@@ -265,6 +265,11 @@ export interface WorkItem {
   // per 2026-11-21 用户发令: branch 级数据隔离 — 每个 branch 独立一套数据,
   // 不传时各自独立; 跨 branch 互传走显式交接。null/缺省 = 未绑定 branch (全局可见)。
   branch_id?: string | null;
+  // 分支名 (git 枚举名, 与目录树 selectedBranch 匹配); null/缺省 = 未绑定
+  branch_name?: string | null;
+  // per 2026-11-21: 服务端 lifecycle 版本 (跨 branch handoff 的 expected_version 乐观锁);
+  // 本地卡缺省 = 无服务端版本, handoff 不可用。
+  lifecycle_version?: number;
   // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
   // 缺省: kind → WT_M_FROM_KIND 派生. 但允许 WorkItem 显式 override (例如 promotion: spike → M 后被改派为 task → T)
   w_t_m?: WtmCategory;

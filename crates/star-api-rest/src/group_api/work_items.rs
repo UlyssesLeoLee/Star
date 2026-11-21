@@ -230,6 +230,21 @@ pub(super) struct MoveWorkItemBody {
     reason: Option<String>,
 }
 
+/// 跨 branch 显式互传 (handoff) 请求体。
+///
+/// 每个 branch 是独立的一套数据; 只有用户显式发起 handoff 时任务卡才跨 branch 转移。
+/// `target_branch_id` 必须是同 Project 下已注册的 SCM Branch (scm.cloud_branch),
+/// 服务端据此定位/创建目标 Engineering Run, 绝不从请求体推断所有权。
+#[derive(Debug, Deserialize, Serialize)]
+pub(super) struct HandoffWorkItemBody {
+    /// 目标 branch 的 canonical BranchId (同 Project)
+    target_branch_id: Uuid,
+    /// 乐观并发版本 (task_lifecycle_current.version)
+    expected_version: i32,
+    correlation_id: Option<Uuid>,
+    reason: Option<String>,
+}
+
 /// 统一列 → 六态生命周期状态的单一映射 (与 groupProjection 读侧映射互逆)。
 ///
 /// 写侧唯一真源: Backlog/Sprint/Kanban 三入口移动卡片都经过本映射;
@@ -327,6 +342,10 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/move",
             post(move_work_item),
+        )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/handoff",
+            post(handoff_work_item),
         )
 }
 
@@ -786,6 +805,301 @@ async fn move_work_item(
         "moved": true,
         "task_card": receipt.snapshot,
     })))
+}
+
+/// 跨 branch 显式互传 (handoff): 把任务卡从源 worktree 所属 branch 转移到目标 branch。
+///
+/// 每个 branch 是独立的一套数据; 不发起 handoff 时任务卡始终留在自己的 branch。
+/// 写入遵循 task_metadata SCD2 契约: 关闭旧 metadata 版本 + 插入新版本 (guard 禁止
+/// 就地改 branch/run), 先解除源 worktree 关联 (guard 要求关联与 run 一致), 再绑定
+/// 目标 run。事务内设置 app.actor_id/app.correlation_id 供 outbox 触发器使用。
+/// 幂等键 + 请求指纹复用 task_command_idempotency; 审计走 task_lifecycle_audit。
+async fn handoff_work_item(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((worktree_id, work_item_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<HandoffWorkItemBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:write")?;
+    let worktree_id = parse_id(&worktree_id)?;
+    let work_item_id = parse_id(&work_item_id)?;
+    // 请求体校验先于任何数据库访问 (fail-closed)
+    if body.target_branch_id.is_nil()
+        || body.expected_version < 1
+        || body
+            .reason
+            .as_ref()
+            .is_some_and(|reason| reason.len() > 4_000)
+    {
+        return Err(GroupApiError::invalid_request("invalid_handoff_command"));
+    }
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(&format!("handoff:{worktree_id}:{work_item_id}"), &body)?;
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    // outbox 触发器要求事务上下文携带 actor/correlation; tenant 由 authorize_worktree 设置
+    sqlx::query(
+        "SELECT set_config('app.actor_id',$1,true),set_config('app.correlation_id',$2,true)",
+    )
+    .bind(actor.user_id.to_string())
+    .bind(correlation_id.to_string())
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+    let source_scope =
+        authorize_task_run_for_worktree(&mut tx, &actor, worktree_id, &worktree).await?;
+    require_task_writer(&source_scope.role)?;
+    // 幂等重放: 同键同指纹直接返回上次结果
+    if let Some(previous) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Ok(Json(previous));
+    }
+    let current = load_work_item(
+        &mut tx,
+        actor.tenant_id,
+        worktree.project_id,
+        worktree_id,
+        work_item_id,
+    )
+    .await?;
+    let current_version = current
+        .pointer("/lifecycle/version")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    if current_version != i64::from(body.expected_version) {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Err(GroupApiError::from_run_task_card(
+            RunTaskCardError::Conflict("version_conflict"),
+        ));
+    }
+    let current_status = current
+        .pointer("/lifecycle/status")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let source_branch_id = current
+        .pointer("/branch_id")
+        .and_then(Value::as_str)
+        .and_then(|value| Uuid::parse_str(value).ok());
+    // 目标 branch 必须是同 Project 下已注册的 SCM Branch (绝不从请求体推断所有权)
+    let target_branch = sqlx::query_as::<_, (Uuid, Uuid)>(
+        r#"
+        SELECT branch_id, repository_id
+        FROM scm.cloud_branch
+        WHERE tenant_id = $1 AND project_id = $2 AND branch_id = $3
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(body.target_branch_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    let (target_branch_id, target_repository_id) = target_branch;
+    if source_branch_id == Some(target_branch_id) {
+        return Err(GroupApiError::conflict("handoff_same_branch"));
+    }
+    // 定位目标 branch 的 Engineering Run; 不存在则按 create_run 模式创建并授予项目角色
+    let target_run_id: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT engineering_run_id
+        FROM multica.engineering_run
+        WHERE tenant_id = $1 AND project_id = $2 AND repository_id = $3 AND branch_id = $4
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(target_repository_id)
+    .bind(target_branch_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let target_run_id = match target_run_id {
+        Some(run_id) => {
+            let scope =
+                super::engineering_runs::authorize_run_owned_task_scope(&mut tx, &actor, run_id)
+                    .await?;
+            require_task_writer(&scope.role)?;
+            run_id
+        }
+        None => {
+            let project = active_binding(&mut tx, &actor, worktree.project_id).await?;
+            require_task_writer(&project.role)?;
+            let run_id = Uuid::new_v4();
+            sqlx::query(
+                "INSERT INTO multica.engineering_run (engineering_run_id,tenant_id,project_id,repository_id,branch_id)
+                 VALUES ($1,$2,$3,$4,$5)",
+            )
+            .bind(run_id)
+            .bind(actor.tenant_id)
+            .bind(worktree.project_id)
+            .bind(target_repository_id)
+            .bind(target_branch_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+            let run_title = format!("Handoff branch {target_branch_id}");
+            sqlx::query(
+                "INSERT INTO multica.engineering_run_revision
+                 (tenant_id,engineering_run_id,title,state,owner_user_id,changed_by,version)
+                 VALUES ($1,$2,$3,'active',$4,$4,1)",
+            )
+            .bind(actor.tenant_id)
+            .bind(run_id)
+            .bind(&run_title)
+            .bind(actor.user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+            sqlx::query(
+                "INSERT INTO permission.engineering_run_role_binding
+                 (tenant_id,engineering_run_id,user_id,role,granted_by,version)
+                 VALUES ($1,$2,$3,$4,$3,1)",
+            )
+            .bind(actor.tenant_id)
+            .bind(run_id)
+            .bind(actor.user_id)
+            .bind(&project.role)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+            run_id
+        }
+    };
+    // 锁定当前 metadata 版本 (SCD2 关闭/插入的并发保护)
+    let metadata = sqlx::query_as::<_, (Uuid, i32, Option<Uuid>)>(
+        r#"
+        SELECT metadata_id, version, workspace_id
+        FROM multica.task_metadata
+        WHERE tenant_id = $1 AND work_item_id = $2 AND valid_to IS NULL
+        FOR UPDATE
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(work_item_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    let (metadata_id, metadata_version, workspace_id) = metadata;
+    // 先解除源 worktree 关联 (metadata guard 要求关联与 run 一致, 否则拒绝换 run)
+    sqlx::query(
+        r#"
+        UPDATE multica.work_item_worktree
+        SET valid_to = now(), version = version + 1
+        WHERE tenant_id = $1 AND project_id = $2 AND work_item_id = $3
+          AND worktree_id = $4 AND valid_to IS NULL
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(work_item_id)
+    .bind(worktree_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    // 关闭旧 metadata 版本 (valid_to 置位, guard 允许; 不触发 outbox)
+    sqlx::query(
+        r#"
+        UPDATE multica.task_metadata
+        SET valid_to = now(), version = version + 1
+        WHERE tenant_id = $1 AND metadata_id = $2 AND valid_to IS NULL
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(metadata_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    // 插入新 metadata 版本: 同卡内容, 新 branch/run 所有权 (outbox 触发器记 task.owner_changed)
+    sqlx::query(
+        r#"
+        INSERT INTO multica.task_metadata
+            (work_item_id, tenant_id, workspace_id, project_id, repository_id, branch_id,
+             engineering_run_id, item_type, title, description, priority, labels, ai_task_data,
+             reporter_user_id, version)
+        SELECT work_item_id, tenant_id, $3, project_id, $4, $5,
+               $6, item_type, title, description, priority, labels, ai_task_data,
+               reporter_user_id, $7
+        FROM multica.task_metadata
+        WHERE tenant_id = $1 AND metadata_id = $2
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(metadata_id)
+    .bind(workspace_id)
+    .bind(target_repository_id)
+    .bind(target_branch_id)
+    .bind(target_run_id)
+    .bind(metadata_version + 1)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    // 审计: handoff 事件 (run 由 guard 自动校正为当前 owner; worktree 留空因源关联已解除)
+    sqlx::query(
+        r#"
+        INSERT INTO multica.task_lifecycle_audit
+            (tenant_id, project_id, engineering_run_id, worktree_id, work_item_id, task_card_id,
+             from_status, to_status, event_type, actor_id, idempotency_key, correlation_id, details)
+        VALUES ($1,$2,$3,NULL,$4,$4,$5,$5,'branch_handoff',$6,$7,$8,$9)
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(target_run_id)
+    .bind(work_item_id)
+    .bind(&current_status)
+    .bind(actor.user_id)
+    .bind(&key)
+    .bind(correlation_id)
+    .bind(json!({
+        "source_branch_id": source_branch_id,
+        "target_branch_id": target_branch_id,
+        "source_worktree_id": worktree_id,
+        "reason": body.reason,
+    }))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    // 回读转移后的投影 (经目标 run 的 worktree 关联; 无关联时直接按 metadata 投影)
+    let handed_off = sqlx::query_as::<_, WorkItemProjection>(
+        r#"
+        SELECT m.work_item_id, m.item_type, m.title, m.description, m.priority, m.labels, m.ai_task_data,
+               m.reporter_user_id, c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.claim_expires_at,
+               c.version, c.updated_at AS lifecycle_updated_at, m.updated_at AS metadata_updated_at,
+               m.branch_id, br.name AS branch_name
+        FROM multica.task_metadata m
+        LEFT JOIN scm.cloud_branch_revision br
+          ON br.tenant_id = m.tenant_id AND br.branch_id = m.branch_id AND br.valid_to IS NULL
+        JOIN multica.task_lifecycle_current c
+          ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
+        WHERE m.tenant_id = $1 AND m.work_item_id = $2 AND m.valid_to IS NULL
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(work_item_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    let response = json!({
+        "handed_off": true,
+        "target_branch_id": target_branch_id,
+        "target_engineering_run_id": target_run_id,
+        "task_card": project_work_item(handed_off),
+    });
+    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(response))
 }
 
 /// Resolve the unified move target: exactly one of column/status, normalized to lifecycle status.

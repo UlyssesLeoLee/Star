@@ -27,12 +27,15 @@ export function WeekView({
   onEventMove,
   userTimezone = "UTC",
   today = new Date(),
+  onDayClick,
 }: {
   startDate: Date;       // any date in the week; we snap to its Sunday
   events: CalendarEvent[];
   onEventMove: EventMoveHandler;
   userTimezone?: string;
   today?: Date;
+  /** 点击空白日期创建任务 (yyyy-MM-dd 本地日期) */
+  onDayClick?: (dateKey: string) => void;
 }) {
   const router = useRouter();
   const days = useMemo(() => buildWeekGrid(startDate), [startDate]);
@@ -92,14 +95,16 @@ export function WeekView({
                 }
               }}
               onDrop={(e) => {
-                e.preventDefault();
-                const id = e.dataTransfer.getData("text/plain");
-                if (id) onEventMove(id, key);
-              }}
-              className={clsx(
-                "min-h-[20rem] border-r border-line last:border-r-0",
-                isToday ? "bg-accent/5" : "bg-bg-card",
-              )}
+                              e.preventDefault();
+                              const id = e.dataTransfer.getData("text/plain");
+                              if (id) onEventMove(id, key);
+                            }}
+                            onClick={onDayClick ? () => onDayClick(key) : undefined}
+                            className={clsx(
+                              "min-h-[20rem] border-r border-line last:border-r-0",
+                              isToday ? "bg-accent/5" : "bg-bg-card",
+                              onDayClick && "cursor-pointer hover:bg-accent/5",
+                            )}
             >
               {/* day header */}
               <div
