@@ -196,7 +196,7 @@ interface StoreState {
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
   // per 2026-11-22: 在沙箱/左侧导航栏中创建 Worktree
-  createWorktree: (input: { project_id: string; name: string; branch: string; base_branch?: string; lane_id?: string; tenant_id?: string }) => string;
+  createWorktree: (input: { project_id: string; name: string; branch: string; base_branch?: string; lane_id?: string; tenant_id?: string; host_path?: string }) => string;
   transitionAgent:    (id: string, to: AgentStatus) => void;
   transitionFeedback: (id: string, to: FeedbackStatus) => void;
   transitionPR:       (id: string, to: PullRequestStatus) => void;
@@ -480,7 +480,7 @@ const initialState = (set: any, get?: any): StoreState => ({
   //   - tenant_id 可选（缺省 store.tenantId）
   //   创建后 status = "initializing"，供左侧 ProjectRunTree 树形导航直接渲染
   createWorktree: (input) => {
-    const { project_id, name, branch, base_branch, lane_id, tenant_id } = input;
+    const { project_id, name, branch, base_branch, lane_id, tenant_id, host_path } = input;
     if (!project_id || !name || !branch) {
       throw new Error("createWorktree 缺少必填项：project_id / name / branch");
     }
@@ -494,6 +494,7 @@ const initialState = (set: any, get?: any): StoreState => ({
       name: name.trim(),
       branch: branch.trim(),
       base_branch: (base_branch ?? "").trim() || "",
+      host_path: host_path?.trim() || undefined,
       status: "initializing",
       lock_version: 1,
       last_event_at: nowIso,

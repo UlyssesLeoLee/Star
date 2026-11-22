@@ -478,6 +478,8 @@ export interface Worktree {
   name: string;
   branch: string;
   base_branch: string;
+  /** 沙箱隔离：用户指定的本地路径，Podman 容器会把它挂载为 /src (per 2026-11-22) */
+  host_path?: string;
   status: WorktreeStatus;
   local_runtime_id?: Uuid;
   agent_session_id?: Uuid;

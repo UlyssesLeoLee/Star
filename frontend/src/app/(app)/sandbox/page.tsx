@@ -120,6 +120,7 @@ export default function SandboxPage() {
   const [wtName, setWtName] = useState("");
   const [wtBranch, setWtBranch] = useState("");
   const [wtBaseBranch, setWtBaseBranch] = useState("");
+  const [wtHostPath, setWtHostPath] = useState("");
   const [wtBusy, setWtBusy] = useState(false);
   const [wtError, setWtError] = useState<string | null>(null);
   const [wtCreated, setWtCreated] = useState<string | null>(null);
@@ -133,16 +134,17 @@ export default function SandboxPage() {
         name: wtName.trim(),
         branch: wtBranch.trim(),
         base_branch: wtBaseBranch.trim() || "main",
+        host_path: wtHostPath.trim() || undefined,
       });
       if (worktreeGroupApi) {
         await worktreeGroupApi.createProjectWorktree(
           "physis-project-default",
-          { id: newId, name: wtName.trim(), branch: wtBranch.trim(), base_branch: wtBaseBranch.trim() || "main", status: "initializing" },
+          { id: newId, name: wtName.trim(), branch: wtBranch.trim(), base_branch: wtBaseBranch.trim() || "main", status: "initializing", host_path: wtHostPath.trim() || undefined },
           `sandbox-wt-${Date.now()}`,
         );
       }
       setWtCreated(newId);
-      setWtName(""); setWtBranch(""); setWtBaseBranch("");
+      setWtName(""); setWtBranch(""); setWtBaseBranch(""); setWtHostPath("");
     } catch (e) {
       setWtError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -417,7 +419,16 @@ export default function SandboxPage() {
                     placeholder="基准分支 (默认 main)"
                     className="rounded border border-line bg-bg-soft px-2.5 py-1.5 text-xs text-ink focus:border-accent"
                   />
-                  <button
+                  <input
+                    data-testid="sandbox-wt-host-path"
+                    type="text"
+                    value={wtHostPath}
+                    onChange={(e) => setWtHostPath(e.target.value)}
+                    placeholder="沙箱挂载路径 (如 D:\\Star\\worktrees\\my-sandbox)"
+                    className="rounded border border-line bg-bg-soft px-2.5 py-1.5 text-xs text-ink focus:border-accent"
+                  />
+                </div>
+                <button
                     type="button"
                     data-testid="sandbox-open-worktree-btn"
                     onClick={handleCreateWT}
@@ -426,7 +437,6 @@ export default function SandboxPage() {
                   >
                     {wtBusy ? "创建中…" : "开设 Worktree"}
                   </button>
-                </div>
               </div>
               <p className="text-[10px] text-ink-dim mt-1">创建后 Worktree 将出现在左侧导航树的 Project 节点下，并可从任务看板、任务卡 CLI、Canvas 等模块读取。</p>
             </section>

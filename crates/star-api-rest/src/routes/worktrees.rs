@@ -65,6 +65,8 @@ pub struct CreateBody {
     pub agent_session_id: Option<String>,
     /// 所属 Lane ID — 可选 (P0-lane: 创建后即挂 lane; 无则留空, 归属经 attach 语义)
     pub lane_id: Option<String>,
+    /// 沙箱隔离：用户指定的本地路径，Podman 容器会把它挂载为 /src (per 2026-11-22)
+    pub host_path: Option<String>,
 }
 
 /// `POST /api/v1/worktrees`
@@ -120,6 +122,36 @@ pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Va
             )
             .await?;
     }
+
+    // per 2026-11-22: 沙箱隔离 — 如果用户指定了 host_path，用 Podman 把该路径挂载为 /src
+    if let Some(host_path) = &body.host_path {
+        let container_name = format!("star-wt-{}", wt.id);
+        // 先检查 podman 是否可用
+        let podman_check = std::process::Command::new("podman")
+            .arg("--version")
+            .output();
+        if podman_check.is_err() {
+            return Err(RestError::service_unavailable(
+                "Podman 未安装或不在 PATH 中，无法创建沙箱容器。请先安装 Podman 并确保在系统 PATH 中。",
+            ));
+        }
+        // 创建容器并挂载用户指定路径到 /src
+        let create_status = std::process::Command::new("podman")
+            .args([
+                "run", "-d", "--name", &container_name,
+                "-v", &format!("{}:{}", host_path, "/src"),
+                "-w", "/src",
+                "ubuntu:22.04",
+                "sleep", "infinity",
+            ])
+            .status()?;
+        if !create_status.success() {
+            return Err(RestError::internal(
+                "Podman 容器创建失败，请检查路径权限和镜像是否可用",
+            ));
+        }
+    }
+
     Ok(Json(RestResponse::ok(json!({
         "worktree": {
             "id": wt.id.to_string(),
@@ -136,6 +168,7 @@ pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Va
             "version": wt.version,
             "created_at": wt.created_at.to_rfc3339(),
             "updated_at": wt.updated_at.to_rfc3339(),
+            "host_path": body.host_path,
         }
     }))))
 }
