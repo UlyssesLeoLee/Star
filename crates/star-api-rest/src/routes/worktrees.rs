@@ -133,6 +133,7 @@ pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Va
         if podman_check.is_err() {
             return Err(RestError::service_unavailable(
                 "Podman 未安装或不在 PATH 中，无法创建沙箱容器。请先安装 Podman 并确保在系统 PATH 中。",
+                "安装 Podman 并确保在系统 PATH 中",
             ));
         }
         // 创建容器并挂载用户指定路径到 /src
@@ -148,6 +149,7 @@ pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Va
         if !create_status.success() {
             return Err(RestError::internal(
                 "Podman 容器创建失败，请检查路径权限和镜像是否可用",
+                "检查路径权限和镜像可用性",
             ));
         }
     }
