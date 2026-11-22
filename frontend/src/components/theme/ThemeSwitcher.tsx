@@ -1,5 +1,13 @@
 "use client";
 
+/*
+@cypher schema=1 source_sha256=c6d653a80d677110aa39c8731e446b512a73502dcd2734f57ddf299a34f1f014
+MERGE (self:File {path:"frontend/src/components/theme/ThemeSwitcher.tsx"})
+MERGE (themeTypes:File {path:"frontend/src/lib/theme/types.ts"})
+MERGE (self)-[:IMPORTS]->(themeTypes)
+@endcypher
+*/
+
 // Star Frontend — 主题切换器
 // 顶栏图标按钮: 当前主题图标 (🌙/☀️) + 点击下拉切换.
 // 设计简化 (per 2026-09-27 用户反馈: 顶栏过于拥挤, 不要 4 字主题名 "暗夜神格"/"少年原画" 文字说明).
@@ -54,7 +62,6 @@ export function ThemeSwitcher() {
     if (t.id === "physis") return "🧊";
     if (t.id === "shanghai") return "🪭";
     if (t.id === "charisma") return "✨";
-    if (t.id === "christmas") return "🎄";
     return t.isDark ? "🌙" : "☀️";
   };
 

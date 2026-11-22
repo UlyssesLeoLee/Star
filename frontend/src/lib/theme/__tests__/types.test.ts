@@ -1,3 +1,11 @@
+/*
+@cypher schema=1 source_sha256=bd455ecb089c8acd0ac800bb21ba06c07d8760e7e5107ddb2fecfae2fb23c6d7
+MERGE (self:File {path:"frontend/src/lib/theme/__tests__/types.test.ts"})
+MERGE (themeTypes:File {path:"frontend/src/lib/theme/types.ts"})
+MERGE (self)-[:IMPORTS]->(themeTypes)
+MERGE (self)-[:TESTS]->(themeTypes)
+@endcypher
+*/
 // Star Frontend — 主题类型单测
 // Per 2026-08-29 04:09 JST 主题决策
 
@@ -12,12 +20,16 @@ import {
 } from "../types";
 
 describe("THEMES", () => {
-  it("至少 5 个内置主题 (Light + Dark + Christmas + Charisma + Shanghai)", () => {
+  it("内置主题包含所有可选主题", () => {
     expect(THEMES.length).toBeGreaterThanOrEqual(5);
     const ids = THEMES.map((t) => t.id);
     expect(ids).toContain("light");
     expect(ids).toContain("dark");
-    expect(ids).toContain("christmas");
+    expect(ids).not.toContain("christmas");
+    expect(ids).toContain("physis");
+    expect(getTheme("christmas")).toBeUndefined();
+    const physis = getTheme("physis");
+    expect(physis?.colors.find((c) => c.name === "--color-surface")?.hex).toBe("#0B0E1C");
     expect(ids).toContain("charisma");
     expect(ids).toContain("shanghai");
   });
@@ -34,18 +46,8 @@ describe("THEMES", () => {
     for (const t of THEMES) {
       if (t.id === "light") expect(t.isDark).toBe(false);
       if (t.id === "dark") expect(t.isDark).toBe(true);
-      if (t.id === "christmas") expect(t.isDark).toBe(true);
       if (t.id === "charisma") expect(t.isDark).toBe(true);
       if (t.id === "shanghai") expect(t.isDark).toBe(false);
-    }
-  });
-
-  it("圣诞主题符合常规毛玻璃风格特征 (标准圆角 > 0px)", () => {
-    const xmas = THEMES.find((t) => t.id === "christmas");
-    expect(xmas).toBeDefined();
-    expect(xmas!.displayName).toBe("圣夜霜雪");
-    for (const r of xmas!.radii) {
-      expect(r.px).toBeGreaterThan(0);
     }
   });
 

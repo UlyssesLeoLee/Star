@@ -1,3 +1,8 @@
+/*
+@cypher schema=1 source_sha256=9571c94861b789fb86b81036b126a854e06334796d4b9c9c969efa7d2682d8f6
+MERGE (self:File {path:"frontend/src/lib/theme/types.ts"})
+@endcypher
+*/
 // Star Frontend — 主题类型定义
 // Per 2026-08-29 04:09 JST 用户拍板: 三元组 enum + 可插拔 + 三层作用域.
 
@@ -46,17 +51,17 @@ export interface ThemeDefinition {
 
 /** Star 调色板 — Mecha Ceramic Light (机甲陶瓷白 / 桜の光) */
 const STAR_LIGHT_PALETTE: ColorToken[] = [
-  { name: "--color-primary", hex: "#0284C7" },
-  { name: "--color-secondary", hex: "#F43F5E" },
-  { name: "--color-success", hex: "#059669" },
-  { name: "--color-warning", hex: "#D97706" },
-  { name: "--color-danger", hex: "#E11D48" },
+  { name: "--color-primary", hex: "#1A6CF6" },
+  { name: "--color-secondary", hex: "#E8295A" },
+  { name: "--color-success", hex: "#16A34A" },
+  { name: "--color-warning", hex: "#B45309" },
+  { name: "--color-danger", hex: "#DC2626" },
   { name: "--color-neutral", hex: "#475569" },
-  { name: "--color-surface", hex: "#F8FAFD" },
-  { name: "--color-surface-2", hex: "#FFFFFF" },
-  { name: "--color-text", hex: "#0F172A" },
-  { name: "--color-text-dim", hex: "#475569" },
-  { name: "--color-border", hex: "#E2E8F0" },
+  { name: "--color-surface", hex: "#FFFFFF" },
+  { name: "--color-surface-2", hex: "#F8F9FC" },
+  { name: "--color-text", hex: "#0D1117" },
+  { name: "--color-text-dim", hex: "#2C3A4A" },
+  { name: "--color-border", hex: "#D0D7E2" },
 ];
 
 /** Star 调色板 — Neo-Tokyo Dark (默认暗色 / 赛博黑曜石 & 电光霓虹) */
@@ -67,35 +72,11 @@ const STAR_DARK_PALETTE: ColorToken[] = [
   { name: "--color-warning", hex: "#F59E0B" },
   { name: "--color-danger", hex: "#FF3366" },
   { name: "--color-neutral", hex: "#94A3B8" },
-  { name: "--color-surface", hex: "#080B11" },
-  { name: "--color-surface-2", hex: "#0F1420" },
+  { name: "--color-surface", hex: "#06080E" },
+  { name: "--color-surface-2", hex: "#0C111C" },
   { name: "--color-text", hex: "#F8FAFC" },
   { name: "--color-text-dim", hex: "#94A3B8" },
-  { name: "--color-border", hex: "#1E293B" },
-];
-
-/**
- * Star 调色板 — Frost Noel / 圣夜霜雪 (第3套UI主题: 冬日温暖毛玻璃风格)
- * 运用毛玻璃 (Glassmorphism) 与冬日色彩心理学:
- * - 圣夜绯红 (#D42426): 礼物缎带与节日暖意
- * - 常青松针 (#165B33): 冬青与冷杉避风港
- * - 星芒烛金 (#F8B229): 伯利恒暖光与流光倒影
- * - 圣夜霜林 (#0B130E): 半透明毛玻璃微暗底
- * - 初雪霜白 (#F5F8F5): 晶莹高对比文本
- */
-const STAR_CHRISTMAS_PALETTE: ColorToken[] = [
-  { name: "--color-primary", hex: "#D42426" },
-  { name: "--color-secondary", hex: "#165B33" },
-  { name: "--color-accent", hex: "#F8B229" },
-  { name: "--color-success", hex: "#22C55E" },
-  { name: "--color-warning", hex: "#F59E0B" },
-  { name: "--color-danger", hex: "#EF4444" },
-  { name: "--color-neutral", hex: "#7A9A8B" },
-  { name: "--color-surface", hex: "#0B130E" },
-  { name: "--color-surface-2", hex: "#122017" },
-  { name: "--color-text", hex: "#F5F8F5" },
-  { name: "--color-text-dim", hex: "#9EBCAB" },
-  { name: "--color-border", hex: "#234330" },
+  { name: "--color-border", hex: "#1A2234" },
 ];
 
 /**
@@ -140,7 +121,7 @@ const STAR_SHANGHAI_PALETTE: ColorToken[] = [
   { name: "--color-danger", hex: "#B8282B" },
   { name: "--color-neutral", hex: "#8C7E70" },
   { name: "--color-surface", hex: "#F5E8C7" },
-  { name: "--color-surface-2", hex: "#EBD8B0" },
+  { name: "--color-surface-2", hex: "#FAF2DE" },
   { name: "--color-text", hex: "#221C16" },
   { name: "--color-text-dim", hex: "#6B6055" },
   { name: "--color-border", hex: "#C89228" },
@@ -170,6 +151,20 @@ const STAR_CEL_PALETTE: ColorToken[] = [
   { name: "--color-text", hex: "#111827" },
   { name: "--color-text-dim", hex: "#4B5563" },
   { name: "--color-border", hex: "#1E293B" },
+];
+
+const STAR_PHYSIS_PALETTE: ColorToken[] = [
+  { name: "--color-primary", hex: "#7C8CFF" },
+  { name: "--color-secondary", hex: "#9C6BFF" },
+  { name: "--color-success", hex: "#5AD2FF" },
+  { name: "--color-warning", hex: "#FFB86B" },
+  { name: "--color-danger", hex: "#FF5C7A" },
+  { name: "--color-neutral", hex: "#AAB3E8" },
+  { name: "--color-surface", hex: "#0B0E1C" },
+  { name: "--color-surface-2", hex: "#12163A" },
+  { name: "--color-text", hex: "#E2E8FF" },
+  { name: "--color-text-dim", hex: "#AAB3E8" },
+  { name: "--color-border", hex: "#2B3163" },
 ];
 
 /** 间距 token (4px 基础栅格) */
@@ -212,7 +207,7 @@ const CEL_RADII: RadiusToken[] = [
   { name: "--radius-lg", px: 6 },
 ];
 
-/** 内置主题 (暗夜神格 + 少年原画 + 圣夜霜雪 + 极魅像素 + 老上海月份牌 + 日式赛璐璐) */
+/** 内置主题 */
 export const THEMES: ThemeDefinition[] = [
   {
     id: "dark",
@@ -228,15 +223,6 @@ export const THEMES: ThemeDefinition[] = [
     displayName: "少年原画",
     isDark: false,
     colors: STAR_LIGHT_PALETTE,
-    spacings: STAR_SPACING,
-    radii: STAR_RADII,
-    version: 2,
-  },
-  {
-    id: "christmas",
-    displayName: "圣夜霜雪",
-    isDark: true,
-    colors: STAR_CHRISTMAS_PALETTE,
     spacings: STAR_SPACING,
     radii: STAR_RADII,
     version: 2,
@@ -272,7 +258,7 @@ export const THEMES: ThemeDefinition[] = [
     id: "physis",
     displayName: "Physis 3D 物理",
     isDark: true,
-    colors: STAR_CEL_PALETTE, // 基色复用 cel (CSS 层覆盖 3D 深紫蓝)
+    colors: STAR_PHYSIS_PALETTE,
     spacings: STAR_SPACING,
     radii: CEL_RADII,
     version: 1,

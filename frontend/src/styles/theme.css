@@ -122,7 +122,7 @@
   --cel-surface-card:     #ffffff;
   --cel-surface-sub:      #f8fafd;
   --cel-surface-stage:    #eff4fa;
-  --cel-card-ramp:        linear-gradient(145deg, #ffffff 0%, #f9fbfd 50%, #eff4fa 100%);
+  --cel-card-ramp:        linear-gradient(145deg, #ffffff 0%, #ffffff 38%, #f1f4f9 38%, #f1f4f9 72%, #e8edf4 72%, #e8edf4 100%);
   --cel-crimson:          #e8295a;
   --cel-cyan:             #1a6cf6;
   --cel-gold:             #d97706;
@@ -131,10 +131,10 @@
   --cel-text-secondary:   #475569;
   --cel-screentone-dot:   rgba(13, 17, 23, 0.035);
   --cel-shadow-color:     #1e293b;
-  --cel-bevel-hi:         rgba(255, 255, 255, 0.95);
-  --cel-bevel-lo:         rgba(13, 17, 23, 0.08);
-  --cel-glint-color:      #ffffff;
-  --cel-glint-rim:        rgba(26, 108, 246, 0.20);
+  --cel-bevel-hi:         rgba(255, 255, 255, 0.65);
+  --cel-bevel-lo:         rgba(10, 13, 20, 0.18);
+  --cel-glint-color:      rgba(255, 255, 255, 0.70);
+  --cel-glint-rim:        rgba(0, 85, 255, 0.15);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -180,11 +180,11 @@
 
   --color-text:      #f8fafc;
   --color-text-dim:  #94a3b8;
-  --color-text-mute: #475569;
+  --color-text-mute: #8492a9;
 
   --ink-DEFAULT: #f8fafc;
   --ink-dim:     #94a3b8;
-  --ink-mute:    #475569;
+  --ink-mute:    #8492a9;
 
   --color-border:        #1a2234;
   --color-border-subtle: #111724;
@@ -210,23 +210,23 @@
   --glow-secondary: 0 0 21px rgba(255, 42, 133, 0.38);
 
   /* === CEL-SHADED / CYBER OBSIDIAN ENGINE TOKENS === */
-  --cel-bg:               #07090e;
-  --cel-surface-card:     #0d1322;
-  --cel-surface-sub:      #131c2e;
-  --cel-surface-stage:    #090e18;
-  --cel-card-ramp:        linear-gradient(145deg, #18233c 0%, #121b2f 45%, #0c1220 100%);
+  --cel-bg:               #06080e;
+  --cel-surface-card:     #0c111c;
+  --cel-surface-sub:      #121929;
+  --cel-surface-stage:    #192338;
+  --cel-card-ramp:        linear-gradient(145deg, #1a2438 0%, #1a2438 35%, #121b2b 35%, #121b2b 70%, #0c111c 70%, #0c111c 100%);
   --cel-crimson:          #ff184c;
   --cel-cyan:             #00f0ff;
   --cel-gold:             #ffc400;
-  --cel-ink:              #1e293b;
+  --cel-ink:              #05070c;
   --cel-text-primary:     #ffffff;
   --cel-text-secondary:   #94a3b8;
-  --cel-screentone-dot:   rgba(0, 240, 255, 0.10);
+  --cel-screentone-dot:   rgba(0, 240, 255, 0.08);
   --cel-shadow-color:     #000000;
-  --cel-bevel-hi:         rgba(0, 240, 255, 0.25);
-  --cel-bevel-lo:         rgba(0, 0, 0, 0.70);
-  --cel-glint-color:      rgba(255, 255, 255, 0.35);
-  --cel-glint-rim:        rgba(0, 240, 255, 0.25);
+  --cel-bevel-hi:         rgba(189, 231, 255, 0.16);
+  --cel-bevel-lo:         rgba(0, 0, 0, 0.55);
+  --cel-glint-color:      rgba(255, 255, 255, 0.28);
+  --cel-glint-rim:        rgba(0, 240, 255, 0.16);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -379,8 +379,8 @@ html.charisma,
   --color-accent-violet:      #a855f7;
   --color-accent-violet-glow: rgba(168, 85, 247, 0.32);
 
-  /* 主色反色 — 纯白 (在 #8b5cf6 紫底上对比度 6.8:1 WCAG AA+) */
-  --color-on-primary:         #ffffff;
+  /* 主色反色 — 深紫墨色，保持浅紫高光上的可读性 */
+  --color-on-primary:         #170d29;
 
   /* === 语义色 === */
   --color-success: #10b981;
@@ -449,7 +449,7 @@ html.charisma,
   --cel-bg: #0c0a14;
   --cel-surface-card: #171326;
   --cel-surface-sub: #221c38;
-  --cel-surface-stage: #08060e;
+  --cel-surface-stage: #2a2046;
   --cel-card-ramp: linear-gradient(135deg, #2a2046 0%, #2a2046 35%, #1c1530 35%, #1c1530 70%, #0c0a14 70%, #0c0a14 100%);
   --cel-crimson: #e11d48;
   --cel-cyan: #8b5cf6;
@@ -457,12 +457,12 @@ html.charisma,
   --cel-ink: #050409;
   --cel-text-primary: #fdf4ff;
   --cel-text-secondary: #a79bb7;
-  --cel-screentone-dot: rgba(245, 158, 11, 0.16);
+  --cel-screentone-dot: rgba(245, 158, 11, 0.12);
   --cel-shadow-color: #050409;
-  --cel-bevel-hi: rgba(245, 158, 11, 0.35);
-  --cel-bevel-lo: rgba(5, 4, 9, 0.85);
-  --cel-glint-color: rgba(255, 255, 255, 0.45);
-  --cel-glint-rim: rgba(139, 92, 246, 0.38);
+  --cel-bevel-hi: rgba(245, 243, 255, 0.16);
+  --cel-bevel-lo: rgba(5, 4, 9, 0.60);
+  --cel-glint-color: rgba(253, 244, 255, 0.26);
+  --cel-glint-rim: rgba(225, 29, 72, 0.18);
 
   /* === HD-2D (歧路旅人 / OCTOPATH TRAVELER) 宗师级 3D 仿 2D 光学与体素变量 === */
   --hd2d-candle-gold:    #fbbf24;
@@ -585,12 +585,12 @@ html.shanghai,
   --cel-ink: #221c16;
   --cel-text-primary: #221c16;
   --cel-text-secondary: #6b6055;
-  --cel-screentone-dot: rgba(184, 40, 43, 0.08);
+  --cel-screentone-dot: rgba(184, 40, 43, 0.10);
   --cel-shadow-color: rgba(34, 28, 22, 0.55);
-  --cel-bevel-hi: rgba(255, 255, 255, 0.75);
-  --cel-bevel-lo: rgba(34, 28, 22, 0.22);
-  --cel-glint-color: rgba(212, 158, 53, 0.45);
-  --cel-glint-rim: rgba(184, 40, 43, 0.25);
+  --cel-bevel-hi: rgba(255, 251, 240, 0.70);
+  --cel-bevel-lo: rgba(122, 90, 40, 0.25);
+  --cel-glint-color: rgba(255, 251, 240, 0.65);
+  --cel-glint-rim: rgba(200, 146, 40, 0.22);
 
   /* === 老上海月份牌 Art Deco 专属变量 === */
   --shanghai-parchment: #f5e8c7;
@@ -701,19 +701,19 @@ html.cel,
   --cel-surface-card: #ffffff;
   --cel-surface-sub: #eef2f6;
   --cel-surface-stage: #e2e8f0;
-  --cel-card-ramp: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  --cel-crimson: #dc2626;
+  --cel-card-ramp: linear-gradient(145deg, #ffffff 0%, #ffffff 38%, #eef2f6 38%, #eef2f6 72%, #dbe4ef 72%, #dbe4ef 100%);
+  --cel-crimson: #ea580c;
   --cel-cyan: #2563eb;
   --cel-gold: #f59e0b;
   --cel-ink: #111827;
   --cel-text-primary: #111827;
   --cel-text-secondary: #4b5563;
-  --cel-screentone-dot: rgba(37, 99, 235, 0.08);
-  --cel-shadow-color: rgba(17, 24, 39, 0.85);
-  --cel-bevel-hi: rgba(255, 255, 255, 0.95);
-  --cel-bevel-lo: rgba(17, 24, 39, 0.35);
-  --cel-glint-color: #ffffff;
-  --cel-glint-rim: rgba(37, 99, 235, 0.45);
+  --cel-screentone-dot: rgba(37, 99, 235, 0.10);
+  --cel-shadow-color: #111827;
+  --cel-bevel-hi: rgba(255, 255, 255, 0.80);
+  --cel-bevel-lo: rgba(17, 24, 39, 0.15);
+  --cel-glint-color: rgba(255, 255, 255, 0.75);
+  --cel-glint-rim: rgba(37, 99, 235, 0.15);
 
   /* === 日式赛璐璐专属变量 === */
   --anime-cel-blue:       #2563eb;
