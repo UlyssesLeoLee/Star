@@ -355,7 +355,18 @@ export default function SandboxPage() {
               <tbody>
                 {worktrees.length > 0 ? worktrees.map((w) => (
                   <tr key={w.id} className="border-b border-line/60">
-                    <td className="py-2 pr-3 font-mono font-semibold text-ink">{w.id}</td>
+                    <td className="py-2 pr-3 font-mono font-semibold text-ink">
+                      <a
+                        href={`/worktree?worktree_id=${encodeURIComponent(w.id)}`}
+                        className="hover:underline text-accent"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.location.href = `/worktree?worktree_id=${encodeURIComponent(w.id)}`;
+                        }}
+                      >
+                        {w.name}
+                      </a>
+                    </td>
                     <td className="py-2 pr-3 font-mono text-ink-dim flex items-center gap-1">
                       <GitBranch size={11} /> {w.branch}
                     </td>
