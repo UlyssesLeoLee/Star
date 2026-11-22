@@ -126,7 +126,30 @@ else
 fi
 
 echo ""
-echo "==== §ST 总结: $st_pass PASS / $st_fail FAIL ===="
+echo "==== §ST 总结: $st_pass PASS / $st_fail FAIL ==="
+echo ""
+
+# ===== §ET: End-to-End Test 层 — Sandbox Worktree Isolation (Playwright) =====
+echo "===== §ET (End-to-End Test) 层 — tests/run-e2e.sh ====="
+echo ""
+
+et_pass=0
+et_fail=0
+et_results=()
+if [ -f "$REPO_ROOT/tools/star-flash-mock/tests/run-e2e.sh" ]; then
+    if bash "$REPO_ROOT/tools/star-flash-mock/tests/run-e2e.sh" 2>&1 | tail -20; then
+        et_results+=("[PASS] tests/run-e2e.sh (sandbox-worktree-isolation)")
+        et_pass=$((et_pass + 1))
+    else
+        et_results+=("[FAIL] tests/run-e2e.sh (sandbox-worktree-isolation)")
+        et_fail=$((et_fail + 1))
+    fi
+else
+    echo "  [WARN] tests/run-e2e.sh 缺失, 跳过 ET 层"
+fi
+
+echo ""
+echo "==== §ET 总结: $et_pass PASS / $et_fail FAIL ==="
 echo ""
 
 # ===== 综合守门 #9 子代理 status 实证 =====
@@ -142,18 +165,19 @@ report_file="$REPORT_DIR/regression-report-all-$(date -u +'%Y-%m-%d').md"
     echo "# Star Mock Project UT + IT + ST 综合回归报告 (v1.1, per ULYS-140)"
     echo ""
     echo "> **生成时间**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-    echo "> **范围**: tools/star-flash-mock/{scripts/,mock_data/,docs/,k3s/}"
+    echo "> **范围**: tools/star-flash-mock/{scripts/,mock_data/,docs/,k3s/,tests/}"
     echo "> **触发**: ULYS-140 (回归测试) 2026-09-20 JST"
     echo "> **守门**: 守门 #1+#9+#11+#12+#13+#19+#24"
     echo ""
-    echo "## 1. 三层总结"
+    echo "## 1. 四层总结"
     echo ""
     echo "| 层 | 范围 | PASS | FAIL | 总 |"
     echo "|---|---|---|---|---|"
     echo "| §UT (Unit Test) | tools/star-flash-mock/scripts/ 12 scripts | $ut_pass | $ut_fail | ${#ut_scripts[@]} |"
     echo "| §IT (Integration Test) | mock_data/uat/regression/ 1 runner (35 场景) | $it_pass | $it_fail | 1 |"
     echo "| §ST (System Test) | scripts/regression-test-system.sh 7 段 | $st_pass | $st_fail | 1 |"
-    echo "| **总计** | — | **$((ut_pass + it_pass + st_pass))** | **$((ut_fail + it_fail + st_fail))** | **$((12 + 1 + 1))** |"
+    echo "| §ET (End-to-End Test) | tests/run-e2e.sh (sandbox-worktree-isolation) | $et_pass | $et_fail | 1 |"
+    echo "| **总计** | — | **$((ut_pass + it_pass + st_pass + et_pass))** | **$((ut_fail + it_fail + st_fail + et_fail))** | **$((12 + 1 + 1 + 1))** |"
     echo ""
     echo "## 2. §UT (Unit Test) 12 scripts 详细"
     echo ""
@@ -177,7 +201,13 @@ report_file="$REPORT_DIR/regression-report-all-$(date -u +'%Y-%m-%d').md"
         echo "- \`$r\`"
     done
     echo ""
-    echo "## 5. mock_data fixture 统计"
+    echo "## 5. §ET (End-to-End Test) 1 runner 详细"
+    echo ""
+    for r in "${et_results[@]}"; do
+        echo "- \`$r\`"
+    done
+    echo ""
+    echo "## 6. mock_data fixture 统计"
     echo ""
     for d in openclaw langgraph/tmo langgraph/sa-10 langgraph/sa-01..09 agent-runtime/l0-dispatcher agent-runtime/l1-ecs agent-runtime/l2-pools mcp streamable-http db-wtm/work db-wtm/transaction db-wtm/master five-domain uat/scenarios; do
         cnt=$(find "$REPO_ROOT/tools/star-flash-mock/mock_data/$d" -name "*.json" 2>/dev/null | wc -l)
@@ -210,15 +240,16 @@ echo "  [OK] $report_file 生成"
 
 echo ""
 echo "============================================="
-echo "  Star Mock Project run-all.sh v1.1 收官"
+echo "  Star Mock Project run-all.sh v1.2 收官"
 echo "  §UT: $ut_pass PASS / $ut_fail FAIL"
 echo "  §IT: $it_pass PASS / $it_fail FAIL"
 echo "  §ST: $st_pass PASS / $st_fail FAIL"
-echo "  总计: $((ut_pass + it_pass + st_pass)) PASS / $((ut_fail + it_fail + st_fail)) FAIL"
+echo "  §ET: $et_pass PASS / $et_fail FAIL"
+echo "  总计: $((ut_pass + it_pass + st_pass + et_pass)) PASS / $((ut_fail + it_fail + st_fail + et_fail)) FAIL"
 echo "  Finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 echo "============================================="
 
 # 若任一层失败, exit 1 (守门 #1 失败即停)
-if [ "$((ut_fail + it_fail + st_fail))" -gt 0 ]; then
+if [ "$((ut_fail + it_fail + st_fail + et_fail))" -gt 0 ]; then
     exit 1
 fi
