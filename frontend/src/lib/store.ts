@@ -573,6 +573,12 @@ const initialState = (set: any, get?: any): StoreState => ({
         worktree_id: input.worktree_id,
         // per 2026-11-21: branch 级隔离字段透传 (缺省 null = 未绑定 branch)
         branch_id: input.branch_id ?? null,
+        // per 2026-11-22: 分支名（本地创建按名绑定，branch_id 为 null 时用于可见集合分离）
+        branch_name: input.branch_name ?? null,
+        // P0: 本地任务标记，用于可见集合分离（未同步至服务端）
+        localOnly: input.localOnly ?? false,
+        // per 2026-11-21: 服务端 lifecycle 版本（跨 branch handoff 的 expected_version 乐观锁）
+        lifecycle_version: input.lifecycle_version ?? undefined,
         documents: input.documents ?? [],
         parent_id: input.parent_id,
         ipa_skill_ids: input.ipa_skill_ids,

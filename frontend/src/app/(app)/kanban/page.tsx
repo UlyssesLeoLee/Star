@@ -197,10 +197,10 @@ export default function KanbanPage() {
     hostConnected && runDirectory.client !== null && selectedWorktreeId !== "";
   const createDisabled = unauthorized || !hostConnected;
 
-  // ---- Stable idempotency key per user action (P0: 统一幂等键) ----
-  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
   const newIdempotencyKey = () =>
     `kanban-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // ---- Stable idempotency key per user action (P0: 统一幂等键) ----
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(newIdempotencyKey());
   const rotateIdempotencyKey = () => setIdempotencyKey(newIdempotencyKey());
 
   // 每次进入页面/上下文切换都重新 fetch 服务端真源 (不依赖 persist 旧数据, per P1 刷新一致)
@@ -1141,11 +1141,8 @@ export default function KanbanPage() {
           >
             <GanttView
               board={board}
-              workItems={
-                serverMode
-                  ? (serverItems ?? []).map(toStoreWorkItem)
-                  : visibleWorkItems
-              }
+              // per P0: 图表/时间线/日历统一消费可见集合（已按 branch/worktree 过滤）
+              workItems={visibleWorkItems}
               identities={identities}
             />
           </section>
@@ -1160,11 +1157,8 @@ export default function KanbanPage() {
             <CalendarView
               sprints={sprints}
               milestones={milestones}
-              workItems={
-                serverMode
-                  ? (serverItems ?? []).map(toStoreWorkItem)
-                  : visibleWorkItems
-              }
+              // per P0: 图表/时间线/日历统一消费可见集合（已按 branch/worktree 过滤）
+              workItems={visibleWorkItems}
               onDayClick={(dateKey) => {
                 // dateKey 形如 "2026-11-22" (localDateKey)
                 setDrawerMode({ kind: "new", defaultStatus: "todo" });
