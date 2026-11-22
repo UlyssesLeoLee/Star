@@ -433,7 +433,17 @@ const initialState = (set: any, get?: any): StoreState => ({
   milestones: [],
   burndownSeries: [],
   // 看板: 未接入/未选项目时为空板 (空 id + 空列); 列由 addBoardColumn/addWorkItem 按需创建
-  board: { id: "", tenant_id: "", project_id: "", name: "", columns: [] },
+  board: {
+    id: "", tenant_id: "", project_id: "", name: "",
+    columns: [
+      { status: "todo", wip_limit: 8, work_item_ids: [] },
+      { status: "in_progress", wip_limit: 5, work_item_ids: [] },
+      { status: "review", wip_limit: 3, work_item_ids: [] },
+      { status: "blocked", wip_limit: 99, work_item_ids: [] },
+      { status: "done", wip_limit: 99, work_item_ids: [] },
+      { status: "wontfix", wip_limit: 99, work_item_ids: [] },
+    ],
+  },
   lanes: [],
   relations: [],
   auditEvents: [],
