@@ -359,7 +359,7 @@ export default function SandboxPage() {
                     <td className="py-2 pr-3 font-mono text-ink-dim flex items-center gap-1">
                       <GitBranch size={11} /> {w.branch}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-ink-dim">{w.name}</td>
+                    <td className="py-2 pr-3 font-mono text-ink-dim">{w.host_path}</td>
                     <td className="py-2 pr-3">
                       <span className={clsx("text-[10px] px-1.5 py-0.5 rounded", w.status === "active" ? "bg-ok/10 text-ok" : "bg-bg-soft text-ink-dim")}>{w.status}</span>
                     </td>
