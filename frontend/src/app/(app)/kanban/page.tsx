@@ -100,6 +100,7 @@ import {
   type UnifiedKanbanColumn,
   type UnifiedWorkItem,
 } from "./unifiedWorkItems";
+import { KANBAN_COLUMNS } from "@/mocks/data";
 
 // per 2026-11-22 用户发令: 任务看板是第一个标签页; 甘特图(时间线)/燃尽图从分析界面迁入,
 // 所有任务管理内容集中在看板。
@@ -458,13 +459,15 @@ export default function KanbanPage() {
     const charts = useMemo(() => buildAnalyticsData(sprints, workItems), [sprints, workItems]);
 
     // ---- 列定义 (per P1): 服务端无 board 列配置, 列闭集来自统一域常量
-  //      UNIFIED_KANBAN_COLUMNS (镜像 group_api `unified_column_status`, 与
-  //      groupProjection 读侧映射互逆); 不再依赖 mocks/data/kanban。 ----
-  const lifecycleCols = serverMode
-    ? UNIFIED_KANBAN_COLUMNS.map((id) => ({ id, label: UNIFIED_COLUMN_LABELS[id]["zh-CN"] }))
-    : board?.columns && board.columns.length > 0
-      ? board.columns.map((c) => ({ id: c.status, label: LIFECYCLE_LABEL[c.status] ?? c.name ?? c.status }))
-      : UNIFIED_KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
+       //      UNIFIED_KANBAN_COLUMNS (镜像 group_api `unified_column_status`, 与
+       //      groupProjection 读侧映射互逆); 不再依赖 mocks/data/kanban。 ---
+       // 本地模式: 使用完整的 KANBAN_COLUMNS (含 review, 支持自定义工作流)
+       // 服务端模式: 使用 UNIFIED_KANBAN_COLUMNS (服务端闭集, 无 review 列)
+       const lifecycleCols = serverMode
+         ? UNIFIED_KANBAN_COLUMNS.map((id) => ({ id, label: UNIFIED_COLUMN_LABELS[id]["zh-CN"] }))
+         : board?.columns && board.columns.length > 0
+           ? board.columns.map((c) => ({ id: c.status, label: LIFECYCLE_LABEL[c.status] ?? c.name ?? c.status }))
+           : KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
 
   // 服务端模式的看板投影 (列 = 统一闭集; work_item_ids 从服务端真源派生, 非本地事实)
   const unifiedBoard = useMemo<Board>(() => ({
