@@ -4,9 +4,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "env": {
-    "NEXT_PUBLIC_API_BASE": {
-      "@vercel/development": "http://localhost:9002",
-      "@vercel/production": ""
-    }
+    "NEXT_PUBLIC_API_BASE": ""
   }
 }
