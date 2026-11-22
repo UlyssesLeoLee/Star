@@ -35,7 +35,8 @@ import { createPortal } from "react-dom";
 export interface ContextMenuItem {
   /** 稳定 action id — 决定 testid `context-menu-item-<id>` */
   id: string;
-  label: string;
+  /** 分隔线时可省略 label */
+  label?: string;
   icon?: ReactNode;
   danger?: boolean;
   disabled?: boolean;

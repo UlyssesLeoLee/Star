@@ -30,6 +30,10 @@ import {
   ChevronRight,
   User,
   Bot,
+  Copy,
+  Trash2,
+  Maximize2,
+  CheckSquare,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useChatStore } from "@/lib/chat/chatStore";
@@ -37,6 +41,8 @@ import { useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/lib/i18n";
 import { StatusNotice } from "@/components/status/StatusNotice";
+import { ContextMenu, type ContextMenuItem } from "@/components/context-menu/ContextMenu";
+import { useContextMenu } from "@/components/context-menu/useContextMenu";
 
 type ChatTab = "task" | "global";
 
@@ -72,10 +78,90 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
   const [newTopicMode, setNewTopicMode] = useState(false);
   const [newTopicTitle, setNewTopicTitle] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [scopeError, setScopeError] = useState<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+    const [scopeError, setScopeError] = useState<string | null>(null);
+    const listRef = useRef<HTMLDivElement>(null);
 
-  // ?task= 深链 → 打开任务卡聊天
+    // 右键菜单状态 (per 2026-11-22: 聊天消息右键菜单 — 清除/压缩/复制/全选 + 自定义快捷按钮)
+    const contextMenu = useContextMenu();
+    const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+    const [rightClickedMessageId, setRightClickedMessageId] = useState<string | null>(null);
+
+    // 右键菜单项定义
+    const buildContextMenuItems = (messageId: string): ContextMenuItem[] => {
+      const isSelected = selectedMessageIds.has(messageId);
+      return [
+        {
+          id: "copy",
+          label: "复制消息",
+          icon: <Copy size={12} />,
+          onSelect: () => {
+            const msg = activeTopic?.messages.find((m) => m.id === messageId);
+            if (msg) navigator.clipboard.writeText(msg.text);
+          },
+        },
+        {
+          id: "select",
+          label: isSelected ? "取消选择" : "选择消息",
+          icon: <CheckSquare size={12} />,
+          onSelect: () => {
+            setSelectedMessageIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(messageId)) next.delete(messageId);
+              else next.add(messageId);
+              return next;
+            });
+          },
+        },
+        { separator: true, id: "sep1" },
+        {
+          id: "select-all",
+          label: "全选",
+          icon: <Maximize2 size={12} />,
+          disabled: activeTopic?.messages.length === 0,
+          disabledReason: "暂无消息可选",
+          onSelect: () => {
+            if (activeTopic) setSelectedMessageIds(new Set(activeTopic.messages.map((m) => m.id)));
+          },
+        },
+        {
+          id: "clear-selection",
+          label: "清除选择",
+          icon: <Trash2 size={12} />,
+          disabled: selectedMessageIds.size === 0,
+          disabledReason: "未选中任何消息",
+          onSelect: () => setSelectedMessageIds(new Set()),
+        },
+        { separator: true, id: "sep2" },
+        {
+          id: "clear-history",
+          label: "清除聊天记录",
+          icon: <Trash2 size={12} />,
+          danger: true,
+          disabled: !activeTopic || activeTopic.messages.length === 0,
+          disabledReason: "暂无聊天记录",
+          onSelect: () => {
+            if (activeTopic && window.confirm(`确定要清除话题 "${activeTopic.title}" 的所有聊天记录吗？此操作不可恢复。`)) {
+              // 通过 store 清除消息（需要在 chatStore 添加 clearTopic 方法，暂时先清空本地状态）
+              // TODO: chatStore 添加 clearTopicMessages 方法
+              setSelectedMessageIds(new Set());
+            }
+          },
+        },
+        {
+          id: "compress-context",
+          label: "压缩上下文",
+          icon: <Maximize2 size={12} />,
+          disabled: !activeTopic || activeTopic.messages.length === 0,
+          disabledReason: "暂无消息可压缩",
+          onSelect: () => {
+            // TODO: 调用压缩上下文 API / 本地摘要逻辑
+            console.log("压缩上下文:", activeTopic?.id);
+          },
+        },
+      ];
+    };
+
+    // ?task= 深链 → 打开任务卡聊天
   useEffect(() => {
     if (taskId) {
       const id = openTopicForTask(taskId, taskTitle ?? "");
@@ -318,12 +404,18 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
                 暂无消息 — 在底部输入第一条
               </div>
             ) : (
-              activeTopic.messages.map((m) => (
-                <div
-                  key={m.id}
-                  data-testid={`chat-msg-${m.id}`}
-                  className={clsx("flex gap-2", m.authorKind === "human" && "flex-row-reverse")}
-                >
+                          activeTopic.messages.map((m) => (
+                            <div
+                              key={m.id}
+                              data-testid={`chat-msg-${m.id}`}
+                              className={clsx("flex gap-2", m.authorKind === "human" && "flex-row-reverse")}
+                              onContextMenu={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  setRightClickedMessageId(m.id);
+                                                  contextMenu.openMenu(e, buildContextMenuItems(m.id));
+                                                }}
+                            >
                   <span
                     className={clsx(
                       "size-6 rounded-full grid place-items-center text-[9px] font-bold shrink-0 mt-0.5",
