@@ -1,6 +1,6 @@
 "use client";
 
-// @cypher schema=1 source_sha256=047e5f9773fccbb551d2297a15f575d78ad91170bcea356a8e4ed00b0da3e1c0
+// @cypher schema=1 source_sha256=d846d62f132e4f17f20a0b8a13ee80ba0584c509c1468faaa49ac886f2625ad4
 // MERGE (self:File {path:"frontend/src/app/(app)/agents/page.tsx"})
 // MERGE (page:Symbol {id:"frontend/src/app/(app)/agents/page.tsx::AgentsPage",kind:"function"})
 // MERGE (agentsApi:File {path:"frontend/src/lib/agents/agentsApi.ts"})
@@ -473,8 +473,6 @@ export default function AgentsPage() {
                       { id: "charisma-crimson", label: "✨ 醉梦红" },
                       { id: "shanghai-gilt", label: "🪭 留声金 (月份牌)" },
                       { id: "shanghai-jade", label: "🪭 翡翠绿" },
-                      { id: "christmas-noel", label: "🎄 圣夜红 (毛玻璃)" },
-                      { id: "christmas-pine", label: "🎄 松针绿" },
                       { id: "manga-vermilion", label: "☀️ 宣纸红 (Light)" },
                       { id: "cel-azure", label: "🎞️ 赛璐璐蓝 (Cel)" },
                     ] as const

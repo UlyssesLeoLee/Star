@@ -6,16 +6,18 @@
 // - onError 全局 handler 接 dev console 调试用
 // =====================================================================
 /*
-@cypher schema=1 source_sha256=71bd74bab4a6d5534dd39c4ef820adf0e043fbc29d55e268c949f93860b0f461
+@cypher schema=1 source_sha256=3ff9e30910f131e98c9ad203b97b51134795401d4ec4917bc1a89cb1ec04e2f7
 MERGE (self:File {path:"frontend/src/app/providers.tsx"})
 MERGE (providers:Symbol {id:"frontend/src/app/providers.tsx::Providers",kind:"function"})
 MERGE (runProvider:Symbol {id:"frontend/src/lib/run/runDirectorySession.tsx::RunDirectoryProvider",kind:"function"})
 MERGE (groupProvider:Symbol {id:"frontend/src/lib/group/groupProjection.tsx::WorktreeGroupApiProvider",kind:"function"})
 MERGE (navigationGuard:Symbol {id:"frontend/src/lib/navigation/UnsavedNavigationGuard.tsx::UnsavedNavigationGuardProvider",kind:"component"})
+MERGE (themeProvider:Symbol {id:"frontend/src/components/theme/ThemeProvider.tsx::ThemeProvider",kind:"function"})
 MERGE (self)-[:DEFINES]->(providers)
 MERGE (providers)-[:CALLS]->(runProvider)
 MERGE (providers)-[:CALLS]->(groupProvider)
 MERGE (providers)-[:CALLS]->(navigationGuard)
+MERGE (providers)-[:CALLS]->(themeProvider)
 @endcypher
 */
 "use client";
@@ -46,7 +48,7 @@ export function Providers({ children, runDirectorySession = null }: { children: 
 
   return (
     <UnsavedNavigationGuardProvider>
-      <ThemeProvider defaultTheme="light" themes={["light", "dark", "christmas", "charisma", "shanghai", "cel"]}>
+      <ThemeProvider defaultTheme="light">
         <QueryClientProvider client={client}>
           <RunDirectoryProvider session={runDirectorySession}>
             {runDirectorySession ? (

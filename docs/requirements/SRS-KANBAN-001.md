@@ -8,7 +8,7 @@ MERGE (self:File {path:"docs/requirements/SRS-KANBAN-001.md"})
 > **任务卡全生命周期管理 (Branch 工作区固定页签: 任务)** (per docs/prototypes/1b · 任务 · IPA 看板-html mockup, 2026-11-15 全量审计后建档)
 >
 > - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 9187f43d)
-> - 权威入口: **本文件是该功能的唯一权威文档** — 修改此功能只改本文件, 并在 §修订履历 加行
+> - 权威入口: 本文件记录看板现有需求；智能缺陷管理的新增专题需求见 [SRS-DEFECT-INTELLIGENCE-001](SRS-DEFECT-INTELLIGENCE-001.md)。涉及缺陷视图的变更须同步两份需求及对应设计、验收状态。
 > - 实现状态: ✅ 已闭环 (浏览器实测 2026-11-15)
 > - 数据源: store (seed 预览模式) — 宿主接入后切换授权投影
 
@@ -54,3 +54,4 @@ MERGE (self:File {path:"docs/requirements/SRS-KANBAN-001.md"})
 |---|---|---|---|
 | 2026-11-15 | v1.0 | 建档: mockup 设计提炼 + FR + 实现状态 (全量审计) | c0f149f2 |
 | 2026-11-15 | v1.1 | 状态回写核对 | 本提交 |
+| 2026-11-22 | v1.2 | 挂接智能缺陷管理专题需求，专题为目标方案且尚未验收 | 工作区 |
