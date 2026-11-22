@@ -647,21 +647,28 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
             <BacklogDropZone
               count={backlogItems.length}
               onQuickAdd={(title) => {
-                // per 2026-11-21: backlog 直接新增 issue (无独立 New issue 按钮);
-                // branch 绑定当前选择 — 每个 branch 独立一套数据
-                const proj = projects.find((p) => p.id === projectId) ?? projects[0];
-                addWorkItem({
-                  tenant_id: session?.payload.tenant_id ?? proj?.tenant_id ?? "",
-                  project_id: proj?.id ?? "",
-                  title,
-                  kind: "task",
-                  status: "todo",
-                  priority: "p2",
-                  reporter_id: session?.payload.user_id ?? proj?.owner_id ?? "",
-                  worktree_id: worktreeId,
-                  branch_id: branch ?? null,
-                });
-              }}
+                              // per 2026-11-21: backlog 直接新增 issue (无独立 New issue 按钮);
+                              // branch 绑定当前选择 — 每个 branch 独立一套数据
+                              const proj = projects.find((p) => p.id === projectId) ?? projects[0];
+                              const tenantId = session?.payload.tenant_id ?? proj?.tenant_id;
+                              const projectIdVal = proj?.id;
+                              const reporterId = session?.payload.user_id ?? proj?.owner_id;
+                              if (!tenantId || !projectIdVal || !reporterId) {
+                                alert("缺少必要上下文: 请先选择有效的 Project 与 Worktree,并确保会话已授权。");
+                                return;
+                              }
+                              addWorkItem({
+                                tenant_id: tenantId,
+                                project_id: projectIdVal,
+                                title,
+                                kind: "task",
+                                status: "todo",
+                                priority: "p2",
+                                reporter_id: reporterId,
+                                worktree_id: worktreeId,
+                                branch_id: branch ?? null,
+                              });
+                            }}
             >
               {backlogItems.length === 0 ? (
                 <div className="text-center text-ink-mute italic py-6 text-xs">无 Backlog 卡片</div>

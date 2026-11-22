@@ -203,26 +203,34 @@ export default function KanbanPage() {
   };
 
   // 服务端真源 → store 形状 (仅缓存水合/看板渲染; 状态/版本仍以服务端为准)
-  const toStoreWorkItem = (item: UnifiedWorkItem): WorkItem => ({
-    id: item.id,
-    tenant_id: project?.tenant_id ?? session?.payload.tenant_id ?? "00000000-0000-0000-0000-000000000001",
-    project_id: projectId || "00000000-0000-0000-0000-000000000000",
-    key: item.id,
-    title: item.title,
-    description: item.description,
-    kind: item.kind as WorkItem["kind"],
-    status: item.column,
-    priority: toStorePriority(item.priority),
-    reporter_id: item.reporterId || session?.payload.user_id || "",
-    labels: item.labels,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    worktree_id: item.worktreeId,
-    // per 2026-11-21: 服务端 branch 真源透传 — id (UUID) 与 name (git 枚举名) 分开存
-    branch_id: item.branchId,
-    branch_name: item.branchName,
-    lifecycle_version: item.lifecycleVersion,
-  });
+    const toStoreWorkItem = (item: UnifiedWorkItem): WorkItem => {
+      const tenantId = project?.tenant_id ?? session?.payload.tenant_id;
+      const projectIdVal = projectId;
+      const reporterId = item.reporterId ?? session?.payload.user_id;
+      if (!tenantId || !projectIdVal || !reporterId) {
+        throw new Error("缺少必要上下文: tenant_id/project_id/reporter_id");
+      }
+      return {
+        id: item.id,
+        tenant_id: tenantId,
+        project_id: projectIdVal,
+        key: item.id,
+        title: item.title,
+        description: item.description,
+        kind: item.kind as WorkItem["kind"],
+        status: item.column,
+        priority: toStorePriority(item.priority),
+        reporter_id: reporterId,
+        labels: item.labels,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        worktree_id: item.worktreeId,
+        // per 2026-11-21: 服务端 branch 真源透传 — id (UUID) 与 name (git 枚举名) 分开存
+        branch_id: item.branchId,
+        branch_name: item.branchName,
+        lifecycle_version: item.lifecycleVersion,
+      };
+    };
 
   const handleCreateTaskCard = async () => {
     const title = draftTitle.trim();
@@ -281,28 +289,32 @@ export default function KanbanPage() {
       return;
     }
     try {
-          addWorkItem({
-            tenant_id: session?.payload.tenant_id ?? "tn-001",
-            project_id: "prj-physis",
-            title,
-            kind: "task",
-            status: "todo",
-            priority: "p2",
-            reporter_id: session?.payload.user_id ?? "usr-002",
-            story_points: Number(draftPoints) || 3,
-            sprint_id: "sp-12",
-            labels: [
-              ...(draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : []),
-              ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
-            ],
-            workflow_id: draftWorkflow || undefined,
-            description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
-            // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据; 本地无 UUID, 按名绑定)
-            branch_id: selectedBranch || null,
-            branch_name: selectedBranch || null,
-            // per 2026-11-22: 日历点击日期创建时预填 due_date
-            due_date: dueDateOverride || undefined,
-          });
+              const tenantId = session?.payload.tenant_id;
+              const reporterId = session?.payload.user_id;
+              if (!tenantId || !reporterId) {
+                throw new Error("缺少必要上下文: tenant_id/reporter_id");
+              }
+              addWorkItem({
+                tenant_id: tenantId,
+                project_id: projectId || "",
+                title,
+                kind: "task",
+                status: "todo",
+                priority: "p2",
+                reporter_id: reporterId,
+                                story_points: Number(draftPoints) || 3,
+                                labels: [
+                  ...(draftIpaFlow ? [draftIpaFlow.split(" ")[0]] : []),
+                  ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
+                ],
+                workflow_id: draftWorkflow || undefined,
+                description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
+                // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据; 本地无 UUID, 按名绑定)
+                branch_id: selectedBranch || null,
+                branch_name: selectedBranch || null,
+                // per 2026-11-22: 日历点击日期创建时预填 due_date
+                due_date: dueDateOverride || undefined,
+              });
       setDraftTitle("");
             setDraftIpaFlow("ipa-s05-002 ソースコード作成");
             setDraftWorkflow("");
@@ -470,24 +482,32 @@ export default function KanbanPage() {
            : KANBAN_COLUMNS.map((id) => ({ id, label: LIFECYCLE_LABEL[id] ?? id }));
 
   // 服务端模式的看板投影 (列 = 统一闭集; work_item_ids 从服务端真源派生, 非本地事实)
-  const unifiedBoard = useMemo<Board>(() => ({
-    id: "00000000-0000-0000-0000-000000000000",
-    tenant_id: project?.tenant_id ?? session?.payload.tenant_id ?? "00000000-0000-0000-0000-000000000001",
-    project_id: projectId || "00000000-0000-0000-0000-000000000000",
-    name: "统一服务端看板 (worktree 真源)",
-    columns: UNIFIED_KANBAN_COLUMNS.map((status) => ({
-      status,
-      name: UNIFIED_COLUMN_LABELS[status]["zh-CN"],
-      work_item_ids: (serverItems ?? []).filter((w) => w.column === status).map((w) => w.id),
-    })),
-  }), [serverItems, projectId, project?.tenant_id]);
+    const unifiedBoard = useMemo<Board | null>(() => {
+      if (!serverMode) return null;
+      const tenantId = project?.tenant_id ?? session?.payload.tenant_id;
+      const projectIdVal = projectId;
+      if (!tenantId || !projectIdVal) {
+        throw new Error("缺少必要上下文: tenant_id/project_id");
+      }
+      return {
+        id: "00000000-0000-0000-0000-000000000000",
+        tenant_id: tenantId,
+        project_id: projectIdVal,
+        name: "统一服务端看板 (worktree 真源)",
+        columns: UNIFIED_KANBAN_COLUMNS.map((status) => ({
+          status,
+          name: UNIFIED_COLUMN_LABELS[status]["zh-CN"],
+          work_item_ids: (serverItems ?? []).filter((w) => w.column === status).map((w) => w.id),
+        })),
+      };
+    }, [serverMode, serverItems, projectId, project?.tenant_id]);
 
-  // 服务端模式看板卡片 (WorkItem 形状仅用于 KanbanBoard 渲染/筛选; 状态以服务端为准)
-  const serverBoardItems = useMemo(
-    () => (serverItems ?? []).map((item) => toStoreWorkItem(item)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [serverItems, projectId, project?.tenant_id],
-  );
+    // 服务端模式看板卡片 (WorkItem 形状仅用于 KanbanBoard 渲染/筛选; 状态以服务端为准)
+    const serverBoardItems = useMemo(
+      () => serverMode ? (serverItems ?? []).map((item) => toStoreWorkItem(item)) : [],
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [serverMode, serverItems, projectId, project?.tenant_id],
+    );
   // per 2026-11-21: 服务端投影同样按 Branch 隔离 (服务端 branch_id 尚未下发时
   // 全部视为未绑定 → 保持可见, 诚实不隐藏真源)
   const branchScopedServerItems = useMemo(
@@ -763,8 +783,8 @@ export default function KanbanPage() {
               shown={serverMode ? filteredServerBoardItems.length : filteredBoardWorkItems.length}
             />
             <KanbanBoard
-              board={serverMode ? unifiedBoard : board}
-              workItems={serverMode ? filteredServerBoardItems : filteredBoardWorkItems}
+                          board={serverMode ? (unifiedBoard ?? board) : board}
+                          workItems={serverMode ? filteredServerBoardItems : filteredBoardWorkItems}
               identities={identities}
               onTransition={serverMode ? (id, to) => void handleServerTransition(id, to) : transitionWorkItem}
               onWorkItemClick={(wi) => setDrawerMode({ kind: "view", workItemId: wi.id })}
@@ -791,15 +811,15 @@ export default function KanbanPage() {
         )}
 
         {activeView === "IPA 流程图" && (
-          <section data-testid="kanban-ipa-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
-            <IpaSkillWorkflowBoard
-              projectId={projectId}
-              tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
-              reporterId={project?.owner_id}
-              onOpenTaskCard={(workItemId) => setDrawerMode({ kind: "view", workItemId })}
-            />
-          </section>
-        )}
+                  <section data-testid="kanban-ipa-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
+                    <IpaSkillWorkflowBoard
+                      projectId={projectId}
+                      tenantId={project?.tenant_id ?? session?.payload.tenant_id ?? ""}
+                      reporterId={project?.owner_id}
+                      onOpenTaskCard={(workItemId) => setDrawerMode({ kind: "view", workItemId })}
+                    />
+                  </section>
+                )}
 
         {activeView === "按文件开卡" && (
           <section data-testid="kanban-file-cards" className="bg-bg-card rounded-xl border border-line shadow-soft p-4">
@@ -889,13 +909,13 @@ export default function KanbanPage() {
 
                       {/* 列内创建 Drawer (per 2026-11-15: 每列 +Add task → Drawer 新建) */}
       <WorkItemDetailDrawer
-        open={drawerMode}
-        onClose={() => setDrawerMode(null)}
-        projectId={projectId}
-        tenantId={project?.tenant_id ?? "00000000-0000-0000-0000-000000000001"}
-        reporterId={project?.owner_id ?? "usr-002"}
-        onOpenChildTask={(childId) => setDrawerMode({ kind: "view", workItemId: childId })}
-      />
+              open={drawerMode}
+              onClose={() => setDrawerMode(null)}
+              projectId={projectId}
+              tenantId={project?.tenant_id ?? session?.payload.tenant_id ?? ""}
+              reporterId={project?.owner_id ?? session?.payload.user_id}
+              onOpenChildTask={(childId) => setDrawerMode({ kind: "view", workItemId: childId })}
+            />
     </div>
   );
 }

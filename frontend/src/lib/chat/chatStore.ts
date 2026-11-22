@@ -116,11 +116,15 @@ interface ChatState {
   createTopic: (scope: "task" | "global", refId: string, title: string) => string;
   setActiveTopic: (topicId: string | null) => void;
   /** 切换底栏聊天范围 (WORKTREE / GLOBAL) */
-  setChatScope: (scope: ChatScope) => void;
-  /** 设置 GLOBAL 范围授权目标 worktree (null = 清除) */
-  setGlobalAuthTarget: (worktreeId: string | null) => void;
-  setAgentSettings: (patch: Partial<ChatAgentSettings>) => void;
-}
+    setChatScope: (scope: ChatScope) => void;
+    /** 设置 GLOBAL 范围授权目标 worktree (null = 清除) */
+    setGlobalAuthTarget: (worktreeId: string | null) => void;
+    setAgentSettings: (patch: Partial<ChatAgentSettings>) => void;
+    /** 清除某话题的所有消息 (保留话题结构) */
+    clearTopicMessages: (topicId: string) => void;
+    /** 压缩上下文 — 仅保留最近 N 条 + 系统消息 */
+    compressContext: (topicId: string, keepLast?: number) => void;
+  }
 
 const nowIso = () => new Date().toISOString();
 
@@ -286,6 +290,28 @@ export const useChatStore = create<ChatState>()(
 
       setAgentSettings: (patch) =>
         set((s) => ({ agentSettings: { ...s.agentSettings, ...patch } })),
+
+      /** 清除某话题的所有消息 (保留话题结构) */
+      clearTopicMessages: (topicId: string) =>
+        set((s) => ({
+          topics: s.topics.map((t) =>
+            t.id === topicId ? { ...t, messages: [] } : t,
+          ),
+        })),
+
+      /** 压缩上下文 — 仅保留最近 N 条 + 系统消息 (stub, 后续接后端摘要) */
+      compressContext: (topicId: string, keepLast: number = 20) =>
+        set((s) => ({
+          topics: s.topics.map((t) => {
+            if (t.id !== topicId) return t;
+            const systemMsgs = t.messages.filter((m) => m.authorKind === "system");
+            const recentMsgs = t.messages
+              .filter((m) => m.authorKind !== "system")
+              .slice(-keepLast);
+            return { ...t, messages: [...systemMsgs, ...recentMsgs] };
+          }),
+        })),
+
     }),
     {
       name: "star-chat-store:v1",

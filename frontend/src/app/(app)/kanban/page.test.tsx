@@ -78,10 +78,11 @@ function renderServerHarness(fetcher: typeof fetch) {
 }
 
 beforeEach(() => {
-  useNavStore.setState({ selectedWorktreeId: "", selectedProjectId: "", selectedLaneId: "", selectedBranch: "" });
+  useNavStore.setState({ selectedWorktreeId: "", selectedProjectId: PROJECT_ID, selectedLaneId: "", selectedBranch: "" });
   useStore.setState({
     workItems: [],
     board: { id: "b-1", tenant_id: "t-1", project_id: "p-1", name: "board", columns: [] },
+    projects: [{ id: PROJECT_ID, tenant_id: "t-1", name: "Test Project", owner_id: "u-1", created_at: new Date().toISOString() }],
   });
   window.history.replaceState(null, "", "/kanban");
 });

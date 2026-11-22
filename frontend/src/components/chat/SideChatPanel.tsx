@@ -141,8 +141,8 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
           disabledReason: "暂无聊天记录",
           onSelect: () => {
             if (activeTopic && window.confirm(`确定要清除话题 "${activeTopic.title}" 的所有聊天记录吗？此操作不可恢复。`)) {
-              // 通过 store 清除消息（需要在 chatStore 添加 clearTopic 方法，暂时先清空本地状态）
-              // TODO: chatStore 添加 clearTopicMessages 方法
+              const clearTopicMessages = useChatStore.getState().clearTopicMessages;
+              clearTopicMessages(activeTopic.id);
               setSelectedMessageIds(new Set());
             }
           },
@@ -154,8 +154,10 @@ export function SideChatPanel({ compact = false, taskId, taskTitle }: SideChatPa
           disabled: !activeTopic || activeTopic.messages.length === 0,
           disabledReason: "暂无消息可压缩",
           onSelect: () => {
-            // TODO: 调用压缩上下文 API / 本地摘要逻辑
-            console.log("压缩上下文:", activeTopic?.id);
+            if (activeTopic) {
+              const compressContext = useChatStore.getState().compressContext;
+              compressContext(activeTopic.id);
+            }
           },
         },
       ];
