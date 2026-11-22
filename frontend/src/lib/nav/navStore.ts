@@ -43,6 +43,19 @@ export type SidebarTabId = "directory" | "aiUpdates";
 export const TASK_STATUS_FILTER_VALUES = ["all", "todo", "in_progress", "blocked", "review", "done"] as const;
 export type TaskStatusFilter = (typeof TASK_STATUS_FILTER_VALUES)[number];
 
+/** 快捷按钮定义 (per 2026-11-22: 自定义快捷入口，支持 tab 感知跳转) */
+export interface ShortcutButton {
+  id: string;                    // 唯一标识
+  label: string;                 // 显示名
+  icon: string;                  // lucide icon name (如 "KanbanSquare", "MessageSquare")
+  href: string;                  // 目标路由 (如 "/kanban", "/projects?tab=timeline")
+  targetTab?: string;            // 目标 tab (用于同页面不同 tab，如 "kanban" | "canvas" | "nema")
+  moduleGroupId?: string;        // 所属模块组 (如 "tasks" | "canvas" | "execution")
+  category: "custom" | "pinned" | "global" | "utility";  // 来源分类
+  order?: number;                // 排序权重
+  createdAt: string;             // ISO 时间
+}
+
 export interface NavState {
   // 纵向侧栏定制 (默认仅核心功能)
   sidebarItemIds: string[];
@@ -65,26 +78,35 @@ export interface NavState {
   selectedWorktreeId: string;
   selectedBranch: string;
   /** 左栏顶部页签 + 底部任务状态筛选 (per 2026-11-20 导航验收, 持久化) */
-  sidebarTab: SidebarTabId;
-  taskStatusFilter: TaskStatusFilter;
+    sidebarTab: SidebarTabId;
+    taskStatusFilter: TaskStatusFilter;
 
-  // Actions
-  openMatrix: () => void;
-  closeMatrix: () => void;
-  toggleMatrix: () => void;
+    // 快捷按钮 (per 2026-11-22: 自定义快捷入口，支持 tab 感知跳转，持久化到 localStorage)
+    shortcutButtons: ShortcutButton[];
 
-  addSidebarItem: (id: string) => void;
-  removeSidebarItem: (id: string) => void;
-  toggleSidebarItem: (id: string) => void;
+    // Actions
+    openMatrix: () => void;
+    closeMatrix: () => void;
+    toggleMatrix: () => void;
 
-  addPinnedView: (id: string) => void;
-  removePinnedView: (id: string) => void;
+    addSidebarItem: (id: string) => void;
+    removeSidebarItem: (id: string) => void;
+    toggleSidebarItem: (id: string) => void;
 
-  addHeaderTab: (id: string) => void;
-  removeHeaderTab: (id: string) => void;
-  toggleHeaderTab: (id: string) => void;
+    addPinnedView: (id: string) => void;
+    removePinnedView: (id: string) => void;
 
-  // Sidebar 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
+    addHeaderTab: (id: string) => void;
+    removeHeaderTab: (id: string) => void;
+    toggleHeaderTab: (id: string) => void;
+
+    // 快捷按钮管理 (per 2026-11-22: 自定义快捷入口，支持 tab 感知跳转)
+    addShortcutButton: (button: ShortcutButton) => void;
+    removeShortcutButton: (id: string) => void;
+    updateShortcutButton: (id: string, patch: Partial<ShortcutButton>) => void;
+    reorderShortcutButtons: (ids: string[]) => void;
+
+    // Sidebar 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
   toggleSidebarFold: () => void;
   setSidebarFold: (state: SidebarFoldState) => void;
   setSidebarScope: (scope: SidebarScope) => void;
@@ -121,6 +143,7 @@ type PersistedNavState = Pick<
   | "selectedBranch"
   | "sidebarTab"
   | "taskStatusFilter"
+  | "shortcutButtons"
 >;
 
 function migratePersistedNavState(persistedState: unknown): PersistedNavState {
@@ -131,6 +154,9 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
   const storedPinnedViews = Array.isArray(persisted?.pinnedViewIds)
     ? persisted.pinnedViewIds
     : DEFAULT_PINNED_VIEWS;
+  const storedShortcutButtons = Array.isArray(persisted?.shortcutButtons)
+    ? persisted.shortcutButtons
+    : [];
 
   // per 2026-11-14 实测对照设计书: NAV_GROUPS 5 组已全量承载模块,
   // 旧版预填的 sidebar/pinned 一次性清理 (组内已显示, 不再重复渲染)
@@ -167,6 +193,7 @@ function migratePersistedNavState(persistedState: unknown): PersistedNavState {
     taskStatusFilter: TASK_STATUS_FILTER_VALUES.includes(persisted?.taskStatusFilter as TaskStatusFilter)
       ? (persisted!.taskStatusFilter as TaskStatusFilter)
       : "all",
+    shortcutButtons: storedShortcutButtons,
   };
 }
 
@@ -176,17 +203,18 @@ export const useNavStore = create<NavState>()(
       sidebarItemIds: DEFAULT_SIDEBAR_ITEMS,
       pinnedViewIds: DEFAULT_PINNED_VIEWS,
       headerTabIds: DEFAULT_HEADER_TABS,
-      isMatrixOpen: false,
-      sidebarFold: "expanded",
-      sidebarScope: "main",
-      selectedProjectId: "",
-      selectedLaneId: "",
-      selectedWorktreeId: "",
-      selectedBranch: "",
-      sidebarTab: "directory",
-      taskStatusFilter: "all",
+            isMatrixOpen: false,
+            sidebarFold: "expanded",
+            sidebarScope: "main",
+            selectedProjectId: "",
+            selectedLaneId: "",
+            selectedWorktreeId: "",
+            selectedBranch: "",
+            sidebarTab: "directory",
+            taskStatusFilter: "all",
+            shortcutButtons: [],
 
-      openMatrix: () => set({ isMatrixOpen: true }),
+            openMatrix: () => set({ isMatrixOpen: true }),
       closeMatrix: () => set({ isMatrixOpen: false }),
       toggleMatrix: () => set((s) => ({ isMatrixOpen: !s.isMatrixOpen })),
 
@@ -265,9 +293,29 @@ export const useNavStore = create<NavState>()(
       setLaneContext: (laneId, worktreeId, branch) =>
               set({ selectedLaneId: laneId, selectedWorktreeId: worktreeId, selectedBranch: branch }),
             setSidebarTab: (tab) => set({ sidebarTab: tab }),
-            setTaskStatusFilter: (filter) => set({ taskStatusFilter: filter }),
+                        setTaskStatusFilter: (filter) => set({ taskStatusFilter: filter }),
 
-            resetToDefault: () => {
+                        // 快捷按钮管理 (per 2026-11-22: 自定义快捷入口，支持 tab 感知跳转)
+                        addShortcutButton: (button: ShortcutButton) =>
+                          set((s) => ({ shortcutButtons: [...s.shortcutButtons, button] })),
+                        removeShortcutButton: (id: string) =>
+                          set((s) => ({ shortcutButtons: s.shortcutButtons.filter((b) => b.id !== id) })),
+                        updateShortcutButton: (id: string, patch: Partial<ShortcutButton>) =>
+                          set((s) => ({
+                            shortcutButtons: s.shortcutButtons.map((b) =>
+                              b.id === id ? { ...b, ...patch } : b
+                            ),
+                          })),
+                        reorderShortcutButtons: (ids: string[]) =>
+                          set((s) => {
+                            const map = new Map(s.shortcutButtons.map((b) => [b.id, b]));
+                            const reordered = ids.map((id) => map.get(id)).filter(Boolean) as ShortcutButton[];
+                            // 保留未在 ids 中的按钮 (放在最后)
+                            const remaining = s.shortcutButtons.filter((b) => !ids.includes(b.id));
+                            return { shortcutButtons: [...reordered, ...remaining] };
+                          }),
+
+                        resetToDefault: () => {
         set({
           sidebarItemIds: DEFAULT_SIDEBAR_ITEMS,
           pinnedViewIds: DEFAULT_PINNED_VIEWS,
@@ -288,18 +336,19 @@ export const useNavStore = create<NavState>()(
         removeItem: () => {},
       })),
       partialize: (s) => ({
-              sidebarItemIds: s.sidebarItemIds,
-              pinnedViewIds: s.pinnedViewIds,
-              headerTabIds: s.headerTabIds,
-              sidebarFold: s.sidebarFold,
-              sidebarScope: s.sidebarScope,
-              selectedProjectId: s.selectedProjectId,
-              selectedLaneId: s.selectedLaneId,
-              selectedWorktreeId: s.selectedWorktreeId,
-              selectedBranch: s.selectedBranch,
-              sidebarTab: s.sidebarTab,
-              taskStatusFilter: s.taskStatusFilter,
-            }),
+                    sidebarItemIds: s.sidebarItemIds,
+                    pinnedViewIds: s.pinnedViewIds,
+                    headerTabIds: s.headerTabIds,
+                    sidebarFold: s.sidebarFold,
+                    sidebarScope: s.sidebarScope,
+                    selectedProjectId: s.selectedProjectId,
+                    selectedLaneId: s.selectedLaneId,
+                    selectedWorktreeId: s.selectedWorktreeId,
+                    selectedBranch: s.selectedBranch,
+                    sidebarTab: s.sidebarTab,
+                    taskStatusFilter: s.taskStatusFilter,
+                    shortcutButtons: s.shortcutButtons,
+                  }),
     }
   )
 );
