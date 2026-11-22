@@ -219,8 +219,6 @@ export const useNavStore = create<NavState>()(
       toggleMatrix: () => set((s) => ({ isMatrixOpen: !s.isMatrixOpen })),
 
       addSidebarItem: (id: string) => {
-        // per WBS §23.32-A: worktree 集中在 Project Worktree Index, 禁止进 sidebar
-        if ((WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)) return;
         if (!get().sidebarItemIds.includes(id)) {
           set((s) => ({ sidebarItemIds: [...s.sidebarItemIds, id] }));
         }
@@ -240,8 +238,6 @@ export const useNavStore = create<NavState>()(
       },
 
       addPinnedView: (id: string) => {
-        // per WBS §23.32-A: worktree 集中在 Project Worktree Index, 禁止进 pinned
-        if ((WORKTREE_INDEX_OWNED_MODULES as readonly string[]).includes(id)) return;
         if (!get().pinnedViewIds.includes(id)) {
           set((s) => ({ pinnedViewIds: [...s.pinnedViewIds, id] }));
         }

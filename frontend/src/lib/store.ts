@@ -195,6 +195,8 @@ interface StoreState {
 
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
+  // per 2026-11-22: 在沙箱/左侧导航栏中创建 Worktree
+  createWorktree: (input: { project_id: string; name: string; branch: string; base_branch?: string; lane_id?: string; tenant_id?: string }) => string;
   transitionAgent:    (id: string, to: AgentStatus) => void;
   transitionFeedback: (id: string, to: FeedbackStatus) => void;
   transitionPR:       (id: string, to: PullRequestStatus) => void;
@@ -469,6 +471,39 @@ const initialState = (set: any, get?: any): StoreState => ({
     set((s: StoreState) => ({
       worktrees: s.worktrees.map((w) => w.id === id ? { ...w, status: to, last_event_at: new Date().toISOString(), lock_version: w.lock_version + 1 } : w),
     })),
+  // per 2026-11-22: 在沙箱/左侧导航栏中创建 Worktree
+  //   - project_id 必填（所属 Project）
+  //   - name 必填（Worktree 显示名）
+  //   - branch 必填（本地分支名，用于 git checkout 隔离）
+  //   - base_branch 可选（基准分支，缺省空）
+  //   - lane_id 可选（归属 Lane，缺省 = 未归类）
+  //   - tenant_id 可选（缺省 store.tenantId）
+  //   创建后 status = "initializing"，供左侧 ProjectRunTree 树形导航直接渲染
+  createWorktree: (input) => {
+    const { project_id, name, branch, base_branch, lane_id, tenant_id } = input;
+    if (!project_id || !name || !branch) {
+      throw new Error("createWorktree 缺少必填项：project_id / name / branch");
+    }
+    const newId = `wt-${globalThis.crypto.randomUUID()}`;
+    const nowIso = new Date().toISOString();
+    const wt: Worktree = {
+      id: newId,
+      tenant_id: tenant_id ?? (get().tenantId ?? ""),
+      project_id,
+      lane_id: lane_id ?? undefined,
+      name: name.trim(),
+      branch: branch.trim(),
+      base_branch: (base_branch ?? "").trim() || "",
+      status: "initializing",
+      lock_version: 1,
+      last_event_at: nowIso,
+      created_at: nowIso,
+    };
+    set((s: StoreState) => ({
+      worktrees: [...s.worktrees, wt],
+    }));
+    return newId;
+  },
   transitionAgent: (id, to) =>
     set((s: StoreState) => ({
       agentSessions: s.agentSessions.map((a) => a.id === id ? { ...a, status: to, ended_at: ["completed","failed","cancelled"].includes(to) ? new Date().toISOString() : a.ended_at } : a),

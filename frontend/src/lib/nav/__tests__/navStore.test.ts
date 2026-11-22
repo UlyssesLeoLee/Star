@@ -226,12 +226,12 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
     expect(s.pinnedViewIds).toEqual([]);
   });
 
-  // per WBS §23.32-A: worktree 禁止写回 sidebar/pinned — 走 add 入口也拦
-  it("refuses to add worktree module to sidebar or pinned views", () => {
+  // per 2026-11-22: worktree 现可加入 sidebar/pinned（左侧导航树管理体系）
+  it("allows adding worktree module to sidebar or pinned views", () => {
     useNavStore.getState().addSidebarItem("worktree");
-    expect(useNavStore.getState().sidebarItemIds).not.toContain("worktree");
+    expect(useNavStore.getState().sidebarItemIds).toContain("worktree");
     useNavStore.getState().addPinnedView("worktree");
-    expect(useNavStore.getState().pinnedViewIds).not.toContain("worktree");
+    expect(useNavStore.getState().pinnedViewIds).toContain("worktree");
     // 正常模块不受影响
     useNavStore.getState().addSidebarItem("scm");
     expect(useNavStore.getState().sidebarItemIds).toContain("scm");

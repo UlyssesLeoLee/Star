@@ -32,8 +32,12 @@ import {
   ShieldAlert,
   LogIn,
   RefreshCw,
+  Terminal,
+  ShieldCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { useStore } from "@/lib/store";
+import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 
 const SANDBOX_TABS = ["概览", "Worktree", "终端", "Docker", "观测"] as const;
 
@@ -64,15 +68,18 @@ const RESOURCES: { group: string; hint?: string; items: Resource[] }[] = [
     ],
   },
   {
-    group: "Docker",
+    group: "容器 / 沙箱",
+    hint: "Podman 沙箱隔离: 容器内 Worktree 与宿主完全隔离，创建后纳入左侧导航树管理",
     items: [
+      { name: "podman", sub: "Podman 沙箱引擎 · 沙箱隔离工作区", badge: "沙箱", badgeTone: "bg-accent/10 text-accent" },
       { name: "docker", sub: "本机 Docker 守护进程 · 6 个容器", badge: "原生", badgeTone: "bg-ok/10 text-ok" },
       { name: "sbx-relation", sub: "Docker 沙盒 · 集成测试", badge: "探针", badgeTone: "bg-[var(--color-accent-violet)]/15 text-[var(--color-accent-violet)]" },
     ],
   },
 ];
 
-const WORKTREES = [
+// 沙箱资源树资源列表 (per 2026-11-22: 接入 store.worktrees 真实数据)
+const WORKTREES_MOCK = [
   { wt: "wt-relation-bfs", branch: "feat/relation-bfs", path: "~/worktrees/wt-relation-bfs", status: "运行中", tone: "bg-ok/10 text-ok" },
   { wt: "wt-cache-ttl", branch: "fix/cache-ttl", path: "~/worktrees/wt-cache-ttl", status: "空闲", tone: "bg-bg-soft text-ink-dim" },
 ];
@@ -85,6 +92,9 @@ const OP_TASKS = [
 
 export default function SandboxPage() {
   // 后端门面数据 (per WBS-BACKEND-SUPPORT-001 W2: sandtree/argo API)
+  const storeApi = useStore();
+  const worktreeGroupApi = useWorktreeGroupApi();
+  const worktrees = storeApi.worktrees;
   const [backendInfo, setBackendInfo] = useState<{
     argoCli?: string[];
     observationLevels?: string[];
@@ -106,6 +116,39 @@ export default function SandboxPage() {
     return () => { alive = false; };
   }, []);
   const [activeTab, setActiveTab] = useState<(typeof SANDBOX_TABS)[number]>("Worktree");
+  const [createWT, setCreateWT] = useState(false);
+  const [wtName, setWtName] = useState("");
+  const [wtBranch, setWtBranch] = useState("");
+  const [wtBaseBranch, setWtBaseBranch] = useState("");
+  const [wtBusy, setWtBusy] = useState(false);
+  const [wtError, setWtError] = useState<string | null>(null);
+  const [wtCreated, setWtCreated] = useState<string | null>(null);
+
+  const handleCreateWT = async () => {
+    if (!wtName.trim() || !wtBranch.trim()) return;
+    setWtBusy(true); setWtError(null);
+    try {
+      const newId = storeApi.createWorktree({
+        project_id: "physis-project-default",
+        name: wtName.trim(),
+        branch: wtBranch.trim(),
+        base_branch: wtBaseBranch.trim() || "main",
+      });
+      if (worktreeGroupApi) {
+        await worktreeGroupApi.createProjectWorktree(
+          "physis-project-default",
+          { id: newId, name: wtName.trim(), branch: wtBranch.trim(), base_branch: wtBaseBranch.trim() || "main", status: "initializing" },
+          `sandbox-wt-${Date.now()}`,
+        );
+      }
+      setWtCreated(newId);
+      setWtName(""); setWtBranch(""); setWtBaseBranch("");
+    } catch (e) {
+      setWtError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWtBusy(false);
+    }
+  };
   // 接入实体机表单 (per 2026-11-15: 2c mockup FR-SB-003, 后端未接入 → 本地登记 + 状态说明)
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachForm, setAttachForm] = useState({ host: "", os: "", via: "SSH" });
@@ -308,15 +351,15 @@ export default function SandboxPage() {
                 </tr>
               </thead>
               <tbody>
-                {WORKTREES.map((w) => (
-                  <tr key={w.wt} className="border-b border-line/60">
-                    <td className="py-2 pr-3 font-mono font-semibold text-ink">{w.wt}</td>
+                {worktrees.length > 0 ? worktrees.map((w) => (
+                  <tr key={w.id} className="border-b border-line/60">
+                    <td className="py-2 pr-3 font-mono font-semibold text-ink">{w.id}</td>
                     <td className="py-2 pr-3 font-mono text-ink-dim flex items-center gap-1">
                       <GitBranch size={11} /> {w.branch}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-ink-dim">{w.path}</td>
+                    <td className="py-2 pr-3 font-mono text-ink-dim">{w.name}</td>
                     <td className="py-2 pr-3">
-                      <span className={clsx("text-[10px] px-1.5 py-0.5 rounded", w.tone)}>{w.status}</span>
+                      <span className={clsx("text-[10px] px-1.5 py-0.5 rounded", w.status === "active" ? "bg-ok/10 text-ok" : "bg-bg-soft text-ink-dim")}>{w.status}</span>
                     </td>
                     <td className="py-2">
                       <span className="flex items-center gap-2 text-accent">
@@ -325,47 +368,67 @@ export default function SandboxPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr className="border-b border-line/60">
+                    <td colSpan={6} className="py-4 text-xs text-ink-mute text-center">暂无 Worktree (点击下方“开设 Worktree”创建)</td>
+                  </tr>
+                )}
               </tbody>
             </table>
 
-            {/* 开设 Worktree */}
+            {/* 开设 Worktree (per 2026-11-22: 接入 store.createWorktree + 服务端 createProjectWorktree) */}
             <section data-testid="sandbox-open-worktree" className="mt-4 rounded-xl border border-line bg-bg p-4 space-y-3">
               <h2 className="text-sm font-bold text-ink">在此沙盒开设 Worktree</h2>
-              <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span className="text-ink-dim">仓库</span>
-                <span className="px-2 py-1 rounded border border-line bg-bg-card font-mono">Physis / GVPE · star</span>
+              {wtCreated && (
+                <div className="rounded-lg border border-ok/50 bg-ok/10 px-3 py-2 text-xs text-ok mb-2" data-testid="sandbox-wt-created">
+                  已创建 Worktree <span className="font-mono font-bold">{wtCreated}</span>，已刷新至左侧导航栏。
+                </div>
+              )}
+              {wtError && (
+                <div className="rounded-lg border border-err/50 bg-err/10 px-3 py-2 text-xs text-err mb-2" data-testid="sandbox-wt-error">
+                  {wtError}
+                </div>
+              )}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    data-testid="sandbox-wt-name"
+                    type="text"
+                    value={wtName}
+                    onChange={(e) => setWtName(e.target.value)}
+                    placeholder="Worktree 名称 (如 wt-relation-bfs)"
+                    className="rounded border border-line bg-bg-soft px-2.5 py-1.5 text-xs text-ink focus:border-accent"
+                  />
+                  <input
+                    data-testid="sandbox-wt-branch"
+                    type="text"
+                    value={wtBranch}
+                    onChange={(e) => setWtBranch(e.target.value)}
+                    placeholder="分支名 (如 feat/x)"
+                    className="rounded border border-line bg-bg-soft px-2.5 py-1.5 text-xs text-ink focus:border-accent"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    data-testid="sandbox-wt-base-branch"
+                    type="text"
+                    value={wtBaseBranch}
+                    onChange={(e) => setWtBaseBranch(e.target.value)}
+                    placeholder="基准分支 (默认 main)"
+                    className="rounded border border-line bg-bg-soft px-2.5 py-1.5 text-xs text-ink focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    data-testid="sandbox-open-worktree-btn"
+                    onClick={handleCreateWT}
+                    disabled={wtBusy || !wtName.trim() || !wtBranch.trim()}
+                    className={`text-xs px-3 py-2 rounded-lg ${wtBusy || !wtName.trim() || !wtBranch.trim() ? "bg-ink-mute/20 text-ink-mute cursor-not-allowed" : "bg-accent text-white hover:bg-accent-soft"}`}
+                  >
+                    {wtBusy ? "创建中…" : "开设 Worktree"}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span className="text-ink-dim">Branch</span>
-                <span className="px-2 py-1 rounded border border-line bg-bg-card font-mono flex items-center gap-1">
-                  <GitBranch size={11} /> feat/relation-bfs（当前）
-                </span>
-                <span className="px-2 py-1 rounded border border-line bg-bg-card text-ink-mute">新建 Branch…</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-ink-dim">关联任务卡</span>
-                <span className="px-2 py-1 rounded border border-line bg-bg-card font-mono">T-142 BFS 环检测</span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="text-xs text-ink-dim">代码进入方式</div>
-                {[
-                  { title: "在沙盒内克隆", desc: "沙盒内独立克隆仓库并检出 Branch，与宿主完全隔离，推荐。", checked: true },
-                  { title: "限路径同步（可审计）", desc: "", checked: false },
-                  { title: "只读挂载", desc: "", checked: false },
-                ].map((opt) => (
-                  <label key={opt.title} className={clsx("flex items-start gap-2 p-2.5 rounded-lg border text-xs cursor-pointer", opt.checked ? "border-accent/60 bg-bg-card" : "border-line bg-bg-card")}>
-                    <input type="radio" name="code-entry" defaultChecked={opt.checked} className="mt-0.5 accent-accent" />
-                    <span>
-                      <span className="font-semibold text-ink">{opt.title}</span>
-                      {opt.desc && <span className="block text-ink-dim mt-0.5">{opt.desc}</span>}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <button type="button" data-testid="sandbox-open-worktree-btn" className="text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft">
-                开设 Worktree
-              </button>
+              <p className="text-[10px] text-ink-dim mt-1">创建后 Worktree 将出现在左侧导航树的 Project 节点下，并可从任务看板、任务卡 CLI、Canvas 等模块读取。</p>
             </section>
 
             {/* 操作任务 */}
