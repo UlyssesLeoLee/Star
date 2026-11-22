@@ -134,6 +134,8 @@ export interface UnifiedWorkItem {
   // per 2026-11-21: branch 隔离 — 服务端真源 branch_id (UUID) + 分支名
   branchId: string | null;
   branchName: string | null;
+  // P0: 本地任务标记 (前端仅标记, 不同步至服务端)
+  localOnly?: boolean;
 }
 
 /** 服务端写冲突/越权的明确反馈载体 (409/403/4xx 由服务端稳定错误码驱动). */

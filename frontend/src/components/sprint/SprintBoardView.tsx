@@ -658,16 +658,18 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
                                 return;
                               }
                               addWorkItem({
-                                tenant_id: tenantId,
-                                project_id: projectIdVal,
-                                title,
-                                kind: "task",
-                                status: "todo",
-                                priority: "p2",
-                                reporter_id: reporterId,
-                                worktree_id: worktreeId,
-                                branch_id: branch ?? null,
-                              });
+                                                              tenant_id: tenantId,
+                                                              project_id: projectIdVal,
+                                                              title,
+                                                              kind: "task",
+                                                              status: "todo",
+                                                              priority: "p2",
+                                                              reporter_id: reporterId,
+                                                              worktree_id: worktreeId,
+                                                              branch_id: branch ?? null,
+                                                              // P0: 标记本地任务, 用于可见集合分离
+                                                              localOnly: true as any,
+                                                            });
                             }}
             >
               {backlogItems.length === 0 ? (

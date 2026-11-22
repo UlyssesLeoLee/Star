@@ -167,7 +167,12 @@ export default function KanbanPage() {
     const [serverError, setServerError] = useState<string | null>(null);
     const [serverRefreshKey, setServerRefreshKey] = useState(0);
     const serverMode = hostConnected && runDirectory.client !== null && selectedWorktreeId !== "";
-    const createDisabled = unauthorized || !hostConnected;
+      const createDisabled = unauthorized || !hostConnected;
+
+      // ---- Stable idempotency key per user action (P0: 统一幂等键) ----
+      const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+      const newIdempotencyKey = () => `kanban-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const rotateIdempotencyKey = () => setIdempotencyKey(newIdempotencyKey());
 
   // 每次进入页面/上下文切换都重新 fetch 服务端真源 (不依赖 persist 旧数据, per P1 刷新一致)
   useEffect(() => {
@@ -256,11 +261,11 @@ export default function KanbanPage() {
         const runContext =
           runDirectory.focus ?? (await runDirectory.client.getWorktreeRunContext(selectedWorktreeId));
         await createUnifiedWorkItem(runDirectory.client, runContext, selectedWorktreeId, {
-          title,
-          description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : "",
-          priority: "medium",
-          idempotencyKey: `kanban-create-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        });
+                  title,
+                  description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : "",
+                  priority: "medium",
+                  idempotencyKey: idempotencyKey || newIdempotencyKey(),
+                });
         setDraftTitle("");
         setDraftIpaFlow("ipa-s05-002 ソースコード作成");
         setDraftWorkflow("");
@@ -308,13 +313,15 @@ export default function KanbanPage() {
                   ...(draftFile && draftFile !== "无" ? [`file:${draftFile}`] : []),
                 ],
                 workflow_id: draftWorkflow || undefined,
-                description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
-                // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据; 本地无 UUID, 按名绑定)
-                branch_id: selectedBranch || null,
-                branch_name: selectedBranch || null,
-                // per 2026-11-22: 日历点击日期创建时预填 due_date
-                due_date: dueDateOverride || undefined,
-              });
+                                description: draftFile && draftFile !== "无" ? `关联文件: ${draftFile}` : undefined,
+                                // per 2026-11-21: 本地创建同样绑定当前 branch (隔离数据; 本地无 UUID, 按名绑定)
+                                branch_id: selectedBranch || null,
+                                branch_name: selectedBranch || null,
+                                // per 2026-11-22: 日历点击日期创建时预填 due_date
+                                due_date: dueDateOverride || undefined,
+                                // P0: 标记本地任务, 用于可见集合分离
+                                localOnly: true as any,
+                              });
       setDraftTitle("");
             setDraftIpaFlow("ipa-s05-002 ソースコード作成");
             setDraftWorkflow("");
@@ -352,12 +359,12 @@ export default function KanbanPage() {
     );
     try {
       const updated = await moveUnifiedWorkItem(
-        groupApi,
-        selectedWorktreeId,
-        item,
-        target,
-        `kanban-move-${workItemId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      );
+              groupApi,
+              selectedWorktreeId,
+              item,
+              target,
+              idempotencyKey || newIdempotencyKey(),
+            );
       setServerItems((cur) => (cur ? cur.map((w) => (w.id === updated.id ? updated : w)) : null));
       transitionWorkItem(updated.id, updated.column);
     } catch (error) {
@@ -459,16 +466,37 @@ export default function KanbanPage() {
     return items;
   }, [workItems, selectedProjectId, selectedLaneId, selectedWorktreeId, selectedBranch, laneWorktreeIds]);
   const filteredBoardWorkItems = useMemo(
-    () => applyBoardFilters(boardWorkItems, boardFilter),
-    [boardWorkItems, boardFilter],
-  );
+      () => applyBoardFilters(boardWorkItems, boardFilter),
+      [boardWorkItems, boardFilter],
+    );
 
-  // ---- nema 文件即任务 (真实 store) ----
+    // ---- nema 文件即任务 (真实 store) ----
     const nemaTasks = useNemaStore((s) => s.nemaTasks);
     const openNemaAsStarTask = useNemaStore((s) => s.openNemaAsStarTask);
 
-    // ---- 统计图表数据 (per 2026-11-22: 燃尽图/甘特图等任务管理内容迁入看板, 复用 analytics/chartData.buildAnalyticsData) ----
-    const charts = useMemo(() => buildAnalyticsData(sprints, workItems), [sprints, workItems]);
+    // ---- 统一可见任务集合 (P0: 单一口径, 本地/服务端分离, 授权过滤) ----
+      const visibleWorkItems: WorkItem[] = useMemo(() => {
+        const serverItemsFiltered = serverMode
+          ? (serverItems ?? [])
+              .filter((w) => !w.branchId || w.branchName === selectedBranch || w.branchId === selectedBranch)
+              .filter((w) => !selectedWorktreeId || w.worktreeId === selectedWorktreeId)
+              .map((w) => toStoreWorkItem(w))
+          : [];
+        // 本地任务: 仅本 branch/worktree/project, 且标记为 localOnly
+        const localItemsFiltered = boardWorkItems.filter(
+          (w) =>
+            w.branch_id === selectedBranch &&
+            (!selectedWorktreeId || w.worktree_id === selectedWorktreeId) &&
+            (w as WorkItem & { localOnly?: boolean }).localOnly === true,
+        );
+        return [...serverItemsFiltered, ...localItemsFiltered];
+      }, [serverMode, serverItems, boardWorkItems, selectedBranch, selectedWorktreeId]);
+
+    // 图表统计仅使用 authorized server items (P0: 避免本地 seed 污染统计)
+        const charts = useMemo(
+          () => buildAnalyticsData(sprints, serverMode ? (serverItems ?? []).map(toStoreWorkItem) : []),
+          [serverMode, sprints, serverItems],
+        );
 
     // ---- 列定义 (per P1): 服务端无 board 列配置, 列闭集来自统一域常量
        //      UNIFIED_KANBAN_COLUMNS (镜像 group_api `unified_column_status`, 与
@@ -784,8 +812,8 @@ export default function KanbanPage() {
             />
             <KanbanBoard
                           board={serverMode ? (unifiedBoard ?? board) : board}
-                          workItems={serverMode ? filteredServerBoardItems : filteredBoardWorkItems}
-              identities={identities}
+                          workItems={serverMode ? filteredServerBoardItems : visibleWorkItems}
+                          identities={identities}
               onTransition={serverMode ? (id, to) => void handleServerTransition(id, to) : transitionWorkItem}
               onWorkItemClick={(wi) => setDrawerMode({ kind: "view", workItemId: wi.id })}
               // 服务端模式: 列编辑与列内新建是本地 board 语义 (服务端无列配置),
@@ -871,19 +899,19 @@ export default function KanbanPage() {
                           <section data-testid="kanban-gantt-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full">
                             <GanttView
                               board={board}
-                              workItems={workItems}
+                              workItems={serverMode ? (serverItems ?? []).map(toStoreWorkItem) : visibleWorkItems}
                               identities={identities}
                             />
                           </section>
                         )}
         {activeView === "日历" && (
-                  <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full overflow-auto">
-                    {/* 老版本日历移植 (per 2026-11-14: 从 ProjectsClient 提取 CalendarView 合并复用)
-                        点击日期创建任务卡 → 打开 Drawer 并预填 due_date (localDateKey) */}
-                    <CalendarView
-                      sprints={sprints}
-                      milestones={milestones}
-                      workItems={workItems}
+                                  <section data-testid="kanban-calendar-view" className="bg-bg-card rounded-xl border border-line shadow-soft p-4 h-full overflow-auto">
+                                    {/* 老版本日历移植 (per 2026-11-14: 从 ProjectsClient 提取 CalendarView 合并复用)
+                                        点击日期创建任务卡 → 打开 Drawer 并预填 due_date (localDateKey) */}
+                                    <CalendarView
+                                      sprints={sprints}
+                                      milestones={milestones}
+                                      workItems={serverMode ? (serverItems ?? []).map(toStoreWorkItem) : visibleWorkItems}
                       onDayClick={(dateKey) => {
                         // dateKey 形如 "2026-11-22" (localDateKey)
                         setDrawerMode({ kind: "new", defaultStatus: "todo" });

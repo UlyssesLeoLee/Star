@@ -267,7 +267,9 @@ export interface WorkItem {
   branch_id?: string | null;
   // 分支名 (git 枚举名, 与目录树 selectedBranch 匹配); null/缺省 = 未绑定
   branch_name?: string | null;
-  // per 2026-11-21: 服务端 lifecycle 版本 (跨 branch handoff 的 expected_version 乐观锁);
+    // P0: 本地任务标记 (未同步至服务端, 用于可见集合分离)
+    localOnly?: boolean;
+    // per 2026-11-21: 服务端 lifecycle 版本 (跨 branch handoff 的 expected_version 乐观锁);
   // 本地卡缺省 = 无服务端版本, handoff 不可用。
   lifecycle_version?: number;
   // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
