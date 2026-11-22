@@ -668,7 +668,7 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
                                                               worktree_id: worktreeId,
                                                               branch_id: branch ?? null,
                                                               // P0: 标记本地任务, 用于可见集合分离
-                                                              localOnly: true as any,
+                                                              localOnly: true,
                                                             });
                             }}
             >

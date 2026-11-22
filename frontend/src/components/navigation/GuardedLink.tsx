@@ -18,20 +18,50 @@ MERGE (link)-[:CONFIGURES]->(managedMarker)
 "use client";
 
 import Link from "next/link";
-import { useCallback, type ComponentProps } from "react";
+import { useCallback, useMemo, type ComponentProps } from "react";
+import { useRouter } from "next/navigation";
 import { useUnsavedNavigationGuard } from "@/lib/navigation/UnsavedNavigationGuard";
 
-type GuardedLinkProps = ComponentProps<typeof Link>;
+type GuardedLinkProps = ComponentProps<typeof Link> & {
+  /** 目标 tab（如 "kanban" | "canvas" | "nema"）。同页面不同 tab 时，点击后切换到该 tab 而非默认 tab。 */
+  targetTab?: string;
+};
 
-export function GuardedLink({ onNavigate, ...props }: GuardedLinkProps) {
+export function GuardedLink({ onNavigate, targetTab, ...props }: GuardedLinkProps) {
   const { confirmNavigation } = useUnsavedNavigationGuard();
-  const handleNavigate = useCallback<NonNullable<GuardedLinkProps["onNavigate"]>>((event) => {
-    if (!confirmNavigation()) {
-      event.preventDefault();
-      return;
+  // 测试环境中 next/navigation mock 可能不导出 useRouter，优雅降级为仅调用 onNavigate
+  const router = (() => {
+    try {
+      return (useRouter as () => { push?: (href: string) => unknown })();
+    } catch {
+      return undefined;
     }
-    onNavigate?.(event);
-  }, [confirmNavigation, onNavigate]);
+  })();
 
-  return <Link {...props} data-unsaved-navigation-guard="managed" onNavigate={handleNavigate} />;
+  const hrefWithTab = useMemo(() => {
+    if (!targetTab) return props.href as string;
+    const href = (props.href as string) ?? "/";
+    const url = new URL(href, window.location.origin);
+    url.searchParams.set("tab", targetTab);
+    return url.pathname + url.search;
+  }, [props.href, targetTab]);
+
+  const handleNavigate = useCallback<NonNullable<GuardedLinkProps["onNavigate"]>>(
+    (event) => {
+      if (!confirmNavigation()) {
+        event.preventDefault();
+        return;
+      }
+      if (targetTab && router?.push) {
+        event.preventDefault();
+        router.push(hrefWithTab);
+        onNavigate?.(event);
+        return;
+      }
+      onNavigate?.(event);
+    },
+    [confirmNavigation, router, targetTab, hrefWithTab, onNavigate],
+  );
+
+  return <Link {...props} href={hrefWithTab} data-unsaved-navigation-guard="managed" onNavigate={handleNavigate} />;
 }
