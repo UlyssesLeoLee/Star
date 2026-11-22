@@ -30,11 +30,16 @@
 
 import { test, expect } from '@playwright/test';
 
+const E2E_HOST_PATH = process.env.E2E_HOST_PATH || 'D:\\\\\\\\Star\\\\\\\\worktrees\\\\\\\\sandbox-e2e';
+const E2E_HOST_PATH_BRANCH_A = process.env.E2E_HOST_PATH_BRANCH_A || 'D:\\\\\\\\Star\\\\\\\\worktrees\\\\\\\\branch-a';
+
 const SANDBOX_URL = '/sandbox';
 const KANBAN_URL = '/kanban';
+const CANVAS_URL = '/canvas';
 const WORKTREE_NAME = 'sandbox-e2e-wt';
 const WORKTREE_BRANCH = 'feat/e2e-sandbox';
-const HOST_PATH = 'D:\\Star\\worktrees\\sandbox-e2e';
+const WORKTREE_BRANCH_A = 'branch-a';
+const WORKTREE_NAME_BRANCH_A = 'wt-branch-a';
 
 test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Isolation E2E)', () => {
   test.beforeEach(async ({ page }) => {
@@ -47,7 +52,7 @@ test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Iso
     // 填表单
     await page.getByTestId('sandbox-wt-name').fill(WORKTREE_NAME);
     await page.getByTestId('sandbox-wt-branch').fill(WORKTREE_BRANCH);
-    await page.getByTestId('sandbox-wt-host-path').fill(HOST_PATH);
+    await page.getByTestId('sandbox-wt-host-path').fill(E2E_HOST_PATH);
 
     // 点击开设
     await page.getByTestId('sandbox-open-worktree-btn').click();
@@ -64,7 +69,7 @@ test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Iso
     // 先创建 Worktree
     await page.getByTestId('sandbox-wt-name').fill(WORKTREE_NAME);
     await page.getByTestId('sandbox-wt-branch').fill(WORKTREE_BRANCH);
-    await page.getByTestId('sandbox-wt-host-path').fill(HOST_PATH);
+    await page.getByTestId('sandbox-wt-host-path').fill(E2E_HOST_PATH);
     await page.getByTestId('sandbox-open-worktree-btn').click();
     await expect(page.getByTestId('sandbox-wt-created')).toBeVisible();
 
@@ -76,7 +81,7 @@ test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Iso
   test('3. 点击 Worktree 进入详情，host_path 正确回显', async ({ page }) => {
     await page.getByTestId('sandbox-wt-name').fill(WORKTREE_NAME);
     await page.getByTestId('sandbox-wt-branch').fill(WORKTREE_BRANCH);
-    await page.getByTestId('sandbox-wt-host-path').fill(HOST_PATH);
+    await page.getByTestId('sandbox-wt-host-path').fill(E2E_HOST_PATH);
     await page.getByTestId('sandbox-open-worktree-btn').click();
     await expect(page.getByTestId('sandbox-wt-created')).toBeVisible();
 
@@ -95,7 +100,7 @@ test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Iso
   test('4. 跨模块数据互通：从 Worktree 详情进入 Kanban，同一 worktree_id 可见', async ({ page }) => {
     await page.getByTestId('sandbox-wt-name').fill(WORKTREE_NAME);
     await page.getByTestId('sandbox-wt-branch').fill(WORKTREE_BRANCH);
-    await page.getByTestId('sandbox-wt-host-path').fill(HOST_PATH);
+    await page.getByTestId('sandbox-wt-host-path').fill(E2E_HOST_PATH);
     await page.getByTestId('sandbox-open-worktree-btn').click();
     await expect(page.getByTestId('sandbox-wt-created')).toBeVisible();
 
@@ -131,7 +136,7 @@ test.describe('沙箱 Worktree 隔离与左侧导航纳入 (Sandbox Worktree Iso
   test('6. 刷新后 Worktree 数据可读取 (持久化)', async ({ page }) => {
     await page.getByTestId('sandbox-wt-name').fill(WORKTREE_NAME);
     await page.getByTestId('sandbox-wt-branch').fill(WORKTREE_BRANCH);
-    await page.getByTestId('sandbox-wt-host-path').fill(HOST_PATH);
+    await page.getByTestId('sandbox-wt-host-path').fill(E2E_HOST_PATH);
     await page.getByTestId('sandbox-open-worktree-btn').click();
     await expect(page.getByTestId('sandbox-wt-created')).toBeVisible();
 
