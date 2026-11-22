@@ -79,10 +79,10 @@ describe("TaskCardCommand", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(onSubmitCommand).toHaveBeenCalledTimes(1);
-    expect(onSubmitCommand).toHaveBeenCalledWith("star run");
+    expect(onSubmitCommand).toHaveBeenCalledWith("star run", "card");
     expect(input).toHaveValue("");
     expect(screen.getByTestId("tcc-sent-hint")).toHaveTextContent(
-      "已发送到右侧聊天",
+      "已保留在任务卡 (未发送到聊天)",
     );
     // 历史立即渲染, 最新一条在最上
     expect(screen.getByTestId("tcc-history-0")).toHaveTextContent("star run");
@@ -101,7 +101,7 @@ describe("TaskCardCommand", () => {
     expect(button).toBeEnabled();
 
     fireEvent.click(button);
-    expect(onSubmitCommand).toHaveBeenCalledWith("git status");
+    expect(onSubmitCommand).toHaveBeenCalledWith("git status", "card");
     expect(input).toHaveValue("");
   });
 

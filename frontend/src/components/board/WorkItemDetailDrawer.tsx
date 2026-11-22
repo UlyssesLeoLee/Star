@@ -59,7 +59,7 @@ import { clsx } from "clsx";
 import {
   X, Trash2, Plus, Flag, Hash, Tag, FileText, User, Bot, Users,
   GitBranch, AlertTriangle, Save, ChevronDown, ListTodo, Workflow,
-  Terminal, ArrowRightLeft,
+  Terminal, ArrowRightLeft, MessageSquare, Clock,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
@@ -132,8 +132,9 @@ export function WorkItemDetailDrawer({
   const [newFileSubTaskTitle, setNewFileSubTaskTitle] = useState("");
   const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
   const [ipaQuery, setIpaQuery] = useState("");
+    const [activeTab, setActiveTab] = useState<"details" | "cli" | "comments" | "history">("details");
 
-  // ---- 跨 branch 显式互传 (handoff) — per 2026-11-21 用户发令: 每个 branch 独立一套数据,
+    // ---- 跨 branch 显式互传 (handoff) — per 2026-11-21 用户发令: 每个 branch 独立一套数据,
   // 不传时各自独立; 互传必须用户手动指定目标 branch。服务端走 SCD2 + 审计 + 幂等。 ----
   const groupApi = useWorktreeGroupApi();
   const runDirectory = useRunDirectory();
@@ -328,7 +329,9 @@ export function WorkItemDetailDrawer({
       labels: draft.labels,
       worktree_id: draft.worktree_id,
       // per 2026-11-21: 创建即绑定当前 branch (branch 级数据隔离)
-      branch_id: useNavStore.getState().selectedBranch || null,
+      // branch_id 保留为服务端 UUID（本地任务无，设 null）；branch_name 记录本地分支名
+      branch_id: null,
+      branch_name: useNavStore.getState().selectedBranch || null,
     });
     // 关闭后让父组件切到 view 模式显示新建的卡
     onClose();
@@ -423,78 +426,112 @@ export function WorkItemDetailDrawer({
   const modeBadge = isNew ? "NEW" : currentWi?.key ?? "VIEW";
 
   const drawerContent = (
-    <div
-      data-testid="work-item-drawer-root"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* 背景: click 关闭 */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-150"
-        onClick={onClose}
-        data-testid="work-item-drawer-backdrop"
-        aria-hidden
-      />
-      {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
-      <div
-        data-testid="work-item-drawer-panel"
-        className="relative h-[88vh] max-h-[860px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
-        style={{ width: DRAWER_W, maxWidth: "92vw" }}
-        onClick={(e) => e.stopPropagation()}
+        data-testid="work-item-drawer-root"
+        className="fixed inset-0 z-50 flex items-center justify-center p-3"
+        role="dialog"
+        aria-modal="true"
       >
-        {/* === Header === */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-bg-soft/50 shrink-0">
-          <div className="flex items-center gap-2 text-xs font-mono text-ink-mute">
-            <span className="text-[10px] text-ink-dim uppercase tracking-wider">
-              {isNew ? "新增任务" : "任务详情"}
-            </span>
-            <span className="text-[10px] text-ink-dim">·</span>
-            <span className="text-[10px] text-accent font-semibold">
-              {isNew ? "NEW" : (currentWi?.key ?? "—")}
-            </span>
-            {!isNew && currentWi && (
-              <>
+        {/* 背景: click 关闭 */}
+        <div
+          className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-150"
+          onClick={onClose}
+          data-testid="work-item-drawer-backdrop"
+          aria-hidden
+        />
+        {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
+        <div
+          data-testid="work-item-drawer-panel"
+          className="relative h-[88vh] max-h-[860px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
+          style={{ width: DRAWER_W, maxWidth: "92vw" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* === Header with Tabs === */}
+          <div className="flex flex-col border-b border-line bg-bg-soft/50 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2 text-xs font-mono text-ink-mute">
+                <span className="text-[10px] text-ink-dim uppercase tracking-wider">
+                  {isNew ? "新增任务" : "任务详情"}
+                </span>
                 <span className="text-[10px] text-ink-dim">·</span>
-                <StatusPill value={currentWi.status} size="xs" />
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            data-testid="work-item-drawer-close"
-            onClick={onClose}
-            className="p-1.5 rounded hover:bg-bg-soft text-ink-mute hover:text-ink transition-colors"
-            aria-label="关闭抽屉"
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        {/* per 2026-11-21 用户发令: 无法创建 → 弹窗顶端失败原因 + 完善建议链接 */}
-        {isNew && createFailure && (
-          <div
-            data-testid="work-item-drawer-create-failure"
-            className="shrink-0 flex items-start gap-2 border-b border-err/40 bg-err/10 px-4 py-2.5 text-xs text-err"
-            role="alert"
-          >
-            <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-err" />
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold">无法创建任务卡: {createFailure.reason}</div>
-              <div className="mt-0.5 text-err/90">
-                {createFailure.hint}
-                {createFailure.link && (
-                  <a href={createFailure.link} className="ml-1.5 font-semibold underline underline-offset-2" data-testid="work-item-drawer-create-failure-link">
-                    完善建议 →
-                  </a>
+                <span className="text-[10px] text-accent font-semibold">
+                  {isNew ? "NEW" : (currentWi?.key ?? "—")}
+                </span>
+                {!isNew && currentWi && (
+                  <>
+                    <span className="text-[10px] text-ink-dim">·</span>
+                    <StatusPill value={currentWi.status} size="xs" />
+                  </>
                 )}
               </div>
+              <button
+                type="button"
+                data-testid="work-item-drawer-close"
+                onClick={onClose}
+                className="p-1.5 rounded hover:bg-bg-soft text-ink-mute hover:text-ink transition-colors"
+                aria-label="关闭抽屉"
+              >
+                <X size={14} />
+              </button>
             </div>
-            <button type="button" onClick={() => setCreateFailure(null)} className="shrink-0 text-err/70 hover:text-err" aria-label="关闭失败提示">
-              <X size={12} />
-            </button>
+            {/* Tab bar */}
+            {!isNew && (
+              <div
+                className="flex gap-1 px-2 pb-2 border-b border-line/50"
+                data-testid="work-item-drawer-tabs"
+                role="tablist"
+              >
+                {[
+                  { id: "details", label: "详情", icon: FileText },
+                  { id: "cli", label: "CLI", icon: Terminal },
+                  { id: "comments", label: "评论", icon: MessageSquare },
+                  { id: "history", label: "历史", icon: Clock },
+                ].map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === id}
+                    onClick={() => setActiveTab(id as typeof activeTab)}
+                    className={clsx(
+                      "flex items-center gap-1 px-3 py-1.5 text-[10px] font-mono rounded-t transition-colors",
+                      activeTab === id
+                        ? "border-b-2 border-accent text-accent bg-accent/10"
+                        : "text-ink-mute hover:text-ink hover:bg-bg-soft/50",
+                    )}
+                    data-testid={`work-item-drawer-tab-${id}`}
+                  >
+                    <Icon size={10} /> {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* per 2026-11-21 用户发令: 无法创建 → 弹窗顶端失败原因 + 完善建议链接 */}
+          {isNew && createFailure && (
+            <div
+              data-testid="work-item-drawer-create-failure"
+              className="shrink-0 flex items-start gap-2 border-b border-err/40 bg-err/10 px-4 py-2.5 text-xs text-err"
+              role="alert"
+            >
+              <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-err" />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">无法创建任务卡: {createFailure.reason}</div>
+                <div className="mt-0.5 text-err/90">
+                  {createFailure.hint}
+                  {createFailure.link && (
+                    <a href={createFailure.link} className="ml-1.5 font-semibold underline underline-offset-2" data-testid="work-item-drawer-create-failure-link">
+                      完善建议 →
+                    </a>
+                  )}
+                </div>
+              </div>
+              <button type="button" onClick={() => setCreateFailure(null)} className="shrink-0 text-err/70 hover:text-err" aria-label="关闭失败提示">
+                <X size={12} />
+              </button>
+            </div>
+          )}
 
         {/* === Body (scrollable) === */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">

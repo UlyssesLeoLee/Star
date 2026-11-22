@@ -12,16 +12,15 @@ import { describe, it, expect } from "vitest";
 import { KANBAN_COLUMNS } from "@/mocks/data";
 
 describe("KANBAN_COLUMNS", () => {
-  it("has 5 default columns, including blocked work", () => {
-    expect(KANBAN_COLUMNS).toHaveLength(5);
+  it("has 4 Jira-consistent columns (blocked is a status, not a column)", () => {
+    expect(KANBAN_COLUMNS).toHaveLength(4);
   });
 
-  it("order: todo → in_progress → review → blocked → done", () => {
+  it("order: todo → in_progress → review → done (Jira consistent)", () => {
     expect(KANBAN_COLUMNS).toEqual([
       "todo",
       "in_progress",
       "review",
-      "blocked",
       "done",
     ]);
   });

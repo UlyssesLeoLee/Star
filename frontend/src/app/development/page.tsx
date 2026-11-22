@@ -21,13 +21,12 @@ export default function DevelopmentPage() {
   const [selected, setSelected] = useState<string | null>("cs-003");
   const cs = changeSets.find((c) => c.id === selected);
   const allowed = cs ? CHANGESET_SM.transitions.filter((t) => t.from === cs.status).map((t) => t.to) : [];
-  const devAuditEvents = auditEvents.filter((e) => e.category === "data_access" || e.category === "config_change").slice(0, 20);
 
   return (
     <div className="max-w-7xl mx-auto">
       <PageHeader
         title={t.pageTitles['/development'].title}
-        subtitle="ChangeSets 代码变更、Worktree 沙箱与研发审计日志"
+        subtitle="ChangeSets 代码变更、Worktree 沙箱与状态机"
         icon={<Hammer className="text-accent" size={20} />}
         track="D"
         count={`${changeSets.length} changesets`}
@@ -47,7 +46,6 @@ export default function DevelopmentPage() {
           { id: "changesets", label: "ChangeSets 变更集",  icon: <Hammer size={12} />,    badge: changeSets.length },
           { id: "worktrees",  label: "Worktrees 沙箱",     icon: <GitBranch size={12} />, badge: worktrees.length },
           { id: "statemachine", label: "State Machine 状态机", icon: <Shield size={12} /> },
-          { id: "audit",     label: "Dev Audit 研发审计",   icon: <History size={12} />,   badge: devAuditEvents.length },
         ]}
       />
 
@@ -153,32 +151,6 @@ export default function DevelopmentPage() {
           <div className="mt-3">
             <StateMachineDiagram sm={CHANGESET_SM} highlightState={cs?.status} />
           </div>
-        </div>
-      )}
-
-      {tab === "audit" && (
-        <div className="card overflow-x-auto" data-testid="tab-audit">
-          <SectionTitle>研发审计日志 (Dev Category)</SectionTitle>
-          {devAuditEvents.length === 0 ? (
-            <p className="text-xs text-ink-mute mt-3 font-mono">// No dev audit events in mock data</p>
-          ) : (
-            <table className="table mt-2">
-              <thead>
-                <tr><th>ID</th><th>Category</th><th>Action</th><th>Actor</th><th>When</th></tr>
-              </thead>
-              <tbody>
-                {devAuditEvents.map((e) => (
-                  <tr key={e.id}>
-                    <td className="font-mono text-xs">{e.id}</td>
-                    <td><StatusPill value={e.category} size="xs" /></td>
-                    <td className="font-mono text-xs">{e.action}</td>
-                    <td className="font-mono text-xs">{e.actor_id}</td>
-                    <td className="text-ink-dim text-xs">{new Date(e.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
         </div>
       )}
     </div>
