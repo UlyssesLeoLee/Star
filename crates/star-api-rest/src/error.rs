@@ -18,6 +18,7 @@ MERGE (self)-[:USES_TYPE]->(terr)
 
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
+use std::io;
 
 /// 6-field REST 错误 (per spec §2.4)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -57,6 +58,30 @@ impl RestError {
             source_module: "star-api-rest".to_string(),
             source_kind: "Validation".to_string(),
             retriable: false,
+            hint: hint.into(),
+        }
+    }
+
+    /// 服务不可用 (e.g. Podman 未安装/不在 PATH)
+    pub fn service_unavailable(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        Self {
+            code: "SERVICE_UNAVAILABLE".to_string(),
+            message: message.into(),
+            source_module: "star-api-rest".to_string(),
+            source_kind: "ServiceUnavailable".to_string(),
+            retriable: true,
+            hint: hint.into(),
+        }
+    }
+
+    /// 内部错误 (e.g. 容器创建失败, IO 错误)
+    pub fn internal(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        Self {
+            code: "INTERNAL".to_string(),
+            message: message.into(),
+            source_module: "star-api-rest".to_string(),
+            source_kind: "Internal".to_string(),
+            retriable: true,
             hint: hint.into(),
         }
     }
@@ -818,6 +843,19 @@ impl From<worktree_shared_dir::ExternalWorktreeImportError> for RestError {
             hint: "Check the repo_id (registered via register_repo?) + path (must appear in \
                    `git worktree list --porcelain` output for scan to know it exists)"
                 .to_string(),
+        }
+    }
+}
+
+impl From<std::io::Error> for RestError {
+    fn from(e: std::io::Error) -> Self {
+        Self {
+            code: "INTERNAL".to_string(),
+            message: e.to_string(),
+            source_module: "star-api-rest".to_string(),
+            source_kind: "Internal".to_string(),
+            retriable: true,
+            hint: "Check file/process IO permissions and path validity".to_string(),
         }
     }
 }
