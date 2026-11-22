@@ -34,7 +34,9 @@
 
 ## §0 目的与完成判定
 
-本设计把工程协作导航固定为 Project → Engineering Run → Worktree → Branch。Project 是左侧第一级；Engineering Run 是跨 App 的 canonical 协作工作区；Worktree 是 Run 管理的本地 checkout；Branch 是该 checkout 当前本地分支的投影与状态叶。远端 SCM/宿主关联只是可选 metadata，不改变父子层级。点击 Worktree 后才打开其 Run tabs，并设为 focus/CLI/Git target。Run 没有 Worktree 时，Run 行可打开不含完整 App tabs 的独立 Task Cards 页面；它仍使用 Project/Run 授权，不创建 Worktree focus。多 Agent Worktree 的归属、checkout 绑定、运行状态、冲突、锁和最近活动仍须在 Project Worktree Index 聚合可见；Index 不取代 Project/Run/Worktree 主树。所有动作须有明确授权、状态守卫、审计和幂等键。
+本设计把工程协作导航固定为 Project → Lane → Worktree → Branch。Project 是左侧第一级；Engineering Run 是跨 App 的 canonical 协作工作区；Worktree 是 Run 管理的本地 checkout；Branch 是该 checkout 当前本地分支的投影与状态叶。远端 SCM/宿主关联只是可选 metadata，不改变父子层级。点击 Worktree 后才打开其 Run tabs，并设为 focus/CLI/Git target。Run 没有 Worktree 时，Run 行可打开不含完整 App tabs 的独立 Task Cards 页面；它仍使用 Project/Run 授权，不创建 Worktree focus。多 Agent Worktree 的归属、checkout 绑定、运行状态、冲突、锁和最近活动仍须在 Project Worktree Index 聚合可见；Index 不取代 Project/Run/Worktree 主树。所有动作须有明确授权、状态守卫、审计和幂等键。
+
+ProjectNavigation 复用 navStore 的视图和状态筛选。桌面、Group 与窄屏目录复用这套控件，Group 的 Branch 任务继续使用授权投影。目录页签切换时保留树节点，授权目录按实际视口计算虚拟行。SidebarShortcuts 读取现有钉选列表，选择「添加应用」打开根布局的应用矩阵。AI 更新尚未接入授权事件流，当前视图显示未接入状态。
 
 生产完成须同时满足：
 

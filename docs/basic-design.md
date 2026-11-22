@@ -4234,7 +4234,9 @@ frontend/src/
 
 canonical Worktree route 为 `/projects/{project_id}/runs/{engineering_run_id}/worktrees/{worktree_id}?tab={app_id}`。旧 `/projects/{project_id}/branches/{branch_id}/runs/{engineering_run_id}/worktrees/{worktree_id}` 仅重定向到 canonical route 并忽略旧 `branch_id`；目标重新解析当前身份、Project/Run grants 与该 Worktree binding。Branch grant 不门控 Project/Run 导航或普通 Run Apps；旧 Branch-scoped compatibility API 可暂时保留原服务端授权检查，远端 SCM 操作仍必须复验相应 Branch grant。`/worktree?project_id=...` 与 `/worktree/{worktree_id}/group` 仍是兼容入口。Run 目录导航只重验 Project/Run；进入 Worktree 子树或设置 focus 时再重验 binding；`worktree_id` 不授予 Run App 权限。不得默认切换到任意项目或通用任务树。
 
-左侧主导航固定为 Project → Engineering Run → Worktree → Branch。Project Worktree Index 保留为跨 Run/Worktree 的汇总管理视图。Run 展开后显示本地 Worktree；Worktree 展开后显示 Branch 本地状态叶。点击 Worktree 才打开其所属 Run 的右侧完整 App tabs。没有 Worktree 的 hostless Run 可从 Run 行打开单独 Task Cards 页面，该页面不呈现完整 tabs，聊天 scope 固定为 GLOBAL。Inbox、任务生命周期、计划管理、Task Card、Infinite Canvas、Workflow/LangGraph、Run BI/Benchmark 与插件都是 Run 同级能力；**Task Card 与 Infinite Canvas 同级**，CLI 与 Agent Session 是卡内操作面板。Worktree 是真实 checkout，也是焦点和 CLI/Git 操作目标；Engineering Run 是 App、任务协作和分析范围。
+左侧主导航固定为 Project → Lane → Worktree → Branch。Project Worktree Index 保留为跨 Run/Worktree 的汇总管理视图。Run 展开后显示本地 Worktree；Worktree 展开后显示 Branch 本地状态叶。点击 Worktree 才打开其所属 Run 的右侧完整 App tabs。没有 Worktree 的 hostless Run 可从 Run 行打开单独 Task Cards 页面，该页面不呈现完整 tabs，聊天 scope 固定为 GLOBAL。Inbox、任务生命周期、计划管理、Task Card、Infinite Canvas、Workflow/LangGraph、Run BI/Benchmark 与插件都是 Run 同级能力；**Task Card 与 Infinite Canvas 同级**，CLI 与 Agent Session 是卡内操作面板。Worktree 是真实 checkout，也是焦点和 CLI/Git 操作目标；Engineering Run 是 App、任务协作和分析范围。
+
+Project 左栏使用共享的顶部视图和底部任务状态。目录与 AI 更新分别保留滚动区域，顶部和底部控件固定。应用快捷导航由右边缘按钮展开为覆盖层，展开时保持 Project 栏和主工作区宽度。应用矩阵与快捷导航共用用户的钉选配置。窄屏目录沿用相同页签和筛选，并在抽屉顶部提供可点按的快捷按钮。
 
 ```text
 Tenant → Workspace → Project（左侧第一级）

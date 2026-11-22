@@ -36,7 +36,9 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 
 ### Phase 2 — 工作空间布局整合 (P0/P1)
 - [x] 2.1 BranchWorkspace tabs → Lane 级中央应用: Backlog/Sprint、Canvas、Workflow/LangGraph、BI/Benchmark、Plugins
-- [x] 2.2 Group Workspace 左侧双页签: 导航树 / AI 更新 (Branch 任务按工作流状态分组; 底部状态筛选同步两页签)
+- [x] 2.2 Project 左栏共用顶部目录 / AI 更新页签和底部状态标签；Group 投影的 Branch 任务使用相同状态筛选。右边缘提供可配置的应用快捷导航。
+- [ ] 2.2a 将 AI 更新页签接到授权事件流。当前显示未接入状态。
+  - 2026-11-20 回归：侧栏、移动目录、目录树、导航状态和任务卡的 6 个 Vitest 文件通过 61 项测试。覆盖页签保留、共享筛选、悬停进入快捷菜单、钉选与移除及触屏打开。
 - [x] 2.3 任务卡统一可关闭子窗口 (3cc5b6b7: kanban 4 处 push → Drawer; /work-item 路由残留不再作入口)
 - [x] 2.4 Project Worktree Index 定位文案完成 (304f3ce5, wt-finish lane: 跨 Lane/Worktree/Branch 汇总入口语义)
 - [x] 2.5 closeTaskCard 验收通过 — 切换 Worktree 上下文验证仍缺 (backlog)
