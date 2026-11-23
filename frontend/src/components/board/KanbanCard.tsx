@@ -118,45 +118,50 @@ export function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={handleClick}
       className={clsx(
-        "card card-compact !p-3.5 border-l-4 cursor-pointer select-none transition-all duration-100",
+        "card card-compact !p-3 border-l-4 cursor-pointer select-none transition-all duration-100",
         pColor,
         isDragging && "opacity-50 ring-2 ring-[var(--cel-cyan)] shadow-[0_0_15px_rgba(0,240,255,0.4)]",
       )}
     >
-      {/* Row 1: key + story_points */}
+      {/* Row 1: key + priority + story_points (jira 风格顶行) */}
       <div className="flex items-center justify-between mb-1.5">
-        <span className="font-mono text-xs text-info font-bold tracking-tight flex items-center gap-1">
-          <span className="text-[10px] text-ink-mute font-normal">//</span>
-          {workItem.key}
-        </span>
-        {workItem.story_points !== undefined && (
-          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border border-line/60 bg-bg-card text-ink-mute">
-            {workItem.story_points} {t.workItem.storyPointsUnit}
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[10px] text-ink-mute font-normal">//</span>
+          <span className="font-mono text-xs text-info font-bold tracking-tight">
+            {workItem.key}
           </span>
-        )}
+        </div>
+        <div className="flex items-center gap-1">
+          {workItem.story_points !== undefined && (
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border border-line/60 bg-bg-card text-ink-mute">
+              {workItem.story_points} {t.workItem.storyPointsUnit}
+            </span>
+          )}
+          <span className={clsx(
+            "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border border-line/60 bg-bg-card",
+            workItem.priority === "p0" && "text-err",
+            workItem.priority === "p1" && "text-warn",
+            workItem.priority === "p2" && "text-info",
+            workItem.priority === "p3" && "text-ink-dim",
+          )}>
+            {priorityLabel}
+          </span>
+        </div>
       </div>
 
       {/* Row 2: title */}
-      <div className="text-sm font-semibold text-ink line-clamp-2 mb-2 leading-snug">{workItem.title}</div>
+      <div className="text-sm font-semibold text-ink line-clamp-2 mb-1.5 leading-snug">
+        {workItem.title}
+      </div>
 
       {/* Row 3: kind + status pills */}
-      <div className="flex flex-wrap items-center gap-1 mb-2">
+      <div className="flex flex-wrap items-center gap-1 mb-1">
         <StatusPill value={workItem.kind} size="xs" translateAs="workItemKind" />
         <StatusPill value={workItem.status} size="xs" translateAs="workItem" />
       </div>
 
-      {/* Row 4: priority + assignee + arch (per ADR-0041) */}
+      {/* Row 4: assignee + chat + arch */}
       <div className="flex items-center justify-between text-[10px] text-ink-mute pt-1 border-t border-line/40">
-        <span className={clsx(
-          "font-mono flex items-center gap-1 font-bold",
-          workItem.priority === "p0" && "text-err drop-shadow-[0_0_6px_rgba(255,51,102,0.4)]",
-          workItem.priority === "p1" && "text-warn",
-          workItem.priority === "p2" && "text-info",
-          workItem.priority === "p3" && "text-ink-dim",
-        )}>
-          <Flag size={12} />
-          {priorityLabel}
-        </span>
         <div className="flex items-center gap-1.5">
           {/* 聊天按钮 (per 2026-11-14 用户发令: 点击任务卡打开与该任务卡相关的聊天页) */}
           <a
