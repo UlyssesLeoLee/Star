@@ -205,6 +205,22 @@ export const ALL_MODULES: ModuleDefinition[] = [
     isCore: true,
   },
   {
+    id: "team",
+    label: "团队",
+    code: "TM",
+    href: "/team",
+    // 统一团队模块: 身份与成员 + agent中心 合并 (per 用户指令)
+    //   - 人类与 Agent 身份统一列表 (store.identities, 按 type 分区)
+    //   - 给 Agent 选供应商 (LLM provider / model / baseUrl / apiKey)
+    //   - 给人类与 Agent 创建小队 (TeamPanel 小队区)
+    //   - Agent 会话中心 (store.agentSessions + 14 状态机)
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "统一团队管理: 人类与 Agent 身份、Agent 供应商、人机小队",
+    icon: Users,
+    isCore: true,
+  },
+  {
     id: "agents",
     label: "Agents",
     code: "04",
