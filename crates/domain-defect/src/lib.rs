@@ -475,6 +475,8 @@ pub struct TransitionDefectCommand {
     pub idempotency_key: Option<IdempotencyKey>,
     pub target_status: DefectStatus,
     pub expected_version: Option<u32>,
+    /** 提交修复版本（在进入 in_progress / pending_verify 时设定，供 submit_verification 校验） */
+    pub fix_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -882,6 +884,12 @@ impl DefectCommandPort for InMemoryDefectService {
         defect.status = cmd.target_status;
         defect.lifecycle_version += 1;
         defect.updated_at = Utc::now();
+        if matches!(
+            defect.status,
+            DefectStatus::InProgress | DefectStatus::PendingVerify
+        ) {
+            defect.fix_version = cmd.fix_version.clone();
+        }
         let result = defect.clone();
 
         let audit_event = AuditEvent {
