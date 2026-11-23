@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import type { Identity, AgentSession, Tenant } from "@/types/ids";
+import type { AgentSettings } from "@/lib/agent/settings";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { MODEL_OPTIONS } from "@/lib/agent/settings";
 
@@ -300,6 +301,7 @@ export default function TeamPage() {
   const tenants = useStore((s) => s.tenants);
   const agentSessions = useStore((s) => s.agentSessions);
   const agentSettings = useStore((s) => s.agentSettings);
+  const [activeTab, setActiveTab] = useState<"members" | "providers" | "squads" | "sessions">("members");
   const [squads, setSquads] = useState<Array<{ id: string; name: string; members: SquadMember[] }>>(
     [
       {
@@ -324,16 +326,26 @@ export default function TeamPage() {
 
   const saveProvider = useCallback(
     (id: string, patch: Partial<{ model: string; baseUrl: string; enabled: boolean }>) => {
-      // 仅本地草稿，不改 store.agentSettings (后端未接入前不写入持久化集合)
-      // 后续接入 /api/api-keys 后改为 store.updateAgentSetting(id, patch)
-      return;
+      // 先 lazy init（如未 init），再局部更新到 store.agentSettings
+      const init = useStore.getState().initAgentSettings;
+      init(id as Uuid);
+      for (const [field, value] of Object.entries(patch)) {
+        useStore
+          .getState()
+          .updateAgentSetting(id as Uuid, field as keyof AgentSettings, value);
+      }
     },
     []
   );
 
   const deleteKey = useCallback((id: string) => {
-    // 后端未接入：仅本地草稿，不执行删除
-    return;
+    // 清空 apiKey 并禁用，标注未持久化
+    const init = useStore.getState().initAgentSettings;
+    init(id as Uuid);
+    useStore
+      .getState()
+      .updateAgentSetting(id as Uuid, "apiKey", "" as AgentSettings["apiKey"]);
+    useStore.getState().updateAgentSetting(id as Uuid, "enabled", false);
   }, []);
 
   const createSquad = useCallback(() => {
@@ -390,8 +402,8 @@ export default function TeamPage() {
 
       {/* Tab: 成员身份 | Agent 供应商 | 小队 | Agent 会话 */}
       <TabsComponent
-        activeTab="members"
-        onChange={() => {}}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as "members" | "providers" | "squads" | "sessions")}
         items={[
           { id: "members", label: "成员与身份", icon: <Users size={12} />, badge: identities.length },
           {
@@ -406,7 +418,7 @@ export default function TeamPage() {
       />
 
       {/* 成员与身份 */}
-      <section data-testid="team-section-members" className="space-y-3">
+      <section data-testid="team-section-members" className={clsx("space-y-3", activeTab !== "members" && "hidden")}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-ink">成员与身份</h2>
@@ -461,7 +473,7 @@ export default function TeamPage() {
       </section>
 
       {/* Agent 供应商 */}
-      <section data-testid="team-section-providers" className="space-y-3 hidden">
+      <section data-testid="team-section-providers" className={clsx("space-y-3", activeTab !== "providers" && "hidden")}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-ink">给 Agent 选供应商</h2>
@@ -492,7 +504,7 @@ export default function TeamPage() {
       </section>
 
       {/* 小队 */}
-      <section data-testid="team-section-squads" className="space-y-3 hidden">
+      <section data-testid="team-section-squads" className={clsx("space-y-3", activeTab !== "squads" && "hidden")}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-ink">小队</h2>
@@ -527,7 +539,7 @@ export default function TeamPage() {
       </section>
 
       {/* Agent 会话 */}
-      <section data-testid="team-section-sessions" className="space-y-3 hidden">
+      <section data-testid="team-section-sessions" className={clsx("space-y-3", activeTab !== "sessions" && "hidden")}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-ink">Agent 会话中心</h2>
