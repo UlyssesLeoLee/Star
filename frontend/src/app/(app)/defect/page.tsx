@@ -8,7 +8,8 @@ MERGE (self)-[:DEFINES]->(page)
 // /defect — 智能缺陷管理主页 (per SRS-DEFECT-INTELLIGENCE-001 §4.4)
 // 布局: 左 筛选 + 缺陷列表 | 右 详情抽屉 (复用 WorkItemDetailDrawer 布局风格)
 // 缺陷以 Bug WorkItem 承载，纳入主导航 Project→Lane→Worktree→Branch
-// ====================================================================="use client";
+// =====================================================================
+"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useStore } from "@/lib/store";
