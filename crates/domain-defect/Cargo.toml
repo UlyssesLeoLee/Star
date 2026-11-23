@@ -1,0 +1,32 @@
+[package]
+# 2026-11-22: 智能缺陷管理领域 crate
+# 本仓 crate 无 crates.io 发布意图。
+publish = false
+name = "domain-defect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+
+# 复用 star-context 的 ActorContext（唯一权威定义）
+star-context = { path = "../star-context" }
+# 复用 domain-work-item 的 WorkItem 实体与端口 trait
+domain-work-item = { path = "../domain-work-item" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

@@ -2001,6 +2001,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-defect"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "domain-work-item",
+ "serde",
+ "serde_json",
+ "star-context",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "domain-development"
 version = "0.1.0"
 dependencies = [
