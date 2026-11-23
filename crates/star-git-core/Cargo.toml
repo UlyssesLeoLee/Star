@@ -8,7 +8,7 @@ description = "Git conflict region engine ported from UlyssesLeoLee/GitGit (auth
 [dependencies]
 tokio = { version = "1.40", features = ["process"], optional = true }
 thiserror = { workspace = true }
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 
 [features]

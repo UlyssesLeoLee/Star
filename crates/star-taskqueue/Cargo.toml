@@ -24,7 +24,7 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 # SQLite via rusqlite (sync, wrapped in spawn_blocking for tokio)
-rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 
 [lints]
 workspace = true
