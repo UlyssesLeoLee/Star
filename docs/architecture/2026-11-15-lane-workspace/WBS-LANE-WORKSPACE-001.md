@@ -45,9 +45,12 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 
 ### Phase 3 — Backlog/Sprint/看板收敛 (P1)
 - [ ] 3.1 独立 /kanban 与 BranchWorkspace Backlog 合并为一套 (保留列内创建/拖动/列增删重命名)
+- [ ] 3.1a 缺陷管理并入 Lane Backlog：`dev@df672de7` 已打开统一任务抽屉，但 Bug 默认类型尚未传入抽屉模式，创建仍为本地 store；缺陷分页/部分失败、授权范围、真实扩展字段和独立验证未闭环。详见 `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` §7.1。
 - [x] 3.2 kanban 预览数据标识 (cf48593b) + 聊天未接入禁用写入 (591915cb) — kanban 写操作授权禁用仍缺 (backlog)
 - [ ] 3.3 创建/移动/刷新/状态变更身份与上下文一致性验证
 - [ ] 3.4 失败提示 + 草稿保留; 授权失败不重放写操作
+
+2026-11-23 验收：`ddb0b6a6` 四组前端测试 37 项通过；看板 5 项使用 NEMA WASM 替身/JS 回退通过；Rust `domain-defect` 编译通过但当时 0 测试。`dev@df672de7` 与 `main@4f54b2c9` 有后续代码变更，本轮文档同步未对其运行端到端测试，不将上述历史结果当作当前闭环证明。
 
 ### Phase 4 — Canvas 上下文与关系图 (P1)
 - [x] 4.1 Canvas ?worktree= 上下文条 + 数据隔离诚实标注 (591915cb) — 任务卡链接未做 (backlog)
@@ -74,6 +77,7 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 - [ ] 7.3 桌面尺寸/窄窗口/缩放/字号/对比度/键盘/焦点/无障碍检查
 - [◐] 7.4 ProjectRunTree 已虚拟化 (rows.slice + VIEWPORT_HEIGHT/OVERSCAN) — 聊天/事件/日志未做有界
 - [ ] 7.5 Hooks 保持"高级设置→Hooks"; Worktree/Lane Detail/BI 展示有效策略并深链
+- [ ] 7.6 修复 Lane 插件页 `/settings?tab=integrations` 未被设置页映射、回落 MCP 的深链；复核 Hooks/Skills/MCP/Plugins 的授权投影和入口。
 
 ### Phase 8 — 实施验收 (贯穿)
 - [x] 8.1 全 session 每批提交均过 tsc 0 / vitest 128·1064 / cgg stamp / 浏览器实测 (自审报告 2026-11-15)
@@ -99,3 +103,4 @@ Canvas 关系图、聊天/状态/Team、会话授权、状态可读性、实施�
 | 2026-11-15 | v1.3 | 4 lane 并行 fan-out (docs/chat/canvas/wt, delegate_task deepseek probe 通过) rebase+merge dev; 2.4/2.5/4.1/4.3/5.2/5.3/5.4 打钩; Agent 中心并入 Canvas; IM1.0 chat 域模型; 1b 创建栏 6 控件 | 304f3ce5→9187f43d |
 | 2026-11-15 | v1.4 | 实际状态全量同步: ◐ 半完成项标注意外; 移交 Codex (MAGOS disarm 命令交付用户终端) | 本提交 |
 | 2026-11-15 | v1.5 | 结构定版: Agent 中心拆分 (90111428) + workflow 回归 canvas「流程」标签 (e804a570) + rail 顶格/agent 设置 (d05c6e3c) + 任务卡子窗口全站统一 (3cc5b6b7); WBS 状态回写 | 本提交 |
+| 2026-11-23 | v1.6 | 登记缺陷抽屉接线、剩余 P0 闭环和设置深链；区分 ddb0b6a6 验收与后续 dev/main 代码状态 | 工作区 |

@@ -1,8 +1,8 @@
 # BD-DEFECT-INTELLIGENCE-001
 
-> 智能缺陷管理 — 基本设计 v1.0 (Draft)
-> 需求：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v0.1
-> 详细设计：`docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.0（本配套）
+> 智能缺陷管理 — 基本设计 v1.1 (Draft；实现部分完成，验收未通过)
+> 需求：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.1
+> 详细设计：`docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.1（本配套）
 > 验收：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` §7 AC-DI-01～08（待验收）
 
 ---
@@ -252,6 +252,13 @@ CREATE TABLE defect_workflow_strategy (
 
 ## §6 已知缺口（显式列，per 缺标比错标）
 
+### 2026-11-23 实现与验收对照
+
+- `dev@ddb0b6a6` 的模块整合验收未通过，问题包括缺陷创建入口、内存服务写入授权和状态/验证边界。四组前端测试 37 项通过；看板 5 项通过时 NEMA WASM 被临时替换为 JS 回退；Rust 缺陷 crate 编译通过但有 0 项测试。真实数据库、授权和浏览器端到端未验收。
+- 随后 `dev@df672de7` 已在缺陷页接入统一任务抽屉，并加入租户/Project 检查、状态迁移检查及验证记录结构。创建模式仍未将 `defaultKind` 放入 `open`，抽屉读取 `open.defaultKind`；创建仍经本地 `addWorkItem`。缺陷数据汇总仍吞掉部分 Worktree 读取错误，扩展字段和验证状态缺少真实来源。
+- 当前工作区 `main@4f54b2c9` 在 dev 基础上增加内存迁移命令的修复版本字段和测试文件；该提交尚不在上述 dev 基线。本次未重跑其测试，不能据此关闭生产持久化、授权、独立验证、审计和 Outbox 门禁。
+- 设计目标仍为 WorkItem owner 的 Bug 身份及授权事实。落地前须补齐创建/流转的身份和范围复验、修复版本及独立验证持久化、事务审计/Outbox 和失败恢复，并以同一候选提交执行 AC-DI-01～03。
+
 | # | 缺口 | 状态 |
 |---|------|------|
 | G-1 | 外部问题系统导入或双向同步（连接授权、许可、字段映射、冲突策略） | 后续可选，不作为本期闭环前提 |
@@ -278,3 +285,4 @@ CREATE TABLE defect_workflow_strategy (
 | 日期 | 版本 | 内容 |
 |------|------|------|
 | 2026-11-22 | v1.0 | 建立智能缺陷管理基本设计：逻辑上下文、W/T/M 事实所有权、模块与接口、数据库设计、非功能设计、已知缺口、阶段交付物 |
+| 2026-11-23 | v1.1 | 补充历史验收、dev 与 main 后续实现差异及未关闭的生产门禁。 |

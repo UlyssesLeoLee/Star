@@ -1,7 +1,7 @@
 # DD-DEFECT-INTELLIGENCE-001
 
-> 智能缺陷管理 — 详细设计 v1.0 (Draft)
-> 上游：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v0.1、`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.0
+> 智能缺陷管理 — 详细设计 v1.1 (Draft；实现部分完成，验收未通过)
+> 上游：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.1、`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.1
 > 本设计不启动生产部署，实体与版本、API 契约、Project owner 事务、前端模块映射、测试钩子、已知缺口均已显式列出。
 
 ---
@@ -10,7 +10,7 @@
 
 | Logical aggregate | Owner | Identity / version | State |
 |-------------------|-------|--------------------|-------|
-| `defect_work_item` | WorkItem owner (`domain-work-item` boundary) | `defect_id, revision` | triage / waiting_info / confirmed / in_progress / awaiting_verification / closed / reopened / duplicate / not_processed; Master history |
+| `defect_work_item` | WorkItem owner (`domain-work-item` boundary) | `defect_id, revision` | triage / waiting_info / confirmed / in_progress / awaiting_verification / closed / reopened / duplicate / not_processed; 事务事实与事件历史（T） |
 | `defect_field_value` | WorkItem owner | `field_id, defect_id, value_revision` | active / superseded |
 | `defect_relation` | WorkItem owner | `relation_id, source_defect_id, target_defect_id, relation_type, relation_revision` | active / revoked |
 | `defect_status_event` | WorkItem owner | `event_id, event_revision` | Append-only; immutable after commit |
@@ -288,6 +288,16 @@ const charts = useMemo(
 
 ## §7 已知缺口（显式列，per 缺标比错标）
 
+### 2026-11-23 验收与实现差异
+
+本节记录实现差异，不改变前文目标契约。上一轮 `dev@ddb0b6a6` 验收未通过；后续 `dev@df672de7` 的缺陷页已打开 `WorkItemDetailDrawer`，但创建模式只设置 `defaultStatus`，独立 `defaultKind="bug"` 未由抽屉初始化消费，且创建走本地 `addWorkItem`。缺陷列表对单个 Worktree 读取错误静默继续，扩展字段仍为未知值，不能依据 `done` 显示验证已通过。
+
+`dev@df672de7` 的 `InMemoryDefectService` 新增租户/Project 检查、状态迁移、验证记录和幂等结构，仍为内存实现，默认 audit/outbox 为 Noop；其验证要求当前 `fix_version` 已存在，而该 dev 版本未提供设置修复版本的状态命令。`main@4f54b2c9` 新增状态迁移命令的 `fix_version` 字段与测试文件，尚未在本次文档同步中执行测试，亦不证明该改动已进入 dev 或生产 owner。
+
+该 dev 版本的状态表允许 `PendingVerify → Closed`，需在命令入口确认通过持久化独立验证才能关闭；现有验证独立性检查比较验证者和报告者，尚须按策略校验实际修复者/执行者。以上为代码审阅中发现的后续验收条件，不视为已在生产入口触发。
+
+实现前必须核对并补齐：Bug WorkItem 权威身份和缺陷扩展的事务边界；租户、Project/Lane、Worktree 及身份的实时授权；完整状态/版本校验；独立验证身份、固定版本和证据；持久化审计、幂等与 Outbox；部分失败和草稿恢复。所有 AC-DI-01～08 保持 `NOT_RUN`，直至在固定候选提交与实际部署环境取得对应验收证据。
+
 | # | 缺口 | 状态 |
 |---|------|------|
 | G-1 | 外部问题系统导入或双向同步（连接授权、许可、字段映射、冲突策略） | 后续可选，不作为本期闭环前提 |
@@ -305,3 +315,4 @@ const charts = useMemo(
 | 日期 | 版本 | 内容 |
 |------|------|------|
 | 2026-11-22 | v1.0 | 建立智能缺陷管理详细设计：实体与版本、API 契约、Project owner 事务、前端模块映射、数据库 DDL、前端代码片段、测试钩子与验收映射、已知缺口 |
+| 2026-11-23 | v1.1 | 对照 dev 与 main 的实际缺陷实现和上一轮验收，登记未闭环接口与证据限制。 |
