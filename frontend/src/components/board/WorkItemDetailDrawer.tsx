@@ -101,9 +101,10 @@ const STATUSES: WorkItemStatus[] = [
 const PRIORITIES: WorkItemPriority[] = ["p0", "p1", "p2", "p3"];
 const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
-// ---- Drawer width (480px, 便于 board 仍可见) ----
-// per 2026-11-21 用户发令: 创建任务卡的子窗口改成大的 (480 → 760)
-const DRAWER_W = 760;
+// ---- Drawer width (自适应窗口) ----
+// per 用户发令: 任务卡整体自适应主窗口区域，展开/收缩随窗口变化
+// 不再硬编码固定宽度，由 CSS max-w/[vw] 自动决定
+const DRAWER_W = "95vw";
 
 export function WorkItemDetailDrawer({
   open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
@@ -132,7 +133,7 @@ export function WorkItemDetailDrawer({
   const [newFileSubTaskTitle, setNewFileSubTaskTitle] = useState("");
   const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
   const [ipaQuery, setIpaQuery] = useState("");
-    const [activeTab, setActiveTab] = useState<"details" | "cli" | "comments" | "history">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "cli" | "comments" | "history">("cli");
 
     // ---- 跨 branch 显式互传 (handoff) — per 2026-11-21 用户发令: 每个 branch 独立一套数据,
   // 不传时各自独立; 互传必须用户手动指定目标 branch。服务端走 SCD2 + 审计 + 幂等。 ----
@@ -434,7 +435,7 @@ export function WorkItemDetailDrawer({
       >
         {/* 背景: click 关闭 */}
         <div
-          className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-150"
+          className="absolute inset-0 bg-black/5 backdrop-blur-sm animate-in fade-in duration-150"
           onClick={onClose}
           data-testid="work-item-drawer-backdrop"
           aria-hidden
@@ -442,8 +443,8 @@ export function WorkItemDetailDrawer({
         {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
         <div
           data-testid="work-item-drawer-panel"
-          className="relative h-[88vh] max-h-[860px] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
-          style={{ width: DRAWER_W, maxWidth: "92vw" }}
+          className="relative h-[92vh] max-h-[92vh] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
+                    style={{ width: DRAWER_W, maxWidth: DRAWER_W }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* === Header with Tabs === */}
@@ -1012,7 +1013,7 @@ export function WorkItemDetailDrawer({
         {!isNew && (
           <div
             data-testid="work-item-cli-panel"
-            className="shrink-0 border-t-2 border-[var(--cel-ink)] bg-[#0b0d10] flex flex-col"
+            className="flex-1 border-t-2 border-[var(--cel-ink)] bg-[#0b0d10] flex flex-col"
           >
             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/10">
               <Terminal size={11} className="text-[#79c0ff]" />
