@@ -103,8 +103,7 @@ const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
 // ---- Drawer width (自适应窗口) ----
 // per 用户发令: 任务卡整体自适应主窗口区域，展开/收缩随窗口变化
-// 不再硬编码固定宽度，由 CSS max-w/[vw] 自动决定
-const DRAWER_W = "95vw";
+// 不再硬编码固定宽度，由 CSS min(95vw, 1200px) 自动决定
 
 export function WorkItemDetailDrawer({
   open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
@@ -133,7 +132,7 @@ export function WorkItemDetailDrawer({
   const [newFileSubTaskTitle, setNewFileSubTaskTitle] = useState("");
   const [newFileSubTaskPath, setNewFileSubTaskPath] = useState("");
   const [ipaQuery, setIpaQuery] = useState("");
-    const [activeTab, setActiveTab] = useState<"details" | "cli" | "comments" | "history">("cli");
+    const [activeTab, setActiveTab] = useState<"details" | "cli" | "comments" | "history">("details");
 
     // ---- 跨 branch 显式互传 (handoff) — per 2026-11-21 用户发令: 每个 branch 独立一套数据,
   // 不传时各自独立; 互传必须用户手动指定目标 branch。服务端走 SCD2 + 审计 + 幂等。 ----
@@ -443,8 +442,8 @@ export function WorkItemDetailDrawer({
         {/* 子窗口本体: 居中弹出 (per 2026-11-15 用户发令: 不要右侧弹出) */}
         <div
           data-testid="work-item-drawer-panel"
-          className="relative h-[92vh] max-h-[92vh] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
-                    style={{ width: DRAWER_W, maxWidth: DRAWER_W }}
+          className="relative h-[92vh] max-h-[min(92vh,900px)] bg-bg-card border-2 border-[var(--cel-ink)] shadow-soft rounded-xl flex flex-col animate-in zoom-in-95 duration-150 overflow-hidden"
+                    style={{ width: "min(95vw, 1200px)", maxWidth: "min(95vw, 1200px)" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* === Header with Tabs === */}
