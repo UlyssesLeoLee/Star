@@ -79,7 +79,7 @@ import type {
 
 // ---- Mode discriminator ----
 export type WorkItemDrawerMode =
-  | { kind: "new";  defaultStatus: WorkItemStatus }
+  | { kind: "new"; defaultStatus: WorkItemStatus; defaultKind?: WorkItemKind; lockKind?: boolean }
   | { kind: "view"; workItemId: string };
 
 export interface WorkItemDetailDrawerProps {
@@ -90,6 +90,10 @@ export interface WorkItemDetailDrawerProps {
   projectKey?: string;
   tenantId?: string;
   reporterId?: string;
+  /** new 模式下的默认 kind (缺陷创建窗口传 "bug" 锁定为缺陷类型) */
+  defaultKind?: WorkItemKind;
+  /** new 模式下是否锁定 kind (锁定后只显示只读文本, 不可切换) */
+  lockKind?: boolean;
   /** 点击子任务行时打开子任务卡 (per 2026-11-11 子任务层级) */
   onOpenChildTask?: (workItemId: string) => void;
 }
@@ -199,7 +203,7 @@ export function WorkItemDetailDrawer({
         title: "",
         status: open.defaultStatus,
         priority: "p2",
-        kind: "task",
+        kind: open.defaultKind ?? "task",
         description: "",
         assignee_id: undefined,
         worktree_id: undefined,
