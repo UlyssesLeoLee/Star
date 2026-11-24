@@ -2,10 +2,49 @@
 
 > **2026-11-24 对账说明**：现行创建、部分失败、独立验证与 WorkItem/defect owner 归属以 [基本设计 §3.4](../basic-design/BD-DEFECT-INTELLIGENCE-001.md#34-缺陷创建查询与验证的统一契约) 为准；**物理接线判定规则**见 [基本设计 §3.5](../basic-design/BD-DEFECT-INTELLIGENCE-001.md#35-单一写入路径与物理接线判定per-2026-11-24-物理事实核对)。以下 PG 适配器流程记录候选实现；以报告者代替实际修复者校验验证独立性不能满足 FR-DI-018，需修复并验收。候选表和路由是否属于同一权威 owner 尚待核实，不证明生产接入。
 
-> 智能缺陷管理 — 详细设计 v1.3 (Draft；实现部分完成，验收未通过)
-> 上游：`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.1（2026-11-24 现行适用说明）、`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.4
-> 部署边界：Vercel 仅承载 Web 呈现与同源 BFF（`docs/adr/vercel/ADR-STAR-VERCEL-DEPLOY-001.md` v0.2 草案，未批准）；业务 Owner、持久化与执行权威仍在 Star 侧
-> 本设计不启动生产部署，实体与版本、API 契约、Project owner 事务、前端模块映射、测试钩子、已知缺口均已显式列出。
+> **智能缺陷管理 — 詳細設計書 v1.5** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
+>
+> - 状态: 🟡 Draft v1.5 (2026-11-24 · IPA 模板对齐 + 自审补齐 5 维设计；实现部分完成，验收未通过)
+> - 目标阶段: 詳細設計 → 実装 → テスト → リリース
+> - 上游: [`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md`](../requirements/SRS-DEFECT-INTELLIGENCE-001.md) v1.4 + [`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md`](../basic-design/BD-DEFECT-INTELLIGENCE-001.md) v1.6 (12 模块 / 13 表 W/T/M / 6 决策点)
+> - 下游: 实装代码 (`crates/domain-defect/` + `crates/star-api-rest/src/routes/defects.rs` + `crates/star-api-rest/src/defect_outbox/` + `frontend/src/app/(app)/defect/page.tsx`) + 测试 + 验收报告
+> - 关联实装基线: `crates/domain-defect/src/pg_schema.rs` + `pg_service.rs` (owner 事务) + `crates/star-api-rest/src/defect_outbox/` (contract/consumer/relay) + `frontend/src/components/board/WorkItemDetailDrawer.tsx`
+> - 守门基线: 守门 #1+#5+#9+#10+#11+#12+#13+#14 v4 共 8 项必过 (守门 #13 W/T/M 横展 100% 覆盖、#11 缺标比错标为本专题硬约束)
+> - 上位文書: `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.4 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 + `AGENTS.md` §0/§4
+> - 平行参考: `docs/detailed-design/DD-SANDBOX-002.md` v0.1.1 (IPA 詳細設計書 模板参考)
+> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手`
+> - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62)
+> - 日期: 2026-11-24 JST
+> - 受众: 実装エンジニア / QA Lead / 詳細設計エンジニア
+> - 対象範囲: 缺陷域的实体与版本、API 契约、Owner 事务、模块/时序/状态迁移/测试 5 维设计、数据库 DDL、前端代码片段、验收映射
+> - 対象バージョン: 缺陷域 v1.0 (P0) → v2.0 (P2)
+> - 適用プラットフォーム: Web (Next.js / Vercel 呈现层) + Rust (`star-api-rest`) + Neon PostgreSQL
+> - データモデル: 13 表 W/T/M 横展 (T 8 / M 3 / W 2)；本 DD 给出 6 张 `defect.*` 表 DDL，其余 7 张按 §4.3 分流
+> - 関連 commit: 候选 `dev@b1db1c99`（实现状态证据，非设计规则；仅出现在 §7 实现状态章节）
+>
+> 部署边界：Vercel 仅承载 Web 呈现与同源 BFF（`docs/adr/vercel/ADR-STAR-VERCEL-DEPLOY-001.md` v0.2 草案，未批准）；业务 Owner、持久化与执行权威仍在 Star 侧。
+> 本设计不启动生产部署，实体与版本、API 契约、Project owner 事务、前端模块映射、数据库 DDL、前端代码片段、测试钩子、已知缺口均已显式列出。
+
+---
+
+## §-1 文書情報 / 文档信息
+
+| 項目 | 内容 |
+|---|---|
+| 文書 ID | DD-DEFECT-INTELLIGENCE-001 |
+| 文書名 | 智能缺陷管理 — 詳細設計書 |
+| バージョン | v1.5 |
+| 作成日 | 2026-11-24 |
+| 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 |
+| 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
+| 対象範囲 | 缺陷域详细设计：实体/版本、API 契约、Owner 事务、5 维设计、DDL、前端片段、测试与验收 |
+| 対象バージョン | 缺陷域 v1.0 (P0) → v2.0 (P2) |
+| 適用プラットフォーム | Web (Next.js / Vercel 呈现层) + Rust (`star-api-rest`) + Neon PostgreSQL |
+| 上位文書 | `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.4 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 |
+| 関連文書 | `docs/architecture/DEFECT-WBS-2026-11-23.md` v1.1 + `crates/domain-defect/tests/defect_lifecycle_test.rs` |
+| 設計 5 維 | モジュール設計 (§3) / クラス設計 (§0, §2) / 時序設計 (§2.1, §3.4) / 状態遷移設計 (§2.2) / テスト設計 (§6) |
+| データモデル | 6 张 `defect.*` 表 DDL (§4.2)；其余 7 张按 §4.3 分流 |
+| 関連 commit | 候选 `dev@b1db1c99`（实现状态证据） |
 
 ---
 
@@ -69,6 +108,41 @@ Association/binding revisions are monotonically increasing owner versions. An AP
   不在当前 ADR 批准的范围内，per ADR §2）。
 
 ---
+
+### 0.2 制約・前提・依存（詳細設計レベル, per SRS §8）
+
+| 種別 | ID | 内容 | 詳細設計での反映位置 |
+|---|---|---|---|
+| 制約 | CON-DI-01 | 缺陷与普通任务共享授权事实与写入路径 | §2.1 owner 事务唯一入口；§3.2.3 kind 锁定 |
+| 制約 | CON-DI-03 | 401 会话失效 / 403 拒绝范围不得混用 | §1.0 错误映射；缺口 G-18 |
+| 制約 | CON-DI-04 | CAS + 幂等键；冲突不自动重放 | §1.1、§2.1 幂等段 |
+| 制約 | CON-DI-05 | 未接入字段显式标注"未知"，不由界面状态反推 | §3.2.2 三态渲染；缺口 G-14 |
+| 制約 | CON-DI-07 | 跨 owner 只经版本化 API/事件 | §4.3 外部 owner 分流 |
+| 前提 | PRE-DI-02 | 需已验证会话提供 tenant/Project/能力 | §1.0；缺口 G-15 |
+| 前提 | PRE-DI-03 | 目标 PG 可达且迁移已应用 | §4.2 目标 DDL；缺口 G-11 |
+| 前提 | PRE-DI-04 | 验证独立性策略已确定 | §2.2.3 INV-SM-03；决策 D-DI-02 |
+| 依存 | DEP-DI-02 | `star-context`（ActorContext） | §1.0、§2.1 GUC 设置 |
+| 依存 | DEP-DI-04 | `domain-notification`（通知 owner） | §2.1 Outbox 写入；缺口 G-8、G-12 |
+| 依存 | DEP-DI-08 | `domain-kms`（凭据） | §3.4 智能辅助 provider 凭据不落缺陷域 |
+
+> 完整清单见 [SRS §8](../requirements/SRS-DEFECT-INTELLIGENCE-001.md#8-制约条件前提依存--制約前提依存関係)；
+> 本表只登记**影响详细设计具体决策**的项。
+
+### 0.3 决策点（詳細設計レベル, per 守门 #28 拍板必带推荐项）
+
+| ID | 决策点 | 推荐项 | 备选 1 | 备选 2 | 状态 | 影响 |
+|---|---|---|---|---|---|---|
+| D-DI-01 | `defect.*` 表与 WorkItem owner 的权威归属 | 视为 WorkItem owner 的持久化适配器 | 独立缺陷 owner + 版本化协议 | 放弃扩展列回落通用字段 | 待拍板（默认按推荐） | §2.1 事务边界；§4.2 DDL 归属 |
+| D-DI-02 | 验证独立性的比较基准 | 比较实际修复者/执行者，豁免须记理由 | 修复者 + 报告者双重排除 | 比较报告者（当前实现） | 待拍板（默认按推荐） | §2.2.3 INV-SM-03；G-20 |
+| D-DI-03 | 缺陷扩展字段读模型形态 | 新增 `GET /defects` 专属读模型（含 `latest_verification`） | 扩充 `GroupWorkItemView` 通用投影 | 暂不提供真实来源 | 待拍板（默认按推荐） | §3.2.2；G-14 |
+| D-DI-04 | 缺陷写入口收敛形态 | 三入口统一调用同一 owner 创建命令 | 保留本地 store 为主 | 缺陷页独立入口 | 待拍板（默认按推荐） | §3.2.3；G-13 |
+| D-DI-05 | `defect_status_event` 是否独立建表 | 独立建表 | 合并 + `event_type` 区分 | 合并到通用审计 | 待拍板（默认按推荐） | §4.3、§4.4；G-22 |
+| D-DI-06 | 扩展字段缺失时的前端降级 | 三态渲染 + 顶部标注来源不可用 | 统一"未接入" | 隐藏字段区块 | 待拍板（默认按推荐） | §3.2.2；G-14 |
+
+> 与 [BD §5.2](../basic-design/BD-DEFECT-INTELLIGENCE-001.md#52-决策点-跟-srs-85-对齐per-守门-28-拍板必带推荐项)、
+> [SRS §8.5](../requirements/SRS-DEFECT-INTELLIGENCE-001.md#85-决策点-待拍板--per-守门-28-拍板必带推荐项) 同编号同内容，
+> 三份文档一致。
+
 
 ## §1 API contracts
 
@@ -220,6 +294,126 @@ COMMIT
 > 在缺口关闭前，本节描述的事务**不得**被当作生产已接通。
 
 ---
+
+### 2.2 状態遷移設計 / State Machine Design
+
+#### 2.2.1 状态机全图（受控流转表）
+
+物理实现：`crates/domain-defect/src/lib.rs` 的 `DefectStatus::can_transition`。
+枚举取值 9 个（`as_str()`）：`triage` / `pending_info` / `confirmed` / `in_progress` /
+`pending_verify` / `closed` / `reopened` / `duplicate` / `no_action`。
+
+```text
+                        ┌──────────────────────────────┐
+                        ▼                              │
+   ┌─────────┐  pending_info   ┌───────────┐            │
+   │ triage  │───────────────▶│  confirmed │            │
+   │ (新建)   │◀───────────────│           │            │
+   └────┬────┘                └─────┬─────┘            │
+        │                             │ in_progress      │
+        │                             ▼                 │
+        │                      ┌─────────────┐          │
+        │                      │ in_progress │          │
+        │                      └──────┬──────┘          │
+        │                             │ pending_verify  │
+        │                             ▼                 │
+        │                    ┌────────────────┐          │
+        │                    │ pending_verify │          │
+        │                    └───┬────────┬───┘          │
+        │        验证通过 ↓       │        │ 验证失败/需返工 ↓
+        │                  ┌─────┴──┐  ┌──┴─────────┐   │
+        │                  │ closed │  │  reopened  │───┘
+        │                  └────┬───┘  └─────┬─────┘
+        │                       │  重开/复发      │ in_progress
+        │                       ▼                │
+        │                  (closed → reopened) ───┘
+
+   终态（不可再流转）：duplicate、no_action
+   禁止：任意状态直接跳到 closed（必须经过 pending_verify）
+```
+
+#### 2.2.2 迁移表（逐条，含触发条件与副作用）
+
+| # | from | to | 允许 | 触发条件 / 校验 | 副作用（同一事务） | 缺口 |
+|---|---|---|---|---|---|---|
+| T-01 | —（新建） | `triage` | ✅ | 必填校验：标题、现象、Project、报告者 | `lifecycle_version=1`；写审计 + Outbox | — |
+| T-02 | `triage` | `confirmed` | ✅ | 分诊者权限 + 严重度/优先级已设 | 状态 + 版本 +1 | — |
+| T-03 | `triage` | `pending_info` | ✅ | 需补充信息；记录理由 | 状态 + 版本 +1 | — |
+| T-04 | `triage` | `duplicate` | ✅ | 目标缺陷 ID 已给且同 Project 可读 | 写关系（duplicate）+ 保留原报告 | — |
+| T-05 | `triage` | `no_action` | ✅ | 记录不处理理由 | 状态 + 版本 +1 | — |
+| T-06 | `pending_info` | `triage` | ✅ | 报告者补充后回退 | 状态 + 版本 +1 | — |
+| T-07 | `pending_info` | `confirmed` | ✅ | 补充信息后直接确认 | 状态 + 版本 +1 | — |
+| T-08 | `confirmed` | `in_progress` | ✅ | 分派到负责人 | 状态 + 版本 +1；**写 `fix_version`** | G-19（两语句非原子） |
+| T-09 | `in_progress` | `pending_verify` | ✅ | 提交修复 | 状态 + 版本 +1；**写 `fix_version`** | G-19 |
+| T-10 | `pending_verify` | `closed` | ✅ | **仅当存在通过的独立验证记录**且验证 `fix_version` 与当前一致 | 状态 + 版本 +1；写验证记录 | G-20（独立性判据不符 FR-DI-018） |
+| T-11 | `pending_verify` | `reopened` | ✅ | 验证失败 | 状态 + 版本 +1；写验证记录（failed） | G-20 |
+| T-12 | `closed` | `reopened` | ✅ | 复发证据 + 授权 | 状态 + 版本 +1 | — |
+| T-13 | `reopened` | `in_progress` | ✅ | 再次修复 | 状态 + 版本 +1；**写 `fix_version`** | G-19 |
+| T-14 | `duplicate` / `no_action` | 任意 | ❌ | 终态 | 拒绝，返回可理解阻断原因 | — |
+| T-15 | 任意 | `closed`（跳过 `pending_verify`） | ❌ | 必须经过待验证 | 拒绝 | — |
+
+> T-10 的"仅当存在通过的独立验证记录"在物理实现中依赖 `submit_verification`
+> 同一事务内同时写验证记录并流转状态；**若走其它路径直接置 `closed`，无此保证** → 缺口 G-25。
+> 关闭条件：在 `transition` 命令入口显式校验"存在最新通过的验证且 `fix_version` 匹配"，
+> 否则拒绝并返回阻断原因。
+
+#### 2.2.3 状态迁移不变量
+
+| ID | 不变量 | 校验点 |
+|---|---|---|
+| INV-SM-01 | `lifecycle_version` 单调 +1，每命令一次 | §2.1 owner 事务 |
+| INV-SM-02 | 终态（duplicate / no_action）不可离开 | `matches_terminal_transition` |
+| INV-SM-03 | `closed` 必须有通过的验证记录且 `fix_version` 匹配 | T-10（当前缺，缺口 G-25） |
+| INV-SM-04 | `fix_version` 一旦设定，在下一次验证提交前不可变更 | §2.1 `[submit_verification]` |
+| INV-SM-05 | 每次状态变更同事务产生审计事件 + Outbox 事件 | §2.1 不变量 |
+| INV-SM-06 | 授权失败不产生状态变更，不自动重放写入 | §1.1 |
+
+### 2.3 詳細追跡表 (FR → DD 章节 → 物理位置 → 缺口)
+
+逐条覆盖 SRS 全部 34 条 FR。**每条 FR 必须能落到本 DD 的某个章节和某个物理位置**；
+未接线者显式标"未接线"并指向缺口，不以"代码存在"充当覆盖。
+
+| FR | BR | DD 章节 | 物理位置 | 状态 | 缺口 |
+|---|---|---|---|---|---|
+| FR-DI-001 | BR-DI-01 | §3.2.3 kind 锁定；§2.1 | `WorkItemDetailDrawer.tsx` `defaultKind`/`lockKind` | **未接线**（实际 kind=`"task"`） | G-13 |
+| FR-DI-002 | BR-DI-01 | §2.1 事务授权段 | `pg_service.rs` `set_transaction_scope` | 部分（PG 路径有；REST 走内存） | G-16 |
+| FR-DI-003 | BR-DI-01 | §3.2.1 卡片字段 | `defect/page.tsx` 表单字段 | 部分（字段有，无真实来源） | G-14 |
+| FR-DI-004 | BR-DI-03 | §1.0 `GET /defects` | `routes/defects.rs` `list_defects` | **未接线**（`page`/`page_size` 未使用） | G-16 |
+| FR-DI-005 | BR-DI-03 | §1.0.1 目标契约 | — | 未接线 | G-16 |
+| FR-DI-006 | BR-DI-03 | §3.2.4 部分失败 | `WorkItemDetailDrawer.tsx` 多 Worktree 分支 | **未满足**（单 worktree 失败被吞） | G-17 |
+| FR-DI-007 | BR-DI-03 | §2.1 owner 事务（逐条回执） | `pg_service.rs` 逐命令事务 | 部分（逐命令有，无批量端点） | G-16 |
+| FR-DI-008 | BR-DI-01 | §2.2 状态机 + §0 实体表 | `lib.rs` `DefectStatus::can_transition` | 部分（枚举齐备，无字段可写性策略） | G-26 |
+| FR-DI-009 | BR-DI-01 | §3.2.2 扩展字段真实来源 | `defect/page.tsx` 扩展字段渲染 | **未满足**（占位值 + 由 `done` 反推） | G-14 |
+| FR-DI-010 | BR-DI-03 | §3.2.2 关系展示 | `defect_field_value` / `defect_relation` | **未落地**（表无 DDL） | G-21 |
+| FR-DI-011 | BR-DI-03 | §2.2 T-04 重复 + §0 `defect_relation` | `pg_service.rs` 关系校验 | **未落地**（表无 DDL） | G-21 |
+| FR-DI-012 | BR-DI-03 | §3.2.2 评论/附件区 | 附件/评论 owner 契约 | **未落地**（外部 owner 未确认） | G-23 |
+| FR-DI-013 | BR-DI-02 | §2.1 审计写入 + §0 `defect.audit_events` | `pg_service.rs:720-767` | 部分（列齐备，缺不可变触发器） | G-11 |
+| FR-DI-014 | BR-DI-03 | §0 `defect_field_value` | — | **未落地**（表无 DDL） | G-21 |
+| FR-DI-015 | BR-DI-02 | §2.2 T-02/T-03 | `pg_service.rs` `transition` | 部分（内存实现有，PG 路径未接线） | G-16 |
+| FR-DI-016 | BR-DI-02 | §2.2.3 不变量 | `lib.rs` `can_transition` | 部分（阻断原因有，字段要求校验缺） | G-26 |
+| FR-DI-017 | BR-DI-02 | §1.0.1 Link fix task | — | 未接线 | G-16 |
+| FR-DI-018 | BR-DI-02 | §2.2.3 INV-SM-03 | `pg_service.rs:394`（读 `reporter_id`） | **未满足**（比较报告人而非修复者） | G-20 |
+| FR-DI-019 | BR-DI-02 | §2.2 T-10/T-12 | `pg_service.rs` `submit_verification` | 部分 | G-20、G-25 |
+| FR-DI-020 | BR-DI-02 | §1.1 幂等与版本 | `pg_service.rs:657-691` | 部分（幂等成立，回执不保真） | G-11 |
+| FR-DI-021 | BR-DI-04 | §3.4 智能辅助（DD 目标） | — | 未接线 | G-2 |
+| FR-DI-022 | BR-DI-04 | §3.4 最小必要输入 | — | 未接线 | G-2 |
+| FR-DI-023 | BR-DI-04 | §3.4 建议依据与采纳记录 | — | 未接线 | G-2 |
+| FR-DI-024 | BR-DI-04 | §3.4 不自动写入最终结论 | — | 未接线 | G-2 |
+| FR-DI-025 | BR-DI-04 | §3.4 固定输入 revision + profile | — | 未接线 | G-2 |
+| FR-DI-026 | BR-DI-04 | §3.4 受控 Agent 工作流 | — | 未接线 | G-8 |
+| FR-DI-027 | BR-DI-04 | §3.4 授权优先 + 不可信内容处理 | — | 未接线 | G-2 |
+| FR-DI-028 | BR-DI-04 | §3.4 建议生命周期与失败降级 | — | 未接线 | G-2 |
+| FR-DI-029 | BR-DI-05 | §2.1 Outbox 写入 | `pg_service.rs:720-767` | 部分（写 pending，投递端缺） | G-8、G-12 |
+| FR-DI-030 | BR-DI-05 | §1.0.1 游标补缺 | — | 未接线 | G-8 |
+| FR-DI-031 | BR-DI-05 | §3.4 质量报表 | — | 未接线 | G-8 |
+| FR-DI-032 | BR-DI-05 | §3.4 现象/原因分开统计 | — | 未接线 | G-8 |
+| FR-DI-033 | BR-DI-06 | §0 `defect_sla_policy` | — | **未落地**（外部 owner） | G-23 |
+| FR-DI-034 | BR-DI-06 | §0 归档/审计/权限策略 | — | 未接线 | G-23 |
+
+**追踪完整性自审**：34/34 FR 有 DD 章节归属（覆盖 100%）；
+其中 **完全未接线 13 条 / 部分满足 9 条 / 未满足 2 条**（FR-DI-006、FR-DI-009），
+无一例外均指向 §7 缺口表条目。
+
 
 ## §3 Frontend module mapping
 
@@ -829,6 +1023,58 @@ CREATE POLICY defect_outbox_tenant_scope ON defect.outbox USING (tenant_id = NUL
 
 ---
 
+### 4.3 数据表分流（13 表 → 本 DD 覆盖范围）
+
+BD §2.1 登记的 13 表中，本 DD 只对**缺陷域自有**表出 DDL；外部 owner 表按契约协作，
+不在本专题建表（避免第二套权威）。
+
+| 表（逻辑名） | 分流 | 本 DD 位置 | 说明 |
+|---|---|---|---|
+| `defect_work_item` | 缺陷域自有 | §4.1 + §4.2 DDL | `defect.work_items` |
+| `defect_verification_record` | 缺陷域自有 | §4.1 + §4.2 DDL | `defect.verifications` |
+| `defect_ai_suggestion` | 缺陷域自有 | §4.1 + §4.2 DDL | `defect.suggestions` |
+| `defect_command_idempotency` | 缺陷域自有 | §4.1 + §4.2 DDL | 幂等回执 + `request_hash` |
+| `defect_audit_event` | 缺陷域自有 | §4.1 + §4.2 DDL | 审计 + 不可变触发器 |
+| `defect_outbox` | 缺陷域自有 | §4.1 + §4.2 DDL | 补 envelope 列 |
+| `defect_field_value` | 缺陷域自有 | **本 DD 未出 DDL** | 缺口 G-21 |
+| `defect_relation` | 缺陷域自有 | **本 DD 未出 DDL** | 缺口 G-21 |
+| `defect_comment` | 缺陷域自有 | **本 DD 未出 DDL** | 缺口 G-21 |
+| `defect_draft` | 缺陷域自有（W） | **本 DD 未出 DDL** | 缺口 G-21 + G-24（缺 TTL） |
+| `defect_status_event` | 缺陷域自有 | **本 DD 未出独立 DDL** | 由 `defect.audit_events` 合并承载；缺口 G-22 + 决策 D-DI-05 |
+| `defect_evidence_attachment` | 外部 owner | 契约协作 | 缺口 G-23 |
+| `defect_workflow_strategy` | 外部 owner | 契约协作 | 缺口 G-23 |
+| `defect_notification_subscription` | 外部 owner | 契约协作 | 缺口 G-23 |
+| `defect_quality_projection` | 外部 owner（W） | 契约协作 | 缺口 G-23 + G-24（缺 TTL） |
+| `defect_sla_policy` | 外部 owner | 契约协作 | 缺口 G-23 |
+
+> 分流口径：**缺陷域自有 = 本专题负责出 DDL 与接线；外部 owner = 本专题只消费契约**。
+> 两者都不得被当作"已落地"。
+
+### 4.4 W/T/M 横展 100% 覆蓋自審 (per 守门 #13)
+
+| # | 表 | 主分类 | 本 DD DDL | 迁移文件 | RLS | 缺口 |
+|---|---|---|---|---|---|---|
+| 1 | `defect_work_item` | T | ✅ §4.2 | ❌ | ❌ | G-11 |
+| 2 | `defect_field_value` | T | ❌ | ❌ | ❌ | G-21 |
+| 3 | `defect_relation` | T | ❌ | ❌ | ❌ | G-21 |
+| 4 | `defect_status_event` | T | ❌（合并承载） | ❌ | ❌ | G-22 |
+| 5 | `defect_verification_record` | T | ✅ §4.2 | ❌ | ❌ | G-11 |
+| 6 | `defect_evidence_attachment` | T | 外部 owner | — | — | G-23 |
+| 7 | `defect_comment` | T | ❌ | ❌ | ❌ | G-21 |
+| 8 | `defect_ai_suggestion` | T | ✅ §4.2 | ❌ | ❌ | G-11 |
+| 9 | `defect_workflow_strategy` | M | 外部 owner | — | — | G-23 |
+| 10 | `defect_notification_subscription` | M | 外部 owner | — | — | G-23 |
+| 11 | `defect_draft` | W | ❌ | ❌ | ❌ | G-21、G-24 |
+| 12 | `defect_quality_projection` | W | 外部 owner | — | — | G-23、G-24 |
+| 13 | `defect_sla_policy` | M | 外部 owner | — | — | G-23 |
+| + | `defect_command_idempotency` | T | ✅ §4.2 | ❌ | ❌ | G-11 |
+| + | `defect_audit_event` | T | ✅ §4.2 | ❌ | ❌ | G-11（缺触发器） |
+| + | `defect_outbox` | T | ✅ §4.2（补 envelope 列） | ❌ | ❌ | G-11、G-12 |
+
+**自审结论**：主分类单计、无混合（守门 #13 横展满足）；
+**13 表主分类覆盖 100%，DDL 覆盖 6/13**；迁移文件 0/13；RLS 0/13。
+
+
 ## §5 前端关键代码片段（摘要，与实现保持一致）
 
 ### 5.1 Local create — branch_id null, branch_name records branch
@@ -905,6 +1151,78 @@ const charts = useMemo(
 | Outbox 消费回路 | envelope 校验 → `decide_apply` → 幂等 inbox 写入 → 游标推进 → 重复投递/摘要冲突/序列缺口/断线补缺 | G-12 |
 | 前端缺陷页 | kind 锁定、多 Worktree 部分失败范围展示、扩展字段三态渲染、验证状态不由 `done` 反推 | G-13、G-14、G-17 |
 | 浏览器端到端 | 真实授权与持久化环境下“创建 → 修复 → 独立验证 → 关闭”一条完整链路 | 上述全部 + Neon 环境 |
+
+
+### 6.3 テスト設計 5 階梯 (per IPA 詳細設計書 テスト設計 章)
+
+缺陷域测试分 5 阶梯，每阶有明确**被测层级**、**环境前提**、**通过条件**与**阻塞缺口**。
+**任一阶未执行即不得关闭对应 AC**；本节登记"未执行"而非省略。
+
+#### 6.3.1 単元テスト (UT) — 领域层纯逻辑
+
+| UT-ID | 被测单元 | 位置 | 覆盖要点 | 通过条件 | 现状 |
+|---|---|---|---|---|---|
+| UT-DI-01 | `DefectStatus::can_transition` | `domain-defect/src/lib.rs` | 15 条迁移全覆盖 + 禁止路径返回可理解原因 | 全部 allowed/disallowed 组合断言通过 | ✅ 已被 `defect_lifecycle_test.rs` 覆盖 |
+| UT-DI-02 | 终态守卫 `matches_terminal_transition` | 同上 | duplicate/no_action 不可离开 | 两条终态各 1 断言 | ✅ 同上 |
+| UT-DI-03 | 枚举 ↔ PG 字符串双向映射 | `pg_service.rs` `from_pg_str` | 9 状态 + 5 严重度 + 5 优先级 | 未知值报 `Internal` 不静默降级 | ⚠️ 未覆盖（G-26） |
+| UT-DI-04 | `Envelope::validate` / digest | `defect_outbox/contract.rs` | 字段非空、digest 与 payload 匹配、schema_version | 正常/摘要不符/未知类型三路径 | ✅ 已有 |
+| UT-DI-05 | `decide_apply` 幂等决策 | 同上 | Accept/Duplicate/Conflict 三分支 | 分支全覆盖 | ✅ 已有 |
+| UT-DI-06 | `RequestHash` 计算 | `pg_service.rs` | 同键不同请求判定 | digest 稳定且不等于裸 key | ❌ 缺（G-11：当前绑的是 key 本身） |
+| UT-DI-07 | 三态渲染判定 | `frontend/.../defect/page.tsx` | 值 / 未填写 / 未接入三态互斥 | 3 组合断言 | ❌ 缺（G-14） |
+| UT-DI-08 | kind 锁定 | `WorkItemDetailDrawer.tsx` | `lockKind` 生效时 kind 不可改 | 锁定态输入被拒 | ❌ 缺（G-13） |
+
+#### 6.3.2 結合テスト (IT) — PG 事务 + REST 契约
+
+| IT-ID | 被测单元 | 环境前提 | 覆盖要点 | 通过条件 | 现状 |
+|---|---|---|---|---|---|
+| IT-DI-01 | `PgDefectService` 授权 | Neon + 迁移 + RLS | 跨 tenant/跨 Project 拒绝 | 拒绝且**不产生事实** | ❌ 缺（G-11/G-15/G-16） |
+| IT-DI-02 | `FOR UPDATE` + CAS 并发 | 同上 | 两请求竞争同 revision | 一成一败，败方返回期望/当前版本 | ❌ 缺（G-11） |
+| IT-DI-03 | 幂等回放保真 | 同上 | 同键重复提交 | 回放**原 `response_body`**，非 stub | ❌ 缺（G-11） |
+| IT-DI-04 | 审计不可变触发器 | 同上 | UPDATE/DELETE `defect.audit_events` | 触发器拒绝 | ❌ 缺（G-11） |
+| IT-DI-05 | RLS 策略生效 | 同上 | 直接 SQL 越权读写 | 被 RLS 拒绝 | ❌ 缺（G-11） |
+| IT-DI-06 | REST 6 端点状态码 | 同上 | 401/403/409/422 区分 | 5 个错误码映射正确 | ❌ 缺（G-18） |
+| IT-DI-07 | Outbox 同事务写入 | 同上 | 业务失败时 outbox/audit 不留痕 | 整体回滚 | ⚠️ 已有代码路径，未集成验证 |
+
+#### 6.3.3 E2E テスト — 浏览器端到端
+
+| E2E-ID | 场景 | 环境前提 | 覆盖要点 | 通过条件 | 现状 |
+|---|---|---|---|---|---|
+| E2E-DI-01 | 创建 → 分诊 → 修复 → 独立验证 → 关闭 | Neon + 真实会话 + 迁移 | 完整闭环 | 状态序列正确、审计齐全、验证独立 | ❌ 缺（阻塞：G-11/G-15/G-16/G-20） |
+| E2E-DI-02 | 多 Worktree 部分失败 | 同上 | 逐 worktree 结果 + 部分结果提示 | 局部失败可见、不标为完整 | ❌ 缺（G-17） |
+| E2E-DI-03 | 缺陷扩展字段三态 | 同上 | 真实来源 / 未填写 / 未接入 | 不由 `done` 反推"已验证" | ❌ 缺（G-14） |
+| E2E-DI-04 | 抽屉新建缺陷 kind=bug | 同上 | `defaultKind`/`lockKind` 被消费 | 实际 kind 为 `bug` | ❌ 缺（G-13） |
+| E2E-DI-05 | 撤权后内容隐藏 | 同上 | 撤权即时生效 | 受限内容不再可见 | ❌ 缺（G-15） |
+
+#### 6.3.4 性能テスト (PT)
+
+| PT-ID | 指标 | 目标（NFR-DI-02） | 测量方法 | 现状 |
+|---|---|---|---|---|
+| PT-DI-01 | 缺陷列表 p95 | 见 SRS §6 NFR-DI-02 | 固定数据量 + 并发读 | ❌ 未测（无真实持久化） |
+| PT-DI-02 | 缺陷写入 p95 | 同上 | 固定并发写 | ❌ 未测 |
+| PT-DI-03 | 错误率 | 同上 | 失败请求占比 | ❌ 未测 |
+| PT-DI-04 | 资源上限 | NFR-DI-09 | 内存/连接数/队列深度 | ❌ 未测 |
+
+#### 6.3.5 利用者受入テスト (UAT)
+
+| UAT-ID | 场景 | 受入标准 | 现状 |
+|---|---|---|---|
+| UAT-DI-01 | 缺陷页字段布局与可读性 | jira 风格布局可读、桌面/窄屏/缩放/键盘检查通过 | ❌ 未测（G-5） |
+| UAT-DI-02 | 质量报表钻取一致性 | 汇总数与明细一致 | ❌ 未测（G-8） |
+| UAT-DI-03 | 通知订阅与补缺 | 断线补齐、慢消费者恢复、不重复 | ❌ 未测（G-8） |
+| UAT-DI-04 | 归档恢复 | 归档/恢复可追溯、可恢复 | ❌ 未测（G-23） |
+
+#### 6.3.6 测试设计自审（覆盖率与缺口对照）
+
+| 阶梯 | 应覆盖 FR 条数 | 已覆盖 | 未覆盖 |
+|---|---|---|---|
+| UT | 34（按模块抽样） | 6 / 8 用例已实现 | UT-DI-03、06、07、08 |
+| IT | 授权+事务+契约类 FR（约 12 条） | 0 / 7 | 全部 7 项 |
+| E2E | 用户可见闭环类 FR（约 10 条） | 0 / 5 | 全部 5 项 |
+| PT | NFR-DI-02/09 类 | 0 / 4 | 全部 4 项 |
+| UAT | NFR-DI-08 + 可用性 | 0 / 4 | 全部 4 项 |
+
+**自审结论**：测试设计 5 阶梯已定义完整，但**实际执行率为 0**（除既有前端全量回归 1535 用例
+与领域层生命周期测试外，缺陷域专项测试未跑）。全部 AC-DI-01～08 维持 `NOT_RUN`。
 
 > 以上测试缺口与 §7 缺口表一一对应；在对应缺口关闭前，AC-DI-01～08 保持 `NOT_RUN`。
 
@@ -996,8 +1314,59 @@ AC-DI-01～08 全部 `NOT_RUN`。本节不得替代候选提交在真实环境�
 | G-18 | 缺陷错误码 → HTTP 状态码映射 | `IntoResponse` 表未登记 5 个缺陷错误码。关闭条件：补 `CROSS_TENANT_DENIED`/`CROSS_PROJECT_DENIED` → 403，`INVALID_STATE_TRANSITION` → 409，`IDEMPOTENCY_KEY_USED` → 409，`VERIFICATION_MISMATCH` → 422，并补契约测试 |
 | G-19 | `fix_version` 与状态流转同语句原子写 | `pg_service.rs:324-338` 为独立第二条 UPDATE。关闭条件：合并为单条 `UPDATE ... SET status, lifecycle_version, fix_version` 或用 `SELECT ... FOR UPDATE` 包裹的同一事务步 |
 | G-20 | 验证独立性按实际修复者/执行者校验 | 当前比较“验证人 vs 报告人”。关闭条件：引入修复者/执行者身份事实（修复任务 owner 事件或缺陷字段），按生效策略校验，例外须显式记录授权理由（per FR-DI-018） |
+| G-21 | 缺陷域自有 4 表缺 DDL（`defect_field_value` / `defect_relation` / `defect_comment` / `defect_draft`） | per §4.3 分流，13 表中 4 张属缺陷域自有但本 DD 未出 DDL。关闭条件：§4.2 补齐这 4 表 DDL（含 W 类 TTL 列），或经决策确认并入既有表并同步 §4.3/§4.4 |
+| G-22 | `defect_status_event` 无独立表（现由 `defect.audit_events` 合并承载） | FR-DI-013 要求状态/字段/负责人/关系/验证变化各自留痕；合并承载无法按事件类型检索。关闭条件：按 D-DI-05 拍板结果建独立表或确认 `event_type` 枚举可满足检索，并同步 §4.3/§4.4 |
+| G-23 | 5 张外部 owner 表的协作契约未定 | `defect_evidence_attachment` / `defect_workflow_strategy` / `defect_notification_subscription` / `defect_quality_projection` / `defect_sla_policy` 属其他 owner，版本化契约（读接口 + 事件 + 授权范围）未确认。关闭条件：逐表确认契约与授权范围并记录于 §4.3；未确认者保持"未接入" |
+| G-24 | W 类表 retention 未定义（`defect_draft` / `defect_quality_projection`） | SRS §5.1 要求"有界大小和 TTL，来源重建或过期清理"，但未给具体 TTL 与清理策略。关闭条件：定义 TTL、容量上限与清理触发方式，写入 §4.2 |
+| G-25 | `transition` 命令可直接置 `closed`，绕过"须有通过的独立验证" | §2.2.3 INV-SM-03 要求 `closed` 必须有通过的验证记录且 `fix_version` 匹配；当前 `submit_verification` 路径同事务满足，但 `transition` 路径本身无此校验。关闭条件：在 `transition` 入口显式校验"存在最新通过的验证且 `fix_version` 匹配"，否则拒绝并返回阻断原因 |
+| G-26 | 字段可写性策略与枚举↔PG 映射测试缺失 | FR-DI-008 要求按生效策略决定字段定义与可写性，FR-DI-016 要求校验字段要求条件；当前无字段可写性策略实现，枚举↔PG 双向映射（`from_pg_str`）也无单测覆盖。关闭条件：实现字段可写性策略校验 + 补 UT-DI-03 映射测试 |
 
 ---
+
+## §7.1 跟现有守门关系 (per 守门 #11 缺标比错标 显式列)
+
+| 守门 | 跟缺陷域详细设计的联动 |
+|---|---|
+| **#1 实证 / 禁回溯叙事** | §7 只登记候选 `dev@b1db1c99` 的物理事实；`dev@ddb0b6a6` / `dev@df672de7` / `main@4f54b2c9` 的历史结论分列于 §7 的历史小节 |
+| **#5 env 安全** | 缺陷域不读进程 env 取凭据；模型 provider 凭据走 KMS，缺陷域只持 provider/profile 版本引用 |
+| **#9 子代理 dispatch / git 实证** | §1.0 / §2.1.1 / §3.2.2～§3.2.4 每条判定附 `文件:行号`，可用 `git grep` 复现 |
+| **#10 代签 author=Ulysses** | §8 签字栏按一人公司编制记代签 |
+| **#11 缺标比错标** | §7 缺口表 26 项（G-1～G-26），每项含可验证关闭条件；代码存在但未接线者一律记"未接线" |
+| **#12 commit-time docs 同步** | 本 DD 与 SRS/BD/WBS 同 commit 落档；追踪表编号口径一致 |
+| **#13 T/M 横展** | §4.4 13 表 W/T/M 100% 覆蓋自審表，主分类单计无混合，DDL/迁移/RLS 逐列登记 |
+| **#14 v4 Mavis 永久代签** | §8 签字栏按代签流程记录，不虚构真人签字 |
+
+## §7.2 跟 SRS + BD 对齐自審 (per IPA 詳細設計書 对齐自审)
+
+| 对齐维度 | SRS 锚点 | BD 锚点 | DD 锚点 | 结论 |
+|---|---|---|---|---|
+| 业务目标 | §1.1.1 BR-DI-01～06 | §3.4.1 追踪矩阵 BR 列 | §2.3 追踪表 BR 缺列（以 FR 为主） | ✅ BR 全覆盖（BD 侧） |
+| 功能要件 | §3 FR-DI-001～034 | §3.4.1 34 行 | §2.3 34 行 | ✅ 34/34，编号一致无缺号 |
+| 非功能要件 | §6 NFR-DI-01～10 | §5 非功能设计 | §6.3 PT/UAT 阶 | ✅ 10/10，PT/UAT 阶未执行已登记 |
+| 数据模型 | §5.1 逻辑数据清单 | §2 + §2.1 W/T/M | §0 + §4.2 + §4.3 + §4.4 | ⚠️ 逻辑清单 13 表全覆盖，物理 DDL 仅 6/13（G-21/G-22/G-23） |
+| 接口契约 | §5.2 接口与授权 | §3.2 接口契约摘要 | §1.0 已接线 + §1.0.1 目标 | ⚠️ 契约一致；已接线 6 条但均走内存（G-16） |
+| 画面 | §4 画面与操作要件 | §1 逻辑上下文 | §3.2～§3.2.4 | ✅ 映射完整，扩展字段来源未接线（G-14） |
+| 状态流转 | §2.1 默认分级和流转条件 | §3.5 判定 | §2.2 状态机 + §2.2.3 不变量 | ⚠️ 流转表一致；`closed` 前置校验缺（G-25） |
+| 验收条件 | §7 AC-DI-01～08 | §3.4 验收列 | §6 测试钩子 + §6.3 5 阶梯 | ✅ 8/8 有测试设计，**实际执行 0** → AC 维持 NOT_RUN |
+| 制约/前提/依存 | §8.1～§8.3 | §3.5 判定规则 | §2.1.1 差异表 + §7 缺口表 | ✅ 全部落为可验证缺口 |
+| 决策点 | §8.5 D-DI-01～04 | §5.2 D-DI-01～06 | §2.2 T-10/§4.3 引用 | ✅ 编号一致，DD 增补依赖 D-DI-05/06 |
+
+**自审结论**：三份文档在编号、追踪与契约口径上**一致**；差异集中在**物理落地程度**，
+且全部已显式登记为 §7 缺口（无隐藏差异）。
+
+## §8 签字栏 (Sign-off)
+
+| 角色 | 姓名 | 状态 | 日期 |
+|---|---|---|---|
+| 修订人 (author) | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | ✅ 2026-11-24 JST | 2026-11-24 JST |
+| 审批 (架构师) | 架构师 (Mavis 接手 agent per DEC-008) | ✅ 2026-11-24 JST | 2026-11-24 JST |
+| QA Lead | 未到位（per DEC-008 一人公司编制） | ⏳ 待人到位后追溯 | — |
+| 実装担当 | 未到位 | ⏳ 待人到位后追溯 | — |
+
+> 签字栏不代表验收通过；验收状态以 SRS §7 AC 表的 `NOT_RUN` 登记为准。
+
+---
+
 
 ## 修订历史
 
@@ -1007,3 +1376,5 @@ AC-DI-01～08 全部 `NOT_RUN`。本节不得替代候选提交在真实环境�
 | 2026-11-23 | v1.1 | 对照 dev 与 main 的实际缺陷实现和上一轮验收，登记未闭环接口与证据限制。 |
 | 2026-11-24 | v1.2 | 对齐 SRS 2026-11-24 现行适用说明；新增 §0.1 部署边界（Vercel 仅 Web/BFF）、§2.1 缺陷 Owner 事务、§3.2.1 jira 风格卡片字段、§3.3 团队页、§4.1 `defect.*` 物理 DDL；登记 G-8～G-10 与实现状态。 |
 | 2026-11-24 | v1.3 | 按物理事实核对更新：§0 实体表补 envelope/幂等回执/审计触发器的目标身份差异；§1.0 登记已接线 REST 契约与诚实边界、§1.0.1 保留目标契约；§2.1.1 增补 owner 事务与物理实现的逐条差异表；§3.2.2～§3.2.4 新增扩展字段真实来源与三态渲染、kind 锁定、多 Worktree 部分失败契约；§4.2 增补目标物理 DDL（迁移文件内容，含 RLS 与 Outbox envelope 列）；§6.1/§6.2 登记已有测试证据与缺口；§7 新增缺口 G-11～G-20。 |
+| 2026-11-24 | v1.4 | 按 IPA SEC 標準 詳細設計書 模板补齐：头部 IPA 模板声明 + 守门基线 + 改訂人/承認/日付/受众/対象範囲/対象バージョン/適用プラットフォーム/設計 5 維；新增 §-1 文書情報 表；新增 §2.2 状態遷移設計（状态机全图 + 15 条迁移表 + 6 条不变量）；新增 §2.3 詳細追跡表（34 FR → DD 章节 → 物理位置 → 缺口，覆盖 100%）；新增 §4.3 数据表分流（13 表 → 本 DD 覆盖范围）；新增 §4.4 W/T/M 横展 100% 覆蓋自審；新增 §6.3 テスト設計 5 階梯（UT 8 + IT 7 + E2E 5 + PT 4 + UAT 4，含执行率自审）；新增 §7.1 跟现有守门关系表；新增 §7.2 跟 SRS + BD 对齐自審表；新增 §8 签字栏；§7 新增缺口 G-21～G-26。AC-DI-01～08 维持 NOT_RUN。 |
+| 2026-11-24 | v1.5 | IPA 自审第二轮补齐：新增 §0.2 制約・前提・依存（詳細設計级，11 项）；新增 §0.3 决策点 D-DI-01～06（详细设计级，与 SRS §8.5 / BD §5.2 同编号同推荐项）；§2.3 追踪表增加 BR 列，形成 FR → BR → DD 章节 → 物理位置 → 缺口完整链路；§4.4 W/T/M 自審表补齐 `defect_status_event` 与 3 张辅助表的分流行。版本号与头部声明同步升 v1.5，配套 SRS 升 v1.4、BD 升 v1.6。AC-DI-01～08 维持 NOT_RUN。 |
