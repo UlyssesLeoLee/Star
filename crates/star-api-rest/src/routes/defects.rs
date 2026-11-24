@@ -27,19 +27,20 @@ use axum::{
     Json,
 };
 use domain_defect::{
-    ActorContext, CreateDefectCommand, Defect, DefectCommandPort, DefectError, DefectId,
-    DefectListItem, DefectQueryPort, DefectSeverity, DefectStatus, DefectVerification,
+    ActorContext, CreateDefectCommand, Defect, DefectError, DefectId,
+    DefectListItem, DefectCommandPort, DefectQueryPort, DefectPort, DefectSeverity, DefectStatus, DefectVerification,
     IdempotencyKey, InMemoryDefectService, PgDefectService, SubmitVerificationCommand,
     TransitionDefectCommand, VerificationId,
 };
 use serde::Deserialize;
+use serde::Serialize;
 
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::error::RestError;
-
 use crate::response::RestResponse;
+use sqlx::PgPool;
 
 /// 缺陷服务（生产 PG，开发/测试 InMemory）
 #[derive(Clone)]
@@ -56,10 +57,88 @@ impl DefectService {
             memory: Arc::new(InMemoryDefectService::new()),
         }
     }
+}
 
-    fn port(&self) -> Box<dyn domain_defect::DefectPort> {
-        self.pg.as_ref().map(|p| Box::new(p.clone()) as _)
-            .unwrap_or_else(|| Box::new(self.memory.clone()))
+/// Implement DefectCommandPort for DefectService (delegating to inner service)
+#[async_trait::async_trait]
+impl domain_defect::DefectCommandPort for DefectService {
+    async fn create_defect(
+        &self,
+        cmd: domain_defect::CreateDefectCommand,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<domain_defect::Defect, domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.create_defect(cmd, actor).await
+        } else {
+            self.memory.create_defect(cmd, actor).await
+        }
+    }
+
+    async fn transition_status(
+        &self,
+        defect_id: domain_defect::DefectId,
+        cmd: domain_defect::TransitionDefectCommand,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<domain_defect::Defect, domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.transition_status(defect_id, cmd, actor).await
+        } else {
+            self.memory.transition_status(defect_id, cmd, actor).await
+        }
+    }
+
+    async fn submit_verification(
+        &self,
+        defect_id: domain_defect::DefectId,
+        cmd: domain_defect::SubmitVerificationCommand,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<(domain_defect::Defect, domain_defect::DefectVerification), domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.submit_verification(defect_id, cmd, actor).await
+        } else {
+            self.memory.submit_verification(defect_id, cmd, actor).await
+        }
+    }
+}
+
+/// Implement DefectQueryPort for DefectService (delegating to inner service)
+#[async_trait::async_trait]
+impl domain_defect::DefectQueryPort for DefectService {
+    async fn get_defect(
+        &self,
+        defect_id: domain_defect::DefectId,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<domain_defect::Defect, domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.get_defect(defect_id, actor).await
+        } else {
+            self.memory.get_defect(defect_id, actor).await
+        }
+    }
+
+    async fn list_defects(
+        &self,
+        project_id: uuid::Uuid,
+        lane_id: Option<uuid::Uuid>,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<Vec<domain_defect::DefectListItem>, domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.list_defects(project_id, lane_id, actor).await
+        } else {
+            self.memory.list_defects(project_id, lane_id, actor).await
+        }
+    }
+
+    async fn list_verifications(
+        &self,
+        defect_id: domain_defect::DefectId,
+        actor: &domain_defect::ActorContext,
+    ) -> Result<Vec<domain_defect::DefectVerification>, domain_defect::DefectError> {
+        if let Some(pg) = &self.pg {
+            pg.list_verifications(defect_id, actor).await
+        } else {
+            self.memory.list_verifications(defect_id, actor).await
+        }
     }
 }
 
@@ -85,7 +164,7 @@ pub async fn create_defect(
 ) -> Result<Json<RestResponse<Defect>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let defect = svc.port().create_defect(cmd, &actor).await?;
+    let defect = svc.create_defect(cmd, &actor).await?;
     Ok(Json(RestResponse::ok(defect)))
 }
 
@@ -97,13 +176,13 @@ pub async fn get_defect(
 ) -> Result<Json<RestResponse<Defect>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let defect = svc.port().get_defect(DefectId::from(id), &actor).await?;
+    let defect = svc.get_defect(DefectId::from(id), &actor).await?;
     Ok(Json(RestResponse::ok(defect)))
 }
 
 /// 列表查询参数
 #[derive(Deserialize)]
-struct ListDefectsQuery {
+pub struct ListDefectsQuery {
     project_id: Uuid,
     lane_id: Option<Uuid>,
     page: Option<usize>,
@@ -118,7 +197,7 @@ pub async fn list_defects(
 ) -> Result<Json<RestResponse<Vec<DefectListItem>>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let items = svc.port().list_defects(query.project_id, query.lane_id, &actor).await?;
+    let items = svc.list_defects(query.project_id, query.lane_id, &actor).await?;
     Ok(Json(RestResponse::ok(items)))
 }
 
@@ -131,7 +210,7 @@ pub async fn transition_defect(
 ) -> Result<Json<RestResponse<Defect>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let defect = svc.port().transition_status(DefectId::from(id), cmd, &actor).await?;
+    let defect = svc.transition_status(DefectId::from(id), cmd, &actor).await?;
     Ok(Json(RestResponse::ok(defect)))
 }
 
@@ -144,7 +223,7 @@ pub async fn submit_verification(
 ) -> Result<Json<RestResponse<(Defect, DefectVerification)>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let (defect, verification) = svc.port().submit_verification(DefectId::from(id), cmd, &actor).await?;
+    let (defect, verification) = svc.submit_verification(DefectId::from(id), cmd, &actor).await?;
     Ok(Json(RestResponse::ok((defect, verification))))
 }
 
@@ -156,7 +235,7 @@ pub async fn list_verifications(
 ) -> Result<Json<RestResponse<Vec<DefectVerification>>>, RestError> {
     let actor = actor_from_headers(&headers);
     let svc = service();
-    let items = svc.port().list_verifications(DefectId::from(id), &actor).await?;
+    let items = svc.list_verifications(DefectId::from(id), &actor).await?;
     Ok(Json(RestResponse::ok(items)))
 }
 

@@ -78,6 +78,7 @@ pub mod response;
 pub mod routes;
 // Local Runtime HTTP 端点 (domain-local-runtime 接线) — 已注册于 routes/mod.rs (routes::runtime)
 pub mod workspace_files;
+pub mod defect_outbox;
 
 use axum::{
     routing::{delete, get, patch, post},

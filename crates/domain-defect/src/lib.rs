@@ -24,7 +24,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use star_context::ActorContext;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
@@ -37,8 +36,10 @@ pub use crate::pg_service::PgDefectService;
 pub trait DefectPort: DefectCommandPort + DefectQueryPort + Send + Sync {}
 
 impl<T: DefectCommandPort + DefectQueryPort + Send + Sync> DefectPort for T {}
-pub use star_context::ActorContext;
 pub mod pg_service;
+// Re-export ActorContext for external use (e.g., star-api-rest routes)
+pub use star_context::ActorContext;
+
 
 use domain_work_item::WorkItemId;
 

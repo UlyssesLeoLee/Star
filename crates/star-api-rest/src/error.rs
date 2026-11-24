@@ -860,6 +860,30 @@ impl From<std::io::Error> for RestError {
     }
 }
 
+impl From<domain_defect::DefectError> for RestError {
+    fn from(e: domain_defect::DefectError) -> Self {
+        let (code, kind, retriable, hint) = match &e {
+            domain_defect::DefectError::NotFound(msg) => ("RESOURCE_NOT_FOUND", "NotFound", false, "Ensure the defect ID is correct and accessible within your tenant/project"),
+            domain_defect::DefectError::PermissionDenied(msg) => ("POLICY_DENIED", "PermissionDenied", false, "Verify you have developer/project_admin/tenant_admin role for this defect"),
+            domain_defect::DefectError::CrossTenantDenied(defect_tenant, actor_tenant) => ("CROSS_TENANT_DENIED", "CrossTenantDenied", false, "Ensure you are accessing defects within your own tenant"),
+            domain_defect::DefectError::CrossProjectDenied(defect_project, actor_project) => ("CROSS_PROJECT_DENIED", "CrossProjectDenied", false, "Ensure you have access to the project containing this defect"),
+            domain_defect::DefectError::InvalidTransition { from, to, reason } => ("INVALID_STATE_TRANSITION", "InvalidTransition", false, "Check valid state transitions: Triage→Confirmed|PendingInfo|Duplicate|NoAction, Confirmed→InProgress, InProgress→PendingVerify, PendingVerify→Closed|Reopened, Closed→Reopened, Reopened→InProgress"),
+            domain_defect::DefectError::Conflict(msg) => ("CONFLICT", "Conflict", false, "Retry after refreshing; ensure expected_version matches current lifecycle_version"),
+            domain_defect::DefectError::IdempotencyKeyUsed(key) => ("IDEMPOTENCY_KEY_USED", "IdempotencyKeyUsed", false, "Use a new idempotency_key for each operation"),
+            domain_defect::DefectError::VerificationMismatch(msg) => ("VERIFICATION_MISMATCH", "VerificationMismatch", false, "Ensure fix_version matches the defect's current fix_version"),
+            domain_defect::DefectError::Internal(msg) => ("INTERNAL", "Internal", true, "Check server logs for details"),
+        };
+        Self {
+            code: code.to_string(),
+            message: e.to_string(),
+            source_module: "domain-defect".to_string(),
+            source_kind: kind.to_string(),
+            retriable,
+            hint: hint.to_string(),
+        }
+    }
+}
+
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
         // per spec §2.4: code → HTTP status 映射
