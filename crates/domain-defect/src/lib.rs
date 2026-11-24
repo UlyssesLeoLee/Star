@@ -30,6 +30,9 @@ use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod pg_schema;
+pub mod pg_service;
+
 use domain_work_item::WorkItemId;
 
 // =====================================================================
@@ -586,14 +589,14 @@ fn actor_user(actor: &ActorContext) -> Uuid {
     actor.user_id
 }
 
-fn check_project_access(actor: &ActorContext, project_id: Uuid) -> Result<(), DefectError> {
+pub(crate) fn check_project_access(actor: &ActorContext, project_id: Uuid) -> Result<(), DefectError> {
     if actor.can_access_project(project_id) {
         return Ok(());
     }
     Err(DefectError::CrossProjectDenied(project_id, actor_tenant(actor)))
 }
 
-fn check_defect_write_capability(actor: &ActorContext) -> Result<(), DefectError> {
+pub(crate) fn check_defect_write_capability(actor: &ActorContext) -> Result<(), DefectError> {
     use star_context::roles::*;
     if actor.is_platform_admin()
         || actor.has_role(TENANT_ADMIN)
@@ -681,6 +684,7 @@ impl OutboxPort for NoopOutboxPort {
 pub struct InMemoryDefectService {
     defects: Arc<RwLock<HashMap<DefectId, Defect>>>,
     verifications: Arc<RwLock<HashMap<VerificationId, DefectVerification>>>,
+    #[allow(dead_code)] // 智能建议读侧端口待接线（per WBS Phase B）
     suggestions: Arc<RwLock<HashMap<SuggestionId, DefectSuggestion>>>,
     idempotency_records: Arc<RwLock<HashMap<IdempotencyKey, DefectId>>>,
     audit: Arc<dyn AuditPort + Send + Sync>,
@@ -855,7 +859,7 @@ impl DefectCommandPort for InMemoryDefectService {
         }
 
         let mut defects = self.defects.write().unwrap();
-        let mut defect = defects
+        let defect = defects
             .get_mut(&defect_id)
             .ok_or_else(|| DefectError::NotFound(defect_id.as_uuid().to_string()))?;
 
