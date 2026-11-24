@@ -211,6 +211,12 @@ fn build_legacy_mirror_routes() -> Router {
         .route("/work-items", post(routes::work_items::create))
         .route("/work-items/{id}", patch(routes::work_items::update))
         .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
+        .route("/defects", post(routes::defects::create_defect))
+        .route("/defects", get(routes::defects::list_defects))
+        .route("/defects/{id}", get(routes::defects::get_defect))
+        .route("/defects/{id}/transition", patch(routes::defects::transition_defect))
+        .route("/defects/{id}/verify", post(routes::defects::submit_verification))
+        .route("/defects/{id}/verifications", get(routes::defects::list_verifications))
         // 4 内核 crate 门面 (ide-collab-core/star-git-core/argo-core/sandtree-core)
         .route("/collab/session", get(routes::integrations::collab_session))
         .route(

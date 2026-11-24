@@ -31,6 +31,13 @@ use thiserror::Error;
 use uuid::Uuid;
 
 pub mod pg_schema;
+pub use crate::pg_service::PgDefectService;
+
+/// Combined trait for defect service (command + query)
+pub trait DefectPort: DefectCommandPort + DefectQueryPort + Send + Sync {}
+
+impl<T: DefectCommandPort + DefectQueryPort + Send + Sync> DefectPort for T {}
+pub use star_context::ActorContext;
 pub mod pg_service;
 
 use domain_work_item::WorkItemId;

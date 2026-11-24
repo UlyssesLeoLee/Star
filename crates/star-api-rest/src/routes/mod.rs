@@ -26,6 +26,7 @@ MERGE (self)-[:DECLARES]->(agents)
 //! - `webhooks::replay_delivery` 仅标记新状态, 真实 retry 调度留 Phase II
 //! - `ex_01..ex_08` 全部 501 not_implemented 跨 session 占位 (跟 OAuth2 introspect handler 同模式, per brief v0.53 §3)
 
+pub mod defects;
 pub mod agents;
 pub mod code;
 pub mod context;
