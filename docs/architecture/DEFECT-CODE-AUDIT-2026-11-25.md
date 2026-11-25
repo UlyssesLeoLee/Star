@@ -24,6 +24,54 @@
 
 ---
 
+## 0.1 补缺执行结果（2026-11-25，同日）
+
+本报告发出后已按用户要求「把缺口都补上」执行一轮补缺，**上表结论已被下表取代**（原结论保留作为补缺前的基线）。
+
+| 项 | 补缺前 | 补缺后 |
+|---|---|---|
+| 26 项缺口实际关闭 | 0 / 26 | **18 完全闭合 · 3 部分闭合 · 5 仍未做/非本期** |
+| 追踪覆盖（DD §2.3，34 FR） | 0 条完全满足 | 缺陷域核心 FR（001～020、029）已接线；FR-021～028 仍受 G-2 阻塞 |
+| 缺陷页 REST 调用 | **0 次** | 读走 `GET /api/v1/defects`，写走 `POST /api/v1/defects` |
+| 物理迁移 + RLS | 无 | 15 表全 RLS + 审计不可变触发器 |
+| Outbox 投递回路 | 记账结构，无投递 | `PgDefectInboxStore` + `OutboxRelay` + 后台 worker |
+| 测试执行 | UT 6/8、其余 0 | UT +9、REST 契约 +11、前端 +15（缺陷页 10 / 抽屉 5 / 快捷按钮 4） |
+
+**补缺过程中新发现并修复的 3 个真实缺陷**（不是形式补齐）：
+
+1. **缺陷路由绕过 JWT**：`build_legacy_mirror_routes` 直挂缺陷 handler，而该 router 只有 `auth_layer_stub`——即使 handler 改成读已验证会话，也会全部 401。已把缺陷路由移到 `build_supplemental_routers()` 独立挂载（带 `verify_jwt_and_inject_actor`）。
+2. **枚举解析静默降级**：`severity`/`priority`/`discovery_stage` 的 `from_pg_str` 对未知值返回默认值（Unknown/Unscheduled），而 `status` 报错——同一份代码里两套语义。已统一为"未知值报错"，并补 9 项 UT 锁死。
+3. **axum 0.8 路由语法**：缺陷路由用 `/defects/:id`，在 axum 0.8 下 panic（"Path segments must not start with `:`"）。已改 `{id}`。
+
+**验证**（补缺后实际执行）：
+
+```
+cargo check -p domain-defect -p star-api-rest   → 0 error
+cargo test -p domain-defect                      → 23 passed / 0 failed
+cargo test -p star-api-rest --test defect_endpoints → 11 passed / 0 failed
+cargo test -p star-api-rest --tests              → 213+14+3+1+16+2 passed
+   （canvas_event_stream_pg 的 2 项失败为改动前既有，stash 验证：401 vs 403/503，与缺陷域无关）
+npx tsc --noEmit                                 → exit 0
+npx vitest run                                   → 173 files / 1554 tests passed
+```
+
+**仍未做（诚实登记）**：
+
+| 缺口 | 原因 |
+|---|---|
+| G-1 外部问题系统 | 本期范围外（非缺陷） |
+| G-2 AI provider | `crates/star-llm/` 不在本仓 |
+| G-4 工作流策略版本化 UI | 需先定策略模型；`defect_workflow_strategy` 全仓 0 引用 |
+| G-7 AI 数据出站与 model profile | 依赖 G-2 |
+| G-23 5 张外部 owner 表协作契约 | 需外部 owner 逐表确认契约 |
+| G-5 辅助技术实测 | 缺陷页前端测试到位，**屏幕阅读器/缩放实测与真实浏览器 E2E 未做** |
+| G-9 Lane Backlog / 独立看板入口 | Sprint Backlog 已改走 owner；另两处入口仍各有路径 |
+| G-26 字段可写性策略 | 枚举映射 UT 已补；`FieldDefinition`/`FieldValue` 类型仍不存在 |
+
+**AC-DI-01～08 维持 `NOT_RUN`**：缺口闭合是代码层事实，受理条件仍需真实 PostgreSQL + 真实浏览器端到端执行。稳定版维持 **NO-GO**。
+
+---
+
 ## 1. 审计方法
 
 1. 从 DD §7 缺口表提取 26 条 G-*，逐条到代码里找证据（不是看文档怎么说，而是看代码有没有）
@@ -39,7 +87,7 @@
 
 | # | 缺口 | 核验证据 | 状态 |
 |---|---|---|---|
-| G-3 | 真实持久化 | `routes/defects.rs:149` `DEFECT_SERVICE.get_or_init(\|\| DefectService::new(None))` → `pg` 恒 `None` | ❌ 未关闭 |
+| G-3 | 真实持久化 | `routes/defects.rs:149` — `DEFECT_SERVICE.get_or_init` 的回退参数为 `DefectService::new(None)` → `pg` 恒 `None` | ❌ 未关闭 |
 | G-8 | 审计/Outbox 投递端 | `defect_outbox/relay.rs` 的 `BoundedRelay` 只有 `register_pending`/`record_result`/`current_delay`/`can_switch_profile` 4 个记账方法，**无 `deliver`/`async fn`/sink**；`consumer.rs:196` `PgDefectInboxStore.pool` 字段 `never read`（cargo warning 实锤）；`defect_outbox` 模块在 `star-api-rest/src/lib.rs` 中 `pub mod` 但无 spawn 入口 | ❌ 未关闭 |
 | G-11 | 迁移文件 + RLS + 触发器 | `db/migrations/` 共 110 个 `.sql`，**defect 相关 0 个**；`pg_schema.rs` / `pg_service.rs` / `lib.rs` 三个文件 `ROW LEVEL SECURITY`=0、`CREATE POLICY`=0、`TRIGGER`=0 | ❌ 未关闭 |
 | G-12 | Outbox envelope 列 | `pg_schema.rs` 的 `defect.outbox` 仍为 `id/aggregate_type/aggregate_id/event_type/payload/status/created_at/sent_at`，**无** `event_id`/`stream_id`/`source_sequence`/`correlation_id`/`event_digest`/`schema_version`/`occurred_at`；`contract.rs:67` `Envelope` 要求全部非空 → 契约与物理表不兼容 | ❌ 未关闭 |

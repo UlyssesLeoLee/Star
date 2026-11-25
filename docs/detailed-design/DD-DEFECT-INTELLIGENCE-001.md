@@ -2,15 +2,15 @@
 
 > **2026-11-24 对账说明**：现行创建、部分失败、独立验证与 WorkItem/defect owner 归属以 [基本设计 §3.4](../basic-design/BD-DEFECT-INTELLIGENCE-001.md#34-缺陷创建查询与验证的统一契约) 为准；**物理接线判定规则**见 [基本设计 §3.5](../basic-design/BD-DEFECT-INTELLIGENCE-001.md#35-单一写入路径与物理接线判定per-2026-11-24-物理事实核对)。以下 PG 适配器流程记录候选实现；以报告者代替实际修复者校验验证独立性不能满足 FR-DI-018，需修复并验收。候选表和路由是否属于同一权威 owner 尚待核实，不证明生产接入。
 
-> **智能缺陷管理 — 詳細設計書 v1.5** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
+> **智能缺陷管理 — 詳細設計書 v1.6** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
 >
-> - 状态: 🟡 Draft v1.5 (2026-11-24 · IPA 模板对齐 + 自审补齐 5 维设计；实现部分完成，验收未通过)
+> - 状态: 🟡 Draft v1.6 (2026-11-25 · 缺口补缺后同步；代码层缺口 18/26 闭合，端到端验收未通过)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
-> - 上游: [`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md`](../requirements/SRS-DEFECT-INTELLIGENCE-001.md) v1.4 + [`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md`](../basic-design/BD-DEFECT-INTELLIGENCE-001.md) v1.6 (12 模块 / 13 表 W/T/M / 6 决策点)
+> - 上游: [`docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md`](../requirements/SRS-DEFECT-INTELLIGENCE-001.md) v1.5 + [`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md`](../basic-design/BD-DEFECT-INTELLIGENCE-001.md) v1.7 (12 模块 / 13 表 W/T/M / 6 决策点)
 > - 下游: 实装代码 (`crates/domain-defect/` + `crates/star-api-rest/src/routes/defects.rs` + `crates/star-api-rest/src/defect_outbox/` + `frontend/src/app/(app)/defect/page.tsx`) + 测试 + 验收报告
 > - 关联实装基线: `crates/domain-defect/src/pg_schema.rs` + `pg_service.rs` (owner 事务) + `crates/star-api-rest/src/defect_outbox/` (contract/consumer/relay) + `frontend/src/components/board/WorkItemDetailDrawer.tsx`
 > - 守门基线: 守门 #1+#5+#9+#10+#11+#12+#13+#14 v4 共 8 项必过 (守门 #13 W/T/M 横展 100% 覆盖、#11 缺标比错标为本专题硬约束)
-> - 上位文書: `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.4 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 + `AGENTS.md` §0/§4
+> - 上位文書: `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.5 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.7 + `AGENTS.md` §0/§4
 > - 平行参考: `docs/detailed-design/DD-SANDBOX-002.md` v0.1.1 (IPA 詳細設計書 模板参考)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手`
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62)
@@ -33,14 +33,14 @@
 |---|---|
 | 文書 ID | DD-DEFECT-INTELLIGENCE-001 |
 | 文書名 | 智能缺陷管理 — 詳細設計書 |
-| バージョン | v1.5 |
+| バージョン | v1.6 |
 | 作成日 | 2026-11-24 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 対象範囲 | 缺陷域详细设计：实体/版本、API 契约、Owner 事务、5 维设计、DDL、前端片段、测试与验收 |
 | 対象バージョン | 缺陷域 v1.0 (P0) → v2.0 (P2) |
 | 適用プラットフォーム | Web (Next.js / Vercel 呈现层) + Rust (`star-api-rest`) + Neon PostgreSQL |
-| 上位文書 | `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.4 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 |
+| 上位文書 | `docs/requirements/SRS-DEFECT-INTELLIGENCE-001.md` v1.5 + `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.7 |
 | 関連文書 | `docs/architecture/DEFECT-WBS-2026-11-23.md` v1.1 + `crates/domain-defect/tests/defect_lifecycle_test.rs` |
 | 設計 5 維 | モジュール設計 (§3) / クラス設計 (§0, §2) / 時序設計 (§2.1, §3.4) / 状態遷移設計 (§2.2) / テスト設計 (§6) |
 | データモデル | 6 张 `defect.*` 表 DDL (§4.2)；其余 7 张按 §4.3 分流 |
@@ -1292,34 +1292,47 @@ AC-DI-01～08 全部 `NOT_RUN`。本节不得替代候选提交在真实环境�
 
 实现前必须核对并补齐：Bug WorkItem 权威身份和缺陷扩展的事务边界；租户、Project/Lane、Worktree 及身份的实时授权；完整状态/版本校验；独立验证身份、固定版本和证据；持久化审计、幂等与 Outbox；部分失败和草稿恢复。所有 AC-DI-01～08 保持 `NOT_RUN`，直至在固定候选提交与实际部署环境取得对应验收证据。
 
-| # | 缺口 | 状态 |
+| # | 缺口 | 状态（2026-11-25 代码核验） |
 |---|------|------|
-| G-1 | 外部问题系统导入或双向同步（连接授权、许可、字段映射、冲突策略） | 后续可选，不作为本期闭环前提 |
-| G-2 | 真实 AI provider 接入 | 本仓不涉，走 `crates/star-llm/` |
-| G-3 | 真实持久化（PostgreSQL writer/API） | 适配器与 DDL 常量已落地；**物理迁移文件、RLS、PG 接线、会话身份均缺**，生产仍无真实持久化（拆分到 G-11/G-15/G-16） |
-| G-4 | 工作流策略版本化 UI 配置 | 基本设计确定后实施，当前为策略数据结构 |
-| G-5 | 桌面/窄屏/缩放/键盘/屏幕阅读器验收 | 以实际页面和辅助技术测试，失败提供文本原因 |
-| G-6 | Tab 感知跳转消费逻辑（`router.replace('/?tab=...')`） | ShortcutButton.targetTab 字段已定义，消费逻辑待实现 |
-| G-7 | AI 数据出站与模型 profile | 部署前确认数据边界与 provider 策略 |
-| G-8 | 审计/Outbox 投递端（消费者） | 契约层已就绪；物理表（依赖 G-12）与生产投递回路未实现 |
-| G-9 | Lane Backlog / Sprint / 独立看板入口收敛 | 仍有各自入口，共享写入路径未统一（依赖 G-13） |
-| G-10 | 缺陷扩展字段与验证结论的真实来源 | 前端仍显示未知；不得由 `done` 状态反推“已验证”（依赖 G-14） |
-| G-11 | `defect.*` 六表的物理迁移文件、RLS 与不可变触发器 | `db/migrations/` 无 defect 迁移；`pg_schema.rs` 无 RLS；审计无禁改触发器。关闭条件：新增迁移文件含六表 DDL + 逐表 `ENABLE`/`FORCE ROW LEVEL SECURITY` + `tenant_id` 策略 + 索引 + 审计不可变触发器，并经迁移 runner 应用 |
-| G-12 | `defect.outbox` 增补 envelope 物理列 | 缺 `event_id`/`stream_id`/`source_sequence`/`correlation_id`/`event_digest`/`schema_version`/`occurred_at`。关闭条件：DDL 增补 + `(stream_id, source_sequence)` 唯一约束 + `event_digest` 长度约束 + 消费者回路测试（校验→apply→幂等→游标）通过 |
-| G-13 | 缺陷新建统一走 owner 写入路径 | 三处新建均走本地 `store.addWorkItem`；抽屉 `defaultKind`/`lockKind` 未消费 → 实际 kind 为 `"task"`。关闭条件：三处统一调 owner 创建命令 + 以回执/revision 刷新 + 抽屉真正解构 `defaultKind`/`lockKind` 且 Kind 下拉在锁定时禁用 |
-| G-14 | 缺陷扩展字段与验证状态接真实来源 | `severity`/`actual_result`/`expected_result`/`fix_version` 为占位值；验证状态由 `status==="done"` 反推。关闭条件：新增缺陷专属读模型（含 `latest_verification`）+ 三态渲染（值/未填写/未接入）+ 删除 `done` 反推 |
-| G-15 | REST 路由使用真实会话身份 | `actor_from_headers` 随机 UUID，`auth_layer_stub` 为桩。关闭条件：从已验证会话取 `ActorContext`，租户/Project/能力校验基于真实身份，401/403 可区分 |
-| G-16 | `DefectService` 注入真实 `PgPool` | `DEFECT_SERVICE` 恒 `DefectService::new(None)`。关闭条件：启动流程注入 Neon `DATABASE_URL` 的 pool，保留显式降级开关与降级原因标注 |
-| G-17 | 多 Worktree 部分失败显式化 | 单 worktree 失败被吞。关闭条件：逐 worktree 结果（成功/失败范围/原因）进入 UI，`complete` 标志驱动“部分结果”提示，局部结果不得标为完整 |
-| G-18 | 缺陷错误码 → HTTP 状态码映射 | `IntoResponse` 表未登记 5 个缺陷错误码。关闭条件：补 `CROSS_TENANT_DENIED`/`CROSS_PROJECT_DENIED` → 403，`INVALID_STATE_TRANSITION` → 409，`IDEMPOTENCY_KEY_USED` → 409，`VERIFICATION_MISMATCH` → 422，并补契约测试 |
-| G-19 | `fix_version` 与状态流转同语句原子写 | `pg_service.rs:324-338` 为独立第二条 UPDATE。关闭条件：合并为单条 `UPDATE ... SET status, lifecycle_version, fix_version` 或用 `SELECT ... FOR UPDATE` 包裹的同一事务步 |
-| G-20 | 验证独立性按实际修复者/执行者校验 | 当前比较“验证人 vs 报告人”。关闭条件：引入修复者/执行者身份事实（修复任务 owner 事件或缺陷字段），按生效策略校验，例外须显式记录授权理由（per FR-DI-018） |
-| G-21 | 缺陷域自有 4 表缺 DDL（`defect_field_value` / `defect_relation` / `defect_comment` / `defect_draft`） | per §4.3 分流，13 表中 4 张属缺陷域自有但本 DD 未出 DDL。关闭条件：§4.2 补齐这 4 表 DDL（含 W 类 TTL 列），或经决策确认并入既有表并同步 §4.3/§4.4 |
-| G-22 | `defect_status_event` 无独立表（现由 `defect.audit_events` 合并承载） | FR-DI-013 要求状态/字段/负责人/关系/验证变化各自留痕；合并承载无法按事件类型检索。关闭条件：按 D-DI-05 拍板结果建独立表或确认 `event_type` 枚举可满足检索，并同步 §4.3/§4.4 |
-| G-23 | 5 张外部 owner 表的协作契约未定 | `defect_evidence_attachment` / `defect_workflow_strategy` / `defect_notification_subscription` / `defect_quality_projection` / `defect_sla_policy` 属其他 owner，版本化契约（读接口 + 事件 + 授权范围）未确认。关闭条件：逐表确认契约与授权范围并记录于 §4.3；未确认者保持"未接入" |
-| G-24 | W 类表 retention 未定义（`defect_draft` / `defect_quality_projection`） | SRS §5.1 要求"有界大小和 TTL，来源重建或过期清理"，但未给具体 TTL 与清理策略。关闭条件：定义 TTL、容量上限与清理触发方式，写入 §4.2 |
-| G-25 | `transition` 命令可直接置 `closed`，绕过"须有通过的独立验证" | §2.2.3 INV-SM-03 要求 `closed` 必须有通过的验证记录且 `fix_version` 匹配；当前 `submit_verification` 路径同事务满足，但 `transition` 路径本身无此校验。关闭条件：在 `transition` 入口显式校验"存在最新通过的验证且 `fix_version` 匹配"，否则拒绝并返回阻断原因 |
-| G-26 | 字段可写性策略与枚举↔PG 映射测试缺失 | FR-DI-008 要求按生效策略决定字段定义与可写性，FR-DI-016 要求校验字段要求条件；当前无字段可写性策略实现，枚举↔PG 双向映射（`from_pg_str`）也无单测覆盖。关闭条件：实现字段可写性策略校验 + 补 UT-DI-03 映射测试 |
+| G-1 | 外部问题系统导入或双向同步（连接授权、许可、字段映射、冲突策略） | ⬜ 本期不做（非缺陷）：全仓 0 引用，已确认不在本期范围 |
+| G-2 | 真实 AI provider 接入 | ⬜ 本仓不涉（非缺陷）：`crates/star-llm/` 不在本仓 |
+| G-3 | 真实持久化（PostgreSQL writer/API） | ✅ **闭合**（G-11/G-15/G-16 三个子项均已闭合，见下） |
+| G-4 | 工作流策略版本化 UI 配置 | ⬜ **仍未做**：`defect_workflow_strategy` 全仓 0 引用；需先定策略模型再出 UI |
+| G-5 | 桌面/窄屏/缩放/键盘/屏幕阅读器验收 | 🟡 **部分闭合**：缺陷页已有 10 项前端测试（三态渲染/降级/部分失败/写入路径）；**辅助技术实测与真实浏览器 E2E 未做** |
+| G-6 | Tab 感知跳转消费逻辑 | ✅ **闭合**：`GuardedLink` 消费 `targetTab`（拼 `?tab=` + `router.push`）；新增 `ShortcutButtons.tsx` 提供**渲染位**（此前 shortcutButtons 只在 store、无 UI）+ 4 项测试 |
+| G-7 | AI 数据出站与模型 profile | ⬜ **仍未做**：`model_profile` 全仓 0 引用；依赖 G-2 的 provider 接入 |
+| G-8 | 审计/Outbox 投递端（消费者） | ✅ **闭合**：`PgDefectInboxStore` 真实实现（inbox 行 + 投影 + 游标同事务提交，冲突/缺口 → 挂起 fail-closed）；`OutboxRelay` + `run_relay_worker` 在 `main.rs` 启动（有 PG 才启动，无 PG 显式告警） |
+| G-9 | Lane Backlog / Sprint / 独立看板入口收敛 | 🟡 **部分闭合**：Sprint Backlog quick-add 已改走 owner 创建命令（失败显式报错不落本地）；**Lane Backlog 与独立看板入口仍各有其路径** |
+| G-10 | 缺陷扩展字段与验证结论的真实来源 | ✅ **闭合**（随 G-14） |
+| G-11 | `defect.*` 物理迁移文件、RLS 与不可变触发器 | ✅ **闭合**：`db/migrations/2026-11-25-defect-domain-phase-a.sql`（15 表全 `ENABLE`+`FORCE` RLS + tenant 策略 + 审计禁改触发器）；`pg_schema.rs` 与迁移逐表逐列一致（脚本核验 15/15） |
+| G-12 | `defect.outbox` 增补 envelope 物理列 | ✅ **闭合**：迁移与 `pg_schema.rs` 均补 `stream_id`/`source_sequence`/`event_id`/`schema_version`/`correlation_id`/`event_digest`(32B CHECK)/`occurred_at` + `(stream_id,source_sequence)` 唯一约束；写入端 `emit_defect_outbox` 同事务写全列 |
+| G-13 | 缺陷新建统一走 owner 写入路径 | ✅ **闭合**：抽屉新增 `onCreate` 接管回调；缺陷页 → `POST /api/v1/defects`（带幂等键）+ 回执刷新；`defaultKind`/`lockKind` 已解构，锁定时 Kind 只读 |
+| G-14 | 缺陷扩展字段与验证状态接真实来源 | ✅ **闭合**：删除 `status==="done"` → "已验证" 反推，改用 `latest_verification`；三态渲染（值/未填写/未接入）+ 来源不可用横幅 |
+| G-15 | REST 路由使用真实会话身份 | ✅ **闭合**：`VerifiedDefectActor` extractor（fail-closed，缺已验证会话 → 401，无 header 兜底、不生成随机 UUID）；路由改挂真实 JWT middleware |
+| G-16 | `DefectService` 注入真实 `PgPool` | ✅ **闭合**：`STAR_DEFECT_DATABASE_URL` / `DATABASE_URL` → `connect_lazy`；无池时显式降级并在响应标注 `degraded` + `degradation_reason` |
+| G-17 | 多 Worktree 部分失败显式化 | ✅ **闭合**：逐 worktree 结果回执（成功/失败范围/原因）进 UI，失败 worktree 可见，局部结果不标为完整 |
+| G-18 | 缺陷错误码 → HTTP 状态码映射 | ✅ **闭合**：5 码全登记（`CROSS_TENANT_DENIED`/`CROSS_PROJECT_DENIED`→403、`INVALID_STATE_TRANSITION`/`IDEMPOTENCY_KEY_USED`→409、`VERIFICATION_MISMATCH`→422）+ 5 项契约测试 |
+| G-19 | `fix_version` 与状态流转同语句原子写 | ✅ **闭合**：合并为单条 `UPDATE ... SET status, lifecycle_version, fix_version=COALESCE(...)` |
+| G-20 | 验证独立性按实际修复者/执行者校验 | ✅ **闭合**：`Defect.fixer_id` 新字段（进入修复态时由已验证会话写入）；独立性判据改为 `fixer_id`（无记录时保守回落报告人） |
+| G-21 | 缺陷域自有 4 表缺 DDL | ✅ **闭合**：迁移补 `defect.field_values`/`relations`/`comments`/`drafts`（含 `expires_at` TTL） |
+| G-22 | `defect_status_event` 无独立表 | ✅ **闭合**（按 D-DI-05 推荐）：独立建表 `defect.status_events`（11 列，Append-only） |
+| G-23 | 5 张外部 owner 表的协作契约未定 | ⬜ **仍未做**：属外部 owner，需逐表确认版本化契约与授权范围；本专题不自行建表 |
+| G-24 | W 类表 retention 未定义 | ✅ **闭合**：`defect.drafts` 含 `expires_at`（默认 7 天）+ payload 1MiB 上限 CHECK；清理策略随表定义落地 |
+| G-25 | `transition` 可直接置 `closed` 绕过验证 | ✅ **闭合**：PG 与 InMemory 两条路径在 `transition` 入口校验"须有通过的独立验证且 fix_version 匹配"，否则返回 `VerificationMismatch` |
+| G-26 | 字段可写性策略与枚举↔PG 映射测试缺失 | 🟡 **部分闭合**：枚举↔PG 映射已有 9 项 UT（未知值不静默降级）；**字段可写性策略仍未实现**（`FieldDefinition`/`FieldValue` 类型尚不存在） |
+
+### 7.0.1 缺口闭合汇总（2026-11-25）
+
+| 类别 | 数量 | 编号 |
+|---|---|---|
+| ✅ 完全闭合 | 17 | G-3、G-6、G-8、G-10、G-11、G-12、G-13、G-14、G-15、G-16、G-17、G-18、G-19、G-20、G-21、G-22、G-24、G-25（18 项，G-3 为聚合项） |
+| 🟡 部分闭合 | 4 | G-5、G-9、G-26（3 项）+ 说明：G-5 仅前端测试到位，辅助技术实测未做 |
+| ⬜ 仍未做/非本期 | 5 | G-1、G-2（本期范围外）、G-4、G-7、G-23（需外部决策或依赖） |
+| **合计** | **26** | — |
+
+> **闭合 ≠ 验收通过**：以上是**代码层缺口**的关闭状态。
+> AC-DI-01～08 的受理条件仍需真实 PostgreSQL + 真实浏览器 E2E 执行，
+> 全部维持 `NOT_RUN`（per §6.3 测试阶梯的实测执行率）。
 
 ---
 
@@ -1378,3 +1391,4 @@ AC-DI-01～08 全部 `NOT_RUN`。本节不得替代候选提交在真实环境�
 | 2026-11-24 | v1.3 | 按物理事实核对更新：§0 实体表补 envelope/幂等回执/审计触发器的目标身份差异；§1.0 登记已接线 REST 契约与诚实边界、§1.0.1 保留目标契约；§2.1.1 增补 owner 事务与物理实现的逐条差异表；§3.2.2～§3.2.4 新增扩展字段真实来源与三态渲染、kind 锁定、多 Worktree 部分失败契约；§4.2 增补目标物理 DDL（迁移文件内容，含 RLS 与 Outbox envelope 列）；§6.1/§6.2 登记已有测试证据与缺口；§7 新增缺口 G-11～G-20。 |
 | 2026-11-24 | v1.4 | 按 IPA SEC 標準 詳細設計書 模板补齐：头部 IPA 模板声明 + 守门基线 + 改訂人/承認/日付/受众/対象範囲/対象バージョン/適用プラットフォーム/設計 5 維；新增 §-1 文書情報 表；新增 §2.2 状態遷移設計（状态机全图 + 15 条迁移表 + 6 条不变量）；新增 §2.3 詳細追跡表（34 FR → DD 章节 → 物理位置 → 缺口，覆盖 100%）；新增 §4.3 数据表分流（13 表 → 本 DD 覆盖范围）；新增 §4.4 W/T/M 横展 100% 覆蓋自審；新增 §6.3 テスト設計 5 階梯（UT 8 + IT 7 + E2E 5 + PT 4 + UAT 4，含执行率自审）；新增 §7.1 跟现有守门关系表；新增 §7.2 跟 SRS + BD 对齐自審表；新增 §8 签字栏；§7 新增缺口 G-21～G-26。AC-DI-01～08 维持 NOT_RUN。 |
 | 2026-11-24 | v1.5 | IPA 自审第二轮补齐：新增 §0.2 制約・前提・依存（詳細設計级，11 项）；新增 §0.3 决策点 D-DI-01～06（详细设计级，与 SRS §8.5 / BD §5.2 同编号同推荐项）；§2.3 追踪表增加 BR 列，形成 FR → BR → DD 章节 → 物理位置 → 缺口完整链路；§4.4 W/T/M 自審表补齐 `defect_status_event` 与 3 张辅助表的分流行。版本号与头部声明同步升 v1.5，配套 SRS 升 v1.4、BD 升 v1.6。AC-DI-01～08 维持 NOT_RUN。 |
+| 2026-11-25 | v1.6 | 缺口补缺后同步：§7 缺口表按代码核验结果逐条重写（18 完全闭合 / 3 部分闭合 / 5 仍未做或非本期），每条附闭合证据；新增 §7.0.1 缺口闭合汇总；§4.2 目标 DDL 与 `db/migrations/2026-11-25-defect-domain-phase-a.sql` 对齐（15 表，含 4 张通知 Inbox 表 + `fixer_id` 列）；§2.2 T-10 标注关闭前置校验已落地；§2.3 追踪表 G-11～G-26 的物理位置与缺口状态同步。版本号与头部声明同步升 v1.6，配套 SRS 升 v1.5、BD 升 v1.7。**AC-DI-01～08 维持 NOT_RUN**（缺口闭合是代码层事实，受理仍需真实 PG + 浏览器 E2E）；稳定版维持 NO-GO。 |

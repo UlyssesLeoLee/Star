@@ -2,12 +2,12 @@
 
 > **2026-11-24 现行适用说明**：智能缺陷、Backlog 和看板共享授权的任务事实及写入路径；§7.1 的历史失败、源码复核及当前未重测状态保持分开，未运行的 AC 不得标通过。 统合边界与状态说明见 [要件总索引](README.md)。
 
-> **智能缺陷管理 — 要件定義書 v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **智能缺陷管理 — 要件定義書 v1.5** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: 🟡 Draft v1.4 (2026-11-24 · IPA 模板对齐 + 自审补齐 5 维设计；基本設計/詳細設計 已落档；实现部分完成，端到端验收未通过)
+> - 状态: 🟡 Draft v1.5 (2026-11-25 · 缺口补缺后同步；基本設計/詳細設計 已落档；代码层缺口 18/26 闭合，端到端验收未通过)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 上游: `docs/requirements/SRS-KANBAN-001.md` v1.0 (任务卡与看板主题) + `AGENTS.md` §4 守门硬约束
-> - 下游: 基本设计 `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 + 詳細設計 `docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.5
+> - 下游: 基本设计 `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.7 + 詳細設計 `docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.6
 > - 关联实装基线: `crates/domain-defect/` (领域 + PG owner 事务) + `crates/star-api-rest/src/routes/defects.rs` (6 REST 端点) + `crates/star-api-rest/src/defect_outbox/` (Outbox 契约层) + `frontend/src/app/(app)/defect/page.tsx` (缺陷页)
 > - 守门基线: 守门 #1+#5+#9+#10+#11+#12+#13+#14 v4 共 8 项必过 (守门 #11 缺标比错标、#13 W/T/M 横展 100% 覆盖为本专题硬约束)
 > - 上位文書: `AGENTS.md` §0 一句话硬约束 + §4 守门硬约束 (per 2026-08-31 联动审计) + `docs/requirements/README.md` (要件总索引)
@@ -25,8 +25,8 @@
 > 本文参考 IPA 的业务、功能及非功能需求定义方法与非功能要求分级资料，结合 Star 现行架构形成可检验规格。IPA 指南用于组织需求和选择目标，本文件不代表 IPA 对产品的认证。
 >
 > 配套设计文档：
-> - 基本设计：`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6（逻辑上下文、W/T/M 事实所有权、模块与接口、物理接线判定规则、非功能设计、测试设计方针、阶段交付物、已知缺口）
-> - 详细设计：`docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.5（实体与版本、API 契约、Project owner 事务、状态机与迁移表、前端模块映射、数据库 DDL、前端代码片段、测试 5 阶梯与验收映射、已知缺口）
+> - 基本设计：`docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.7（逻辑上下文、W/T/M 事实所有权、模块与接口、物理接线判定规则、非功能设计、测试设计方针、阶段交付物、已知缺口）
+> - 详细设计：`docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.6（实体与版本、API 契约、Project owner 事务、状态机与迁移表、前端模块映射、数据库 DDL、前端代码片段、测试 5 阶梯与验收映射、已知缺口）
 
 ## 0. 文档依据与当前边界
 
@@ -36,7 +36,7 @@
 |---|---|
 | 文書 ID | SRS-DEFECT-INTELLIGENCE-001 |
 | 文書名 | 智能缺陷管理 — 要件定義書 |
-| バージョン | v1.4 (IPA 自审补齐 5 维设计) |
+| バージョン | v1.5 (缺口补缺后同步) |
 | 作成日 | 2026-11-24 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -44,7 +44,7 @@
 | 対象バージョン | 缺陷域 v1.0 (P0) → v2.0 (P2) |
 | 適用プラットフォーム | Web (Next.js / Vercel 呈现层) + Rust (`star-api-rest`) + Neon PostgreSQL |
 | 上位文書 | `AGENTS.md` §0 + §4 守门硬约束 + `docs/requirements/SRS-KANBAN-001.md` v1.0 |
-| 関連文書 | `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.6 + `docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.5 + `docs/architecture/DEFECT-WBS-2026-11-23.md` v1.1 |
+| 関連文書 | `docs/basic-design/BD-DEFECT-INTELLIGENCE-001.md` v1.7 + `docs/detailed-design/DD-DEFECT-INTELLIGENCE-001.md` v1.6 + `docs/architecture/DEFECT-WBS-2026-11-23.md` v1.1 |
 | 機能数 | 34 機能 (FR-DI-001 ~ FR-DI-034) + 6 業務要件 (BR-DI-01 ~ BR-DI-06) + 10 非機能 (NFR-DI-01 ~ NFR-DI-10) + 8 受理条件 (AC-DI-01 ~ AC-DI-08) |
 | データモデル | 13 表 W/T/M 横展 (T 8 / M 3 / W 2)，物理落地状态见 BD §2.1 |
 | 関連 commit | 候选 `dev@b1db1c99`（实现状态证据，非需求规则；仅出现在 §7.2 实现状态章节） |
@@ -504,3 +504,4 @@ Project Worktree Index / Project 级缺陷汇总只展示当前主体有权访�
 | 2026-11-24 | v1.2 | 新增 §7.2 物理事实复核（候选 dev@b1db1c99）：按四项判定逐条登记 FR 满足情况、实际执行的验证命令与结果；补齐配套 BD v1.4 / DD v1.3 互引。AC-DI-01～08 维持 NOT_RUN。 |
 | 2026-11-24 | v1.3 | 按 IPA SEC 標準 要件定義書 模板补齐：头部 IPA 模板声明 + 守门基线 + 改訂人/承認/日付/受众/対象バージョン/適用プラットフォーム；新增 §0.1 文書情報 表；新增 §1.1.1 業務要件 BR-DI-01～06（与 FR/AC 双向挂钩）；新增 §8.1 制约条件 CON-DI-01～08、§8.2 前提条件 PRE-DI-01～06、§8.3 依存关系 DEP-DI-01～09、§8.5 决策点 D-DI-01～04（每项带推荐项）；新增 §9 签字栏；原 §8 顺延为 §8.4、修订历史顺延为 §10。配套 BD 升 v1.5、DD 升 v1.4。AC-DI-01～08 维持 NOT_RUN。 |
 | 2026-11-24 | v1.4 | IPA 自审第二轮补齐：新增 §2.2 状態遷移設計（要件层允许的 9 状态流转 + 6 条要件层不变量，与 BD §3.6 / DD §2.2 状态集合逐值一致）；新增 §7.2.1 テスト設計方針（5 阶梯 → AC 映射 + 3 条受入原则）；新增 §7.3.1 跟 BD + DD 对齐自審表（9 个维度）；§7.3 补全追踪闭合性自审结果。版本号与头部声明同步升 v1.4，配套 BD 升 v1.6、DD 升 v1.5。AC-DI-01～08 维持 NOT_RUN。 |
+| 2026-11-25 | v1.5 | 缺口补缺后同步：§8.3 缺口编号登记更新为「26 项中 18 完全闭合 / 3 部分闭合 / 5 仍未做或非本期」；§8.2 前提条件 PRE-DI-02（真实会话身份）与 PRE-DI-03（迁移已应用）状态由「不满足」更新为「已满足（代码层）」，并注明验收仍待真实环境执行。FR 编号与追踪口径不变。AC-DI-01～08 维持 NOT_RUN，稳定版维持 NO-GO。 |

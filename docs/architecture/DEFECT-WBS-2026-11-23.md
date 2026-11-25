@@ -1,6 +1,6 @@
 # DEFECT-WBS — 缺陷管理模块交付工作分解结构
 
-版本：v1.2 · 2026-11-24 · 基于 dev@b1db1c99 · 设计文档 SRS v1.4 / BD v1.6 / DD v1.5  
+版本：v1.3 · 2026-11-25 · 基于 dev@184dac93 · 设计文档 SRS v1.5 / BD v1.7 / DD v1.6  
 适用：`crates/domain-defect`、前端 `/defect` 页面、`star-api-rest` 路由、SRS/BD/DD 设计文档（IPA 模板对齐版）  
 发布门禁：稳定版在所需门禁通过前维持 NO-GO（per 用户发布门禁）。  
 状态判定口径：基本设计 §3.5.2 四项判定（调用可达 / 物理持久化 / 授权真实 / 数据同源）。
@@ -135,24 +135,38 @@
 
 ### F.5 缺口总表（2026-11-24 物理事实复核 + IPA 自审，与 BD §6 / DD §7 一致，共 26 项）
 
-| # | 缺口 | 阻塞的阶段 | 关闭条件摘要 |
-|---|------|-----------|------------|
-| G-11 | `defect.*` 六表物理迁移文件 + RLS + 审计不可变触发器；幂等回执保真 | A / B | 新增迁移文件（含六表 DDL、逐表 ENABLE/FORCE RLS、tenant 策略、索引、审计禁改触发器）；幂等命中回放 `response_body`；`request_hash` 改为真实请求摘要并比对 |
-| G-12 | `defect.outbox` 增补 envelope 物理列 | B | DDL 增补 `event_id`/`stream_id`/`source_sequence`/`correlation_id`/`event_digest`/`schema_version`/`occurred_at` + `(stream_id, source_sequence)` 唯一约束 + digest 长度约束 |
-| G-13 | 缺陷新建统一走 owner 写入路径 + kind 锁定 | D | 三处新建统一调 owner 创建命令并以回执/revision 刷新；抽屉真正解构 `defaultKind`/`lockKind`，Kind 下拉锁定时禁用 |
-| G-14 | 缺陷扩展字段与验证状态接真实来源 | D | 新增缺陷专属读模型（含 `latest_verification`）；三态渲染（值/未填写/未接入）；删除 `done` → “已验证” 的反推 |
-| G-15 | REST 路由使用真实会话身份 | C | 从已验证会话取 `ActorContext`；租户/Project/能力校验基于真实身份；401/403 可区分 |
-| G-16 | `DefectService` 注入真实 `PgPool` | A / C | 启动流程注入 Neon pool；保留显式降级开关与降级原因标注 |
-| G-17 | 多 Worktree 部分失败显式化 | D | 逐 worktree 结果（成功/失败范围/原因）进入 UI；`complete` 标志驱动“部分结果”提示 |
-| G-18 | 缺陷错误码 → HTTP 状态码映射 | C | 补 5 个缺陷错误码的 status 映射 + 契约测试 |
-| G-19 | `fix_version` 与状态流转同语句原子写 | B | 合并为单条 `UPDATE ... SET status, lifecycle_version, fix_version` |
-| G-20 | 验证独立性按实际修复者/执行者校验 | B | 引入修复者/执行者身份事实并按策略校验，例外须显式记录授权理由 |
-| G-21 | 缺陷域自有 4 表缺 DDL（`defect_field_value`/`defect_relation`/`defect_comment`/`defect_draft`） | D | 补齐 4 表 DDL（含 W 类 TTL 列），或经决策确认并入既有表 |
-| G-22 | `defect_status_event` 无独立表（现由 `defect.audit_events` 合并承载） | D | 按 D-DI-05 拍板结果建独立表或确认 `event_type` 枚举可满足检索 |
-| G-23 | 5 张外部 owner 表的协作契约未定（证据附件/工作流策略/通知订阅/质量投影/SLA 策略） | E | 逐表确认版本化契约与授权范围并记录于 DD §4.3 |
-| G-24 | W 类表 retention 未定义（`defect_draft`/`defect_quality_projection`） | D / E | 定义 TTL、容量上限与清理触发方式并写入 DD §4.2 |
-| G-25 | `transition` 命令可直接置 `closed`，绕过"须有通过的独立验证" | B | 在 `transition` 入口显式校验"存在最新通过的验证且 `fix_version` 匹配"，否则拒绝并返回阻断原因 |
-| G-26 | 字段可写性策略与枚举↔PG 映射测试缺失 | B / D | 实现字段可写性策略校验 + 补 UT-DI-03 映射测试 |
+| # | 缺口 | 阻塞的阶段 | 状态（2026-11-25 代码核验） |
+|---|------|-----------|------|
+| G-1 | 外部问题系统导入或双向同步 | — | ⬜ 本期不做（非缺陷） |
+| G-2 | 真实 AI provider 接入 | — | ⬜ 本仓不涉（非缺陷） |
+| G-3 | 真实持久化（PG writer/API） | A | ✅ 闭合（G-11/G-15/G-16 均闭合） |
+| G-4 | 工作流策略版本化 UI 配置 | E | ⬜ 仍未做（需先定策略模型） |
+| G-5 | 桌面/窄屏/缩放/键盘/屏幕阅读器验收 | F | 🟡 部分（前端测试到位，辅助技术实测未做） |
+| G-6 | Tab 感知跳转消费逻辑 | E | ✅ 闭合（GuardedLink + ShortcutButtons 渲染位） |
+| G-7 | AI 数据出站与模型 profile | E | ⬜ 仍未做（依赖 G-2） |
+| G-8 | 审计/Outbox 投递端（消费者） | B | ✅ 闭合（PgDefectInboxStore + OutboxRelay + worker） |
+| G-9 | Lane Backlog / Sprint / 独立看板入口收敛 | E | 🟡 部分（Sprint Backlog 已走 owner；Lane Backlog 未） |
+| G-10 | 缺陷扩展字段与验证结论的真实来源 | D | ✅ 闭合（随 G-14） |
+| G-11 | 六表物理迁移 + RLS + 审计触发器 | A | ✅ 闭合（15 表全 RLS + 触发器） |
+| G-12 | `defect.outbox` 增补 envelope 物理列 | B | ✅ 闭合（envelope 全列 + 唯一约束） |
+| G-13 | 缺陷新建统一走 owner 写入路径 | D | ✅ 闭合（onCreate + POST /defects + kind 锁定） |
+| G-14 | 扩展字段与验证状态接真实来源 | D | ✅ 闭合（latest_verification + 三态渲染） |
+| G-15 | REST 路由使用真实会话身份 | C | ✅ 闭合（VerifiedDefectActor fail-closed 401） |
+| G-16 | `DefectService` 注入真实 `PgPool` | A/C | ✅ 闭合（connect_lazy + 显式降级标注） |
+| G-17 | 多 Worktree 部分失败显式化 | D | ✅ 闭合（逐 worktree 结果可见） |
+| G-18 | 错误码 → HTTP 状态码映射 | C | ✅ 闭合（5 码 403/409/422 + 契约测试） |
+| G-19 | `fix_version` 同语句原子写 | B | ✅ 闭合（单条 UPDATE） |
+| G-20 | 验证独立性按实际修复者 | B | ✅ 闭合（fixer_id 字段 + 判据切换） |
+| G-21 | 缺陷域自有 4 表缺 DDL | A | ✅ 闭合（field_values/relations/comments/drafts） |
+| G-22 | `defect_status_event` 独立表 | A | ✅ 闭合（status_events 独立建表） |
+| G-23 | 5 张外部 owner 表协作契约 | E | ⬜ 仍未做（需外部 owner 确认） |
+| G-24 | W 类表 retention | D/E | ✅ 闭合（drafts.expires_at 7d + 1MiB CHECK） |
+| G-25 | `transition` 绕过验证直接关闭 | B | ✅ 闭合（入口校验通过的独立验证） |
+| G-26 | 字段可写性策略 + 枚举映射测试 | B/D | 🟡 部分（枚举映射 UT 9 项已补；可写性策略未实现） |
+
+**闭合汇总**：✅ 完全闭合 18 项 · 🟡 部分闭合 3 项 · ⬜ 仍未做/非本期 5 项 = 26 项。
+**闭合 ≠ 验收通过**：AC-DI-01～08 仍全部 `NOT_RUN`（真实 PG + 浏览器 E2E 未执行）。
+
 
 ### F.6 发布门禁
 - [ ] F.6.1 Vercel 生产分支（旧域名 `starcanvas.vercel.app`）构建通过并载入最新代码
@@ -183,3 +197,4 @@
 | 2026-11-23 | v1.0 | 建立缺陷管理模块交付工作分解结构：Phase A～F、依赖顺序、验收标准与门禁。 |
 | 2026-11-24 | v1.1 | 按物理事实复核重标各阶段状态，新增缺口 G-11～G-20 与发布门禁。 |
 | 2026-11-24 | v1.2 | 设计文档 IPA 模板对齐后同步：新增缺口 G-21～G-26（4 表缺 DDL / 状态事件表 / 外部 owner 契约 / W 类 retention / closed 前置校验 / 字段可写性策略）；头部登记 SRS v1.4 / BD v1.6 / DD v1.5 版本口径。稳定版维持 NO-GO。 |
+| 2026-11-25 | v1.3 | 缺口补缺执行后同步：F.5 缺口总表按代码核验重写（18 完全闭合 / 3 部分闭合 / 5 仍未做或非本期）；Phase A/B/C/D 状态按闭合结果更新；头部登记 SRS v1.5 / BD v1.7 / DD v1.6 版本口径。AC-DI-01～08 维持 NOT_RUN，稳定版维持 NO-GO。 |
