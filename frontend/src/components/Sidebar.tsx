@@ -27,6 +27,7 @@ import { clsx } from "clsx";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect } from "react";
 import { ProjectNavigation } from "@/components/nav/ProjectNavigation";
+import { ShortcutButtons } from "@/components/nav/ShortcutButtons";
 import { SidebarShortcuts } from "@/components/nav/SidebarShortcuts";
 import { GuardedLink } from "@/components/navigation/GuardedLink";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
@@ -94,6 +95,8 @@ export function Sidebar() {
       </div>
 
       <ProjectNavigation directory={<ProjectRunTree collapsed={collapsed} />} collapsed={collapsed} />
+      {/* 自定义快捷入口 (per G-6: shortcutButtons 此前无渲染处) */}
+      {!collapsed ? <ShortcutButtons className="px-2 pb-1" /> : null}
       <SidebarShortcuts />
     </aside>
   );
