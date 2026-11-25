@@ -28,7 +28,11 @@ import {
   type GroupWorkItemView,
   type WorkItemLifecycleStatus,
 } from "@/lib/group/groupProjection";
-import { listDefects, type DefectListItemView } from "@/lib/defect/defectApi";
+import {
+  createDefect,
+  listDefects,
+  type DefectListItemView,
+} from "@/lib/defect/defectApi";
 import { useNavStore } from "@/lib/nav/navStore";
 import { clsx } from "clsx";
 import {
@@ -43,6 +47,7 @@ import {
 import { StatusPill } from "@/components/StatusPill";
 import {
   WorkItemDetailDrawer,
+  type WorkItemCreateCommand,
   type WorkItemDrawerMode,
 } from "@/components/board/WorkItemDetailDrawer";
 import type { WorkItemKind, WorkItemPriority, WorkItemStatus } from "@/types/ids";
@@ -98,6 +103,29 @@ export function defectStatusToKanbanStatus(raw: string): WorkItemStatus {
 
 export function defectPriorityToWorkItemPriority(priority: string): WorkItemPriority {
   return DEFECT_PRIORITY_TO_WORKITEM[priority] ?? "p3";
+}
+
+/**
+ * WorkItem 优先级 → 缺陷域优先级（per `CreateDefectCommand.priority`）。
+ *
+ * 缺陷域枚举：P0 / P1 / P2 / P3 / unscheduled
+ * （与 `domain_defect::DefectPriority::as_str()` 逐值一致）。
+ */
+export function workItemPriorityToDefectPriority(
+  priority: WorkItemPriority,
+): string {
+  switch (priority) {
+    case "p0":
+      return "P0";
+    case "p1":
+      return "P1";
+    case "p2":
+      return "P2";
+    case "p3":
+      return "P3";
+    default:
+      return "unscheduled";
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -405,138 +433,127 @@ export default function DefectPage() {
   const addWorkItem = storeApi.addWorkItem;
 
   // 加载缺陷: 优先 REST 读模型, 失败显式降级到多 worktree 路径 (per N-01 / G-14 / G-17)
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    const hydrateStoreItems = (items: DefectItem[]) => {
-      // waterfall 到 store: 使 WorkItemDetailDrawer view 模式能读到 currentWi
-      for (const item of items) {
-        try {
-          addWorkItem({
-            id: item.id,
-            tenant_id: tenantId,
-            project_id: projectId,
-            title: item.title,
-            description: item.phenomenon || "",
-            kind: "bug" as const,
-            status: item.status,
-            priority: defectPriorityToWorkItemPriority(item.priority),
-            reporter_id: item.reporter_id,
-            labels: [],
-            worktree_id: item.worktree_id ?? undefined,
-            branch_id: item.branch_id ?? undefined,
-            branch_name: item.branch_name ?? undefined,
-            lifecycle_version: item.lifecycle_version,
-          });
-        } catch {
-          // 水合单条失败不阻塞整体
-        }
-      }
-    };
-
-    const loadDefects = async () => {
-      if (!projectId || !tenantId || !reporterId) {
-        if (!cancelled) {
-          setDefects([]);
-          setLoadResults(null);
-          setDataSource({ kind: "none" });
-        }
-        return;
-      }
-
-      // ---- 1. 优先: REST 读模型 GET /api/v1/defects (N-01) ----
-      let restErrorText = "";
+  /**
+   * 加载缺陷列表（per N-01 / G-14 / G-17）。
+   *
+   * - 优先 REST 读模型 `GET /api/v1/defects`
+   * - 失败显式降级到多 worktree 路径，逐 worktree 结果可见
+   * - 降级状态与原因都进 `dataSource`，UI 如实呈现
+   *
+   * 抽成 useCallback 是为了让 `handleOwnerCreate`（创建后刷新）复用同一条路径。
+   */
+  const reloadDefects = useCallback(async (): Promise<void> => {
+  const hydrateStoreItems = (items: DefectItem[]) => {
+    // waterfall 到 store: 使 WorkItemDetailDrawer view 模式能读到 currentWi
+    for (const item of items) {
       try {
-        const res = await listDefects({
+        addWorkItem({
+          id: item.id,
+          tenant_id: tenantId,
           project_id: projectId,
-          lane_id: selectedLaneId || undefined,
-          page: 1,
-          page_size: 200,
+          title: item.title,
+          description: item.phenomenon || "",
+          kind: "bug" as const,
+          status: item.status,
+          priority: defectPriorityToWorkItemPriority(item.priority),
+          reporter_id: item.reporter_id,
+          labels: [],
+          worktree_id: item.worktree_id ?? undefined,
+          branch_id: item.branch_id ?? undefined,
+          branch_name: item.branch_name ?? undefined,
+          lifecycle_version: item.lifecycle_version,
         });
-        if (cancelled) return;
-        const defectItems = res.items.map(restRowToDefectItem);
-        setDefects(defectItems);
-        setLoadResults(null);
-        setDataSource({
-          kind: "rest",
-          serviceDegraded: res.degraded,
-          degradationReason: res.degradation_reason ?? null,
-        });
-        hydrateStoreItems(defectItems);
-        return;
-      } catch (restErr) {
-        // 显式降级, 不静默 (per G-14 / N-01)
-        restErrorText = restErr instanceof Error ? restErr.message : String(restErr);
+      } catch {
+        // 水合单条失败不阻塞整体
       }
+    }
+  };
 
-      // ---- 2. 降级路径: worktreeGroupApi 多 worktree (G-17 逐 worktree 结果) ----
-      if (!worktreeGroupApi) {
-        if (!cancelled) {
-          setDefects([]);
-          setLoadResults(null);
-          setDataSource({ kind: "degraded-fallback", restError: restErrorText });
-          setError(
-            `缺陷读模型不可用 (${restErrorText})，且 worktreeGroupApi 未接入。`,
-          );
-        }
-        return;
-      }
+  const loadDefects = async () => {
+    if (!projectId || !tenantId || !reporterId) {
+      setDefects([]);
+      setLoadResults(null);
+      setDataSource({ kind: "none" });
+      return;
+    }
 
-      const targetWorktreeIds = selectedWorktreeId
-        ? [selectedWorktreeId]
-        : worktrees
-            .filter(
-              (w) =>
-                w.project_id === projectId &&
-                (!selectedLaneId || w.lane_id === selectedLaneId),
-            )
-            .map((w) => w.id);
-
-      // 逐 worktree 收集结果: 单个失败不阻塞整体, 但失败范围必须可见 (G-17)
-      const results: WorktreeLoadResult[] = await Promise.all(
-        targetWorktreeIds.map(
-          async (wtId): Promise<WorktreeLoadResult> => {
-            try {
-              const envelope =
-                await worktreeGroupApi.listWorkItems<DegradedWorkItemEnvelope>(wtId);
-              const items = mapDegradedEnvelopeWorkItems(envelope, wtId);
-              return { worktreeId: wtId, ok: true, items };
-            } catch (err) {
-              return {
-                worktreeId: wtId,
-                ok: false,
-                error: err instanceof Error ? err.message : String(err),
-                items: [],
-              };
-            }
-          },
-        ),
-      );
-
-      if (cancelled) return;
-      const allItems = results.flatMap((r) => r.items);
-      const bugs = allItems.filter((item) => item.kind === "bug");
-      const defectItems = bugs.map(groupItemToDefectItem);
-      hydrateStoreItems(defectItems);
-      setDefects(defectItems);
-      setLoadResults(results);
-      setDataSource({ kind: "degraded-fallback", restError: restErrorText });
-    };
-
-    loadDefects()
-      .catch((e: unknown) => {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+    // ---- 1. 优先: REST 读模型 GET /api/v1/defects (N-01) ----
+    let restErrorText = "";
+    try {
+      const res = await listDefects({
+        project_id: projectId,
+        lane_id: selectedLaneId || undefined,
+        page: 1,
+        page_size: 200,
       });
+      const defectItems = res.items.map(restRowToDefectItem);
+      setDefects(defectItems);
+      setLoadResults(null);
+      setDataSource({
+        kind: "rest",
+        serviceDegraded: res.degraded,
+        degradationReason: res.degradation_reason ?? null,
+      });
+      hydrateStoreItems(defectItems);
+      return;
+    } catch (restErr) {
+      // 显式降级, 不静默 (per G-14 / N-01)
+      restErrorText = restErr instanceof Error ? restErr.message : String(restErr);
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    // ---- 2. 降级路径: worktreeGroupApi 多 worktree (G-17 逐 worktree 结果) ----
+    if (!worktreeGroupApi) {
+      setDefects([]);
+      setLoadResults(null);
+      setDataSource({ kind: "degraded-fallback", restError: restErrorText });
+      setError(
+        `缺陷读模型不可用 (${restErrorText})，且 worktreeGroupApi 未接入。`,
+      );
+      return;
+    }
+
+    const targetWorktreeIds = selectedWorktreeId
+      ? [selectedWorktreeId]
+      : worktrees
+          .filter(
+            (w) =>
+              w.project_id === projectId &&
+              (!selectedLaneId || w.lane_id === selectedLaneId),
+          )
+          .map((w) => w.id);
+
+    // 逐 worktree 收集结果: 单个失败不阻塞整体, 但失败范围必须可见 (G-17)
+    const results: WorktreeLoadResult[] = await Promise.all(
+      targetWorktreeIds.map(
+        async (wtId): Promise<WorktreeLoadResult> => {
+          try {
+            const envelope =
+              await worktreeGroupApi.listWorkItems<DegradedWorkItemEnvelope>(wtId);
+            const items = mapDegradedEnvelopeWorkItems(envelope, wtId);
+            return { worktreeId: wtId, ok: true, items };
+          } catch (err) {
+            return {
+              worktreeId: wtId,
+              ok: false,
+              error: err instanceof Error ? err.message : String(err),
+              items: [],
+            };
+          }
+        },
+      ),
+    );
+
+    const allItems = results.flatMap((r) => r.items);
+    const bugs = allItems.filter((item) => item.kind === "bug");
+    const defectItems = bugs.map(groupItemToDefectItem);
+    hydrateStoreItems(defectItems);
+    setDefects(defectItems);
+    setLoadResults(results);
+    setDataSource({ kind: "degraded-fallback", restError: restErrorText });
+  };
+
+  // 真正执行加载（内层函数定义完成后调用）
+  await loadDefects();
   }, [
     selectedLaneId,
     selectedWorktreeId,
@@ -547,6 +564,25 @@ export default function DefectPage() {
     reporterId,
     addWorkItem,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    reloadDefects()
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadDefects]);
+
 
   const filtered = useMemo(() => {
     return defects.filter((d) => {
@@ -573,6 +609,42 @@ export default function DefectPage() {
   }, [defects, filter]);
 
   // ---- 新建缺陷：打开 drawer new 模式，kind 锁定为 bug ----
+  /**
+   * 新建缺陷 → owner 创建命令（per G-13 单一写入路径 / D-DI-04）。
+   *
+   * 走 `POST /api/v1/defects`（真实 owner，含幂等键 + 版本回执），
+   * 成功后用回执刷新列表；失败时**不**静默落到本地 store，
+   * 而是抛出让抽屉显示阻断原因。
+   *
+   * `idempotency_key` 用 `crypto.randomUUID()`：同一命令重试复用同一键，
+   * 服务端按 key 去重（per FR-DI-020）。
+   */
+  const handleOwnerCreate = useCallback(
+    async (command: WorkItemCreateCommand): Promise<string | null> => {
+      const created = await createDefect({
+        idempotency_key:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${command.project_id}:${command.title}:${Date.now()}`,
+        tenant_id: command.tenant_id,
+        project_id: command.project_id,
+        lane_id: selectedLaneId ?? null,
+        worktree_id: command.worktree_id ?? null,
+        branch_name: command.branch_name,
+        title: command.title,
+        phenomenon: command.description,
+        reporter_id: command.reporter_id,
+        severity: "unknown",
+        priority: workItemPriorityToDefectPriority(command.priority),
+        labels: command.labels,
+      });
+      // 用回执刷新列表（权威事实来自 owner，不本地臆造）
+      await reloadDefects();
+      return created.id;
+    },
+    [selectedLaneId, reloadDefects],
+  );
+
   const handleCreate = useCallback(() => {
     setSelectedDefect(null);
     // mode 级 + prop 级双通道锁定 (per DD §3.2.3 方案 A/B 兼容)
@@ -804,6 +876,7 @@ export default function DefectPage() {
           reporterId={reporterId || undefined}
           defaultKind="bug"
           lockKind={true}
+          onCreate={handleOwnerCreate}
         />
 
         {/* 缺陷扩展字段 (现象/实际结果/修复版本/验证状态)，仅在选中缺陷时展示 */}

@@ -77,6 +77,22 @@ import type {
   WorkItemDocument,
 } from "@/types/ids";
 
+// ---- 新建命令（供 onCreate 接管，per G-13 单一写入路径） ----
+export type WorkItemCreateCommand = {
+  tenant_id: string;
+  project_id: string;
+  title: string;
+  status: WorkItemStatus;
+  kind: WorkItemKind;
+  priority: WorkItemPriority;
+  reporter_id: string;
+  description: string;
+  assignee_id: string | undefined;
+  labels: string[];
+  worktree_id: string | undefined;
+  branch_name: string | null;
+};
+
 // ---- Mode discriminator ----
 export type WorkItemDrawerMode =
   | { kind: "new"; defaultStatus: WorkItemStatus; defaultKind?: WorkItemKind; lockKind?: boolean }
@@ -96,6 +112,14 @@ export interface WorkItemDetailDrawerProps {
   lockKind?: boolean;
   /** 点击子任务行时打开子任务卡 (per 2026-11-11 子任务层级) */
   onOpenChildTask?: (workItemId: string) => void;
+  /**
+   * 新建命令**接管回调**（per G-13 单一写入路径）。
+   *
+   * 提供时：抽屉不再直接写本地 store，而是把创建命令交给调用方
+   * （缺陷域走 owner 创建命令 `POST /defects`），由调用方用回执/revision 刷新。
+   * 未提供时：回退到本地 store（其它模块的既有行为，不受影响）。
+   */
+  onCreate?: (command: WorkItemCreateCommand) => Promise<string | null>;
 }
 
 // ---- Static enums (跟 types/ids.ts 同步) ----
@@ -111,7 +135,7 @@ const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
 export function WorkItemDetailDrawer({
   open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
-  defaultKind, lockKind,
+  defaultKind, lockKind, onCreate,
 }: WorkItemDetailDrawerProps) {
   // ---- 读 store ----
   const workItems = useStore((s) => s.workItems);
@@ -303,7 +327,9 @@ export function WorkItemDetailDrawer({
   const canSave = !!draft && draft.title.trim().length > 0;
   // per 2026-11-21 用户发令: 无法创建 → 屏幕顶端失败原因 + 完善建议链接
   const [createFailure, setCreateFailure] = useState<{ reason: string; hint: string; link?: string } | null>(null);
-  const handleCreate = () => {
+  // owner 写入路径进行中（per G-13）
+  const [createBusy, setCreateBusy] = useState(false);
+  const handleCreate = async () => {
     if (!draft || !canSave) {
       setCreateFailure({ reason: "标题必填", hint: "填写任务卡标题后再创建。" });
       return;
@@ -322,6 +348,52 @@ export function WorkItemDetailDrawer({
       return;
     }
     setCreateFailure(null);
+    // per 2026-11-21: 创建即绑定当前 branch (branch 级数据隔离)
+    // branch_id 保留为服务端 UUID（本地任务无，设 null）；branch_name 记录本地分支名
+    const branchName = useNavStore.getState().selectedBranch || null;
+
+    // --- G-13 单一写入路径 ---
+    // 调用方提供 onCreate 时：走 owner 创建命令（缺陷域 = POST /defects），
+    // 由调用方用回执/revision 刷新；此处**不**直接写本地 store。
+    // 未提供 onCreate 时：回退本地 store（其它模块既有行为不变）。
+    if (onCreate) {
+      setCreateBusy(true);
+      try {
+        const createdId = await onCreate({
+          tenant_id: tenantId,
+          project_id: projectId,
+          title: draft.title.trim(),
+          status: draft.status,
+          kind: draft.kind,
+          priority: draft.priority,
+          reporter_id: reporterId,
+          description: draft.description,
+          assignee_id: draft.assignee_id,
+          labels: draft.labels,
+          worktree_id: draft.worktree_id,
+          branch_name: branchName,
+        });
+        if (createdId) {
+          onClose();
+          // eslint-disable-next-line no-console
+          console.info(`[WorkItemDetailDrawer] created work-item ${createdId} via owner`);
+        } else {
+          setCreateFailure({
+            reason: "创建未成功",
+            hint: "owner 未返回新记录 id，请重试。",
+          });
+        }
+      } catch (err) {
+        setCreateFailure({
+          reason: "创建失败",
+          hint: err instanceof Error ? err.message : "未知错误",
+        });
+      } finally {
+        setCreateBusy(false);
+      }
+      return;
+    }
+
     const newId = addWorkItem({
       tenant_id: tenantId,
       project_id: projectId,
@@ -334,10 +406,8 @@ export function WorkItemDetailDrawer({
       assignee_id: draft.assignee_id,
       labels: draft.labels,
       worktree_id: draft.worktree_id,
-      // per 2026-11-21: 创建即绑定当前 branch (branch 级数据隔离)
-      // branch_id 保留为服务端 UUID（本地任务无，设 null）；branch_name 记录本地分支名
       branch_id: null,
-      branch_name: useNavStore.getState().selectedBranch || null,
+      branch_name: branchName,
     });
     // 关闭后让父组件切到 view 模式显示新建的卡
     onClose();

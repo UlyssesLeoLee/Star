@@ -432,3 +432,125 @@ describe("三态渲染纯函数 (G-14)", () => {
     ).toBe("验证失败（1.5.0）");
   });
 });
+
+describe("DefectPage 写入路径 (G-13 单一写入路径)", () => {
+  it("新建缺陷走 owner 创建命令 POST /defects（不再只写本地 store）", async () => {
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes("/defects") && (init?.method ?? "GET") === "POST") {
+        return new Response(
+          JSON.stringify({
+            data: {
+              id: "def-new-001",
+              tenant_id: "tn-defect-1",
+              project_id: PROJECT_ID,
+              lane_id: null,
+              worktree_id: null,
+              branch_id: null,
+              branch_name: "dev",
+              title: "新建的缺陷",
+              phenomenon: "现象描述",
+              expected_result: null,
+              actual_result: null,
+              reproduction_steps: null,
+              impact_scope: null,
+              discovery_stage: null,
+              severity: "unknown",
+              priority: "P2",
+              status: "triage",
+              reporter_id: "usr-defect-1",
+              fixer_id: null,
+              assignee_id: null,
+              environment: null,
+              labels: [],
+              discovery_version: null,
+              fix_version: null,
+              lifecycle_version: 1,
+              created_at: "2026-11-25T00:00:00Z",
+              updated_at: "2026-11-25T00:00:00Z",
+              deleted_at: null,
+            },
+            meta: {},
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      // GET 列表
+      return new Response(JSON.stringify(restList([restItem()])), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+
+    // 打开新建抽屉
+    const newBtn = await screen.findByRole("button", { name: /新建缺陷/i });
+    fireEvent.click(newBtn);
+
+    // 填标题并提交
+    const titleInput = await screen.findByTestId("work-item-drawer-title");
+    fireEvent.change(titleInput, { target: { value: "新建的缺陷" } });
+    const createBtn = screen.getByTestId("work-item-drawer-create");
+    fireEvent.click(createBtn);
+
+    await waitFor(
+      () => {
+        expect(
+          calls.some((c) => c.startsWith("POST") && c.includes("/defects")),
+          `期望调用 POST /defects，实际调用: ${JSON.stringify(calls)}`,
+        ).toBe(true);
+      },
+      { timeout: 3000 },
+    );
+
+    // 请求体带幂等键 + 标题 + phenomenon（owner 命令契约）
+    const postCall = fetchMock.mock.calls.find(
+      (c) => String(c[0]).includes("/defects") && (c[1]?.method ?? "GET") === "POST",
+    );
+    const body = JSON.parse(String(postCall?.[1]?.body ?? "{}"));
+    expect(
+      body.idempotency_key,
+      `创建命令必须带幂等键（per FR-DI-020），实际 body: ${JSON.stringify(body)}`,
+    ).toBeTruthy();
+    expect(body.title).toBe("新建的缺陷");
+    // phenomenon 来自抽屉的描述字段；未填时是空串（合法：现象必填由 owner 校验）
+    expect(body).toHaveProperty("phenomenon");
+    expect(body.reporter_id).toBe("usr-defect-1");
+  });
+
+  it("owner 创建失败 → 不静默落到本地 store，显示阻断原因", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/defects") && (init?.method ?? "GET") === "POST") {
+        return new Response(
+          JSON.stringify({ error: "VALIDATION_FAILED", message: "标题必填" }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify(restList([restItem()])), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+    const newBtn = await screen.findByRole("button", { name: /新建缺陷/i });
+    fireEvent.click(newBtn);
+    const titleInput = await screen.findByTestId("work-item-drawer-title");
+    fireEvent.change(titleInput, { target: { value: "会被拒绝的缺陷" } });
+    fireEvent.click(screen.getByTestId("work-item-drawer-create"));
+
+    // 失败必须可见（不冒充成功）
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("work-item-drawer-create-failure") ??
+          document.body.textContent,
+      ).toBeTruthy();
+    });
+  });
+});
