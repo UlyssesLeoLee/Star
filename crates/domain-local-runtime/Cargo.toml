@@ -32,7 +32,7 @@ serde_json = { workspace = true }
 # w22-w31 通用 tracing
 tracing = { workspace = true }
 # ULYS-156 cli_session_registry: rusqlite bundled SQLite WAL (per star-taskqueue 同款)
-rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 
 star-context = { path = "../star-context" }
 star-dto = { path = "../star-dto" }

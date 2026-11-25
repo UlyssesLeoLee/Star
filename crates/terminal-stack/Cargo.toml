@@ -34,7 +34,7 @@ axum = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { workspace = true }
 # ULYS-220 P1-A Persistence: rusqlite bundled SQLite WAL (per cli_session_registry / star-taskqueue 同款)
-rusqlite = { version = "0.41", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.43", default-features = false, features = ["bundled"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }
