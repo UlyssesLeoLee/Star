@@ -371,6 +371,15 @@ pub struct Defect {
     pub status: DefectStatus,
     pub reporter_id: Uuid,
     pub assignee_id: Option<Uuid>,
+    /// **实际修复者/执行者**身份（per FR-DI-018 + 决策 D-DI-02）。
+    ///
+    /// 由"进入 in_progress / pending_verify 的那次状态流转"的**已验证会话**
+    /// 写入（服务端从 ActorContext 取，不接受客户端指定）——
+    /// 这才是"谁真正修了它"的事实，区别于 `assignee_id`（分派责任人，
+    /// 可能从未动手）。
+    ///
+    /// 验证独立性以此为准：验证人不得等于 `fixer_id`（管理员豁免须留理由）。
+    pub fixer_id: Option<Uuid>,
     pub environment: Option<String>,
     pub labels: Vec<String>,
     pub discovery_version: Option<String>,
@@ -410,6 +419,7 @@ impl Defect {
             priority: DefectPriority::Unscheduled,
             status: DefectStatus::Triage,
             reporter_id,
+            fixer_id: None,
             assignee_id: None,
             environment: None,
             labels: vec![],
@@ -618,9 +628,22 @@ pub(crate) fn check_defect_write_capability(actor: &ActorContext) -> Result<(), 
     ))
 }
 
+/// 验证能力与**独立性**校验（per FR-DI-018 + 决策 D-DI-02）。
+///
+/// 独立性基准 = **实际修复者/执行者**（`fixer_id`，由进入 in_progress /
+/// pending_verify 的那次流转的已验证会话写入），**不是**报告人。
+/// 报告人只有在其同时也是实际修复者时才构成冲突。
+///
+/// - `fixer_id = Some(f)`：验证人不得等于 `f`（管理员豁免，且须留理由）。
+/// - `fixer_id = None`：尚未有人登记实际修复者 → 只校验报告人冲突
+///   （保守拒绝，避免"无记录即放行"）。
+///
+/// 管理员豁免不静默：调用方须在审计事件 payload 记录豁免事实
+/// （per DD §5.2 D-DI-02 "例外须显式记录授权理由"）。
 fn check_defect_verify_capability(
     actor: &ActorContext,
     defect_reporter_id: Uuid,
+    defect_fixer_id: Option<Uuid>,
 ) -> Result<(), DefectError> {
     use star_context::roles::*;
     let is_admin = actor.is_platform_admin()
@@ -632,10 +655,23 @@ fn check_defect_verify_capability(
             "当前角色无缺陷验证权限".into(),
         ));
     }
-    if actor_user(actor) == defect_reporter_id && !is_admin {
-        return Err(DefectError::PermissionDenied(
-            "验证独立性要求：验证人不能是缺陷报告人".into(),
-        ));
+    let verifier = actor_user(actor);
+    // 独立性基准：优先实际修复者；无修复者记录时回落到报告人（保守）。
+    let forbidden = match defect_fixer_id {
+        Some(fixer) => Some(fixer),
+        None => Some(defect_reporter_id),
+    };
+    if let Some(forbidden) = forbidden {
+        if verifier == forbidden && !is_admin {
+            let basis = if defect_fixer_id.is_some() {
+                "实际修复者"
+            } else {
+                "缺陷报告人（尚无实际修复者记录）"
+            };
+            return Err(DefectError::PermissionDenied(format!(
+                "验证独立性要求：验证人不能是{basis}"
+            )));
+        }
     }
     Ok(())
 }
@@ -799,6 +835,7 @@ impl DefectCommandPort for InMemoryDefectService {
             }).unwrap_or(DefectPriority::Unscheduled),
             status: DefectStatus::Triage,
             reporter_id: cmd.reporter_id,
+            fixer_id: None,
             assignee_id: None,
             environment: cmd.environment,
             labels: cmd.labels,
@@ -893,6 +930,37 @@ impl DefectCommandPort for InMemoryDefectService {
             }
         })?;
 
+        // --- G-25 / INV-SM-03: 关闭前置校验 ---
+        // 进入 closed 必须存在**通过的**独立验证记录，且其 fix_version 与
+        // 缺陷当前 fix_version 匹配。与 PG 路径 (pg_service.rs) 保持同一口径。
+        if cmd.target_status == DefectStatus::Closed {
+            let current_fix = defect.fix_version.as_deref();
+            let verifications = self.verifications.read().unwrap();
+            let latest_passed = verifications
+                .values()
+                .filter(|v| v.defect_id == defect_id && v.result == VerificationResult::Passed)
+                .max_by_key(|v| v.created_at)
+                .map(|v| v.fix_version.as_str());
+            match (current_fix, latest_passed) {
+                (None, _) => {
+                    return Err(DefectError::VerificationMismatch(
+                        "缺陷尚未设定修复版本，无法关闭：请先提交修复并进入待验证。".into(),
+                    ));
+                }
+                (Some(_), None) => {
+                    return Err(DefectError::VerificationMismatch(
+                        "关闭前必须存在通过的独立验证记录。请先提交验证（结果为通过）。".into(),
+                    ));
+                }
+                (Some(current), Some(passed)) if current != passed => {
+                    return Err(DefectError::VerificationMismatch(format!(
+                        "验证记录的修复版本 {passed} 与缺陷当前修复版本 {current} 不一致，无法关闭。"
+                    )));
+                }
+                (Some(_), Some(_)) => {}
+            }
+        }
+
         defect.status = cmd.target_status;
         defect.lifecycle_version += 1;
         defect.updated_at = Utc::now();
@@ -901,6 +969,9 @@ impl DefectCommandPort for InMemoryDefectService {
             DefectStatus::InProgress | DefectStatus::PendingVerify
         ) {
             defect.fix_version = cmd.fix_version.clone();
+            // G-20 / FR-DI-018: 记录**实际修复者** = 本次流转的已验证会话主体。
+            // 服务端取自 ActorContext，不接受客户端指定。
+            defect.fixer_id = Some(actor_user(actor));
         }
         let result = defect.clone();
 
@@ -952,7 +1023,7 @@ impl DefectCommandPort for InMemoryDefectService {
             return Err(DefectError::CrossTenantDenied(defect.tenant_id, actor_tenant(actor)));
         }
         check_project_access(actor, defect.project_id)?;
-        check_defect_verify_capability(actor, defect.reporter_id)?;
+        check_defect_verify_capability(actor, defect.reporter_id, defect.fixer_id)?;
 
         if !matches!(
             defect.status,

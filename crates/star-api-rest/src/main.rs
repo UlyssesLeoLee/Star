@@ -166,11 +166,43 @@ async fn main() -> anyhow::Result<()> {
         .merge(star_api_rest::build_scm_router(scm_state));
     info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
+    // --- G-8: 缺陷 Outbox → 通知 投递 worker ---
+    // 无 PG 时不启动（显式降级，不静默假装在跑）。
+    let defect_relay_handle = match star_api_rest::routes::defects::defect_pg_pool() {
+        Some(defect_pool) => {
+            let relay = std::sync::Arc::new(
+                star_api_rest::defect_outbox::OutboxRelay::new(
+                    defect_pool.clone(),
+                    std::sync::Arc::new(
+                        star_api_rest::defect_outbox::PgDefectInboxStore::new(defect_pool),
+                    ),
+                ),
+            );
+            let (tx, rx) = tokio::sync::watch::channel(false);
+            let handle = tokio::spawn(async move {
+                star_api_rest::defect_outbox::run_relay_worker(relay, rx).await;
+            });
+            info!("defect Outbox relay worker started");
+            Some((tx, handle))
+        }
+        None => {
+            tracing::warn!(
+                "defect Outbox relay worker 未启动 — 未配置 STAR_DEFECT_DATABASE_URL / DATABASE_URL"
+            );
+            None
+        }
+    };
+
     let server_result = bi_task_event_ingestion::serve_until_shutdown(
         axum::serve(listener, app),
         bi_task_event_ingestion.shutdown_signal(),
     )
     .await;
+    // G-8: 关闭投递 worker（在服务停止之后，避免丢在途事件）
+    if let Some((tx, handle)) = defect_relay_handle {
+        let _ = tx.send(true);
+        handle.abort();
+    }
     let shutdown_result = bi_task_event_ingestion.shutdown().await;
     server_result?;
     shutdown_result

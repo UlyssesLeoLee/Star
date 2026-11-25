@@ -111,6 +111,7 @@ const KINDS: WorkItemKind[] = ["story", "task", "bug", "spike", "epic"];
 
 export function WorkItemDetailDrawer({
   open, onClose, projectId, projectKey, tenantId, reporterId, onOpenChildTask,
+  defaultKind, lockKind,
 }: WorkItemDetailDrawerProps) {
   // ---- 读 store ----
   const workItems = useStore((s) => s.workItems);
@@ -203,7 +204,8 @@ export function WorkItemDetailDrawer({
         title: "",
         status: open.defaultStatus,
         priority: "p2",
-        kind: open.defaultKind ?? "task",
+        // per G-13 / DD §3.2.3: prop 级 defaultKind 优先, mode 级兜底
+        kind: defaultKind ?? open.defaultKind ?? "task",
         description: "",
         assignee_id: undefined,
         worktree_id: undefined,
@@ -428,6 +430,8 @@ export function WorkItemDetailDrawer({
 
   const isNew = open.kind === "new";
   const modeBadge = isNew ? "NEW" : currentWi?.key ?? "VIEW";
+  // per G-13 / DD §3.2.3: kind 锁定 (缺陷创建窗口 lockKind=true) — 只读文本, 不可切换
+  const kindLocked = isNew && (lockKind === true || open.lockKind === true);
 
   const drawerContent = (
       <div
@@ -581,14 +585,23 @@ export function WorkItemDetailDrawer({
               onChange={(v) => setDraft({ ...draft, priority: v as WorkItemPriority })}
               testid="work-item-drawer-priority"
             />
-            <FieldSelect
-              label="Kind"
-              icon={<Tag size={10} />}
-              value={draft.kind}
-              options={KINDS.map((k) => ({ value: k, label: k }))}
-              onChange={(v) => setDraft({ ...draft, kind: v as WorkItemKind })}
-              testid="work-item-drawer-kind"
-            />
+            {kindLocked ? (
+              <FieldReadonly
+                label="Kind"
+                icon={<Tag size={10} />}
+                value={draft.kind}
+                testid="work-item-drawer-kind"
+              />
+            ) : (
+              <FieldSelect
+                label="Kind"
+                icon={<Tag size={10} />}
+                value={draft.kind}
+                options={KINDS.map((k) => ({ value: k, label: k }))}
+                onChange={(v) => setDraft({ ...draft, kind: v as WorkItemKind })}
+                testid="work-item-drawer-kind"
+              />
+            )}
           </div>
 
           {/* 3. Assignee (3 段: Person / Agent / Squad) */}
@@ -1066,6 +1079,33 @@ export function WorkItemDetailDrawer({
   );
 
   return createPortal(drawerContent, document.body);
+}
+
+// =====================================================================
+// FieldReadonly — 锁定字段只读展示 (per G-13 / DD §3.2.3: kind 锁定不可切换)
+// =====================================================================
+function FieldReadonly({
+  label, icon, value, testid,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  testid: string;
+}) {
+  return (
+    <div>
+      <label className="text-[9px] font-mono uppercase tracking-wider text-ink-dim block mb-1">
+        {icon} {label}
+      </label>
+      <div
+        data-testid={`${testid}-locked`}
+        data-kind-locked="true"
+        className="w-full text-[11px] bg-bg-soft border border-line rounded pl-2 pr-6 py-1.5 text-ink opacity-60 cursor-not-allowed select-none"
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
 // =====================================================================

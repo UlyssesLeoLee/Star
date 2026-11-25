@@ -174,6 +174,9 @@ pub fn build_supplemental_routers() -> Router {
         .nest("/api/v1/im", routes::im::router())
         .nest("/api/v1/notifications", routes::notifications::router())
         .nest("/api/v1/comments", routes::notifications::comments_router())
+        // ── 缺陷域 (per G-15)：独立 router 自带 JWT 验签 middleware，
+        // 不能并入 legacy mirror（那里只有 auth_layer_stub）。
+        .nest("/api/v1", routes::defects::router())
         // ── F15 G-01 第二批 (2026-11-18): legacy `build_router` 的其余
         // 44 条路由同样从未进生产二进制。全部为自持 state (OnceLock /
         // 内存态) 的无外部依赖 handler, 路径与 group 域 60 条路由零冲突
@@ -212,12 +215,11 @@ fn build_legacy_mirror_routes() -> Router {
         .route("/work-items", post(routes::work_items::create))
         .route("/work-items/{id}", patch(routes::work_items::update))
         .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
-        .route("/defects", post(routes::defects::create_defect))
-        .route("/defects", get(routes::defects::list_defects))
-        .route("/defects/{id}", get(routes::defects::get_defect))
-        .route("/defects/{id}/transition", patch(routes::defects::transition_defect))
-        .route("/defects/{id}/verify", post(routes::defects::submit_verification))
-        .route("/defects/{id}/verifications", get(routes::defects::list_verifications))
+        // 缺陷路由**不在此处直挂 handler**（per G-15）：直挂会绕过
+        // `routes::defects::router()` 自带的 JWT 验签 middleware，
+        // 导致 fail-closed 的 `VerifiedDefectActor` extractor 拿不到
+        // 已验证会话 → 全部 401。改为在 `build_supplemental_routers()`
+        // 里 `.nest("/api/v1", routes::defects::router())` 单独挂载。
         // 4 内核 crate 门面 (ide-collab-core/star-git-core/argo-core/sandtree-core)
         .route("/collab/session", get(routes::integrations::collab_session))
         .route(

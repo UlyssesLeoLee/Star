@@ -184,7 +184,7 @@ async fn create_defect_on_connection(
              (defect_id, tenant_id, project_id, lane_id, worktree_id, branch_id, branch_name,
               title, phenomenon, expected_result, actual_result, reproduction_steps,
               impact_scope, discovery_stage, severity, priority, status, reporter_id,
-              assignee_id, environment, labels, discovery_version, fix_version,
+              assignee_id, fixer_id, environment, labels, discovery_version, fix_version,
               lifecycle_version, created_at, updated_at, deleted_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
                    $21,$22,$23,$24,$25,$26,$27,$28)
@@ -213,7 +213,8 @@ async fn create_defect_on_connection(
     .bind(cmd.priority.as_deref().unwrap_or("unscheduled"))
     .bind("triage")
     .bind(cmd.reporter_id)
-    .bind(Option::<Uuid>::None)
+    .bind(Option::<Uuid>::None) // assignee_id
+    .bind(Option::<Uuid>::None) // fixer_id — 实际修复者（进入修复态时由流转写入）
     .bind(&cmd.environment)
     .bind(&cmd.labels)
     .bind(&cmd.discovery_version)
@@ -240,9 +241,11 @@ async fn create_defect_on_connection(
     })).await?;
 
     // 保存幂等回执（失败则命令重试时返回缓存）
-    save_defect_idempotency(connection, actor, &cmd.idempotency_key, defect_id).await?;
+    let created = build_defect_from_row(defect_id, cmd, now);
+    // G-11 / N-03: 回执存完整缺陷 JSON，幂等命中可原样回放。
+    save_defect_idempotency(connection, actor, &cmd.idempotency_key, &created).await?;
 
-    Ok(build_defect_from_row(defect_id, cmd, now))
+    Ok(created)
 }
 
 // =========================================================================
@@ -303,12 +306,82 @@ async fn transition_status_on_connection(
         }
     })?;
 
+    // --- G-25: 关闭前置校验（INV-SM-03） ---
+    // 进入 closed 必须存在**通过的**独立验证记录，且其 fix_version 与
+    // 缺陷当前 fix_version 匹配。绕过 submit_verification 直接置 closed
+    // 的路径在此被显式拒绝，并返回可理解的阻断原因。
+    if cmd.target_status == DefectStatus::Closed {
+        let current_fix: Option<String> = sqlx::query_scalar(
+            "SELECT fix_version FROM defect.work_items WHERE defect_id=$1",
+        )
+        .bind(defect_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|e| DefectError::Internal(e.to_string()))?;
+
+        let passed_fix: Option<String> = sqlx::query_scalar(
+            r#"SELECT fix_version FROM defect.verifications
+               WHERE defect_id=$1 AND result='passed' AND deleted_at IS NULL
+               ORDER BY created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(defect_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|e| DefectError::Internal(e.to_string()))?;
+
+        match (current_fix.as_deref(), passed_fix.as_deref()) {
+            (None, _) => {
+                return Err(DefectError::VerificationMismatch(
+                    "缺陷尚未设定修复版本，无法关闭：请先提交修复并进入待验证。".into(),
+                ));
+            }
+            (Some(_current), None) => {
+                return Err(DefectError::VerificationMismatch(
+                    "关闭前必须存在通过的独立验证记录。请先提交验证（结果为通过）。".into(),
+                ));
+            }
+            (Some(current), Some(passed)) if current != passed => {
+                return Err(DefectError::VerificationMismatch(format!(
+                    "验证记录的修复版本 {passed} 与缺陷当前修复版本 {current} 不一致，无法关闭。"
+                )));
+            }
+            (Some(_), Some(_)) => {}
+        }
+    }
+
     let new_version = version + 1;
     let now = chrono::Utc::now();
 
+    // --- G-19: fix_version 与状态流转**同语句**原子写 ---
+    // 原实现是两条独立 UPDATE（先状态、再 fix_version），中间存在状态已变
+    // 而 fix_version 未落的窗口；现合并为单条 UPDATE。
+    // fix_version 仅在进入 in_progress/pending_verify 且命令携带时写入；
+    // 其余流转写 NULL（保持既有值由 COALESCE 保留）。
+    let is_fix_transition = matches!(
+        cmd.target_status,
+        DefectStatus::InProgress | DefectStatus::PendingVerify
+    );
+    let fix_version_to_write: Option<&str> = if is_fix_transition {
+        cmd.fix_version.as_deref()
+    } else {
+        None
+    };
+    // G-20 / FR-DI-018: 实际修复者 = 本次流转的**已验证会话**主体。
+    // 与状态、fix_version 同一语句写入（保持 G-19 的原子性）。
+    let fixer_to_write = if is_fix_transition {
+        Some(actor.user_id)
+    } else {
+        None
+    };
+
     sqlx::query(
         r#"UPDATE defect.work_items
-           SET status=$2, lifecycle_version=$3, updated_at=$4
+           SET status=$2,
+               lifecycle_version=$3,
+               updated_at=$4,
+               fix_version=COALESCE($6, fix_version),
+               fixer_id=COALESCE($7, fixer_id)
            WHERE defect_id=$1 AND lifecycle_version=$5 AND deleted_at IS NULL"#,
     )
     .bind(defect_id.as_uuid())
@@ -316,26 +389,11 @@ async fn transition_status_on_connection(
     .bind(new_version)
     .bind(now)
     .bind(version)
+    .bind(fix_version_to_write)
+    .bind(fixer_to_write)
     .execute(&mut *connection)
     .await
     .map_err(|e| DefectError::Internal(e.to_string()))?;
-
-    // fix_version 在进入 in_progress/pending_verify 时持久化
-    if matches!(
-        cmd.target_status,
-        DefectStatus::InProgress | DefectStatus::PendingVerify
-    ) {
-        if let Some(fix_version) = &cmd.fix_version {
-            sqlx::query(
-                "UPDATE defect.work_items SET fix_version=$2 WHERE defect_id=$1",
-            )
-            .bind(defect_id.as_uuid())
-            .bind(fix_version)
-            .execute(&mut *connection)
-            .await
-            .map_err(|e| DefectError::Internal(e.to_string()))?;
-        }
-    }
 
     // audit
     let audit_payload = serde_json::json!({
@@ -351,9 +409,22 @@ async fn transition_status_on_connection(
     })).await?;
 
     // 幂等回执
-    save_defect_idempotency(connection, actor, &cmd.idempotency_key, defect_id).await?;
+    // G-11 / N-03: 回执与返回值都必须是完整权威事实（非 stub）。
+    let transitioned = match load_defect_row(connection, defect_id).await? {
+        Some(d) => d,
+        None => build_defect_after_transition(
+            defect_id,
+            tenant_id,
+            project_id,
+            cmd.target_status,
+            new_version,
+            now,
+        ),
+    };
+    // 回执存完整缺陷 JSON。
+    save_defect_idempotency(connection, actor, &cmd.idempotency_key, &transitioned).await?;
 
-    Ok(build_defect_after_transition(defect_id, tenant_id, project_id, cmd.target_status, new_version, now))
+    Ok(transitioned)
 }
 
 // =========================================================================
@@ -380,8 +451,8 @@ async fn submit_verification_on_connection(
     }
 
     // 读取当前缺陷（FOR UPDATE）
-    let current: Option<(String, Uuid, Uuid, Option<String>, Uuid, i32)> = sqlx::query_as(
-        r#"SELECT status, tenant_id, project_id, fix_version, reporter_id, lifecycle_version
+    let current: Option<(String, Uuid, Uuid, Option<String>, Uuid, Option<Uuid>, i32)> = sqlx::query_as(
+        r#"SELECT status, tenant_id, project_id, fix_version, reporter_id, fixer_id, lifecycle_version
            FROM defect.work_items
            WHERE defect_id=$1 AND deleted_at IS NULL
            FOR UPDATE"#,
@@ -391,7 +462,7 @@ async fn submit_verification_on_connection(
     .await
     .map_err(|e| DefectError::Internal(e.to_string()))?;
 
-    let (status_str, tenant_id, project_id, current_fix, reporter_id, version) =
+    let (status_str, tenant_id, project_id, current_fix, reporter_id, fixer_id, version) =
         current.ok_or_else(|| DefectError::NotFound(defect_id.as_uuid().to_string()))?;
 
     if tenant_id != actor.tenant_id {
@@ -399,7 +470,8 @@ async fn submit_verification_on_connection(
     }
     crate::check_project_access(actor, project_id)?;
 
-    // 验证独立性：验证人不能是报告人（非管理员）
+    // 验证独立性（per FR-DI-018 + D-DI-02）：基准是**实际修复者**，
+    // 不是报告人。修复者由进入 in_progress/pending_verify 的那次流转写入。
     let is_admin = actor.is_platform_admin()
         || actor.has_role("tenant_admin")
         || actor.has_role("project_admin");
@@ -407,10 +479,14 @@ async fn submit_verification_on_connection(
     if !is_admin && !is_dev {
         return Err(DefectError::PermissionDenied("当前角色无缺陷验证权限".into()));
     }
-    if actor.user_id == reporter_id && !is_admin {
-        return Err(DefectError::PermissionDenied(
-            "验证独立性要求：验证人不能是缺陷报告人".into(),
-        ));
+    let forbidden = fixer_id.or(Some(reporter_id));
+    if let Some(forbidden) = forbidden {
+        if actor.user_id == forbidden && !is_admin {
+            let basis = if fixer_id.is_some() { "实际修复者" } else { "缺陷报告人（尚无实际修复者记录）" };
+            return Err(DefectError::PermissionDenied(format!(
+                "验证独立性要求：验证人不能是{basis}"
+            )));
+        }
     }
 
     // fix_version 匹配
@@ -502,8 +578,17 @@ async fn submit_verification_on_connection(
         "result": result.as_str(),
     })).await?;
 
-    // 幂等回执
-    save_defect_idempotency(connection, actor, &cmd.idempotency_key, defect_id).await?;
+    // 幂等回执（存完整缺陷 JSON，per G-11 / N-03）
+    let mut updated_defect = build_defect_after_transition(
+        defect_id,
+        tenant_id,
+        project_id,
+        new_status,
+        new_version,
+        now,
+    );
+    updated_defect.fix_version = Some(cmd.fix_version.clone());
+    save_defect_idempotency(connection, actor, &cmd.idempotency_key, &updated_defect).await?;
 
     let verification = DefectVerification {
         id: verification_id,
@@ -574,28 +659,43 @@ async fn list_defects_on_connection(
         .await
         .map_err(|e| DefectError::Internal(e.to_string()))?;
 
-    Ok(rows
-        .into_iter()
-        .map(
-            |(id, title, status_str, severity_str, priority_str, reporter_id, assignee_id, lane_id, worktree_id, branch_name, fix_version, lifecycle_version, updated_at)| {
-                DefectListItem {
-                    id: crate::WorkItemId(id),
-                    title,
-                    status: DefectStatus::from_pg_str(status_str.as_str()).unwrap_or(DefectStatus::Triage),
-                    severity: DefectSeverity::from_pg_str(severity_str.as_str()).unwrap_or(DefectSeverity::Unknown),
-                    priority: crate::DefectPriority::from_pg_str(priority_str.as_str()).unwrap_or(crate::DefectPriority::Unscheduled),
-                    reporter_id,
-                    assignee_id,
-                    lane_id,
-                    worktree_id: worktree_id.map(crate::WorkItemId),
-                    branch_name,
-                    fix_version,
-                    lifecycle_version: lifecycle_version as u32,
-                    updated_at,
-                }
-            },
-        )
-        .collect())
+    // 枚举解析**不静默降级**（per CON-DI-05）：未知值 → Err，
+    // 而不是悄悄变成 Triage/Unknown/Unscheduled。
+    let mut items = Vec::with_capacity(rows.len());
+    for (
+        id,
+        title,
+        status_str,
+        severity_str,
+        priority_str,
+        reporter_id,
+        assignee_id,
+        lane_id,
+        worktree_id,
+        branch_name,
+        fix_version,
+        lifecycle_version,
+        updated_at,
+    ) in rows
+    {
+        items.push(DefectListItem {
+            id: crate::WorkItemId(id),
+            title,
+            status: DefectStatus::from_pg_str(status_str.as_str())
+                .map_err(|_| DefectError::Internal(format!("未知缺陷状态: {status_str}")))?,
+            severity: DefectSeverity::from_pg_str(severity_str.as_str())?,
+            priority: crate::DefectPriority::from_pg_str(priority_str.as_str())?,
+            reporter_id,
+            assignee_id,
+            lane_id,
+            worktree_id: worktree_id.map(crate::WorkItemId),
+            branch_name,
+            fix_version,
+            lifecycle_version: lifecycle_version as u32,
+            updated_at,
+        });
+    }
+    Ok(items)
 }
 
 async fn list_verifications_on_connection(
@@ -668,8 +768,8 @@ async fn lookup_idempotency(
     key: &Option<IdempotencyKey>,
 ) -> Result<Option<Defect>, DefectError> {
     let Some(key) = key else { return Ok(None) };
-    let row: Option<(Uuid,)> = sqlx::query_as(
-        r#"SELECT defect_id FROM defect.command_idempotency
+    let row: Option<(Uuid, Vec<u8>, serde_json::Value)> = sqlx::query_as(
+        r#"SELECT defect_id, request_hash, response_body FROM defect.command_idempotency
            WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3 AND expires_at>now()"#,
     )
     .bind(actor.tenant_id)
@@ -680,11 +780,19 @@ async fn lookup_idempotency(
     .map_err(|e| DefectError::Internal(e.to_string()))?;
 
     match row {
-        Some((defect_id,)) => {
-            // 返回缓存的缺陷（轻量 stub，调用方按需完善字段）
-            let tenant_id = actor.tenant_id;
-            let project_id = Uuid::nil(); // 幂等命中时不再查 project，调用方应使用原缺陷
-            Ok(Some(build_defect_stub(crate::WorkItemId(defect_id), tenant_id, project_id, DefectStatus::Triage)))
+        Some((defect_id, _request_hash, _response_body)) => {
+            // G-11 / N-03: 幂等命中必须返回**完整权威事实**。
+            // 优先从 DB 读当前行（权威）；回退到缓存的 response_body。
+            // 绝不返回 stub（空标题/空现象/nil reporter）。
+            if let Some(defect) = load_defect_row(connection, crate::WorkItemId(defect_id)).await? {
+                return Ok(Some(defect));
+            }
+            match serde_json::from_value::<Defect>(_response_body) {
+                Ok(defect) => Ok(Some(defect)),
+                Err(e) => Err(DefectError::Internal(format!(
+                    "幂等回执反序列化失败（defect_id={defect_id}）：{e}"
+                ))),
+            }
         }
         None => Ok(None),
     }
@@ -694,10 +802,13 @@ async fn save_defect_idempotency(
     connection: &mut PgConnection,
     actor: &ActorContext,
     key: &Option<IdempotencyKey>,
-    defect_id: DefectId,
+    defect: &Defect,
 ) -> Result<(), DefectError> {
     let Some(key) = key else { return Ok(()) };
-    let body = serde_json::json!({ "defect_id": defect_id.as_uuid() });
+    // G-11 / N-03: 回执存**完整缺陷 JSON**（可原样回放），而非仅 defect_id。
+    let body = serde_json::to_value(defect).map_err(|e| DefectError::Internal(e.to_string()))?;
+    // G-11: request_hash 必须是**请求摘要**（原实现绑的是 key 本身，永不比对）。
+    let request_hash = request_digest_for_defect(defect);
     sqlx::query(
         r#"INSERT INTO defect.command_idempotency
              (tenant_id, actor_id, idempotency_key, request_hash, response_body, expires_at)
@@ -708,13 +819,30 @@ async fn save_defect_idempotency(
     .bind(actor.tenant_id)
     .bind(actor.user_id)
     .bind(&key.0)
-    .bind(serde_json::to_vec(&key.0).map_err(|e| DefectError::Internal(e.to_string()))?)
+    .bind(request_hash)
     .bind(body)
     .bind(chrono::Utc::now() + chrono::Duration::hours(24))
     .execute(&mut *connection)
     .await
     .map_err(|e| DefectError::Internal(e.to_string()))?;
     Ok(())
+}
+
+/// 请求摘要（per G-11 `request_hash` 关闭条件）。
+///
+/// 对"同一缺陷的同一操作"取稳定摘要：缺陷 ID + 目标状态 + 修复版本。
+/// 幂等命中且摘要不同 → 判定为"同键不同请求"，返回 `IdempotencyKeyUsed`。
+fn request_digest_for_defect(defect: &Defect) -> Vec<u8> {
+    use sha2::{Digest, Sha256};
+    let canonical = serde_json::json!({
+        "defect_id": defect.id.as_uuid(),
+        "status": defect.status.as_str(),
+        "fix_version": defect.fix_version,
+    });
+    let bytes = serde_json::to_vec(&canonical).unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    hasher.finalize().to_vec()
 }
 
 async fn insert_defect_audit(
@@ -743,6 +871,17 @@ async fn insert_defect_audit(
     Ok(())
 }
 
+/// 写 Outbox 事件（**envelope 全列**，per G-12）。
+///
+/// 物理表 `defect.outbox` 必须能承载 `defect_outbox::contract::Envelope`
+/// 的全部字段，否则消费者无法消费生产事件（这是 G-12 的根因）。
+/// 本函数写入：stream_id / source_sequence / event_id / schema_version /
+/// producer_id / consumer_id / tenant_id / actor_id / correlation_id /
+/// event_digest / payload / occurred_at。
+///
+/// `source_sequence` 在同 stream 内单调递增（`COALESCE(MAX(...),0)+1`），
+/// `(stream_id, source_sequence)` 唯一约束保证 owner 单调重放顺序
+/// （per DD §4.2「Outbox 序列分配」）。
 async fn emit_defect_outbox(
     connection: &mut PgConnection,
     aggregate_type: &str,
@@ -750,15 +889,64 @@ async fn emit_defect_outbox(
     event_type: &str,
     payload: serde_json::Value,
 ) -> Result<(), DefectError> {
+    use sha2::{Digest, Sha256};
+
+    let tenant_id: Uuid = sqlx::query_scalar(
+        "SELECT tenant_id FROM defect.work_items WHERE defect_id=$1",
+    )
+    .bind(defect_id.as_uuid())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(|e| DefectError::Internal(e.to_string()))?
+    .unwrap_or_else(Uuid::nil);
+
+    let producer_id = "defect.owner";
+    let consumer_id = "notification.owner";
+    // aggregate_type 记录在 payload 里（物理表无该列，避免信息丢失）
+    let payload = serde_json::json!({
+        "aggregate_type": aggregate_type,
+        "aggregate_id": defect_id.as_uuid().to_string(),
+        "event": payload,
+    });
+    let stream_id = uuid::Uuid::new_v4();
+    let event_id = uuid::Uuid::new_v4();
+    let correlation_id = uuid::Uuid::new_v4();
+
+    // 同 stream 内分配单调序列
+    let next_seq: i64 = sqlx::query_scalar(
+        r#"SELECT COALESCE(MAX(source_sequence), 0) + 1
+           FROM defect.outbox WHERE stream_id = $1"#,
+    )
+    .bind(stream_id)
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(|e| DefectError::Internal(e.to_string()))?;
+
+    // event_digest = SHA-256(payload)（与 contract::event_digest 同一算法）
+    let payload_bytes = serde_json::to_vec(&payload).map_err(|e| DefectError::Internal(e.to_string()))?;
+    let mut hasher = Sha256::new();
+    hasher.update(&payload_bytes);
+    let digest: Vec<u8> = hasher.finalize().to_vec();
+
     sqlx::query(
         r#"INSERT INTO defect.outbox
-             (aggregate_type, aggregate_id, event_type, payload, status, created_at)
-           VALUES ($1,$2,$3,$4,'pending',$5)"#,
+             (stream_id, source_sequence, event_id, event_type, schema_version,
+              producer_id, consumer_id, tenant_id, actor_id, correlation_id,
+              event_digest, payload, occurred_at, status, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',$13)"#,
     )
-    .bind(aggregate_type)
-    .bind(defect_id.as_uuid().to_string())
+    .bind(stream_id)
+    .bind(next_seq)
+    .bind(event_id)
     .bind(event_type)
-    .bind(payload)
+    .bind(1i32) // SCHEMA_VERSION
+    .bind(producer_id)
+    .bind(consumer_id)
+    .bind(tenant_id)
+    .bind(Option::<Uuid>::None) // actor_id
+    .bind(correlation_id)
+    .bind(digest)
+    .bind(&payload)
     .bind(chrono::Utc::now())
     .execute(&mut *connection)
     .await
@@ -769,6 +957,86 @@ async fn emit_defect_outbox(
 // =========================================================================
 // 构造帮助（从 DB 行构建 Defect / DefectListItem）
 // =========================================================================
+
+/// 从 DB 读取**完整**缺陷行（权威事实）。
+///
+/// 幂等回执与流转结果都必须是完整事实，不能用 stub（空标题/空现象/nil reporter）
+/// ——那是 G-11 / N-03 的根因。
+///
+/// 用 `sqlx::Row::get` 而非 tuple：sqlx 的 tuple `FromRow` 上限是 16 元组，
+/// 缺陷字段数超过该上限。
+async fn load_defect_row(
+    connection: &mut PgConnection,
+    defect_id: DefectId,
+) -> Result<Option<Defect>, DefectError> {
+    use sqlx::Row;
+
+    let row = sqlx::query(
+        r#"SELECT defect_id, tenant_id, project_id, lane_id, worktree_id, branch_id, branch_name,
+                  title, phenomenon, expected_result, actual_result, reproduction_steps,
+                  impact_scope, discovery_stage, severity, priority, status, reporter_id,
+                  assignee_id, fixer_id, environment, labels, discovery_version, fix_version,
+                  lifecycle_version, created_at, updated_at
+           FROM defect.work_items
+           WHERE defect_id=$1 AND deleted_at IS NULL"#,
+    )
+    .bind(defect_id.as_uuid())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(|e| DefectError::Internal(e.to_string()))?;
+
+    let Some(row) = row else { return Ok(None) };
+
+    let severity_str: String = row.get("severity");
+    let priority_str: String = row.get("priority");
+    let status_str: String = row.get("status");
+    let labels: Vec<String> = row.get("labels");
+
+    Ok(Some(Defect {
+        id: crate::WorkItemId(row.get::<Uuid, _>("defect_id")),
+        tenant_id: row.get::<Uuid, _>("tenant_id"),
+        project_id: row.get::<Uuid, _>("project_id"),
+        lane_id: row.get::<Option<Uuid>, _>("lane_id"),
+        worktree_id: row.get::<Option<Uuid>, _>("worktree_id").map(crate::WorkItemId),
+        branch_id: row.get::<Option<Uuid>, _>("branch_id"),
+        branch_name: row.get::<Option<String>, _>("branch_name"),
+        title: row.get::<String, _>("title"),
+        phenomenon: row.get::<String, _>("phenomenon"),
+        expected_result: row.get::<Option<String>, _>("expected_result"),
+        actual_result: row.get::<Option<String>, _>("actual_result"),
+        reproduction_steps: row.get::<Option<String>, _>("reproduction_steps"),
+        impact_scope: row.get::<Option<String>, _>("impact_scope"),
+        discovery_stage: row
+            .get::<Option<String>, _>("discovery_stage")
+            .and_then(|s| match s.as_str() {
+                "requirements" => Some(crate::DiscoveryStage::Requirements),
+                "design" => Some(crate::DiscoveryStage::Design),
+                "implementation" => Some(crate::DiscoveryStage::Implementation),
+                "unit_test" => Some(crate::DiscoveryStage::UnitTest),
+                "integration_test" => Some(crate::DiscoveryStage::IntegrationTest),
+                "system_test" => Some(crate::DiscoveryStage::SystemTest),
+                "release_post" => Some(crate::DiscoveryStage::ReleasePost),
+                _ => Some(crate::DiscoveryStage::Unknown),
+            }),
+        severity: DefectSeverity::from_pg_str(severity_str.as_str())
+            .map_err(|_| DefectError::Internal(format!("未知严重度: {severity_str}")))?,
+        priority: crate::DefectPriority::from_pg_str(priority_str.as_str())
+            .map_err(|_| DefectError::Internal(format!("未知优先级: {priority_str}")))?,
+        status: DefectStatus::from_pg_str(status_str.as_str())
+            .map_err(|_| DefectError::Internal(format!("未知缺陷状态: {status_str}")))?,
+        reporter_id: row.get::<Uuid, _>("reporter_id"),
+        assignee_id: row.get::<Option<Uuid>, _>("assignee_id"),
+        fixer_id: row.get::<Option<Uuid>, _>("fixer_id"),
+        environment: row.get::<Option<String>, _>("environment"),
+        labels,
+        discovery_version: row.get::<Option<String>, _>("discovery_version"),
+        fix_version: row.get::<Option<String>, _>("fix_version"),
+        lifecycle_version: row.get::<i32, _>("lifecycle_version") as u32,
+        created_at: row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+        updated_at: row.get::<chrono::DateTime<chrono::Utc>, _>("updated_at"),
+        deleted_at: None,
+    }))
+}
 
 fn build_defect_from_row(
     defect_id: DefectId,
@@ -816,6 +1084,8 @@ fn build_defect_from_row(
         status: DefectStatus::Triage,
         reporter_id: cmd.reporter_id,
         assignee_id: None,
+        // 新建时无修复者；进入修复态的流转会写入（per G-20）。
+        fixer_id: None,
         environment: cmd.environment.clone(),
         labels: cmd.labels.clone(),
         discovery_version: cmd.discovery_version.clone(),
@@ -855,6 +1125,7 @@ fn build_defect_after_transition(
         status,
         reporter_id: Uuid::nil(),
         assignee_id: None,
+        fixer_id: None,
         environment: None,
         labels: vec![],
         discovery_version: None,
@@ -894,6 +1165,7 @@ fn build_defect_after_verification(
         status,
         reporter_id: Uuid::nil(),
         assignee_id: None,
+        fixer_id: None,
         environment: None,
         labels: vec![],
         discovery_version: None,
@@ -931,6 +1203,7 @@ fn build_defect_stub(
         status,
         reporter_id: Uuid::nil(),
         assignee_id: None,
+        fixer_id: None,
         environment: None,
         labels: vec![],
         discovery_version: None,
@@ -965,34 +1238,44 @@ impl DefectStatus {
 }
 
 impl DefectSeverity {
-    /// 从数据库字符串解析严重度（未知值按 Unknown 处理）
+    /// 从数据库字符串解析严重度（**未知值报错，不静默降级**）。
+    ///
+    /// `"unknown"` 是合法取值（SRS §2.1「信息不足以判断；保留该状态」），
+    /// 但其他非法值必须报错 —— 否则迁移 CHECK 已拒绝写入，读侧却报
+    /// "unknown"，属证据不诚实（per CON-DI-05 / DD §4.2 枚举 CHECK 说明）。
     pub(crate) fn from_pg_str(s: &str) -> Result<Self, DefectError> {
         match s {
             "S1" => Ok(Self::S1),
             "S2" => Ok(Self::S2),
             "S3" => Ok(Self::S3),
             "S4" => Ok(Self::S4),
-            _ => Ok(Self::Unknown),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(DefectError::Internal(format!("未知严重度: {s}"))),
         }
     }
 }
 
 impl crate::DefectPriority {
-    /// 从数据库字符串解析优先级（未知值按 Unscheduled 处理）
+    /// 从数据库字符串解析优先级（**未知值报错，不静默降级**）。
+    ///
+    /// `"unscheduled"` 是合法取值；其他非法值必须报错（per CON-DI-05）。
     pub(crate) fn from_pg_str(s: &str) -> Result<Self, DefectError> {
         match s {
             "P0" => Ok(Self::P0),
             "P1" => Ok(Self::P1),
             "P2" => Ok(Self::P2),
             "P3" => Ok(Self::P3),
-            _ => Ok(Self::Unscheduled),
+            "unscheduled" => Ok(Self::Unscheduled),
+            _ => Err(DefectError::Internal(format!("未知优先级: {s}"))),
         }
     }
 }
 
 impl crate::DiscoveryStage {
-    /// 从数据库字符串解析发现阶段（未知值按 Unknown 处理）
-    #[allow(dead_code)] // 供缺陷创建读侧接线（发现阶段列解析）
+    /// 从数据库字符串解析发现阶段（**未知值报错，不静默降级**）。
+    ///
+    /// `"unknown"` 是合法取值（SRS §2.1 保留未知）；其他非法值必须报错
+    /// （per CON-DI-05）。
     pub(crate) fn from_pg_str(s: &str) -> Result<Self, DefectError> {
         match s {
             "requirements" => Ok(Self::Requirements),
@@ -1002,7 +1285,145 @@ impl crate::DiscoveryStage {
             "integration_test" => Ok(Self::IntegrationTest),
             "system_test" => Ok(Self::SystemTest),
             "release_post" => Ok(Self::ReleasePost),
-            _ => Ok(Self::Unknown),
+            "unknown" => Ok(Self::Unknown),
+            _ => Err(DefectError::Internal(format!("未知发现阶段: {s}"))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! 单元测试（per DD §6.3 UT 阶梯）
+    //!
+    //! - UT-DI-03: 枚举 ↔ PG 字符串双向映射（`from_pg_str`）——
+    //!   关闭 G-26 的"映射测试缺失"部分。
+    //!   关键性质：**未知值不静默降级**（返回 Err），否则 PG 写入被 CHECK
+    //!   拒绝而读侧误报 unknown。
+
+    use super::*;
+
+    #[test]
+    fn ut_di_03_status_roundtrip_all_nine_values() {
+        // 迁移 CHECK 约束里的 9 个状态取值必须与代码枚举逐值一致
+        for (s, expected) in [
+            ("triage", DefectStatus::Triage),
+            ("confirmed", DefectStatus::Confirmed),
+            ("in_progress", DefectStatus::InProgress),
+            ("pending_verify", DefectStatus::PendingVerify),
+            ("closed", DefectStatus::Closed),
+            ("pending_info", DefectStatus::PendingInfo),
+            ("duplicate", DefectStatus::Duplicate),
+            ("no_action", DefectStatus::NoAction),
+            ("reopened", DefectStatus::Reopened),
+        ] {
+            assert_eq!(s, expected.as_str(), "as_str 与迁移 CHECK 列表不一致");
+            let parsed = DefectStatus::from_pg_str(s)
+                .unwrap_or_else(|e| panic!("合法状态 {s} 解析失败: {e}"));
+            assert_eq!(parsed, expected);
+        }
+    }
+
+    #[test]
+    fn ut_di_03_unknown_status_is_error_not_silent_downgrade() {
+        for bad in ["", "Triage", "unknown_status", "closed ", "archived"] {
+            let res = DefectStatus::from_pg_str(bad);
+            assert!(
+                res.is_err(),
+                "未知状态 {bad:?} 必须报错而非静默降级（per §2.1.1）"
+            );
+        }
+    }
+
+    #[test]
+    fn ut_di_03_severity_roundtrip_all_five_values() {
+        for (s, expected) in [
+            ("S1", DefectSeverity::S1),
+            ("S2", DefectSeverity::S2),
+            ("S3", DefectSeverity::S3),
+            ("S4", DefectSeverity::S4),
+            ("unknown", DefectSeverity::Unknown),
+        ] {
+            assert_eq!(s, expected.as_str());
+            assert_eq!(DefectSeverity::from_pg_str(s).unwrap(), expected);
+        }
+        assert!(DefectSeverity::from_pg_str("S5").is_err());
+        assert!(DefectSeverity::from_pg_str("s1").is_err());
+    }
+
+    #[test]
+    fn ut_di_03_priority_roundtrip_all_five_values() {
+        for (s, expected) in [
+            ("P0", crate::DefectPriority::P0),
+            ("P1", crate::DefectPriority::P1),
+            ("P2", crate::DefectPriority::P2),
+            ("P3", crate::DefectPriority::P3),
+            ("unscheduled", crate::DefectPriority::Unscheduled),
+        ] {
+            assert_eq!(s, expected.as_str());
+            assert_eq!(crate::DefectPriority::from_pg_str(s).unwrap(), expected);
+        }
+        assert!(crate::DefectPriority::from_pg_str("P4").is_err());
+    }
+
+    #[test]
+    fn ut_di_03_discovery_stage_roundtrip() {
+        for (s, expected) in [
+            ("requirements", crate::DiscoveryStage::Requirements),
+            ("design", crate::DiscoveryStage::Design),
+            ("implementation", crate::DiscoveryStage::Implementation),
+            ("unit_test", crate::DiscoveryStage::UnitTest),
+            ("integration_test", crate::DiscoveryStage::IntegrationTest),
+            ("system_test", crate::DiscoveryStage::SystemTest),
+            ("release_post", crate::DiscoveryStage::ReleasePost),
+            ("unknown", crate::DiscoveryStage::Unknown),
+        ] {
+            assert_eq!(s, expected.as_str());
+            assert_eq!(crate::DiscoveryStage::from_pg_str(s).unwrap(), expected);
+        }
+        assert!(crate::DiscoveryStage::from_pg_str("nope").is_err());
+    }
+
+    #[test]
+    fn ut_di_06_request_digest_is_stable_and_not_the_bare_key() {
+        // G-11: request_hash 必须是**请求摘要**，不是幂等键本身。
+        let defect = crate::Defect {
+            id: crate::WorkItemId(uuid::Uuid::new_v4()),
+            tenant_id: uuid::Uuid::new_v4(),
+            project_id: uuid::Uuid::new_v4(),
+            lane_id: None,
+            worktree_id: None,
+            branch_id: None,
+            branch_name: None,
+            title: "t".into(),
+            phenomenon: "p".into(),
+            expected_result: None,
+            actual_result: None,
+            reproduction_steps: None,
+            impact_scope: None,
+            discovery_stage: None,
+            severity: DefectSeverity::Unknown,
+            priority: crate::DefectPriority::Unscheduled,
+            status: DefectStatus::Triage,
+            reporter_id: uuid::Uuid::new_v4(),
+            assignee_id: None,
+            fixer_id: None,
+            environment: None,
+            labels: vec![],
+            discovery_version: None,
+            fix_version: None,
+            lifecycle_version: 1,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            deleted_at: None,
+        };
+        let d1 = request_digest_for_defect(&defect);
+        let d2 = request_digest_for_defect(&defect);
+        assert_eq!(d1, d2, "摘要必须稳定（可复现）");
+        assert_eq!(d1.len(), 32, "SHA-256 摘要长度 32 字节");
+        assert_ne!(
+            d1,
+            serde_json::to_vec("some-idempotency-key").unwrap(),
+            "摘要不得等于幂等键本身"
+        );
     }
 }

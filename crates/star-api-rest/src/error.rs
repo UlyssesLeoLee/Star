@@ -911,6 +911,9 @@ impl IntoResponse for RestError {
                 StatusCode::FORBIDDEN
             }
             "RUNTIME_PERMISSION_DENIED" | "RUNTIME_CROSS_TENANT_DENIED" => StatusCode::FORBIDDEN,
+            // 缺陷域 (per DD §2.1.1 + G-18): 跨租户/跨 Project 属"被拒绝范围" → 403，
+            // 与 401（会话能力失效）严格区分 (per SRS §5.2)。
+            "CROSS_TENANT_DENIED" | "CROSS_PROJECT_DENIED" => StatusCode::FORBIDDEN,
             "WORKTREE_CONFLICT"
             | "INTEGRATION_CONFLICT"
             | "COMMENT_CONFLICT"
@@ -930,6 +933,9 @@ impl IntoResponse for RestError {
             | "PROJECT_CONFLICT"
             | "PROJECT_SLUG_EXISTS"
             | "RUNTIME_CONFLICT" => StatusCode::CONFLICT,
+            // 缺陷域 (per G-18): 非法状态流转 = 当前状态与目标状态冲突；
+            // 幂等键复用（同键不同请求）= 与既有命令冲突。两者都是 409。
+            "INVALID_STATE_TRANSITION" | "IDEMPOTENCY_KEY_USED" => StatusCode::CONFLICT,
             "BATCH_NODE_TIMEOUT" => StatusCode::REQUEST_TIMEOUT,
             "BATCH_ENGINE_OVERLOADED" => StatusCode::SERVICE_UNAVAILABLE,
             "FB_INVALID_STATE_TRANSITION"
@@ -954,6 +960,9 @@ impl IntoResponse for RestError {
             | "PERMISSION_INVALID_RULE"
             | "PROJECT_INVALID_STATE"
             | "RUNTIME_INVALID_STATE" => StatusCode::UNPROCESSABLE_ENTITY,
+            // 缺陷域 (per G-18): 验证的 fix_version 与缺陷当前修复版本不匹配 —— 
+            // 语义可解析但内容不满足 → 422 (区别于 409 的状态冲突)。
+            "VERIFICATION_MISMATCH" => StatusCode::UNPROCESSABLE_ENTITY,
             "INTERNAL"
             | "BATCH_NODE_EXECUTION_FAILED"
             | "BATCH_WORKER_LEASE_LOST"

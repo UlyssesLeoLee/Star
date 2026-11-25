@@ -9,7 +9,9 @@ MERGE (relay:Symbol {id:"crates/star-api-rest/src/defect_outbox/relay.rs::module
 MERGE (self)-[:DEFINES]->(module)
 MERGE (module)-[:CONTAINS]->(contract),(module)-[:CONTAINS]->(consumer),(module)-[:CONTAINS]->(relay)
 MERGE (self)-[:CREATES]->(:Table {name:"defect.outbox",kind:"table"})
-MERGE (self)-[:CREATES]->(:Table {name:"defect.outbox_checkpoint",kind:"table"})
+MERGE (self)-[:CREATES]->(:Table {name:"defect.notification_inbox",kind:"table"})
+MERGE (self)-[:CREATES]->(:Table {name:"defect.notification_inbox_cursor",kind:"table"})
+MERGE (self)-[:CREATES]->(:Table {name:"defect.notification_inbox_incident",kind:"table"})
 MERGE (self)-[:CREATES]->(:Table {name:"defect.notification_projection",kind:"table"})
 @cypher
 */
@@ -28,8 +30,11 @@ MERGE (self)-[:CREATES]->(:Table {name:"defect.notification_projection",kind:"ta
 //!   drain-before-profile-switch discipline.
 //!
 //! Delivery semantics are at-least-once; nothing claims exactly-once.
-//! DDL lives at `db/migrations/2026-11-24-defect-outbox-notification.sql` and is
-//! applied by the repository migration runner (one statement per line).
+//! DDL lives at `db/migrations/2026-11-25-defect-domain-phase-a.sql` (15 tables,
+//! per-line statements) and is applied by the repository migration runner
+//! (one statement per line). The inbox tables
+//! (`defect.notification_inbox` / `_cursor` / `_projection` / `_incident`)
+//! back the consumer half of the loop (per G-8).
 
 pub mod contract;
 pub mod consumer;
@@ -48,4 +53,7 @@ pub use consumer::{
     ApplyOutcome, DefectInboxError, DefectInboxStore,
     InMemoryDefectInbox, PgDefectInboxStore,
 };
-pub use relay::{BoundedRelay, PendingDelivery, ProfileSwitchOutcome, RelayBackoffPolicy};
+pub use relay::{
+    run_relay_worker, BoundedRelay, OutboxRelay, PendingDelivery, ProfileSwitchOutcome,
+    RelayBackoffPolicy, RelayRunReport,
+};
