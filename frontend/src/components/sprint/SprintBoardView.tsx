@@ -49,6 +49,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useRunDirectory } from "@/lib/run/runDirectorySession";
+import { createUnifiedWorkItem } from "@/app/(app)/kanban/unifiedWorkItems";
 import { getSession } from "@/lib/auth";
 import type { WorkItem, Sprint, Identity } from "@/types/ids";
 
@@ -531,6 +533,11 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
 }) {
   const sprints = useStore((s) => s.sprints);
   const allWorkItems = useStore((s) => s.workItems);
+  // per G-9: Backlog 快捷新增走 owner 写入路径（与看板/缺陷页同一写入路径）
+  const runDirectory = useRunDirectory();
+  // 幂等键（per FR-DI-020；同一用户动作重试复用同一键）
+  const newIdempotencyKey = () =>
+    `sprint-backlog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   // per 2026-11-17 功能补齐: projectId prop 接线 (此前声明未用) — 按 project_id
   // 过滤 sprints/workItems; 未传保持全局旧行为。
   const visibleSprints = projectId ? sprints.filter((s) => s.project_id === projectId) : sprints;
@@ -655,6 +662,40 @@ export function SprintBoardView({ onSelect, worktreeId, projectId, branch }: {
                               const reporterId = session?.payload.user_id ?? proj?.owner_id;
                               if (!tenantId || !projectIdVal || !reporterId) {
                                 alert("缺少必要上下文: 请先选择有效的 Project 与 Worktree,并确保会话已授权。");
+                                return;
+                              }
+                              // --- G-9 单一写入路径 ---
+                              // 有 run context 时走 owner 创建命令（服务端真源），
+                              // 与看板 / 缺陷页同一写入路径；无 owner 上下文时
+                              // 才回退本地 store，并显式标记 localOnly。
+                              const client = runDirectory.client;
+                              if (client && worktreeId) {
+                                void (async () => {
+                                  try {
+                                    const runContext =
+                                      runDirectory.focus ??
+                                      (await client.getWorktreeRunContext(worktreeId));
+                                    await createUnifiedWorkItem(
+                                      client,
+                                      runContext,
+                                      worktreeId,
+                                      {
+                                        title,
+                                        description: "",
+                                        priority: "medium",
+                                        idempotencyKey: newIdempotencyKey(),
+                                      },
+                                    );
+                                  } catch (err) {
+                                    // owner 写入失败 → 显式报错，不静默落到本地 seed
+                                    // (per AGENTS.md §4 "本地 seed 不冒充正式任务")
+                                    alert(
+                                      `创建失败（服务端未接受）: ${
+                                        err instanceof Error ? err.message : String(err)
+                                      }\n未写入本地，避免冒充正式任务。`,
+                                    );
+                                  }
+                                })();
                                 return;
                               }
                               addWorkItem({
