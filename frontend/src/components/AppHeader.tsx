@@ -102,7 +102,7 @@ export function AppHeader() {
 
           {/* === Middle: Primary Navigation Tabs (用户自由增删, per 2026-11-27 flex-wrap 适配窄视口) === */}
                     <nav
-                      className="flex items-center gap-1 flex-wrap"
+                      className="flex items-center gap-1.5 py-1 flex-wrap"
                       data-testid="primary-tabs"
                       aria-label={t.ariaLabels.primaryNav}
                     >
@@ -227,20 +227,20 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
           transform: active ? "translateY(-1px) translateZ(0px)" : "translateZ(0px)",
         }}
         className={clsx(
-          "ui-3d-tab relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200 shrink-0 whitespace-nowrap",
+          "ui-3d-tab relative px-3 h-10 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200 shrink-0 whitespace-nowrap",
           active
             ? // 域色 active: text 域色 + border 域色 + glow
               clsx(cs.text, cs.borderActive, "font-bold", cs.glow)
             : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
         )}
       >
-        {/* 域分色 icon tile — 7x7 圆角色块 + line icon (per 18:23 JST 推) */}
+        {/* 域分色 icon tile — 6x6 徽章块 + line icon */}
         <div
           data-testid={`tab-icon-tile-${tab.id}`}
           aria-hidden="true"
           style={{ transform: active ? "translateZ(2px)" : "translateZ(1px)" }}
           className={clsx(
-            "size-7 rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
+            "size-6 rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
             active
               ? // active: 域色 bg + 域色 border + 域色 text + glow + 3D extrusion
                 clsx(cs.bg, cs.border, cs.text, cs.glow, "shadow-[0_3px_0_0_var(--cel-ink)]")
@@ -248,9 +248,15 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
                 "border-transparent text-ink-mute group-hover:text-ink-dim"
           )}
         >
-          <Icon size={15} strokeWidth={2.25} />
+          <Icon size={14} strokeWidth={2.25} />
         </div>
         <span>{mod.label}</span>
+        <span
+          aria-hidden="true"
+          className="ml-0.5 border border-current/25 bg-black/20 px-1 py-0.5 font-mono text-[9px] font-black leading-none opacity-75"
+        >
+          {tab.code}
+        </span>
       </Link>
 
       {/* 顶栏 Tab 删除按钮 */}
