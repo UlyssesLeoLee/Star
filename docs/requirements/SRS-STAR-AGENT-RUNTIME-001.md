@@ -1,5 +1,22 @@
 # SRS-STAR-AGENT-RUNTIME-001
 
+> **2026-11-24 现行适用说明**：历史 crate 数、测试数及阶段通过项只代表当时切片；Rust Runtime 的授权、profile/digest、资源预算、隔离、取消恢复和独立验证须分别取得当前证据。 统合边界与状态说明见 [要件总索引](README.md)。
+
+### 2026-11-24 任务管理 Agent 核心要求补充
+
+下列要件补足任务管理场景；原有 Runtime、PI、Hook、Schedule 与协作编号不变。基本设计及验收矩阵见 [BD-AGENT-CORE-001](../basic-design/BD-AGENT-CORE-001.md)，全部 AC-ARC 当前为 `NOT_RUN`。
+
+| 编号 | 现行要件 | 基本设计 / 验收 |
+|---|---|---|
+| FR-ARC-01 | 在获授权 Project/Lane/Run/Worktree/Task 上下文内执行受预算约束的决策—行动—观察循环；结果经独立验证和 owner 命令回写，讨论不自动获得写权限。 | §0～2 / AC-ARC-01 |
+| FR-ARC-02 | Function Calling 必须校验完整参数、schema、工具版本、能力、当前授权、Hook、隔离和预算；有副作用命令以回执/幂等恢复，不因超时或授权失败自动重放。 | §3 / AC-ARC-02 |
+| FR-ARC-03 | Hook、Skill、MCP 和 Plugin 使用版本化身份、能力和资源边界；关键 Hook 由 Rust 原生执行并 fail closed，Skill/连接可见性不授予权限。 | §4 / AC-ARC-03 |
+| FR-ARC-04 | 以有界版本化事件流展示响应、工具和终态；owner 事实与 Outbox 持久化后授权推送，断线按游标恢复，重投不重复执行工具。 | §5 / AC-ARC-04 |
+| FR-ARC-05 | 思考模式按 provider 实际能力和预算显式选择；用户提问可恢复、可过期，答复按当前授权和版本校验，未回答不视为同意。 | §6 / AC-ARC-05 |
+| FR-ARC-06 | Parent/child Agent 使用收缩的 scope、隔离上下文、分配预算、可取消与独立验证；并行结果和副作用有明确来源及回执。 | §7 / AC-ARC-06 |
+| FR-ARC-07 | 分类记录 provider usage、缓存、推理、预估、实报、价格和币种；按 attempt 幂等汇总且避免父子及包含字段重复计数，未知值不写成零。 | §8 / AC-ARC-07 |
+| FR-ARC-08 | 数据按 owner 和 W/T/M 管理；授权、策略、隔离或容量未知时 fail closed，队列、工具输出和成本统计有界并可审计。 | §9～10 / AC-ARC-08 |
+
 > **STAR Agent Runtime 软件需求规格说明书 v1.0**
 >
 > - 状态: Requirements Baseline
@@ -158,6 +175,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v1.0 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 参考 Rust Hybrid ECS 高并发 Agent Runtime SRS v1.0 100 节结构, 映射 STAR 项目当前状态, 标 ✅/🟡/⏳/❌; 目标量级从 100K 推到 1M logical agents on 16-32GB 单机; 12 节已落地 / 8 节部分 / 60 节待 P3-B-F / 4 节 N/A; G-1~G-12 已知缺口; 守门 #1-#24 + 累积规 v1-v24 全列; DDD Review 必查项已标 | 2026-09-03 用户发令"参考这个制作需求文档" |
+| v1.1 | 2026-11-24 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 FR-ARC-01～08 与核心基本设计及未运行验收追踪；历史性能数字保持原时点证据。 | 用户要求完善任务管理 Agent 的核心能力设计。 |
 
 ---
 

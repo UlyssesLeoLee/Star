@@ -1,5 +1,5 @@
 # File-Based Session Management System (FSMS)
-> **架构集成状态（2026-10-12）**：本文件包作为设计提案并入 `dev`，尚未通过产品架构裁决。其中“FileSession 直接隶属 Worktree、与 Task Card 并列”等层级陈述与当前规范（Project → Cloud Branch → Lane (对外层级; 内部 engineering_run 契约保留, per 2026-11-15) → Worktree；Run 内 App/工作项按 RunContext 协作）不一致。本提案不得作为已批准的实现依据；FileSession 的归属、与 Run/Worktree/Task Card 的关系、存储及 CLI 边界须重新评审，并同步需求、基本设计、详细设计后才能排期。
+> **架构集成状态（2026-11-24 更新）**：本文件包仍为设计提案，尚未通过产品架构裁决。现行导航是 Project → Lane → Worktree → Branch，内部 Run 契约保留；任务卡是 Branch 子项，在 Backlog 子窗口打开。FileSession 的归属、存储及 CLI 边界须重新评审并同步需求、基本设计、详细设计后才能排期，不得以提案证明实现。[要件总索引](../../requirements/README.md)
 
 > **Status**: Draft v0.1
 > **Author**: Ulysses (per DEC-008) — Mavis 接手

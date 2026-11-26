@@ -5,11 +5,13 @@ MERGE (self:File {path:"docs/requirements/SRS-SETTINGS-001.md"})
 */
 # SRS-SETTINGS-001 — 设置
 
+> **2026-11-24 现行适用说明**：Hooks 沿用高级设置选项卡，提供 typed 无代码编辑、Project/Worktree 继承及固定版本；策略持久化、原生执行与深链分项验收。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **5 组左导航 + MCP 目录 + Mod 目录 + 开发者模式** (per docs/prototypes/6 · 设置-html mockup, 2026-11-15 全量审计后建档)
 >
-> - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit c0f149f2)
-> - 权威入口: **本文件是该功能的唯一权威文档** — 修改此功能只改本文件, 并在 §修订履历 加行
-> - 实现状态: ✅ 已闭环 (浏览器实测 2026-11-15)
+> - 状态: Requirements Baseline v1.0；commit c0f149f2 是历史预览证据。
+> - 权威入口: 本文件记录设置专题；修改须同步相关需求、基本设计、详细设计和验收状态。
+> - 实现状态: 2026-11-15 浏览器预览；策略持久化和原生执行未由该记录证明。
 > - 数据源: store (seed 预览模式) — 宿主接入后切换授权投影
 
 ---
@@ -31,6 +33,8 @@ MERGE (self:File {path:"docs/requirements/SRS-SETTINGS-001.md"})
 | FR-ST-003 | Mod 目录面板 (双源/3 按钮禁用/表/隔离说明) | ✅ c0f149f2 |
 | FR-ST-004 | 开发者模式 | ✅ |
 | FR-ST-005 | Hooks 高级设置深链 | ✅ |
+| FR-ST-006 | Hooks typed、无代码可视化编辑，Project/Worktree 继承与有效版本展示 | 目标；待单独验收 |
+| FR-ST-007 | Rust 原生安全关键 Hook 及策略持久化；不可由插件减弱 | 目标；待单独验收 |
 
 ## §3 实现状态与文件映射
 

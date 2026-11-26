@@ -1,4 +1,6 @@
 # SRS-CANVAS-001
+
+> **2026-11-24 现行适用说明**：当前产品树为 Project → Lane → Worktree → Branch；Canvas 是 Lane 应用，任务是 Branch 子项并在 Backlog 子窗口打开。多人协作、双方草稿保护与显式冲突解决属于现行需求，旧排除清单只保留为历史范围。 统合边界与状态说明见 [要件总索引](README.md)。
 # SRS-CANVAS-001
 
 > ⚠️ **现状纠正 (2026-11-15)**: /canvas 现在是**唯一无限画布入口** — 直进 canvas-001
@@ -167,7 +169,7 @@ V0.1 MVP 已实装能力, 本总册**保留**为 V0.1 不重新设计:
 
 ### 1.6 渡口 Worktree 群组集成边界 (v1.4 补充)
 
-- **产品树**：Worktree 是导航根。每个 Worktree 群组下，Multica、Jira 等价任务管理、Task Card 索引、Group Infinite Canvas 和已启用插件入口是同级能力。
+- **产品树**：主导航为 Project → Lane → Worktree → Branch。选择 Worktree 后打开 Lane 应用，Canvas 与 Backlog 等是应用；任务卡是 Branch 子项，在 Backlog 内以可关闭子窗口打开。
 - **Canvas 角色**：本 SRS 的 Infinite Canvas 提供可视化协作表面，支持把 WorkItem、Task Card、关系、Agent/Flow 等以类型化元素引用加入画布，并从画布跳转或发起经授权的领域命令。“Miro-like”描述画布交互，不扩大为全部 Miro 通用功能。
 - **任务事实**：Canvas 元素引用统一使用 `EntityRef(type, id, worktree_id)`；布局和画布元数据属于 Canvas，任务状态归 WorkItem/Multica/Jira 等价域。Canvas 不维护第二份任务状态机。
 - **聊天栏**：固定底部聊天栏属于 Group Shell，在各群组应用间保持同一会话入口；明确选择 `WORKTREE` 或 `GLOBAL`。Canvas 只传递当前 Worktree/元素作为上下文，不创建专属聊天栏。

@@ -1,5 +1,7 @@
 # STAR Sub-task Binding 要件定義書 (Requirements Specification)
 
+> **2026-11-24 现行适用说明**：子任务绑定必须验证当前 Project/Lane/Task/Worktree 授权和 owner 关系；CLI 继承获授权 Worktree，执行、取消恢复和独立验证分项验收，不因绑定存在而允许执行。[要件总索引](../../requirements/README.md)
+
 > **バージョン**: v0.1
 > **ステータス**: 🟡 Draft → 🔵 Review (待 DDD Review 拍板)
 > **日付**: 2026-09-09

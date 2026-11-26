@@ -1,5 +1,7 @@
 # SRS-PRE-TOOL-USE-GUARD-001
 
+> **2026-11-24 现行适用说明**：产品安全关键操作的规则、原生 evaluator 或必需审计不可用时必须阻断；旧 Python fail-open 仅可作为非权威的开发兼容或观测描述。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Mavis PreToolUse 安全拦截层 — 要件定義書 v0.1** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
 > - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
@@ -92,7 +94,7 @@
 | **FR-3** | 危险模式库 | 5 项 | P0 | 15 条危险模式 (BLOCK 8 + ASK 5 + WARN 2) |
 | **FR-4** | 审计 log | 2 项 | P0 | 全操作留痕, Transaction append-only per 守门 #13 |
 | **FR-5** | 规则配置 | 1 项 | P1 | JSON Schema + 热更新, 不重启 mavis runtime |
-| **FR-6** | 旁路 / fail-open | 1 项 | P0 | 规则加载失败不阻断主流程, audit log 写失败 → fail-closed |
+| **FR-6** | 安全故障处理 | 1 项 | P0 | 安全关键规则、原生 evaluator 或必要审计不可用时阻断受影响调用。 |
 | **FR-7** | 测试 / 报告 | 1 项 | P1 | 单元测试 + 集成测试 + 报告 (跟现有 PHASE-*-IMPL-REPORT 一致) |
 | **合計** | | **17 项** | | |
 
@@ -128,7 +130,7 @@
 | **BLOCK** | 工具调用直接拒绝, 返回错误给 LLM, LLM 必须改 plan | 本 v0.1 自定义 |
 | **ASK** | 走 `ask_user`, 1 个推荐项"取消" (per 守门 v28) | 本 v0.1 自定义 |
 | **WARN** | 在 LLM context 注入一条 warning, 继续执行, session log 留痕 | 本 v0.1 自定义 |
-| **fail-open** | 规则加载失败时, 默认放行 (不阻断主流程) | 行业术语 |
+| **fail-open** | 历史非权威开发工具的放行方式；不得用于产品安全关键操作 | 历史术语 |
 | **fail-closed** | 审计 log 写失败时, 默认阻断 (凭据外泄零容忍) | 行业术语 |
 | **W/T/M** | Work / Transaction / Master 三类横展 (per 守门 #13) | STAR 守门 #13 |
 | **IPA SEC** | Information-technology Promotion Agency, Software Engineering Center | 日本独立行政法人 |
@@ -254,14 +256,14 @@
 - 规则文件: `scripts/automation/guardian/rules/pre_tool_use_rules.json`
 - 监听: file mtime 变化, 自动 reload
 - 不重启 mavis runtime
-- reload 失败 → fail-open (per FR-6.1) + WARN log
+- 安全关键规则 reload 失败 → fail-closed，记录可用的诊断；不可用审计不能作为放行理由。
 
-### FR-6 旁路 / fail-open (1 项, P0)
+### FR-6 安全关键规则故障处理 (P0)
 
-**FR-6.1** 规则加载失败 → fail-open
+**FR-6.1** 安全关键规则或原生 evaluator 不可用 → fail-closed
 - 触发: 规则 JSON 解析失败 / schema 校验失败 / 编译错误
-- 行为: 默认放行, 写一条 WARN 级 audit log
-- 原因: 不能因为规则 bug 阻断整个 mavis runtime
+- 行为: 拒绝受影响的工具调用；不把旧 Python handler 当作授权替代，并记录可用的诊断信息。
+- 恢复: 规则和必要审计恢复后重新执行完整授权与策略校验，不自动重放先前变更。
 
 **FR-6.2** (隐含) audit log 写失败 → fail-closed
 - 触发: 磁盘满 / 权限不足 / JSON 序列化失败
@@ -271,7 +273,7 @@
 ### FR-7 测试 / 报告 (1 项, P1)
 
 **FR-7.1** 单元测试 + 集成测试 + 报告
-- 单元测试: `tests/automation/guardian/test_pre_tool_use_guard.py` 覆盖 15 条规则 + fail-open / fail-closed
+- 测试: 故障注入覆盖原生安全规则、evaluator 和审计不可用时的 fail-closed；旧 Python 测试仅作为兼容观测证据。
 - 集成测试: `tests/e2e/test_pre_tool_use_hook.py` 覆盖 console_server.py 实际调用
 - 报告: `docs/reports/PHASE-PRE-TOOL-USE-GUARD-IMPL-REPORT.md` 跟现有 6 份 PHASE-*-IMPL-REPORT 一致
 
@@ -293,7 +295,7 @@
 
 | ID | 要求 | 計測方法 | 阈值 |
 |---|---|---|---|
-| **NFR-A-1** | 规则加载失败 → fail-open | 单元测试 | 100% 放行 |
+| **NFR-A-1** | 安全关键规则加载或 evaluator 失败 → fail-closed | 故障注入 | 100% 阻断受影响调用 |
 | **NFR-A-2** | audit log 写失败 → fail-closed | 单元测试 | 100% 阻断 |
 | **NFR-A-3** | 规则 reload 不中断 hook 调用 | 实测 | 0 中断 |
 | **NFR-A-4** | mavis runtime 启动时间不显著增加 | 实测 | < 50ms (15 条规则加载) |
@@ -367,7 +369,7 @@
 |---|---|---|---|
 | **AC-1** | FR-3.2 + FR-3.3 + FR-3.4 | 单元测试 15 条规则全部命中 | 100% |
 | **AC-2** | FR-1.1 + NFR-P-1 + NFR-P-2 | benchmark p50 + p99 | < 5ms / < 10ms |
-| **AC-3** | FR-6.1 + FR-6.2 | 故障注入测试 | 100% fail-open / 100% fail-closed |
+| **AC-3** | FR-6.1 + FR-6.2 | 规则、原生 evaluator、审计故障注入 | 受影响关键调用全部阻断；恢复后重新授权，不自动重放 |
 | **AC-4** | FR-4.1 + NFR-S-2 | 单元测试 + OS 权限验证 | 100% append-only |
 | **AC-5** | NFR-T-1 + NFR-T-2 | CI 双平台 | 100% pass |
 | **AC-6** | FR-5.1 | 规则修改实测 | < 100ms reload, 0 中断 |

@@ -5,6 +5,8 @@ MERGE (self:File {path:"docs/requirements/SRS-OPS-CONSOLE-001.md"})
 */
 # SRS-OPS-CONSOLE-001 — 运维控制台
 
+> **2026-11-24 现行适用说明**：历史界面及模拟链路不是实际 K3s 运维验收；真实控制、授权、持久事实、部署和回滚分别取证，未接入项明确展示。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **集群/告警/原子化 App 晋级 (仅管理员)** (per docs/prototypes/7 · 运维控制台（仅管理员）-html mockup, 2026-11-15 全量审计后建档)
 >
 > - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 23d60e75)

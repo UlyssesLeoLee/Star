@@ -1,5 +1,7 @@
 # 02. STAR Agent Runtime - 基本設計書 (Basic Design)
 
+> **2026-11-24 现行接口与产品边界**：任务 Agent 的模型/工具循环、提问、流、子 Agent 与用量统一见 [Agent 核心基本设计](../../basic-design/BD-AGENT-CORE-001.md)；本文件保留 Runtime 资源组织和历史设计。旧规模、性能数字和单项测试不代表当前生产验收。
+
 > **状態**：🟡 Draft v0.1
 > **日期**：2026-09-03
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手

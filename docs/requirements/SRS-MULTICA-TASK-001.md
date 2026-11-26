@@ -1,5 +1,7 @@
 # SRS-MULTICA-TASK-001
 
+> **2026-11-24 现行适用说明**：产品导航使用 Lane；任务属于 Branch 并在 Backlog 子窗口打开。执行结果的独立验证及原生安全门不可被 skip/force_skip 绕过；内部 Run 标识按兼容契约保留。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
 
 > **Task Lifecycle 域要件定義書 v0.26** (6 状态 + 独立 Review Gate; Project/Run owner、bounded Task delivery 与 BI owner projection/quarantine/query 增量)
@@ -172,7 +174,7 @@ Task Lifecycle 是 Run 内的任务事实 owner；产品呈现使用中性任务
 | FR-16 | subagent 报 complete → 不直接进 done, 设置 `review_state=pending_review` (或 `in_progress` 带 `awaiting_review: bool`) | P0 |
 | FR-17 | Mavis review 3 件事: (a) commit hash 存在 / (b) output 落档 / (c) artifact 落档 | P0 |
 | FR-18 | Mavis review 通过 → 进 `completed`; review 失败 → 进 `failed` + 标 review_failed_reason | P0 |
-| FR-19 | Review gate 可配置 skip (per 守门 #9 v27 fallback) | P0 |
+| FR-19 | 任务执行结果必须通过独立验证；skip/force_skip 不得绕过验证、当前授权或安全关键 Hook。普通非安全关键评审按有效版本化策略处理。 | P0 |
 
 ### TK-5 WBS row schema 升级 (FR-20 ~ FR-22)
 
@@ -191,7 +193,7 @@ Task Lifecycle 是 Run 内的任务事实 owner；产品呈现使用中性任务
 | NFR-1 性能 | 状态机迁移 41 子项 < 5s |
 | NFR-2 可靠性 | subagent RPC 失败 → stale_dispatch=true, 不阻塞其他 task |
 | NFR-3 可观测 | 每次状态变更写 audit log, console 显示状态机 transition 图 |
-| NFR-4 易用 | 状态机守门 = 不可绕过, 但提供 force_skip 路径 (per 守门 #9 v27) |
+| NFR-4 易用 | 状态机、安全关键 Hook 与任务结果独立验证不可绕过；缺少验证证据时保持未验收并说明原因。 |
 | NFR-5 安全 | session_poisoned 标不删除, 等人工修 (per 守门 #11) |
 
 ---
@@ -208,7 +210,7 @@ Task Lifecycle 是 Run 内的任务事实 owner；产品呈现使用中性任务
 | 风险 | 概率 | 影响 | 缓解 |
 |---|---|---|---|
 | 41 子项 status 字段迁移漏改 | 中 | 中 | `wbs_migrate_v33.py` 自动改 + `registry_check.py` 校验 |
-| Review gate 太严阻塞主流程 | 中 | 高 | 提供 force_skip 配置 (per 守门 #9 v27) |
+| Review gate 阻塞主流程 | 中 | 高 | 展示阻断原因，修复或恢复验证能力；不得以 force_skip 宣称任务结果已验收。 |
 | Session poison 5 类原因分类不够 | 中 | 中 | Multica 当前 5 类, 后续可扩 (per Multica `taskfailure.ReasonAPIInvalidRequest` 集中) |
 | Stale dispatch 标了之后没法识别 | 低 | 中 | automation console 红 banner + 周报 |
 
@@ -254,7 +256,7 @@ Task Lifecycle 是 Run 内的任务事实 owner；产品呈现使用中性任务
 |---|---|---|---|
 | #1 6 态 state machine 跟现有 WBS row 字段冲突 (e.g. `status` 当前是 enum 4 态) | P0 | 阻塞 AC-1 | `wbs_migrate_v33.py` 兼容迁移 |
 | #2 Session poison 5 类原因 跟现有 session 概念区分 (Mavis 当前 session = Mavis root session, 不等于 `(agent, issue) session`) | P0 | 阻塞 AC-3 | 文档加 disclaimer, 实施时统一命名 |
-| #3 Review gate 跟守门 #9 v27 fallback 协调 (v27 已是 fallback 路径) | P0 | 阻塞 AC-2 | force_skip 配置 |
+| #3 Review gate 跟历史 fallback 协调 | P0 | 阻塞 AC-2 | 历史 fallback 不得绕过产品独立验证、安全关键 Hook 和授权门。 |
 | #4 stale_dispatch=true 时, subagent output 怎么保留? (per 守门 #9 v27) | P1 | 不阻塞 | 暂存 `<task_id>.stale.json` 24h |
 | #5 4 类 404 timestamp 跟 automation-design §3.4 横向 audit log 范式协调 | P1 | 不阻塞 | 复用现有 audit_log 字段 |
 | #6 状态机守门 "claimed 后 30s 必须 start" 跟守门 #9 v27 30s claim timeout 重复 | P1 | 不阻塞 | 复用同一 timeout 常量 |

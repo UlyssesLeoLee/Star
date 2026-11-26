@@ -1,5 +1,7 @@
 # SRS-MULTICA-SKILL-001
 
+> **2026-11-24 现行适用说明**：关键词仅用于建议；实际注入前须验证 Run 固定的 Skill profile/version/digest、能力范围、上下文和预算，本地同名文件不得静默替换固定版本。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Multica Skill Compounding 域要件定義書 v0.1** (per ADR-0026 v0.2 §1.1 抽象, 跟 v35+ 候选对齐)
 >
 > - 状态: 🟡 Draft v0.1

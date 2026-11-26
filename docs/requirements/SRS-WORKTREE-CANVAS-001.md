@@ -1,5 +1,7 @@
 # SRS-WORKTREE-CANVAS-001
 
+> **2026-11-24 现行适用说明**：Project Worktree Index 是授权范围内的跨 Lane/Branch 汇总，不能替代 Project → Lane → Worktree → Branch 主导航，也不能以 seed 冒充生产数据。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **AI Worktree Graph Canvas — 无限画布需求文档 v1.11** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
 > - 状态: Requirements Baseline v1.11 (Project Graph / Run Canvas 与 Repository identity/persistence source remediation 状态)
@@ -27,12 +29,12 @@
 |---|---|
 | 文书 ID | SRS-WORKTREE-CANVAS-001 |
 | 文书名 | AI Worktree Graph Canvas — 无限画布 需求定义书 |
-| 版本 | v1.10 (Project Graph、Engineering Run Canvas 与 Repository identity/persistence remediation status) |
+| 版本 | v1.11 (Project Graph、Lane Canvas 与内部 Run/Repository identity/persistence remediation status) |
 | 作成日 | 2026-09-15 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 关联 commit | (root 统一 commit 时填, per 守门 #1 v15) |
-| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.11 + `DD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-GROUP-001.md` v5.24 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.9 |
+| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.12 + `DD-WORKTREE-CANVAS-001.md` v1.4 + `DD-WORKTREE-GROUP-001.md` v5.33 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v2.0（版本沿用本文件头部引用，当前内容需另行对账） |
 | 上位文档 | 无 (新领域主册) |
 | 平行文档 | `SRS-CANVAS-001.md` v1.4 (无限画布总册) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG) |
 | 拍板来源 | 2026-09-15 Multica ULYS-57 issue 创建者发令 "你是一名资深软件架构师...针对一个面向 AI 并行开发场景的 Worktree 无限画布管理模块, 依次生成需求文档 / 基本设计 / 详细设计" |

@@ -1,5 +1,7 @@
 # 01. Tree-sitter Worktree Graph - 要件定義書 (Requirements Definition)
 
+> **2026-11-24 现行适用说明**：Worktree 图是获授权资源的投影，不替代 Project → Lane → Worktree → Branch 导航或 canonical owner；索引、缓存和下钻受当前权限与资源预算约束。[要件总索引](../../requirements/README.md)
+
 > **状態**：🟡 Draft v0.1
 > **日期**：2026-09-03
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手

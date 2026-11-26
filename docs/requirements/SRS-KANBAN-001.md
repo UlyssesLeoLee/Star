@@ -5,11 +5,13 @@ MERGE (self:File {path:"docs/requirements/SRS-KANBAN-001.md"})
 */
 # SRS-KANBAN-001 — 任务 · IPA 看板
 
-> **任务卡全生命周期管理 (Branch 工作区固定页签: 任务)** (per docs/prototypes/1b · 任务 · IPA 看板-html mockup, 2026-11-15 全量审计后建档)
+> **2026-11-24 现行适用说明**：任务位于 Branch 下，在 Lane Backlog 内以可关闭子窗口打开，CLI 使用当前获授权 Worktree；历史绿色标记只覆盖当时预览，当前接入和验收以 §7.1 缺陷专题为准。 统合边界与状态说明见 [要件总索引](README.md)。
+
+> **任务卡全生命周期管理**：任务位于 Branch 下，在 Lane Backlog 内以可关闭子窗口打开（原型背景见 docs/prototypes/1b · 任务 · IPA 看板）。
 >
-> - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 9187f43d)
+> - 状态: Requirements Baseline v1.0；commit 9187f43d 的历史预览证据不代表当前生产验收。
 > - 权威入口: 本文件记录看板现有需求；智能缺陷管理的新增专题需求见 [SRS-DEFECT-INTELLIGENCE-001](SRS-DEFECT-INTELLIGENCE-001.md)。涉及缺陷视图的变更须同步两份需求及对应设计、验收状态。
-> - 实现状态: ✅ 已闭环 (浏览器实测 2026-11-15)
+> - 实现状态: 历史浏览器预览（2026-11-15）；当前授权数据和写入闭环待验收。
 > - 数据源: store (seed 预览模式) — 宿主接入后切换授权投影
 > - 2026-11-23 验收：上述 2026-11-15 状态为历史记录；Lane Backlog、独立看板和缺陷视图仍需完成同一授权数据/写入路径及端到端验收。当前缺口和提交基线见 [智能缺陷需求 §7.1](SRS-DEFECT-INTELLIGENCE-001.md#71-2026-11-23-模块整合验收与后续代码复核)。
 

@@ -1,5 +1,7 @@
 # SRS-SANDBOX-002
 
+> **2026-11-24 现行适用说明**：生产 sandbox 不可用时禁止执行，不得降级为未验证 subprocess；允许展示诊断，恢复须重新核验授权、策略和独立 sandbox readiness。VM/K3s 就绪不替代 Runtime sandbox。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Sandbox-as-a-Service (sandboxd) — 要件定義書 v0.1.1** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
 > - 状态: 🟢 Draft v0.1.2 (2026-09-10 22:36 JST 决策点 D-7~D-10 全部已拍板 per Ulysses opt1 = 全部按推荐, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter 集成 + 文档修正 + WBS §14.19 拆 4 子项)
@@ -97,7 +99,7 @@
 | **FR-4** | session 生命周期 | 3 项 | P0 | create / run / destroy, 用完即回收 |
 | **FR-5** | 跨平台隔离后端 | 3 项 | P0 | Windows (Job Objects + WFP + AppContainer) + Linux (cgroups v2 + netns + mount ns) + macOS (sandbox-exec) |
 | **FR-6** | 观测性 | 3 项 | P1 | Prometheus metrics + audit log (PG) + 健康检查 |
-| **FR-7** | 旁路 / fail-open | 2 项 | P0 | sandboxd 不可用 → 走 SANDBOX-001 v0.2 subprocess 降级 |
+| **FR-7** | 安全故障处理 | 2 项 | P0 | sandbox 不可用或必要审计失败时阻断执行，不以未验证 subprocess 降级 |
 | **FR-8** | 测试 / 报告 | 3 项 | P1 | 单元测试 + 集成测试 + e2e + 报告 (跟现有 PHASE-*-IMPL-REPORT 一致) |
 | **合計** | | **24 项** | | |
 
@@ -151,7 +153,7 @@
 | **netns** | Linux network namespace, 网络隔离 | Linux kernel |
 | **mount ns** | Linux mount namespace, 文件系统隔离 | Linux kernel |
 | **sandbox-exec** | macOS 内置沙箱工具, 跟 sandboxd 集成 | macOS SDK |
-| **fail-open** | sandboxd 不可用时, 走 SANDBOX-001 v0.2 subprocess 降级 (不阻断主流程) | 行业术语, 跟 SRS-PRE-TOOL-USE-GUARD-001 一致 |
+| **fail-open** | 历史未验证 subprocess 降级方式，不适用于生产执行 | 历史术语 |
 | **fail-closed** | audit log 写失败时, BLOCK 工具调用, 返回错误 | 行业术语, 跟 SRS-PRE-TOOL-USE-GUARD-001 一致 |
 | **W/T/M** | Work / Transaction / Master 三类横展 (per 守门 #13) | STAR 守门 #13 |
 | **OLU** | One-person Logistics Unit, 1 SRE·周 ≈ 1M tokens (per STAR-OLU-001.md) | STAR 派生 |
@@ -177,7 +179,7 @@
 所有 sandboxd session (无论 resource / network / fs / capability 命中) 必写入 audit log (PG), 可查询 / 可回放 / 可聚合。Prometheus metrics 暴露 session 计数 / 资源使用 / 命中分布, 跟守门 v36 audit log 索引联动。
 
 ### BR-5 跨平台 + 升级兼容
-sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 (仅 Windows) 兼容 (fail-open 降级路径)。**v0.2 不破坏 v0.1 任何业务 logic**, 仅追加 platform backends + audit log + metrics。
+跨平台兼容须分别验证实际隔离能力；历史 subprocess 包装器不能替代生产 sandbox。provider 或必要审计不可用时阻断执行并提供诊断。
 
 ---
 
@@ -260,7 +262,7 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 **FR-4.2** RunCommand
 - 入参: `{session_id, cmd: CommandSpec, timeout_sec}`
 - 出参: `{returncode, stdout, stderr, latency_ms, hit_violations: [string]}`
-- 命中违规: 不阻断, 仅 audit log + hit_violations 字段返回 (per fail-open 派生)
+- 命中安全策略违规: 阻断受影响操作并记录可用诊断，不能仅返回告警后继续执行。
 - 超时: 走 session 内 timeout, 触发 sandboxd kill session (per FR-1.1 级联 kill)
 
 **FR-4.3** DestroySession
@@ -313,13 +315,13 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 - 响应: `{status: "ok", uptime_sec: int, sessions_active: int, sessions_total: int, version: string}`
 - 用途: systemd / k8s liveness probe + 调试
 
-### FR-7 旁路 / fail-open (2 项, P0)
+### FR-7 安全故障处理 (2 项, P0)
 
-**FR-7.1** sandboxd 不可用 → SANDBOX-001 v0.2 降级
+**FR-7.1** sandbox 不可用 → 阻断产品执行
 - 触发: gRPC 连接失败 / sandboxd 返回 Unavailable / 健康检查失败
-- 行为: dispatcher / client 走 SANDBOX-001 v0.2 subprocess.run 降级路径 (per `scripts/automation/guardian/sandbox.py` v0.2)
+- 行为: 拒绝创建或继续受影响执行，不以未验证的 subprocess 替代隔离；允许展示故障诊断。
 - 告警: 写 root session 通知 (per NFR-O-3, < 500ms 推送)
-- 持续: sandboxd 恢复后自动切回
+- 恢复: 重新校验当前授权、策略、绑定与独立 sandbox readiness；不得自动重放先前变更。
 
 **FR-7.2** (隐含) audit log 写失败 → fail-closed
 - 触发: PG 不可用 / 磁盘满 / 权限不足
@@ -330,7 +332,7 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 
 **FR-8.1** 单元测试
 - 路径: `crates/sandboxd/src/**/tests/`
-- 覆盖: 4 维隔离策略 + session 生命周期 + fail-open / fail-closed
+- 覆盖: 4 维隔离策略、session 生命周期和故障 fail-closed；独立验证生产隔离。
 - 工具: cargo test (跟守门 #1 v25 一致)
 - 阈值: ≥ 90% line coverage
 
@@ -386,7 +388,7 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 | **NFR-M-2** | policy JSON Schema 文档化 | 文档 | 100% |
 | **NFR-M-3** | audit log JSON Lines 兼容 | 实测 | 100% parseable |
 | **NFR-M-4** | 测试覆盖率 | cargo tarpaulin | ≥ 90% |
-| **NFR-M-5** | 跟 SANDBOX-001 v0.2 兼容 (v0.2 subprocess.run 降级路径) | 实测 | 100% 兼容 |
+| **NFR-M-5** | 兼容接口不得降低生产隔离或安全策略 | 故障注入 | 未验证隔离时 100% 阻断 |
 
 ### NFR-T 移植性 (Portability)
 
@@ -412,7 +414,7 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 
 | ID | 要求 | 計測方法 | 阈值 |
 |---|---|---|---|
-| **NFR-C-1** | 跟 SANDBOX-001 v0.2 兼容 (v0.2 subprocess.run 降级) | 实测 | 100% |
+| **NFR-C-1** | 旧接口兼容不允许未验证 subprocess 降级执行 | 故障注入 | 受影响执行 100% 阻断 |
 | **NFR-C-2** | 跟 dispatcher.py v0.1 兼容 (gRPC client 替代 subprocess.run) | 实测 | 100% |
 | **NFR-C-3** | 跟 mavis desktop Rust 集成 (gRPC client) | 实测 | 100% |
 | **NFR-C-4** | 跟守门 #5 (env 安全) 联动 | 单元测试 | 100% 命中场景被本层 BLOCK |
@@ -456,7 +458,7 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 |---|---|---|---|
 | **AC-1** | FR-3.1 + FR-3.2 + FR-3.3 + FR-3.4 | 单元测试 4 维隔离全部命中 | 100% |
 | **AC-2** | FR-1.1 + NFR-P-1 + NFR-P-2 | benchmark p50 + p99 | < 10ms / < 100ms |
-| **AC-3** | FR-7.1 + FR-7.2 | 故障注入测试 | 100% fail-open / 100% fail-closed |
+| **AC-3** | FR-7.1 + FR-7.2 | sandbox 和审计故障注入 | 受影响执行全部阻断；恢复重新校验且不自动重放 |
 | **AC-4** | FR-4.1 + FR-4.2 + FR-4.3 | session 生命周期测试 | 100% 行为符合 |
 | **AC-5** | NFR-T-1 + NFR-T-2 + NFR-T-3 | CI 三平台 | 100% pass |
 | **AC-6** | FR-6.1 + NFR-O-1 | Prometheus scrape 验证 | 100% 指标暴露 |

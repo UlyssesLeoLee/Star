@@ -1,5 +1,7 @@
 # SRS-CANVAS-AGENT-001
 
+> **2026-11-24 现行适用说明**：以 §4.12.9 和本说明为当前协作基线：产品名称为 Lane，任务卡为 Branch 子项且在 Backlog 内打开；旧 Engineering Run 为内部兼容契约，不因改名改变授权或数据边界。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **无限画布 — Agent 管理域 (Agent Management Domain) 要件定義書 v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
 > - 状态: Requirements Baseline (**v1.4 追加当前 Run/Worktree 协作契约与验收映射；v1.2/v1.3 历史保留**)
@@ -1115,7 +1117,7 @@ STAR 平台是 5 域 (player / economy / match / social / admin per 8/21 JST RGS
 
 #### 4.12.9 WLD-7 当前协作契约（规范性要求；未实现声明）
 
-1. **产品树与作用域**：主导航固定为 Project → Engineering Run → Worktree → 本地 Branch。Engineering Run 可脱离宿主 Branch 创建、授权、列出和管理；远端 repository/provider/branch 是可选元数据。Worktree 表示 Run 管理的本地 checkout，Branch 仅表示该 checkout 的本地 ref/state。选择 Worktree 后，Canvas 与 Task Card/工作项作为同一 Run/Worktree 下的同级 App；Canvas 不拥有 Run/Worktree，也不改变其授权边界。
+1. **产品树与作用域**：主导航固定为 Project → Lane → Worktree → 本地 Branch。Lane 可脱离宿主 Branch 创建、授权、列出和管理；远端 repository/provider/branch 是可选元数据。Worktree 表示 Lane 管理的本地 checkout，Branch 仅表示该 checkout 的本地 ref/state。选择 Worktree 后打开 Lane 应用，Canvas 是应用；任务卡是 Branch 子项，在 Backlog 内以可关闭子窗口打开。Canvas 不拥有 Lane/Worktree，也不改变内部 Run 契约的授权边界。
 2. **授权和私有草稿**：每次连接、订阅、读取、差异分页、恢复、解决及重连都必须按当前 Project/Run/Worktree/resource scope 重新授权。作者未完成的草稿默认仅作者可见；冲突双方的已封存草稿与差异只向当前获授权参与者开放。撤权立即停止相应推送并拒绝后续读取。
 3. **事实与通知**：各事实 owner 在自己的事务内写入 canonical revision、append-only audit、draft/conflict 事实和 transactional Outbox；跨 owner 不共享写事务。Outbox 事件仅作为轻量唤醒/版本提示，再按授权资源 fan-out；事件不携带草稿正文。该段是目标契约，不证明 durable push、Outbox relay、持久草稿/冲突或跨实例恢复已经实现。
 4. **冲突时序**：两份完整、摘要校验通过且语义重叠的 proposal，在第二份到达 owner 时立即形成一个稳定 conflict_id 并 pin 双方精确草稿；任何更长到达间隔的有效语义重叠仍须检测。第二份完整 proposal 在 ≤1000 ms 到达只是 E2E 测试刺激，不是提交时间差、冲突窗口、检测窗口或 holdback。PT-09 的 p99 ≤1 s 从 owner conflict transaction commit 起计，单独衡量双方同一 unread conflict_id 与首个有界差异页可读。

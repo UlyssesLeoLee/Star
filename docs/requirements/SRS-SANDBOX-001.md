@@ -5,6 +5,8 @@ MERGE (self:File {path:"docs/requirements/SRS-SANDBOX-001.md"})
 */
 # SRS-SANDBOX-001 — 沙盒
 
+> **2026-11-24 现行适用说明**：预览界面、授权资源投影、真实控制与 Runtime sandbox 分项验收；seed 或心跳预览不能证明真实隔离和任务执行。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **实体机/虚拟机/Docker 资源与观测 (Branch 工作区页签)** (per docs/prototypes/2c · 沙盒-html mockup, 2026-11-15 全量审计后建档)
 >
 > - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 304f3ce5)

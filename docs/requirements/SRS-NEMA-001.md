@@ -5,6 +5,8 @@ MERGE (self:File {path:"docs/requirements/SRS-NEMA-001.md"})
 */
 # SRS-NEMA-001 — 协同 (文件即任务 · 多人多 Agent)
 
+> **2026-11-24 现行适用说明**：已有 Rust profile 或种子演示仅代表相应局部能力；生产任务需要 canonical owner、当前授权、持久化及实时协作的独立验收，需求变更须同步基本和详细设计。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **.nema 侧车文件即任务协同** (per docs/prototypes/2b · 协同（文件即任务 · 多人多 Agent）-html mockup, 2026-11-15 全量审计后建档)
 >
 > - 状态: Requirements Baseline v1.2 — profile-aware Rust NEMA I/O 已实现；第三方解释器独立安装/运行时未接通

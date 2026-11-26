@@ -1,5 +1,7 @@
 # SRS-STAR-OPS-001
 
+> **2026-11-24 现行适用说明**：后续生产运维须经可信 Host Manager，固定 cluster identity/generation，分层预留 Host/cluster 容量并验证真实 provider、授权及回滚；mock/stub 保持预览状态。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **STAR Ops Console 软件需求规格说明书 v0.1**
 >
 > - 状态: Requirements Baseline (Draft)

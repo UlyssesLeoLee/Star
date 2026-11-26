@@ -1,4 +1,6 @@
-# 图表 & 报告系统 总需求（对标 Jira Cloud 报告中心）v1.0
+# 图表与报告系统总需求 v1.0
+
+> **2026-11-24 现行适用说明**：图表、分享、嵌入、导出及下钻须逐次按当前 Project/Lane/资源授权；聚合只包含可见事实。旧的对标名称与展示方案仅为来源背景。 统合边界与状态说明见 [要件总索引](README.md)。
 
 > **状态**: Draft v1.0 (2026-09-02)
 > **对标基线**: Jira Cloud Reports & Dashboards (per atlassian.com/software/jira/reports, 2026-09 取证)
@@ -22,7 +24,7 @@
 
 本文档是 Star 平台**图表 & 报告系统**的总需求基线,目标:
 
-1. **对标 Jira Cloud 报告中心**——覆盖 Jira 22 类核心图表 + 5 大类数据 scope,做到"功能等价、能力可比"
+1. **提供多维分析能力**——规划 22 类图表和多种数据范围；具体适用范围、授权与验收以本文件现行说明为准。
 2. **支撑 22 bounded context + 6 supporting crate 的数据可视化**——所有业务域(WorkItem / Sprint / Version / User / Time 等)必须有可视化出口
 3. **可被 Dashboard 复用**——每个图表既可单独作为 Report 输出,也可作为 Dashboard Gadget 嵌入
 4. **跨 5 类 scope 一致性**——同一图表在 Project / Sprint / Version / Project Hierarchy / Issue 5 个 scope 下行为一致

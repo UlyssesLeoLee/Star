@@ -1,5 +1,7 @@
 # SRS-STAR-CLI-001
 
+> **2026-11-24 现行适用说明**：历史 MVP 命令清单和勾选只证明当时范围；生产 CLI 须贯通当前授权的 Run/Worktree/Task 绑定、受控执行、取消恢复、独立验证、审计证据及结果回写。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **STAR CLI 软件需求规格说明书 v1.0 (recreate, per ULYS-124 v1.0 缺口补齐)**
 >
 > - 状态: Requirements Baseline (v1.0 — recreate after 9/21 + 9/23 reviewer 打回, per 用户 9/25 01:09 JST "确保缺口已补")

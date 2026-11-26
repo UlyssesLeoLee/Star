@@ -1,5 +1,7 @@
 # SRS-WORKFLOW-TEMPLATE-001
 
+> **2026-11-24 现行适用说明**：列身份独立于状态，多列可映射同一状态且任务归列需持久化；在线同步使用 owner 事实与授权推送，重连用游标补齐，冲突保留双方草稿并通过 CAS 显式解决。 统合边界与状态说明见 [要件总索引](README.md)。
+
 **瀑布式开发工作流模板 — 需求定义书 v0.1**
 
 > **状态**: 🟡 Draft v0.1
@@ -81,10 +83,10 @@ ULYS-30 父任务原文 (issue 创建者, 2026-09-13):
 | WT-1 | 模板数据模型与持久化 | 5 | WorkflowTemplate 实体 + 17 列预置结构 + 版本管理 (SCD Type 2) + 租户隔离 + 软删除 |
 | WT-2 | 17 列结构定义与不可违反规则 | 6 | Todo / 作废 / P1-P9 + P6.1-P6.4 / 审核 / 完成 共 17 列 + 列宽比 + 顺序约束 + 预置/用户列分组 + 命名约束 + 修改边界 |
 | WT-3 | 模板 CRUD UI | 5 | 创建 / 查看 / 重命名 / 删除 / 复制 5 动作, 全在 `/workflow-templates` 路由下 |
-| WT-4 | 模板应用到看板 | 4 | 选中模板 → 跳到 `/workflow-templates/{id}/board` → 用模板列渲染看板 → WorkItem.status 与模板列 1:1 映射 |
+| WT-4 | 模板应用到看板 | 4 | 用模板列渲染看板；模板列有独立身份，多列可映射同一 WorkItem.status，任务的列归属须由 owner 持久化。 |
 | WT-5 | 模板列可编辑边界 | 5 | 用户可增列 / 删列 / 改列宽 / 重排顺序 / 重命名, 但 17 列预置中 Todo 不可删 / 作废列宽 0.5 不可改 / 顺序前 2 列固定 |
-| WT-6 | 同步事件与跨界面联动 | 3 | 模板改动通过 SSE / polling 5s 兜底同步到所有打开的看板 / 详情页 / UserMenu 入口状态 |
-| WT-7 | 多人并发编辑与排他锁 | 3 | 写锁 5min 超时 + 乐观锁 (version 字段) + 一键回滚到任意历史版本 |
+| WT-6 | 同步事件与跨界面联动 | 3 | owner 事务与 Outbox 驱动授权推送；首次加载、断线或 gap 以游标恢复。 |
+| WT-7 | 多人并发编辑与冲突保护 | 3 | 允许并发草稿；owner 检测语义重叠、固定双方草稿并以 CAS 显式解决。 |
 | WT-8 | 右侧工作流入口 | 2 | UserMenu 新增第 5 类入口 → `/workflow-templates` + 当前激活模板 indicator |
 
 **合计**: 33 FR (P0 23 / P1 10 / P2 0) + 14 US + 5 NFR
@@ -150,7 +152,7 @@ ULYS-30 父任务原文 (issue 创建者, 2026-09-13):
 | 用语 | 定义 |
 |---|---|
 | **模板化看板 (Templated Board)** | 渲染在 `/workflow-templates/{template_id}/board` 路由, 列结构由模板定义, 不是 `KanbanBoard` 默认 4 列 |
-| **WorkItem.status** | 既有 enum (`todo`/`in_progress`/`review`/`done`), 模板列通过映射层 1:1 映射到这 4 个值 (具体映射规则见 §4.5) |
+| **WorkItem.status** | 既有 enum (`todo`/`in_progress`/`review`/`done`)；每列映射一个状态，多列允许映射同一状态，列身份不能从状态反推。 |
 | **列宽比** | 同屏水平方向的相对宽度比例, 列宽因子 × 总宽 = 该列实际像素宽 |
 
 ### 2.4 命名消歧 (per 守门 #11 缺标比错标 — 三词易混)
@@ -185,7 +187,7 @@ per §1.2 全文引用, 关键约束 5 项:
 |---|---|---|
 | **A12 乐观锁** | 既有 `board.version` 字段 (per `frontend/src/store/boardStore.ts`) | 不阻塞, 可复用 |
 | **写锁机制** | 既有 WebSocket 写锁 5min (per `docs/specs/board-lock-001.md`) | 不阻塞, 可复用 |
-| **SSE 推送** | 既有 SSE 通道 (per `frontend/src/lib/realtime/sse.ts`) | 不阻塞, 可复用; v1 fallback polling 5s |
+| **SSE 推送** | 历史候选通道 (per `frontend/src/lib/realtime/sse.ts`) | 复用须验证授权、owner Outbox、恢复和慢消费者；固定轮询不满足在线实时要求。 |
 | **zustand persist** | 既有 `frontend/src/store/*.ts` 已用 zustand persist middleware | 不阻塞, 可复用 |
 | **KanbanBoard 组件** | 既有 `frontend/src/components/board/KanbanBoard.tsx` | **阻塞 1**: 不支持自定义列宽因子, 需扩展 |
 | **WorkItem.status enum** | 既有 `frontend/src/types/ids.ts` 4 状态 | **阻塞 2**: 17 列 → 4 状态 映射层需新建 |
@@ -200,11 +202,11 @@ per §1.2 全文引用, 关键约束 5 项:
 | **BR-WT-3** | Todo + 作废 必须在最前 2 位 (顺序固定), 其余 13 列顺序可重排但相对顺序 P1 → P9 不能颠倒 |
 | **BR-WT-4** | 审核列 + 完成列在下方 1/3 panel (水平排列, 审核 60% / 完成 40%) |
 | **BR-WT-5** | 「瀑布式开发」模板 `is_builtin=true`, 不可改名不可删除不可复制 |
-| **BR-WT-6** | 写锁超时 5 分钟, 超时自动释放 + 通知原锁持有者 |
+| **BR-WT-6** | 允许并发草稿，按 owner revision 检测语义重叠；历史写锁不能替代冲突固定及解决。 |
 | **BR-WT-7** | 模板版本 SCD Type 2 (per §4.1.4), 每次结构性变更新增 version, 不覆盖历史 |
-| **BR-WT-8** | 跨界面同步延迟 ≤ 5s (polling) / ≤ 1s (SSE, 真实生产) |
+| **BR-WT-8** | 在线同步由 owner Outbox 驱动授权推送；断线或 gap 按游标恢复。冲突通知和首个有界差异页按提交后 p99 ≤ 1 秒验收。 |
 | **BR-WT-9** | 一键回滚到任意历史版本, 回滚也产生新 version (per 守门 #1 禁回溯叙事) |
-| **BR-WT-10** | 同 tenant 用户可编辑, 跨 tenant 只读 (v1 不做 per-role, 留 P1+) |
+| **BR-WT-10** | 读取、编辑、订阅和恢复均按当前 Project/Lane/资源授权；tenant 一致或已知链接均不能替代授权。 |
 
 ---
 
@@ -316,7 +318,7 @@ interface TemplateColumn {
 
 **WT-4.2 (FR-WT-4.2, P0)** — 模板化看板复用 KanbanBoard 组件, 传入 `columns` prop 而非用 `KANBAN_COLUMNS` 常量
 
-**WT-4.3 (FR-WT-4.3, P0)** — WorkItem 拖到模板列时, 写 `WorkItem.status = column.mapping_status`, 触发既有 status 状态机校验
+**WT-4.3 (FR-WT-4.3, P0)** — WorkItem 拖到模板列时，由有权 owner 持久化 template/version/column 身份并校验对应状态迁移；同状态的不同列仍可区分。写入须具备版本/CAS 和授权校验。
 
 **WT-4.4 (FR-WT-4.4, P1)** — 模板化看板右上角显示「当前模板: {name} v{version}」indicator
 
@@ -332,23 +334,23 @@ interface TemplateColumn {
 
 **WT-5.5 (FR-WT-5.5, P0)** — 用户可重命名, builtin 列允许重命名 (P0); 但空 / 重名校验 (per FR-WT-2.6)
 
-**WT-5.6 (FR-WT-5.6, P1)** — (无对应 US) 用户可改 `mapping_status`, 弹 Picker 选 4 状态之一, 防止 1 个状态被多列映射
+**WT-5.6 (FR-WT-5.6, P1)** — 用户可将每个列的 `mapping_status` 设为四种状态之一；允许多列映射同一状态，保持稳定列身份。
 
 ### WT-6 同步事件与跨界面联动 (3 项)
 
 **WT-6.1 (FR-WT-6.1, P0)** — 模板 CRUD 后通过 SSE 推送 `template_changed` 事件, payload 含 `template_id` + `version`
 
-**WT-6.2 (FR-WT-6.2, P0)** — v1 SSE 不可用时 fallback polling 5s 轮询 `/api/workflow-templates` (mock 走 zustand persist 内存)
+**WT-6.2 (FR-WT-6.2, P0)** — 在线变更由 owner 事务事实及 Outbox 触发授权范围推送；游标读取仅用于首次加载、断线恢复及缺口补齐。推送不可用时展示未接入/断线，不以固定轮询冒充实时协作。
 
 **WT-6.3 (FR-WT-6.3, P0)** — 收到事件后所有打开的 `/workflow-templates/{id}*` 路由自动 invalidate 缓存并重渲染
 
-### WT-7 多人并发编辑与排他锁 (3 项)
+### WT-7 多人并发编辑与冲突保护 (3 项)
 
-**WT-7.1 (FR-WT-7.1, P0)** — 进入模板编辑模式时申请写锁 (5min 超时, per BR-WT-6), 锁持有者 UI 角标显示 🟢 持有锁
+**WT-7.1 (FR-WT-7.1, P0)** — 获授权用户可并发编辑私有草稿；owner 根据 resource revision 检测重叠，不以客户端时钟或固定时间窗口判定。
 
-**WT-7.2 (FR-WT-7.2, P0)** — 其它用户进入编辑模式时显示「{user} 正在编辑 (剩余 {N} 分钟)」, 按钮置灰
+**WT-7.2 (FR-WT-7.2, P0)** — 对有权参与者显示有界的协作状态；presence 不替代 revision、授权检查或持久冲突事实。
 
-**WT-7.3 (FR-WT-7.3, P0)** — 乐观锁 + version 字段冲突时弹 conflict dialog, 提供「强制覆盖」「放弃」「回滚到 version N」3 选项 (per BR-WT-9)
+**WT-7.3 (FR-WT-7.3, P0)** — 语义重叠的完整草稿由 owner 固定双方精确修订并建立持久冲突，展示授权差异和显式解决；写入须通过当前 revision 的 CAS。取消或 CAS 失败须保留双方草稿，不得强制覆盖。
 
 ### WT-8 右侧工作流入口 (2 项)
 
@@ -358,7 +360,7 @@ interface TemplateColumn {
 
 ### 4.5 列 ↔ WorkItem.status 映射 (强制声明, per §1.4 Out-of-Scope)
 
-> **强制声明**: 本 SRS 不新增 `WorkItem.status` 枚举值, 模板列必须映射到既有 4 状态之一. 17 列预置默认映射见 §4.1.3 表. 用户列 mapping 默认 `in_progress`. **同一状态不允许被多列映射** (per FR-WT-5.6).
+> **现行映射约束**: 本 SRS 不要求新增 `WorkItem.status` 枚举值；每个模板列映射到既有状态之一，多列可映射同一状态。任务的模板版本和列身份必须由 owner 持久化，不能仅凭状态反推。用户列默认映射 `in_progress`；旧的一对一和唯一映射描述已由本条替代。
 
 ---
 
@@ -448,20 +450,20 @@ interface TemplateColumn {
 | FR-WT-3.5 | AC-WT-16: 复制模板成功, 新模板 `is_builtin=false` | e2e |
 | FR-WT-4.1 | AC-WT-17: 点击应用跳路由 + query string | e2e |
 | FR-WT-4.2 | AC-WT-18: 模板化看板渲染模板列, 不渲染默认 4 列 | snapshot test |
-| FR-WT-4.3 | AC-WT-19: 拖 WorkItem 到模板列 → status 更新 + 状态机校验 | e2e + state machine test |
+| FR-WT-4.3 | AC-WT-19: 同状态不同列可持久区分，拖动后 owner 校验授权、状态转换与 CAS，刷新后归列不变 | e2e + state machine test |
 | FR-WT-4.4 | AC-WT-20: indicator 显示当前模板名 + version | snapshot test |
 | FR-WT-5.1 | AC-WT-21: 增列 modal 强制选 panel | UI form test |
 | FR-WT-5.2 | AC-WT-22: builtin 列删除按钮置灰 | snapshot test |
 | FR-WT-5.3 | AC-WT-23: 作废列宽调节器置灰 | snapshot test |
 | FR-WT-5.4 | AC-WT-24: 重排违反顺序约束 → toast | UI integration test |
 | FR-WT-5.5 | AC-WT-25: 重命名校验 (空 / 重名) | form validation test |
-| FR-WT-5.6 | AC-WT-26: 改 mapping 弹 picker, 1 状态不可被多列映射 | UI form test |
+| FR-WT-5.6 | AC-WT-26: 多列可选择相同状态，列身份独立且归列可恢复 | UI + persistence test |
 | FR-WT-6.1 | AC-WT-27: 模板 CRUD 后 SSE 事件推送 (mock 阶段用事件总线) | integration test |
-| FR-WT-6.2 | AC-WT-28: SSE 不可用时 polling 5s 兜底 | e2e: 断 SSE → 验证 polling |
+| FR-WT-6.2 | AC-WT-28: 在线授权推送；断线后游标补缺、撤权停止投递 | e2e: 断线、重连、gap 和撤权 |
 | FR-WT-6.3 | AC-WT-29: 收到事件后所有相关路由 invalidate 缓存 | e2e |
-| FR-WT-7.1 | AC-WT-30: 进入编辑申请写锁, UI 显示 🟢 | e2e |
-| FR-WT-7.2 | AC-WT-31: 其它用户看到锁状态 + 按钮置灰 | e2e |
-| FR-WT-7.3 | AC-WT-32: 乐观锁冲突弹 conflict dialog 含 3 选项 | e2e |
+| FR-WT-7.1 | AC-WT-30: 两名授权用户可并发编辑，owner 检测不同到达间隔的语义重叠 | 并发 e2e |
+| FR-WT-7.2 | AC-WT-31: 有权用户看到协作状态，撤权后不能读取或订阅 | 授权 e2e |
+| FR-WT-7.3 | AC-WT-32: 重叠草稿固定双方修订、同一冲突通知、授权差异和显式 CAS 解决；取消/过期不丢草稿 | 并发 e2e + 故障注入 |
 | FR-WT-8.1 | AC-WT-33: UserMenu 第 5 入口存在, href 正确 | snapshot test |
 
 ### 7.2 端到端场景 (3 项)
@@ -469,8 +471,8 @@ interface TemplateColumn {
 | 场景 | 验证方法 |
 |---|---|
 | **AC-WT-e2e-1 创建 → 应用 → 编辑 → 回滚**: 用户在 `/workflow-templates` 创建模板 → 应用到看板 → 编辑列名 → 收到 conflict → 选择回滚到 version 2 → 看板列名恢复 | 完整 e2e |
-| **AC-WT-e2e-2 多人并发**: A 进入编辑拿锁 → B 进入看到锁 → A 超时释放 → B 拿锁 | 完整 e2e |
-| **AC-WT-e2e-3 跨界面同步**: A 改模板列 → 5s 后 B 的看板自动 invalidate | 完整 e2e |
+| **AC-WT-e2e-2 多人并发**: A、B 同时编辑，语义重叠时 owner 固定双方草稿并通知，显式 CAS 解决；更长间隔重叠仍触发冲突 | 完整 e2e |
+| **AC-WT-e2e-3 跨界面同步**: A 的 owner 事务提交后，授权的 B 经推送更新；断线重连按游标补齐且撤权用户不再接收 | 完整 e2e |
 
 ### 7.3 守门 #1 baseline (per AGENTS.md §4.1.1)
 
@@ -536,13 +538,13 @@ per `docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md` v0.1 验证基线
 
 ## §10 已知缺口 / 未决问题 (9 项, per 守门 #11 缺标比错标)
 
-1. **风险 #1 (polling 5s 兜底)**: v1 SSE 不可用时 polling 5s, 真实生产建议 SSE/WebSocket ≤ 1s (留 §2+)
+1. **风险 #1 (实时推送缺口)**: 历史 5 秒轮询不满足在线实时要求；owner Outbox、授权推送和断线恢复待实现及验收。
 2. **风险 #2 (后端持久化)**: P0 阻塞前提, v1 走前端 mock + zustand persist; 真实生产前必补后端 API
 3. **风险 #3 (签字 PDF/文档)**: v1 不做, 审核/完成 panel 仅 UI + 字段写存储 (留 P2+)
 4. **风险 #4 (ULYS-34 前次失败)**: 上次 worker `74dda328` commit 报告存在但仓库未实际落地 (per `git log --all -- docs/requirements/SRS-WORKFLOW-TEMPLATE-001.md` 0 hits); 本次 v0.1 重新撰写并落地
 5. **风险 #5 (作废列映射 `wontfix` 是否新增 enum)**: §4.1.3 表中作废列 mapping_status 写 `wontfix`, 但 `WorkItemStatus` 当前 enum 不含 `wontfix`; 需 stage 2/3 拍板: (a) 新增 enum 值, 或 (b) 复用 `todo` 映射
 6. **风险 #6 (软删物理恢复)**: §5.3 NFR-WT-S 写「软删不可物理恢复」, 需 stage 2 拍板确认 (vs 30 天保留后真删)
-7. **风险 #7 (映射唯一性冲突)**: FR-WT-5.6 写「同一状态不允许被多列映射」, 但 v1 17 列预置已存在 13 列映射到 `in_progress`, 与该约束冲突 — 需 stage 2 拍板: (a) 放宽约束 (允许 N 列 → 1 状态), 或 (b) 17 列拆 13 个独立 enum
+7. **风险 #7 (映射与归列)**: 当前规则允许多列映射同一状态；模板版本与任务列身份的 owner 持久化、迁移和并发验收仍待设计及验证。
 8. **风险 #8 (模板跨 project 范围)**: §4.1.1 `project_id` 字段允许 null = 跨项目, 但 v1 不实装跨项目模板; stage 3 需确认 null vs 必填
 9. **风险 #9 (ULYS-35 协调)**: 本 SRS 落档后 ULYS-35 (stage 2 基本設計) worker 可消费; ULYS-35 worker 需读本 SRS 作为前置输入, 不可跳级
 

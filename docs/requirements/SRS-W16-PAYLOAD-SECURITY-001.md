@@ -1,5 +1,7 @@
 # SRS-W16-PAYLOAD-SECURITY-001 — 协作载荷身份与持久加密要求
 
+> **2026-11-24 现行适用说明**：原 dev commit、Rust 1.99.0 与对应测试仅是历史切片，当前 MSRV 为 1.99.1；生产安全与目标环境验收沿用原文的未运行状态。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > 状态：Draft v0.9；这是 SRS-CANVAS-AGENT-001 v1.4 的 W16 补充需求，待后续无冲突时并回主 SRS。此次补充冻结设备 generation/source sequence、权威 snapshot/replay API、服务授权、租约、Collaboration 连续 checkpoint 与物理数据/RLS 分类；这些均为目标设计，尚非实现或部署验收。W16-A 的设备身份源码、隔离 PostgreSQL owner/RLS 与 OAuth repository 切片已部分验收；Canvas 活跃 SSE 流撤销关闭用例对应的 PostgreSQL 18.6 acceptance run 49b512fbfe334f0e98e46fe7eae7ea39 在候选 HEAD d1269a7928c9323f94403f3f1bb7888048c1dbac 上通过。该结果只关闭该单用例，生产协作闭环仍未验收；W16-C 只有有界 provider-neutral envelope core。
 
 ## 0. 目的与范围

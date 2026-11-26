@@ -5,11 +5,13 @@ MERGE (self:File {path:"docs/requirements/SRS-ANALYTICS-001.md"})
 */
 # SRS-ANALYTICS-001 — 效能分析
 
+> **2026-11-24 现行适用说明**：历史浏览器验证仅覆盖相应界面或种子数据；Lane BI 和 Project 汇总按当前授权计算、下钻时复验，未接通指标明确标示未接入。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **任务/验证/Agent/技能指标与操作日志 (全局组: 分析)** (per docs/prototypes/5 · 分析-html mockup, 2026-11-15 全量审计后建档)
 >
-> - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 23d60e75)
-> - 权威入口: **本文件是该功能的唯一权威文档** — 修改此功能只改本文件, 并在 §修订履历 加行
-> - 实现状态: ✅ 已闭环 (浏览器实测 2026-11-15)
+> - 状态: Requirements Baseline v1.0；commit 23d60e75 记录历史预览。
+> - 权威入口: 本文件记录分析专题；相关需求、设计及验收须同步。
+> - 实现状态: 2026-11-15 浏览器预览；授权数据和指标闭环需另行验收。
 > - 数据源: store (seed 预览模式) — 宿主接入后切换授权投影
 
 ---

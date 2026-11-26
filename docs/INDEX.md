@@ -5,8 +5,8 @@
 ## 顶层规范文档（canonical 入口）
 | 领域 | 入口 | 状态 | 说明 |
 |---|---|---|---|
-| 需求 | [requirements.md](requirements.md) + [requirements/](requirements/) | active | 主需求(统合版)；requirements/ 为各专题 SRS |
-| 基本设计 | [basic-design.md](basic-design.md) + [basic-design/](basic-design/) | active | 主文件 + 专题增量，非重复 |
+| 需求 | [requirements.md](requirements.md) + [专题要件总索引](requirements/README.md) | active | 主需求与专题入口；索引区分现行边界、历史记录和未完成验收。 |
+| 基本设计 | [basic-design.md](basic-design.md) + [基本设计总索引](basic-design/README.md) | active | 总册负责跨域契约，专题册负责单一设计入口；索引列出差异、验证与待对账项。 |
 | 详细设计 | [detailed-design/](detailed-design/) + 各 *-design.md | active | api/data/security/runtime/integration/ai-agent/external/internal/operation-design |
 | 数据设计 | [data-design.md](data-design.md) + [data-design/](data-design/) | active | db-design/ 仅 1 份补充表设计 |
 | 前端设计 | [frontend-design.md](frontend-design.md) + [frontend/design/](frontend/design/) | active | frontend-internal-01..04 为其子文档 |

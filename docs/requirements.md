@@ -1,5 +1,7 @@
 # Vibe Coding Work Management SaaS 要件定义书（统合扩展版 v7.09）
 
+> **2026-11-24 专题要件整理**：现行产品树为 Project → Lane → Worktree → Branch；Lane 独立于远端 Branch，内部 Run 契约在迁移前保持兼容。Lane 应用与 Branch 下的任务卡、Backlog 子窗口、Worktree CLI 上下文按 [专题要件总索引](requirements/README.md) 执行。原生安全关键 Hook fail closed、Schedule run-as 逐次复验、跨 owner 容量预留、协作冲突草稿保护和授权推送等为目标契约；历史原型及测试不证明当前生产验收。本次为需求整理，未完成全部基本设计、详细设计与测试的逐项对账，也未运行产品或目标环境验收。
+
 > **v7.09 9F4J 原生 BI 事件授权错误分类（2026-11-08）**：Native gRPC Unauthenticated / PermissionDenied 必须映射为 Unauthorized，其他状态映射为脱敏 Transport；应用适配器不得丢失此分类，授权失败必须使接收 worker fail closed 并停止，不能按瞬时传输故障重试或 ACK。该源码切片的定向测试、all-targets 编译、格式检查和独立审查已在来源 lane 完成；目标 PostgreSQL/RLS、真实 mTLS/RPC 与 commit-before-ACK 网络验收未运行，BI ingress 与执行仍保持关闭。详见 §50.8AX、基本设计 §16.79、专属详细设计和 Group WBS §23.21。
 
 > **当前工具链基线（2026-11-05）**：Star 的最低支持 Rust 版本已提升为 **1.99.1**，与 Rust 官方 1.99.1 点版本发布保持一致。根 `Cargo.toml`、BFF、被纳入构建的独立 crate、`rust-toolchain.toml`、CI、Canvas/k3s 构建镜像及受支持的验收 runner 必须使用 1.99.1；历史阶段记录中的 1.99.0 仅作为当时证据保留，不能作为当前基线通过证明。当前版本切换本身不关闭 workspace、目标数据库、托管 CI、发布或执行门禁。

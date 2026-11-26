@@ -1,5 +1,7 @@
 # SRS-MULTICA-AUTOPILOT-001
 
+> **2026-11-24 现行适用说明**：创建待执行意图不等于准许运行；每次 trigger/retry/resume 以固定 run-as 复验权限、绑定、策略及预算，并使用持久 occurrence 身份实现幂等。执行另需 Host/cluster 预留和独立 sandbox readiness。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Multica Autopilot 域要件定義書 v0.1** (per ADR-0026 v0.2 §2.1 模式 3, 跟 v34 候选对齐)
 >
 > - 状态: 🟡 Draft v0.1
@@ -138,9 +140,9 @@ STAR / Mavis 当前 root session 模型下, 4 类具体痛点:
 
 | FR | 描述 | 优先级 |
 |---|---|---|
-| FR-7 | `create_issue` 模式: autopilot 触发时建 WBS row + 指派 subagent + 跑任务 + 收 output (跟 Mavis 当前 root session 行为一致) | P0 |
+| FR-7 | `create_issue` 模式可创建持久的待执行意图；只有通过当前授权、绑定、策略、预算、容量、原生 Hook 与 sandbox 等准入后才可执行，并独立验证和回写结果。 | P0 |
 | FR-8 | `create_issue` 模式: 即使 agent runtime offline, 仍建 WBS row, 等 runtime 上线再 claim | P0 |
-| FR-9 | `run_only` 模式: autopilot 触发时直接派给 subagent, 不建 WBS row | P0 |
+| FR-9 | `run_only` 可不创建 WBS row，但必须通过与其他执行模式相同的准入及独立验证门。 | P0 |
 | FR-10 | `run_only` 模式: agent runtime offline 即 `skipped` + failure_reason, 不堆积任务 (per MUL-1899) | P0 |
 | FR-11 | 模式选择: 创建 autopilot 时配置, 不可运行时改 (避免误操作) | P0 |
 | FR-12 | 模式行为跟 Multica autopilot.go:101-150 一致 (line refs 在 BD-MULTICA-AUTOPILOT-001 §3 详) | P0 |
@@ -149,16 +151,16 @@ STAR / Mavis 当前 root session 模型下, 4 类具体痛点:
 
 | FR | 描述 | 优先级 |
 |---|---|---|
-| FR-13 | `run_only` 触发时校验 agent runtime 在线 (per Multica `dispatchAutopilot` admission) | P0 |
+| FR-13 | 每次 trigger/retry/resume 使用创建 Rule 时固化的不可变 run-as，复验当前授权、任务/Worktree 绑定、策略、预算与执行条件；runtime 在线只是必要条件之一。 | P0 |
 | FR-14 | 离线即 `skipped` + failure_reason=`agent_runtime_offline` | P0 |
-| FR-15 | `create_issue` 模式**不**做 admission check, 持久审计 trail 优先 | P0 |
+| FR-15 | `create_issue` 可记录待执行意图，实际执行必须进行完整 admission；未知或不足时保持非执行态并记录结果。 | P0 |
 | FR-16 | admission check 状态写 audit log (per 守门 #1 v15) | P0 |
 
 ### AP-4 Idempotency key (FR-17 ~ FR-20)
 
 | FR | 描述 | 优先级 |
 |---|---|---|
-| FR-17 | 60s 窗口内同 (trigger, source, payload_hash) 去重, 复用 Multica `autopilotRecentDuplicateWindow = 60s` | P0 |
+| FR-17 | 每次逻辑 occurrence 使用持久化的幂等身份和回执；60 秒窗口仅可用于可配置去抖，不能作为持久幂等边界。 | P0 |
 | FR-18 | 重复触发: 后到的触发返 `idempotent_replay: true` 标记, 不创建新 task | P0 |
 | FR-19 | Idempotency key 写 commit message (per 守门 #1 v15 docs 同步) | P0 |
 | FR-20 | Idempotency 窗口可配 (per WBS row 配置, 默认 60s) | P0 |

@@ -1,5 +1,7 @@
 # 01. Star Multi-User & Multi-Agent 排他与幂等架构系统 - 需求定义书 (Requirements Definition)
 
+> **2026-11-24 现行适用说明**：幂等身份、租约和副作用由各自 owner 管理；跨 owner 不共享事务。协作语义重叠按 revision 检测并固定双方完整草稿，不以客户端时间或固定窗口取代冲突事务。[要件总索引](../../requirements/README.md)
+
 > **状态**: 🟢 Accepted v1.0
 > **生效**: 2026-09-07 (初版 2026-09-07)
 > **制定者**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手

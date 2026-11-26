@@ -1,5 +1,7 @@
 # SRS-STAR-CANVAS-GAME-001
 
+> **2026-11-24 现行适用说明**：本文件保持既有退役定位，不将历史游戏功能视为当前生产需求或交付证据。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **历史状态（2026-10-30）**：已退役，不属于当前 Star 产品需求或发布范围。本文保留原始内容用于审计与历史追溯；当前 Canvas 服务以 `docs/basic-design.md` 和 `docs/deployment/star-canvas-services-deploy.md` 为准。
 
 > **STAR 画布游戏 软件需求规格说明书 v0.1** (弹幕 Roguelike + 3渲2 像素风机器人)

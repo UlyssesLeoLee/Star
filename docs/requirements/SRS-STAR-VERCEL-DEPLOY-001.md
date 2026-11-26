@@ -1,5 +1,7 @@
 # SRS-STAR-VERCEL-DEPLOY-001
 
+> **2026-11-24 现行适用说明**：关于仓库配置的调查结论只适用于其原检查时点；当前存在 frontend/vercel.json，文件存在本身不证明部署、目标数据库或线上验收成功。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **STAR Vercel 部署需求说明 v0.4**
 >
 > - 状态: Requirements Baseline（Draft，未批准，0 实现；v0.4 = 修正 Functions WebSocket GA 范围并同步 VCD-0 兼容性评审结论，详见附录 C）

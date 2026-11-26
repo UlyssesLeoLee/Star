@@ -1,5 +1,11 @@
 # Star 平台《基本设计書》
 
+> **2026-11-24 设计入口整理**：产品导航、缺陷、协作、Hooks、Sandbox 与 Vercel 对照的当前设计入口和验收边界见 [基本设计总索引](basic-design/README.md) 与 §16.80；历史增量仅为其时点证据，与现行设计冲突时以当前条款为准。线上 Vercel 部署提交和配置尚未核实。
+
+> **Agent 核心设计补充（2026-11-24）**：任务 Agent 的 Function Calling、ReAct、Hooks、Skills、MCP、流、多 Agent、思考模式、提问、工具调用和 token/费用统计统一见 [BD-AGENT-CORE-001](basic-design/BD-AGENT-CORE-001.md)；§16.15～16.17、§16.78 继续负责跨域运行、原生 Hook 和协作契约。目标设计不代表生产闭环已实现或验收。
+
+> **聊天上下文控制补充（2026-11-24）**：消息撤回与个人上下文排除分别由消息 owner 与 Context owner 授权和记录；派生内容失效、在途执行与无法撤销的外部副作用按 [聊天上下文基本设计](basic-design/BD-CHAT-CONTEXT-CONTROL-001.md) 处理。IM1.0 候选接口和上线状态均需独立核验。
+
 > **9F4J 当前增量（2026-11-08）**：Native gRPC 的 Unauthenticated / PermissionDenied 统一映射为 Unauthorized；其他状态成为不带服务端详情的 Transport。应用适配器保留授权拒绝，消费者遇到该拒绝后进入 Blocked 并停止，不做传输重试或 ACK。定向 Rust 检查与源码审查只证明该分类切片；目标 PostgreSQL/RLS、真实 mTLS/RPC 和 ACK 网络验收未运行，BI 接收与执行保持 fail closed。详见 §16.79 和 DD-9F4J-NATIVE-GRPC-AUTH-CLASSIFICATION-001。
 
 > **9F4I 当前增量**：Rust 原生消息服务新增独立 `event` wire/delivery kind，并通过 15 个迁移/契约步骤（隔离 PostgreSQL runner 连续成功 3 次）、Rust 44/44 library tests 与 native-gRPC feature all-targets check。该切片只开放受独立 Profile 授权的传输类别；BI 认证 adapter、owner Inbox commit-before-ACK 网络联测、生产身份/目标 DB、恢复与性能仍未完成，BI 消费与任务执行继续 fail closed，详见 `PHASE-9F4I-NATIVE-EVENT-REPORT.md`。
@@ -12,8 +18,8 @@
 > **WLD-0 hostless Run HTTP acceptance（2026-10-23）**：REST 读写事务在 tenant/actor scope 初始化前显式切换至 `star_engineering_directory_owner`；该 role 仅对 Run identity、首个 revision、创建者 grant 获得 INSERT。fresh PostgreSQL 18 loopback runner 55/55 步通过，并以实际认证 HTTP 路由验证 hostless create、同键 replay、Project list、RunContext 和无 Run grant actor 的不可见性；同时覆盖绑定 race、outbox 故障回滚、detach。runner 未连接目标数据库，结束后停止并删除唯一临时 cluster。目标部署 login membership、目标 DB migration/grants、历史 reconciliation 与 hostless Task/CLI/执行仍未验收或保持 fail closed；详见 WLD-0 报告。
 > **WLD-1 Repository master review remediation（2026-10-24）**：SCM bounded context 增加 RepositoryMasterRevision 与 tenant RLS owner adapter。current partial unique index 保证每个身份至多一个 current revision，新增 DEFERRABLE INITIALLY DEFERRED 约束 trigger 在提交时保证至少一个；单独关闭 current revision 会回滚，关闭+连续 successor 同事务提交可成功。owner-role migration 在任何 role/schema/grant 变更前枚举 database、schema、relation/column、function、type、language、tablespace、FDW/server、large-object、default ACL 与可用 parameter ACL；发现 SCM schema 外直接 ACL、向外 role membership 或对象所有权即 fail closed，PUBLIC ACL 不误判为 owner direct grant，也不跨 schema 撤权。migration 显式获取 PoolConnection，在该物理连接上开始事务并执行身份复验和全部 DDL；pool 单连接上限仅控制资源。两个 PG bootstrap/drift probe 分支在 probe/task 与 cleanup 同时失败时都保留双方诊断；地址/端口 mismatch identity guard 负例通过。Rust 1.99 目标包 locked all-targets check、35+35 包测试、ignored PG target 编译和定向 rustfmt 检查通过；package fmt 检查被四个未改文件阻断。PostgreSQL test 仍 ignored 且未运行（缺一次性数据库 fixture），full workspace、Clippy、独立 lock/resolution、目标 DB/RLS/并发仍未验收。当前 Cargo.lock diff 仅新增 adapter 到既有 `domain-scm` package 的 direct dependency edge，无新增 package entry 或其他 lockfile 改动。Project link、Run binding、Host root registry、provider/API 与 Worktree/CLI admission 仍未实现。详见 PHASE-WLD1-REPOSITORY-MASTER-20261023.md。
 
-> **文档版本**: v7.12 (2026-10-25)
-> **上游要件定义书**: docs/requirements.md v7.08
+> **文档版本**: v7.16 (2026-11-24，聊天撤回与上下文控制设计入口)
+> **上游要件定义书**: docs/requirements.md 与 docs/requirements/README.md 的现行边界
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 > **PR history**: v5.41 → PR-276 add § Index + per-§ anchors + DEC-008 ADR formalization (per PR-272 docs 乖离 audit follow-up)
 
@@ -4263,6 +4269,8 @@ Run Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 ### 16.2 Project / Run / Worktree / Branch 导航与 Run App Shell
 
+**现行产品入口（2026-11-24）**：主导航为 Project → Lane → Worktree → Branch；Lane 可无远端 repository/branch 身份管理。内部 Engineering Run 的 API、ID、授权和持久化兼容契约在迁移前保留。选择已授权 Worktree 后打开 Lane 级应用，任务卡属于 Branch 并在 Backlog 内以可关闭子窗口打开，CLI 继承该 Worktree。Lane 未知或解绑时显示未归类/未绑定，不根据同 Project 的首个 Lane 猜测归属或授权。以下历史实现与版本化 Run 契约不改变此产品层边界。
+
 目标 Run 目录、创建、读取与授权仅以 Project/Run membership/grants 为准，不依赖远端宿主 Branch 或 Worktree binding；主树固定为 Project → Engineering Run → Worktree → Branch。Worktree binding 仅门控 Worktree 子树、checkout 操作和 focus，不能成为 Project/Run 可见性的前置条件。候选实现已提供 Project-scoped Run list/create 与 Project+Run 授权源码，且 remote repository_id/branch_id 可为空；旧 Branch/Run registry 继续兼容。WLD-0 新增绑定/重绑/解绑 API 源码和前向 migration：绑定记录本地 Worktree repository，允许 hostless Run 的远端 repository/branch 为空，并使用 Project/Run 授权、版本 CAS、幂等、Worktree 锁、SCD2、Audit 和同事务 Outbox。migration 尚未应用到目标数据库，应用角色 grants/RLS、真实认证写入、回滚、并发与历史 reconciliation 尚未验收。可信本地 Branch observation、Task owner tuple hostless migration 和授权负向验收仍未完成。Branch 只从受信 Worktree checkout observation 生成末级状态叶；远端 SCM 操作额外要求相应 Branch grant。
 
 **WLD-0 binding vocabulary**：Engineering Run Directory owns `EngineeringRunWorktreeBinding`, its Project/Run-authorized attach/reassign/detach commands and Run Outbox facts. Worktree Domain owns checkout lifecycle and Project-to-repository checkout ownership; it does not own the Run binding fact. Run/Worktree relation CAS uses `binding_id` + `binding_version`; Project/repository relation CAS uses `project_binding_id` + `project_binding_version`; optional RunContext focus selection uses `focus_version`. `worktree_generation` and `k3s_cluster_generation` are separate resource-incarnation values and are never binding-version aliases. Local Branch is an observation with `local_branch_ref`, `observation_source`, `observed_at` and `freshness`; optional `remote_branch_id` is separate. Missing, stale or invalid observations remain unknown. Hostless Runs and optional Worktree focus remain valid; each attach/reassign/detach command must be authorized by its owning domain and revalidate current facts. These terms align the design only: target PostgreSQL roles/grants and FORCE RLS, authenticated writes, rollback/replay, concurrent races, duplicate-current-row handling and historical reconciliation remain open acceptance gates.
@@ -6009,3 +6017,20 @@ Unauthorized 在 pull 前出现时，消费者停止且不创建 delivery 事实
 本地实现状态：native mapper 与应用适配器定向测试、star-api-rest all-targets 检查、Rust 格式检查和独立源码审查已在来源 lane 通过；集成到 dev 后未在本轮重跑 Rust gates。Clippy、目标 PostgreSQL/RLS/grants、真实 mTLS/RPC、commit-before-ACK latch、服务端授权撤销/轮换与生产恢复仍未验收。9F4J 继续 OPEN/PARTIAL，BI ingress 与 Schedule/Agent execution 不因本切片而启用。
 
 修订 v7.13 · 2026-11-08 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：同步 9F4J 授权错误分类的应用层契约、消费者 fail-closed 行为和当前验证边界；§16.77（WLD-1）与 §16.78（协作）保持原义，新增 §16.79。
+
+## 16.80 Vercel 界面差异与跨模块设计收敛
+
+**范围与证据**：本节是跨域目录，不重复专题状态机或数据库设计。上一轮 Vercel 部署列表查询因网络请求失败，线上提交、身份、环境及运行结果未知；本地源码、历史测试、未提交工作与生产证据分别记录。完整映射见 [基本设计总索引](basic-design/README.md)。
+
+1. **统一导航和上下文**：见 §16.2。缺陷、Backlog、Canvas、Workflow、BI 和插件使用同一已授权 Lane/Worktree 上下文；无 Worktree 的 Lane 可管理其允许的记录，不能推断 checkout 或授权。不同视图切换和返回深链需复验当前身份、范围与资源归属。
+2. **缺陷与看板事实**：统一 Bug 身份、owner 写入和 revision，先确认 WorkItem/RunTaskCard 与新增 `defect.*` 的关系。创建、查询、部分失败、验证证据和 AC-DI 追踪以 [缺陷基本设计 §3.4](basic-design/BD-DEFECT-INTELLIGENCE-001.md#34-缺陷创建查询与验证的统一契约) 为权威入口；不得将 `done` 推断为验证通过。
+3. **协作与模板**：跨域协作只定义在 §16.78；[工作流模板基本设计](design/BD-WORKFLOW-TEMPLATE-001.md) 仅补模板列和状态映射。owner 事务、授权推送、双方草稿、显式解决和 CAS 不因界面离线或 provider 未接入而降级。
+4. **设置和执行**：高级设置 Hooks 的编辑与策略传播见 [Hook 基本设计](design/BD-MULTICA-HOOK-001.md)，隔离故障处理见 [Sandbox 基本设计](basic-design/SANDBOX-BASIC-DESIGN-002.md)；Schedule 的固定 run-as 与跨 owner 预留见 [Schedule 基本设计](design/BD-AUTOMATION-SCHEDULE-API-001.md)。浏览器本地设置、虚拟机就绪或准备回执均不证明安全执行闭环。
+5. **BI、通知和数据诚实**：所有汇总、导出、分享和下钻按相同 actor/Project/Lane/资源授权范围计算；通知由事实 owner 的 Outbox 驱动，收件箱已读事实由通知 owner 持久化，读取和跳转复验。无真实数据源、无授权、失败、部分失败和空结果分别显示；演示内容不得标作实时事实。
+6. **交付验收**：Web/Vercel 与桌面分别记录版本、身份、API、持久数据源、目标环境和测试结果。缺陷 AC-DI-01～08、协作多客户端/恢复/性能、Hook/Sandbox 故障注入及 Schedule 生产执行均需独立证据；本节未声称这些项目通过。
+
+修订 v7.14 · 2026-11-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：按 Vercel 源码对照及要件整理建立跨域设计入口、消除产品导航歧义并链接专题；本次为设计整理，线上和运行时验收未执行。
+
+修订 v7.15 · 2026-11-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：增加任务 Agent 核心专题入口及 FR/AC 追踪，复用既有跨域 Hook、Sandbox、Schedule 和协作设计；实现与性能未验收。
+
+修订 v7.16 · 2026-11-24 · Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核。触发：增加聊天撤回和上下文影响控制的要件/基本设计入口，明确跨 owner 与外部副作用边界；未做线上验收。

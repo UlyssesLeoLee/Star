@@ -1,5 +1,7 @@
 # SRS-PI-BORROW-001
 
+> **2026-11-24 现行适用说明**：仅借鉴小核心与事件生命周期，执行核心保持 Rust；工具调用后不得自动修改参数重放，新的变更命令须重新授权并按幂等契约执行。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Pi Coding-Agent 模式级参考 — Agent Core 内部架构升级要件定義書 v0.2**
 > (基于 ULYS-175 调研报告 + ULYS-175 §F 不适配分析, 跟 ADR-0026 v0.2 §2.1 模式 4 对齐)
 >
@@ -239,7 +241,7 @@ Pi 解法 (per ULYS-175 报告 §"5 MUST"):
 |---|---|---|
 | FR-24 | `AgentPolicy` 加 `policy_hooks: PolicyHooks` 字段, 含 `before_tool_call: Vec<Box<dyn PolicyHook>>` + `after_tool_call: Vec<Box<dyn PolicyHook>>` (per pi-agent-core/src/types.ts:66-128) | P0 |
 | FR-25 | `AgentLoopBoundary::before_tool_call` 遍历 `policy_hooks.before_tool_call`, 任一返回 `PolicyDecision::Deny` → abort 工具调用 | P0 |
-| FR-26 | `after_tool_call` 钩子结果 `PolicyDecision::Modify(args)` → 修改参数重试, `Audit` → 写 audit_log (per 守门 #1 v15) | P0 |
+| FR-26 | `after_tool_call` 只返回有界观测或建议并写审计；不得修改参数自动重放工具调用。新的变更命令须重新授权并按幂等契约执行。 | P0 |
 
 ### PI-6 ~ PI-9 SHOULD (FR-27 ~ FR-30, 简列, 5 域 Lead 拍板后再展开)
 
@@ -306,7 +308,7 @@ Pi 解法 (per ULYS-175 报告 §"5 MUST"):
 | AC-3 | StopReason 7 值 + Usage 五元组 + ThinkingLevel 全部定义, 老 `finish_reason: String` 标 `#[deprecated]` (per FR-7~12) |
 | AC-4 | AgentLoopBoundary trait 4 方法 + StreamFn no-throw 契约 UT 通过, 模拟 5 类 provider 失败 (per FR-13~18) |
 | AC-5 | Tool trait 5 方法重写 + 老 3 方法 `#[deprecated]`, 现有 stub (BashTool/ReadTool/WriteTool) 编译通过 (per FR-19~23) |
-| AC-6 | AgentPolicy::policy_hooks 字段接入, beforeToolCall 任一 deny → abort, afterToolCall modify → 重试 (per FR-24~26) |
+| AC-6 | beforeToolCall 任一安全关键 deny → abort；afterToolCall 仅提供观测/建议，参数变更须新命令重新授权，禁止自动重放（FR-24～26）。 |
 | AC-7 | 守门 #13 W-T-M 100% 覆盖: Tool schema = Master / execution log = Transaction / replay state = Work / AgentStreamEvent audit log = Transaction |
 | AC-8 | 12 段 SRS 模板结构完整, 5 域 Lead 拍板签字 (per §10) |
 | AC-9 | PI-6~9 SHOULD 在 Sprint 3-5 启动前, 5 域 Lead 各拍 1 个 sub-issue (per §10 签字栏联动) |

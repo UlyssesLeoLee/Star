@@ -1,5 +1,6 @@
 # BD-CANVAS-001
-# BD-CANVAS-001
+
+> **2026-11-24 现行边界**：Canvas 是 Lane 应用；任务卡位于 Branch 并在 Backlog 子窗口打开。实时协作及冲突保护唯一以 [总册 §16.78](../basic-design.md#1678-resource-scoped-push-collaboration-drafts-and-conflict-recovery) 为准，Project Worktree Index 与 Lane Canvas 是独立资源。历史对标及旧导航只作原方案记录。
 
 > ⚠️ **现状纠正 (2026-11-15)**: /canvas 直进 3 标签 (无画廊); 新增 ?tab= 深链
 > (board/agent/relation); Worktree 图在 /canvas/worktree-graph; workflow 独立页。

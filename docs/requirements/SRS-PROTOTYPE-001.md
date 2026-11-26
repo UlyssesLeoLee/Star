@@ -5,6 +5,8 @@ MERGE (self:File {path:"docs/requirements/SRS-PROTOTYPE-001.md"})
 */
 # SRS-PROTOTYPE-001 — 原型生成器
 
+> **2026-11-24 现行适用说明**：原型界面使用当前 Lane/Worktree 上下文；示例文件或模型代理调用仅证明对应局部路径，授权上下文、持久化和导出需独立验收。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **1D-5D 原型生成与推演 (Branch 工作区页签)** (per docs/prototypes/2d · 原型-html mockup, 2026-11-15 全量审计后建档)
 >
 > - 状态: Requirements Baseline v1.0 — 已实现并实测 (commit 23d60e75)

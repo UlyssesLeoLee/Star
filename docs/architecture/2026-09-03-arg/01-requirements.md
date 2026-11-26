@@ -1,5 +1,7 @@
 # ARG-ARCH-001 Agent Relationship Graph (ARG) 要件定義書
 
+> **2026-11-24 现行适用说明**：关系图不授予历史、上下文或执行权限；读取及协作须按当前 Project/Lane/资源授权并校验版本化能力和预算。历史 5 域是治理分类，不映射为 Star DDD 域。[要件总索引](../../requirements/README.md)
+
 > **Status**: 🟡 Draft v0.1 (per 2026-09-09 21:18 JST 派发 brief v0.45 §14.11 ARG.1 文档完整化)
 > **Created**: 2026-09-09
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 永久代签)

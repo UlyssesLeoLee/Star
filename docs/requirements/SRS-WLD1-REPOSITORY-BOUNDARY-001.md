@@ -1,5 +1,7 @@
 # SRS-WLD1-REPOSITORY-BOUNDARY-001
 
+> **2026-11-24 现行适用说明**：产品层使用 Lane，兼容迁移完成前内部 Run API/ID 与授权边界不变；Project owner、retiring、迁移回执和失败保留旧关联的契约继续有效。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > 状态：Draft v0.4；需求已纳入 Project owner、部署选择、hostless Run、可选 infrastructure placement 及 Schedule/手动触发来源契约，尚未实施或通过运行验收。
 > 基线：dev `63d97ca5b00a1476e0beeaad0e88032c85b0f1b6`。
 > W11-A 设计增补基线：dev `4f629ce5103fb4a9fb67a775341475ef66bbf2ea`；仅文档决策，待同步 `DD-LOCAL-INFRASTRUCTURE-001` 与 WBS。

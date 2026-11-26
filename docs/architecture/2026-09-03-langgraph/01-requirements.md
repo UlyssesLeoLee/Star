@@ -1,5 +1,7 @@
 # 01. Star LangGraph 統合アーキテクチャ - 要件定義書 (Requirements Definition)
 
+> **2026-11-24 现行适用说明**：Workflow 在 Lane 上下文协作；checkpointer 持有流程状态，不拥有任务、Canvas 或 Git 业务事实。恢复前复验授权、绑定及预算，副作用通过 owner 幂等命令处理；执行需原生 Hook、sandbox 与独立验证。[要件总索引](../../requirements/README.md)
+
 > **状態**：🟢 Draft v0.3 (Worktree 群组集成补充)
 > **日期**：2026-09-28
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手

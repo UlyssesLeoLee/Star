@@ -1,5 +1,7 @@
 # SRS-STAR-CANVAS-001
 
+> **2026-11-24 现行适用说明**：本文件保持原有 SUPERSEDED 定位；现行画布目标见 [SRS-CANVAS-001](SRS-CANVAS-001.md)，Project 级 Worktree 汇总另见 [SRS-WORKTREE-CANVAS-001](SRS-WORKTREE-CANVAS-001.md)。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **⚠️ SUPERSEDED 2026-09-07 JST ⚠️**
 >
 > **本 SRS v0.1 (commit `9a2e6e0` + `934d456` self-review fix) 已被全面推翻重写。**

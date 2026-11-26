@@ -1,5 +1,7 @@
 # SRS-MULTICA-HOOK-001
 
+> **2026-11-24 现行适用说明**：安全关键 Hook 由 Rust 原生执行，策略、执行器或必要审计不可用时 fail closed；旧 Python handler 仅作非权威兼容或观测，后文旧 fail-open/WARN 条款不适用于产品关键操作。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Multica Hook 域要件定义书 v0.5.6** (沿用 ULYS-235 Advanced Settings Hooks tab；补充条件式 Run admission producer/事务双写与当前 production adapter 缺口)
 
 > - 状态: 🟡 Draft v0.5.6 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer contract)
@@ -418,9 +420,9 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 
 | ID | 要求 | 計測方法 | 阈值 |
 |---|---|---|---|
-| **NFR-A-1** | registry 加载失败 → fail-open | 单元测试 | 100% 放行 |
+| **NFR-A-1** | 安全关键 registry 加载失败 → fail-closed | 故障注入 | 100% 阻断关键操作 |
 | **NFR-A-2** | audit log 写失败 → fail-closed | 单元测试 | 100% 阻断 |
-| **NFR-A-3** | hook handler 抛异常 → 视为 WARN | 单元测试 | 100% 继续 fan-out |
+| **NFR-A-3** | 原生安全关键 hook 异常 → fail-closed；非权威观测 handler 的失败不能改变授权决定 | 故障注入 | 100% 阻断受影响关键操作 |
 | **NFR-A-4** | registry 热更新不中断 hook 调用 | 实测 | 0 中断 |
 | **NFR-A-5** | mavis runtime 启动时间不显著增加 | 实测 | < 100ms (14 事件装载 + builtin hook 装载) |
 

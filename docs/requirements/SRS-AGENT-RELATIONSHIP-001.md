@@ -1,5 +1,7 @@
 # SRS-AGENT-RELATIONSHIP-001
 
+> **2026-11-24 现行适用说明**：Agent 关系不授予读取或执行权限；引用历史和输出时须复验当前身份、资源授权、版本化能力及预算，撤权即停止访问。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Agent Relationship Graph (ARG) — 要件定義書 v0.1**
 >
 > - 状态: 🟡 Draft v0.1

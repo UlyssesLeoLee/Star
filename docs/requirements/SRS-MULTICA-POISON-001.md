@@ -1,5 +1,7 @@
 # SRS-MULTICA-POISON-001
 
+> **2026-11-24 现行适用说明**：poison 标志及会话键只用于恢复判断；恢复前还须复验当前 actor、Project/Lane/Task/Worktree 绑定、策略版本、预算、执行 fence 和已有副作用的幂等状态。 统合边界与状态说明见 [要件总索引](README.md)。
+
 > **Multica Session Poisoning 域要件定義書 v0.1** (per ADR-0026 v0.2 §1.1 抽象, 跟 v33 候选配套)
 >
 > - 状态: 🟡 Draft v0.1
