@@ -209,6 +209,14 @@
   --glow-accent:    0 0 21px rgba(0, 240, 255, 0.38), 0 0 42px rgba(168, 85, 247, 0.16);
   --glow-secondary: 0 0 21px rgba(255, 42, 133, 0.38);
 
+  /* === 暗夜神格 (Dark Divinity) 统一硬边直角与衍生变量 === */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --dark-divinity-grid: radial-gradient(rgba(0, 240, 255, 0.07) 1px, transparent 1px);
+  --dark-divinity-bevel: inset 1px 1px 0 0 rgba(189, 231, 255, 0.16), inset -1px -1px 0 0 rgba(0, 0, 0, 0.55);
+
   /* === CEL-SHADED / CYBER OBSIDIAN ENGINE TOKENS === */
   --cel-bg:               #06080e;
   --cel-surface-card:     #0c111c;

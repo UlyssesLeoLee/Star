@@ -68,6 +68,7 @@ const STAR_LIGHT_PALETTE: ColorToken[] = [
 const STAR_DARK_PALETTE: ColorToken[] = [
   { name: "--color-primary", hex: "#00F0FF" },
   { name: "--color-secondary", hex: "#FF2A85" },
+  { name: "--color-accent", hex: "#FFC400" },
   { name: "--color-success", hex: "#10B981" },
   { name: "--color-warning", hex: "#F59E0B" },
   { name: "--color-danger", hex: "#FF3366" },

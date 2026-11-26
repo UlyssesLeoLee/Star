@@ -51,6 +51,17 @@ describe("THEMES", () => {
     }
   });
 
+  it("暗夜神格 (dark) 主题包含统一的高对比赛博神格色板", () => {
+    const dark = getTheme("dark");
+    expect(dark).toBeDefined();
+    expect(dark!.displayName).toBe("暗夜神格");
+    expect(dark!.isDark).toBe(true);
+    expect(dark!.colors.find((c) => c.name === "--color-primary")?.hex).toBe("#00F0FF");
+    expect(dark!.colors.find((c) => c.name === "--color-secondary")?.hex).toBe("#FF2A85");
+    expect(dark!.colors.find((c) => c.name === "--color-accent")?.hex).toBe("#FFC400");
+    expect(dark!.colors.find((c) => c.name === "--color-surface")?.hex).toBe("#06080E");
+  });
+
   it("极魅主题为唯一专属 16 位与 HD-2D 纯像素风 (0px 矢量圆角 + 神恩紫罗兰与丝绒红)", () => {
     const charisma = THEMES.find((t) => t.id === "charisma");
     expect(charisma).toBeDefined();

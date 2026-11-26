@@ -21,6 +21,44 @@ import * as THREE from "three";
 import { resolveCelTokenPalette, readThemeRgb, type CelTokenPalette } from "@/lib/theme/themeTokens";
 
 // ============================================================================
+// 0. SHARED THEME / VISIBILITY / REDUCED-MOTION HOOKS
+// ============================================================================
+function useThemeRevision(): number {
+  const [rev, setRev] = useState(0);
+  useEffect(() => {
+    if (typeof MutationObserver === "undefined") return;
+    const obs = new MutationObserver(() => setRev((r) => r + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return rev;
+}
+
+function usePageVisibility(): boolean {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const onVis = () => setVisible(!document.hidden);
+    setVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+  return visible;
+}
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return reduced;
+}
+
+// ============================================================================
 // 1. SHARED SHADERS FOR 3D CEL UI PRIMITIVES
 // ============================================================================
 
@@ -112,11 +150,13 @@ function CelButtonMesh({
   pressed,
   hovered,
   focused,
+  themeRev,
 }: {
   variant: "crimson" | "cyan" | "gold" | "stealth";
   pressed: boolean;
   hovered: boolean;
   focused: boolean;
+  themeRev: number;
 }) {
   const meshRef = useRef<THREE.Group>(null);
   const keycapRef = useRef<THREE.Mesh>(null);
@@ -155,7 +195,8 @@ function CelButtonMesh({
           fallback: { base: [1, 0.094, 0.298], shadow: [0.22, 0.016, 0.063], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
         }));
     }
-  }, [variant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant, themeRev]);
 
   // 几何：键帽(圆角盒) + 底座(圆柱) + 弹簧(螺旋线) + 波纹环
   const keycapGeom = useMemo(() => new THREE.BoxGeometry(2.4, 0.5, 0.35, 8, 4, 4), []);
@@ -338,6 +379,8 @@ export function CelButton3D({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
 
   useEffect(() => setMounted(true), []);
 
@@ -384,18 +427,21 @@ export function CelButton3D({
       onKeyDown={handleKeyDown}
       style={{ width: "100%" }}
     >
-      <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 30 }}
-        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
-        className="w-full h-[48px]"
-      >
-        <CelButtonMesh
-          variant={variant}
-          pressed={pressed}
-          hovered={hovered && !disabled}
-          focused={focused && !disabled}
-        />
-      </Canvas>
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 4.5], fov: 30 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          className="w-full h-[48px]"
+        >
+          <CelButtonMesh
+            variant={variant}
+            pressed={pressed}
+            hovered={hovered && !disabled}
+            focused={focused && !disabled}
+            themeRev={themeRev}
+          />
+        </Canvas>
+      )}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="font-black text-xs text-[var(--cel-ink)] leading-tight">{label}</span>
         {sublabel && (
@@ -422,7 +468,8 @@ export interface CelToggle3DProps {
 function CelToggleMesh({
   checked,
   focused,
-}: { checked: boolean; focused: boolean }) {
+  themeRev,
+}: { checked: boolean; focused: boolean; themeRev: number }) {
   const baseRef = useRef<THREE.Mesh>(null);
   const leverRef = useRef<THREE.Group>(null);
   const knobRef = useRef<THREE.Mesh>(null);
@@ -443,7 +490,8 @@ function CelToggleMesh({
         rim: new THREE.Color(...v.rim),
       };
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeRev]
   );
 
   const colorsOff = useMemo(
@@ -459,7 +507,8 @@ function CelToggleMesh({
         rim: new THREE.Color(...v.rim),
       };
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeRev]
   );
 
   const baseGeom = useMemo(() => new THREE.BoxGeometry(2.2, 0.9, 0.28), []);
@@ -671,6 +720,8 @@ export function CelToggle3D({
   const [focused, setFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
 
   useEffect(() => setMounted(true), []);
 
@@ -718,14 +769,16 @@ export function CelToggle3D({
       onBlur={() => setFocused(false)}
       style={{ width: "140px", height: "64px" }}
     >
-      <Canvas
-        camera={{ position: [0, 0, 4.2], fov: 35 }}
-        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
-        frameloop={animating ? "always" : "demand"}
-        className="w-full h-full"
-      >
-        <CelToggleMesh checked={checked} focused={focused} />
-      </Canvas>
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 4.2], fov: 35 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          frameloop={animating ? "always" : "demand"}
+          className="w-full h-full"
+        >
+          <CelToggleMesh checked={checked} focused={focused} themeRev={themeRev} />
+        </Canvas>
+      )}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2">
         {label && <span className="font-black text-xs text-[var(--cel-text-primary)] leading-tight">{label}</span>}
         {sublabel && <span className="font-mono text-[8px] text-[var(--cel-text-secondary)] leading-none mt-0.5">{sublabel}</span>}
@@ -742,12 +795,14 @@ export interface CelBeacon3DProps {
   size?: number;
   title?: string;
   className?: string;
+  "data-testid"?: string;
 }
 
 function CelBeaconMesh({
   status,
   focused,
-}: { status: "idle" | "active" | "warning" | "error"; focused: boolean }) {
+  themeRev,
+}: { status: "idle" | "active" | "warning" | "error"; focused: boolean; themeRev: number }) {
   const towerRef = useRef<THREE.Group>(null);
   const antennaRef = useRef<THREE.Group>(null);
   const dishRef = useRef<THREE.Mesh>(null);
@@ -764,7 +819,7 @@ function CelBeaconMesh({
     };
     const token = tokenMap[status] ?? "--cel-surface-sub";
     const v = resolveCelTokenPalette({
-      baseToken: token as any, rimToken: "--cel-cyan",
+      baseToken: token, rimToken: "--cel-cyan",
       fallback: { base: [0.5, 0.5, 0.5], shadow: [0.1, 0.1, 0.1], highlight: [1, 1, 1], rim: [0, 0.941, 1] },
     });
     return {
@@ -773,7 +828,8 @@ function CelBeaconMesh({
       highlight: new THREE.Color(...v.highlight),
       rim: new THREE.Color(...v.rim),
     };
-  }, [status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, themeRev]);
 
   const towerGeom = useMemo(() => new THREE.CylinderGeometry(0.15, 0.22, 1.8, 8), []);
   const antennaGeom = useMemo(() => new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6), []);
@@ -996,9 +1052,13 @@ export function CelBeacon3D({
   size = 48,
   title,
   className = "",
+  "data-testid": testId,
 }: CelBeacon3DProps) {
   const [focused, setFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => setMounted(true), []);
 
@@ -1010,7 +1070,7 @@ export function CelBeacon3D({
       idle: "var(--cel-surface-sub)",
     };
     return (
-      <div className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
+      <div data-testid={testId} className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             className="w-2 h-2 rounded-full animate-pulse"
@@ -1025,20 +1085,25 @@ export function CelBeacon3D({
   return (
     <div
       role="status"
-      aria-label={title}
+      aria-label={title ?? `3D Beacon: ${status}`}
+      title={title}
+      data-testid={testId}
       tabIndex={0}
       className={`relative inline-block cursor-pointer select-none focus:outline-none ${className}`}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{ width: size, height: size }}
     >
-      <Canvas
-        camera={{ position: [0, 0, 5.5], fov: 30 }}
-        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
-        className="w-full h-full"
-      >
-        <CelBeaconMesh status={status} focused={focused} />
-      </Canvas>
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 5.5], fov: 30 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          frameloop={reducedMotion ? "demand" : "always"}
+          className="w-full h-full"
+        >
+          <CelBeaconMesh status={status} focused={focused} themeRev={themeRev} />
+        </Canvas>
+      )}
     </div>
   );
 }
@@ -1057,7 +1122,8 @@ function CelDialMesh({
   value,
   options,
   focused,
-}: { value: number; options: string[]; focused: boolean }) {
+  themeRev,
+}: { value: number; options: string[]; focused: boolean; themeRev: number }) {
   const dialRef = useRef<THREE.Group>(null);
   const knobRef = useRef<THREE.Group>(null);
   const markerRef = useRef<THREE.Mesh>(null);
@@ -1077,7 +1143,8 @@ function CelDialMesh({
         rim: new THREE.Color(...v.rim),
       };
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeRev]
   );
 
   const bgColors = useMemo(
@@ -1093,7 +1160,8 @@ function CelDialMesh({
         rim: new THREE.Color(...v.rim),
       };
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeRev]
   );
 
   const dialGeom = useMemo(() => new THREE.CylinderGeometry(1.1, 1.1, 0.15, 32), []);
@@ -1308,6 +1376,8 @@ export function CelDial3D({
   const [mounted, setMounted] = useState(false);
   const [dragging, setDragging] = useState(false);
   const startRef = useRef({ x: 0, y: 0, value: 0 });
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
 
   useEffect(() => setMounted(true), []);
 
@@ -1373,13 +1443,15 @@ export function CelDial3D({
       onKeyDown={handleKeyDown}
       style={{ width: "80px", height: "80px" }}
     >
-      <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 30 }}
-        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
-        className="w-full h-full"
-      >
-        <CelDialMesh value={value} options={options} focused={focused} />
-      </Canvas>
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 4.5], fov: 30 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          className="w-full h-full"
+        >
+          <CelDialMesh value={value} options={options} focused={focused} themeRev={themeRev} />
+        </Canvas>
+      )}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="font-mono text-[10px] text-[var(--cel-text-secondary)]">{options[value]}</span>
       </div>
@@ -1396,7 +1468,7 @@ export interface CelCard3DProps {
   variant?: "default" | "elevated" | "outlined";
 }
 
-function CelCardMesh({ variant }: { variant: "default" | "elevated" | "outlined" }) {
+function CelCardMesh({ variant, themeRev }: { variant: "default" | "elevated" | "outlined"; themeRev: number }) {
   const panelRef = useRef<THREE.Mesh>(null);
   const edgeRef = useRef<THREE.Group>(null);
   const cornerRefs = useRef<THREE.Mesh[]>([]);
@@ -1414,7 +1486,8 @@ function CelCardMesh({ variant }: { variant: "default" | "elevated" | "outlined"
         rim: new THREE.Color(...v.rim),
       };
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeRev]
   );
 
   const panelGeom = useMemo(() => new THREE.BoxGeometry(4.0, 3.0, 0.06, 2, 2, 1), []);
@@ -1556,6 +1629,8 @@ function CelCardMesh({ variant }: { variant: "default" | "elevated" | "outlined"
 
 export function CelCard3D({ children, className = "", variant = "default" }: CelCard3DProps) {
   const [mounted, setMounted] = useState(false);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
 
   useEffect(() => setMounted(true), []);
 
@@ -1569,14 +1644,634 @@ export function CelCard3D({ children, className = "", variant = "default" }: Cel
 
   return (
     <div className={`relative ${className}`} style={{ width: "100%", height: "100%" }}>
-      <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 25 }}
-        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
-        className="absolute inset-0 -z-10 w-full h-full pointer-events-none"
-      >
-        <CelCardMesh variant={variant} />
-      </Canvas>
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 4.5], fov: 25 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          className="absolute inset-0 -z-10 w-full h-full pointer-events-none"
+        >
+          <CelCardMesh variant={variant} themeRev={themeRev} />
+        </Canvas>
+      )}
       <div className="relative z-10 p-4 h-full w-full">{children}</div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 7. CEL CRYSTAL 3D — 暗夜神格八面体棱镜晶核
+// ============================================================================
+export type CelTone = "cyan" | "crimson" | "gold" | "ok";
+
+function resolveToneColors(tone: CelTone) {
+  const tokenMap: Record<CelTone, { base: string; rim: string; fbBase: [number, number, number]; fbRim: [number, number, number] }> = {
+    cyan: { base: "--cel-cyan", rim: "--cel-crimson", fbBase: [0, 0.941, 1], fbRim: [1, 0.094, 0.298] },
+    crimson: { base: "--cel-crimson", rim: "--cel-cyan", fbBase: [1, 0.094, 0.298], fbRim: [0, 0.941, 1] },
+    gold: { base: "--cel-gold", rim: "--cel-cyan", fbBase: [1, 0.769, 0], fbRim: [0, 0.941, 1] },
+    ok: { base: "--ok-DEFAULT", rim: "--cel-cyan", fbBase: [0.063, 0.725, 0.506], fbRim: [0, 0.941, 1] },
+  };
+  const cfg = tokenMap[tone] ?? tokenMap.cyan;
+  const v = resolveCelTokenPalette({
+    baseToken: cfg.base,
+    rimToken: cfg.rim,
+    fallback: {
+      base: cfg.fbBase,
+      shadow: [cfg.fbBase[0] * 0.16, cfg.fbBase[1] * 0.16, cfg.fbBase[2] * 0.16],
+      highlight: [1, 1, 1],
+      rim: cfg.fbRim,
+    },
+  });
+  return {
+    base: new THREE.Color(...v.base),
+    shadow: new THREE.Color(...v.shadow),
+    highlight: new THREE.Color(...v.highlight),
+    rim: new THREE.Color(...v.rim),
+  };
+}
+
+export interface CelCrystal3DProps {
+  tone?: CelTone;
+  size?: number;
+  label?: string;
+  value?: string | number;
+  title?: string;
+  className?: string;
+  "data-testid"?: string;
+}
+
+function CelCrystalMesh({
+  tone,
+  hovered,
+  burstTime,
+  themeRev,
+  reducedMotion,
+}: {
+  tone: CelTone;
+  hovered: boolean;
+  burstTime: number;
+  themeRev: number;
+  reducedMotion: boolean;
+}) {
+  const crystalRef = useRef<THREE.Group>(null);
+  const ringARef = useRef<THREE.Mesh>(null);
+  const ringBRef = useRef<THREE.Mesh>(null);
+  const shardsRef = useRef<THREE.Mesh[]>([]);
+
+  const colors = useMemo(
+    () => resolveToneColors(tone),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tone, themeRev]
+  );
+
+  const crystalGeom = useMemo(() => new THREE.OctahedronGeometry(0.74, 0), []);
+  const ringGeom = useMemo(() => new THREE.TorusGeometry(1.12, 0.032, 8, 32), []);
+  const shardGeom = useMemo(() => new THREE.TetrahedronGeometry(0.11, 0), []);
+
+  const crystalUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.base },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.rim },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 3.0 },
+    }),
+    [colors]
+  );
+
+  const ringUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.rim },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.base },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 2.0 },
+    }),
+    [colors]
+  );
+
+  const outlineUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.base },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.rim },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 1.0 },
+      uOutlineOffset: { value: 0.045 },
+      uBands: { value: 2.0 },
+    }),
+    [colors]
+  );
+
+  useFrame((_, delta) => {
+    if (reducedMotion) return;
+    const isBursting = Date.now() - burstTime < 600;
+    const speed = isBursting ? 5.5 : hovered ? 2.4 : 1.0;
+
+    if (crystalRef.current) {
+      crystalRef.current.rotation.y += delta * 0.95 * speed;
+      crystalRef.current.rotation.x = Math.sin(Date.now() * 0.0015) * 0.2;
+      const scale = isBursting ? 1.15 : hovered ? 1.06 : 1.0;
+      crystalRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.15);
+    }
+    if (ringARef.current) {
+      ringARef.current.rotation.z += delta * 1.1 * speed;
+      ringARef.current.rotation.x += delta * 0.4 * speed;
+    }
+    if (ringBRef.current) {
+      ringBRef.current.rotation.z -= delta * 0.9 * speed;
+      ringBRef.current.rotation.y += delta * 0.6 * speed;
+    }
+    shardsRef.current.forEach((shard, idx) => {
+      if (!shard) return;
+      const t = Date.now() * 0.0018 * (isBursting ? 2.5 : 1) + idx * (Math.PI / 2);
+      const radius = (hovered || isBursting ? 1.48 : 1.28) + Math.sin(t * 1.5) * 0.08;
+      shard.position.set(
+        Math.cos(t) * radius,
+        Math.sin(t * 1.4 + idx) * 0.45,
+        Math.sin(t) * radius
+      );
+      shard.rotation.x += delta * 2.5 * speed;
+      shard.rotation.y += delta * 1.8 * speed;
+    });
+  });
+
+  return (
+    <group>
+      <group ref={crystalRef}>
+        <mesh geometry={crystalGeom}>
+          <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={crystalUniforms} />
+        </mesh>
+        <mesh geometry={crystalGeom}>
+          <shaderMaterial
+            vertexShader={CEL_UI_VERTEX}
+            fragmentShader={CEL_UI_FRAGMENT}
+            uniforms={outlineUniforms}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      </group>
+
+      <mesh ref={ringARef} geometry={ringGeom} rotation={[Math.PI / 3, 0.25, 0]}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={ringUniforms} />
+      </mesh>
+      <mesh ref={ringBRef} geometry={ringGeom} rotation={[-Math.PI / 3, -0.25, Math.PI / 4]}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={crystalUniforms} />
+      </mesh>
+
+      {[0, 1, 2, 3].map((idx) => (
+        <mesh
+          key={idx}
+          ref={(el) => { if (el) shardsRef.current[idx] = el; }}
+          geometry={shardGeom}
+          position={[Math.cos((idx * Math.PI) / 2) * 1.28, 0, Math.sin((idx * Math.PI) / 2) * 1.28]}
+        >
+          <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={ringUniforms} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+export function CelCrystal3D({
+  tone = "cyan",
+  size = 44,
+  label,
+  value,
+  title = "Dark Divinity Crystal Core [真3D 晶核]",
+  className = "",
+  "data-testid": testId,
+}: CelCrystal3DProps) {
+  const [mounted, setMounted] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [burstTime, setBurstTime] = useState(0);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => setMounted(true), []);
+
+  const handleTrigger = useCallback(() => setBurstTime(Date.now()), []);
+
+  if (!mounted) {
+    return (
+      <div
+        data-testid={testId}
+        style={{ width: size, height: size }}
+        className={`divinity-3d-frame grid place-items-center shrink-0 ${className}`}
+      >
+        <span className="size-2.5 rotate-45 bg-[var(--cel-cyan)] border border-[var(--cel-ink)] animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label ? `${label} ${value ?? ""}`.trim() : title}
+      title={title}
+      data-testid={testId}
+      onClick={handleTrigger}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleTrigger();
+        }
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ width: size, height: size }}
+      className={`divinity-3d-frame relative cursor-pointer select-none overflow-hidden shrink-0 transition-transform duration-100 hover:scale-105 active:scale-95 ${className}`}
+    >
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 3.3], fov: 42 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          frameloop={reducedMotion ? "demand" : "always"}
+          className="w-full h-full pointer-events-none"
+        >
+          <CelCrystalMesh
+            tone={tone}
+            hovered={hovered}
+            burstTime={burstTime}
+            themeRev={themeRev}
+            reducedMotion={reducedMotion}
+          />
+        </Canvas>
+      )}
+      {value !== undefined && (
+        <span className="absolute bottom-0.5 right-1 font-mono text-[9px] font-black text-[var(--cel-text-primary)] pointer-events-none">
+          {value}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 8. CEL HOLO CUBE 3D — 战术全息魔方 / 容器拓扑核
+// ============================================================================
+export interface CelHoloCube3DProps {
+  status?: "optimal" | "syncing" | "warning";
+  size?: number;
+  title?: string;
+  className?: string;
+  "data-testid"?: string;
+}
+
+function CelHoloCubeMesh({
+  status,
+  hovered,
+  burstTime,
+  themeRev,
+  reducedMotion,
+}: {
+  status: "optimal" | "syncing" | "warning";
+  hovered: boolean;
+  burstTime: number;
+  themeRev: number;
+  reducedMotion: boolean;
+}) {
+  const outerRef = useRef<THREE.Mesh>(null);
+  const coreRef = useRef<THREE.Group>(null);
+  const scanRef = useRef<THREE.Mesh>(null);
+
+  const colors = useMemo(() => {
+    const tone: CelTone = status === "warning" ? "gold" : status === "syncing" ? "crimson" : "cyan";
+    return resolveToneColors(tone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, themeRev]);
+
+  const outerGeom = useMemo(() => new THREE.BoxGeometry(1.42, 1.42, 1.42), []);
+  const coreGeom = useMemo(() => new THREE.DodecahedronGeometry(0.54, 0), []);
+  const scanGeom = useMemo(() => new THREE.RingGeometry(0.75, 0.88, 4), []);
+
+  const coreUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.base },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.rim },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 3.0 },
+    }),
+    [colors]
+  );
+
+  const outlineUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.base },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.rim },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 1.0 },
+      uOutlineOffset: { value: 0.04 },
+      uBands: { value: 2.0 },
+    }),
+    [colors]
+  );
+
+  useFrame((_, delta) => {
+    if (reducedMotion) return;
+    const isBursting = Date.now() - burstTime < 600;
+    const speed = isBursting ? 5.0 : hovered ? 2.2 : status === "syncing" ? 1.6 : 1.0;
+
+    if (outerRef.current) {
+      outerRef.current.rotation.x += delta * 0.45 * speed;
+      outerRef.current.rotation.y += delta * 0.65 * speed;
+    }
+    if (coreRef.current) {
+      coreRef.current.rotation.x -= delta * 0.9 * speed;
+      coreRef.current.rotation.y += delta * 1.1 * speed;
+    }
+    if (scanRef.current) {
+      const wave = Math.sin(Date.now() * 0.003 * speed);
+      scanRef.current.position.y = wave * 0.62;
+      scanRef.current.rotation.z += delta * 1.2 * speed;
+    }
+  });
+
+  return (
+    <group>
+      <mesh ref={outerRef} geometry={outerGeom} rotation={[0.45, 0.6, 0]}>
+        <meshBasicMaterial color={colors.base} wireframe transparent opacity={0.75} />
+      </mesh>
+
+      <group ref={coreRef}>
+        <mesh geometry={coreGeom}>
+          <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={coreUniforms} />
+        </mesh>
+        <mesh geometry={coreGeom}>
+          <shaderMaterial
+            vertexShader={CEL_UI_VERTEX}
+            fragmentShader={CEL_UI_FRAGMENT}
+            uniforms={outlineUniforms}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      </group>
+
+      <mesh ref={scanRef} geometry={scanGeom} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
+        <meshBasicMaterial color={colors.rim} transparent opacity={0.65} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+export function CelHoloCube3D({
+  status = "optimal",
+  size = 44,
+  title = "Tactical HoloCube 3D [真3D 拓扑核]",
+  className = "",
+  "data-testid": testId,
+}: CelHoloCube3DProps) {
+  const [mounted, setMounted] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [burstTime, setBurstTime] = useState(0);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => setMounted(true), []);
+
+  const handleTrigger = useCallback(() => setBurstTime(Date.now()), []);
+
+  if (!mounted) {
+    return (
+      <div
+        data-testid={testId}
+        style={{ width: size, height: size }}
+        className={`divinity-3d-frame grid place-items-center shrink-0 ${className}`}
+      >
+        <span className="size-3 border-2 border-[var(--cel-cyan)] animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={title}
+      title={title}
+      data-testid={testId}
+      onClick={handleTrigger}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleTrigger();
+        }
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ width: size, height: size }}
+      className={`divinity-3d-frame relative cursor-pointer select-none overflow-hidden shrink-0 transition-transform duration-100 hover:scale-105 active:scale-95 ${className}`}
+    >
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 3.4], fov: 42 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          frameloop={reducedMotion ? "demand" : "always"}
+          className="w-full h-full pointer-events-none"
+        >
+          <CelHoloCubeMesh
+            status={status}
+            hovered={hovered}
+            burstTime={burstTime}
+            themeRev={themeRev}
+            reducedMotion={reducedMotion}
+          />
+        </Canvas>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 9. CEL ORBITAL GAUGE 3D — 真3D三渲二轨道进度仪
+// ============================================================================
+export interface CelOrbitalGauge3DProps {
+  progress: number;
+  tone?: CelTone;
+  size?: number;
+  title?: string;
+  className?: string;
+  "data-testid"?: string;
+}
+
+function CelOrbitalGaugeMesh({
+  progress,
+  tone,
+  hovered,
+  burstTime,
+  themeRev,
+  reducedMotion,
+}: {
+  progress: number;
+  tone: CelTone;
+  hovered: boolean;
+  burstTime: number;
+  themeRev: number;
+  reducedMotion: boolean;
+}) {
+  const gaugeRef = useRef<THREE.Group>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
+  const satRef = useRef<THREE.Mesh>(null);
+
+  const clamped = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
+  const arcAngle = Math.max(0.25, (clamped / 100) * Math.PI * 2);
+
+  const colors = useMemo(
+    () => resolveToneColors(tone),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tone, themeRev]
+  );
+
+  const trackGeom = useMemo(() => new THREE.TorusGeometry(1.06, 0.038, 8, 40), []);
+  const arcGeom = useMemo(() => new THREE.TorusGeometry(1.06, 0.085, 10, 40, arcAngle), [arcAngle]);
+  const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(0.46, 0), []);
+  const satGeom = useMemo(() => new THREE.OctahedronGeometry(0.11, 0), []);
+
+  const arcUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.base },
+      uShadowColor: { value: colors.shadow },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.rim },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 3.0 },
+    }),
+    [colors]
+  );
+
+  const trackUniforms = useMemo(
+    () => ({
+      uBaseColor: { value: colors.shadow },
+      uShadowColor: { value: new THREE.Color(0.02, 0.03, 0.06) },
+      uHighlightColor: { value: colors.highlight },
+      uRimColor: { value: colors.base },
+      uLightPos: { value: new THREE.Vector3(3, 4, 5) },
+      uIsOutline: { value: 0.0 },
+      uOutlineOffset: { value: 0.0 },
+      uBands: { value: 2.0 },
+    }),
+    [colors]
+  );
+
+  useFrame((_, delta) => {
+    if (reducedMotion) return;
+    const isBursting = Date.now() - burstTime < 600;
+    const speed = isBursting ? 4.5 : hovered ? 2.0 : 1.0;
+
+    if (gaugeRef.current) {
+      gaugeRef.current.rotation.z += delta * 0.45 * speed;
+      gaugeRef.current.rotation.x = 0.42 + Math.sin(Date.now() * 0.0014) * 0.14;
+    }
+    if (coreRef.current) {
+      coreRef.current.rotation.y += delta * 1.1 * speed;
+      coreRef.current.rotation.x += delta * 0.6 * speed;
+    }
+    if (satRef.current) {
+      satRef.current.position.set(
+        Math.cos(arcAngle) * 1.06,
+        Math.sin(arcAngle) * 1.06,
+        0
+      );
+      satRef.current.rotation.z += delta * 2.5 * speed;
+    }
+  });
+
+  return (
+    <group ref={gaugeRef} rotation={[0.42, -0.25, 0]}>
+      <mesh geometry={trackGeom}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={trackUniforms} />
+      </mesh>
+      <mesh geometry={arcGeom}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={arcUniforms} />
+      </mesh>
+      <mesh ref={coreRef} geometry={coreGeom}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={arcUniforms} />
+      </mesh>
+      <mesh ref={satRef} geometry={satGeom} position={[Math.cos(arcAngle) * 1.06, Math.sin(arcAngle) * 1.06, 0]}>
+        <shaderMaterial vertexShader={CEL_UI_VERTEX} fragmentShader={CEL_UI_FRAGMENT} uniforms={trackUniforms} />
+      </mesh>
+    </group>
+  );
+}
+
+export function CelOrbitalGauge3D({
+  progress,
+  tone = "cyan",
+  size = 44,
+  title = "Orbital Gauge 3D [真3D 轨道仪表]",
+  className = "",
+  "data-testid": testId,
+}: CelOrbitalGauge3DProps) {
+  const [mounted, setMounted] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [burstTime, setBurstTime] = useState(0);
+  const themeRev = useThemeRevision();
+  const isPageVisible = usePageVisibility();
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => setMounted(true), []);
+
+  const clamped = Math.round(Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0)));
+  const handleTrigger = useCallback(() => setBurstTime(Date.now()), []);
+
+  if (!mounted) {
+    return (
+      <div
+        data-testid={testId}
+        style={{ width: size, height: size }}
+        className={`divinity-3d-frame grid place-items-center shrink-0 ${className}`}
+      >
+        <span className="font-mono text-[9px] font-black text-[var(--cel-cyan)]">{clamped}%</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="img"
+      aria-label={`${title}: ${clamped}%`}
+      title={`${title} (${clamped}%)`}
+      data-testid={testId}
+      onClick={handleTrigger}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ width: size, height: size }}
+      className={`divinity-3d-frame relative cursor-pointer select-none overflow-hidden shrink-0 transition-transform duration-100 hover:scale-105 ${className}`}
+    >
+      {isPageVisible && (
+        <Canvas
+          camera={{ position: [0, 0, 3.2], fov: 44 }}
+          gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+          frameloop={reducedMotion ? "demand" : "always"}
+          className="w-full h-full pointer-events-none"
+        >
+          <CelOrbitalGaugeMesh
+            progress={clamped}
+            tone={tone}
+            hovered={hovered}
+            burstTime={burstTime}
+            themeRev={themeRev}
+            reducedMotion={reducedMotion}
+          />
+        </Canvas>
+      )}
     </div>
   );
 }

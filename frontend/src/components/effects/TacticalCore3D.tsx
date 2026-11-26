@@ -344,7 +344,26 @@ function CoreMesh({
       }
     }
 
-    // ── 5. 暗夜神格 (Neo-Tokyo Cyber Manga Void Palette - 默认) ──
+    // ── 5. 主题 token 覆盖 (per 2026-11-17 主题统一: physis 及扩展主题从 CSS token 取色) ──
+    if (effectiveTheme !== "dark") {
+      const baseToken = status === "overdrive" ? "--cel-crimson"
+        : status === "warning" ? "--cel-gold" : "--cel-cyan";
+      const base = readThemeRgb(baseToken, [0, 0.941, 1]);
+      const keyRim = readThemeRgb(status === "nominal" ? "--cel-crimson" : "--cel-cyan", [1, 0.094, 0.298]);
+      const counterRim = readThemeRgb("--cel-gold", [1, 0.769, 0]);
+      const outline = readThemeRgb("--cel-ink", [0, 0, 0]);
+      const c = (v: [number, number, number]) => new THREE.Color(v[0], v[1], v[2]);
+      return {
+        base: c(base),
+        shadow: c([base[0] * 0.16, base[1] * 0.16, base[2] * 0.16]),
+        keyRim: c(keyRim),
+        counterRim: c(counterRim),
+        outline: c(outline),
+        energy: c(base),
+      };
+    }
+
+    // ── 6. 暗夜神格 (Neo-Tokyo Cyber Manga Void Palette - 默认) ──
     switch (status) {
       case "warning":
         return {
@@ -374,27 +393,6 @@ function CoreMesh({
           outline: new THREE.Color("#000000"),
           energy: new THREE.Color("#00f0ff"),
         };
-    }
-    // ── 7. 主题 token 覆盖 (per 2026-11-17 主题统一) ──
-    // 非 dark/light 主题: base/keyRim/counterRim/outline 从当前 html.<theme>
-    // 的 --cel-* token 重读, 保证 3D 与 CSS 主题同源; shadow 按 base×0.16 重算。
-    // dark/light 保留上方设计原色 (与原实现逐字节一致)。
-    if (effectiveTheme !== "dark" && effectiveTheme !== "light") {
-      const baseToken = status === "overdrive" ? "--cel-crimson"
-        : status === "warning" ? "--cel-gold" : "--cel-cyan";
-      const base = readThemeRgb(baseToken, [0, 0.941, 1]);
-      const keyRim = readThemeRgb(status === "nominal" ? "--cel-crimson" : "--cel-cyan", [1, 0.094, 0.298]);
-      const counterRim = readThemeRgb("--cel-gold", [1, 0.769, 0]);
-      const outline = readThemeRgb("--cel-ink", [0, 0, 0]);
-      const c = (v: [number, number, number]) => new THREE.Color(v[0], v[1], v[2]);
-      return {
-        base: c(base),
-        shadow: c([base[0] * 0.16, base[1] * 0.16, base[2] * 0.16]),
-        keyRim: c(keyRim),
-        counterRim: c(counterRim),
-        outline: c(outline),
-        energy: c(base),
-      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, effectiveTheme, themeRev]);
