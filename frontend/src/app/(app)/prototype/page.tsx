@@ -38,15 +38,33 @@ import {
   GitBranch,
   Loader2,
   XCircle,
+  Eye,
+  EyeOff,
+  Key,
+  RotateCw,
 } from "lucide-react";
 import { clsx } from "clsx";
+
+// =====================================================================
+// GemArc API Key 本地持久化
+// =====================================================================
+const GEMARC_KEY_STORAGE = "star-prototype-gemarc-key";
+function getSavedKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(GEMARC_KEY_STORAGE) ?? "";
+}
+function saveKey(key: string) {
+  if (typeof window === "undefined") return;
+  if (key) localStorage.setItem(GEMARC_KEY_STORAGE, key);
+  else localStorage.removeItem(GEMARC_KEY_STORAGE);
+}
 
 // =====================================================================
 // GemArc MCP 集成 (per INTEGRATION-MAP-GITHUB-REPOS-001 §2.1)
 // 流水线 建模→校验→推演→构建→验证→导出 = GemArc tools
 //   gemarc_brief(建模) → gemarc_validate(校验) → gemarc_simulate(推演)
 //   → gemarc_build(构建) → gemarc_verify(验证)
-// 经 /api/gemarc 代理调用本地 GemArc Streamable HTTP (E:\\GemArc)
+// 经 /api/gemarc 代理调用远端 GemArc Streamable HTTP (gem-arc.vercel.app/mcp)
 // =====================================================================
 interface GemArcStep {
   id: string;
@@ -63,11 +81,23 @@ const GEMARC_PIPELINE: GemArcStep[] = [
   { id: "export", label: "导出", tool: "gemarc_render" },
 ];
 
-async function callGemArc(tool: string, args: Record<string, unknown>, source: "local" | "remote") {
+async function callGemArc(tool: string, args: Record<string, unknown>, source: "local" | "remote", token?: string) {
   const res = await fetch("/api/gemarc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "tools/call", params: { name: tool, arguments: args, _meta: { source: source === "remote" ? "remote" : "local" } } }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: tool,
+        arguments: args,
+        _meta: {
+          source: source === "remote" ? "remote" : "local",
+          ...(token ? { token } : {}),
+        },
+      },
+    }),
   });
   if (!res.ok) throw new Error(`gemarc ${tool}: HTTP ${res.status}`);
   const payload = await res.json();
@@ -101,8 +131,24 @@ export default function PrototypePage() {
   const [runningStep, setRunningStep] = useState<string | null>(null);
   const [pipelineLog, setPipelineLog] = useState<string>("");
 
+  // GemArc API Key 状态
+  const [apiKey, setApiKey] = useState(getSavedKey);
+  const [showKey, setShowKey] = useState(false);
+  const [keyDirty, setKeyDirty] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+
+  // 保存 API Key 到 localStorage
+  const handleSaveKey = useCallback(() => {
+    saveKey(apiKey);
+    setKeyDirty(false);
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2000);
+    // 重新检查 GemArc 状态
+    checkGemArcStatus(apiKey);
+  }, [apiKey]);
+
   // GemArc 健康检查 (本地 full + 远端 stateless 双通道)
-  useEffect(() => {
+  const checkGemArcStatus = useCallback((token?: string) => {
     fetch("/api/gemarc", { method: "GET" })
       .then((r) => r.json())
       .then((d: { local?: { status?: string }; remote?: { status?: string } }) => {
@@ -116,9 +162,14 @@ export default function PrototypePage() {
       .catch(() => setGemarcStatus("down"));
   }, [dataSource]);
 
+  useEffect(() => {
+    checkGemArcStatus();
+  }, [checkGemArcStatus]);
+
   // 真实流水线执行 (建模→校验→推演→构建→验证)
   const runPipeline = useCallback(async () => {
     setPipelineLog("");
+    const token = apiKey || undefined;
     for (const step of GEMARC_PIPELINE) {
       setRunningStep(step.id);
       try {
@@ -126,6 +177,7 @@ export default function PrototypePage() {
           step.tool,
           { project: "prototype-demo", query: prompt, note: `device=${device}` },
           dataSource === "sample" ? "remote" : "local",
+          token,
         );
         setPipelineLog((prev) => `${prev}\n[${step.label}] ${out.slice(0, 300)}`);
       } catch (err) {
@@ -135,7 +187,7 @@ export default function PrototypePage() {
       }
     }
     setRunningStep(null);
-  }, [prompt, device, dataSource]);
+  }, [prompt, device, dataSource, apiKey]);
 
   return (
     <div className="flex flex-col h-full bg-bg">
@@ -179,6 +231,49 @@ export default function PrototypePage() {
             <button type="button" className="mt-1.5 w-full text-xs py-1.5 rounded-lg border border-dashed border-line text-ink-dim hover:border-accent/60 flex items-center justify-center gap-1">
               + 文件 / 截图 / 任务卡
             </button>
+          </div>
+
+          {/* GemArc API Key 配置 */}
+          <div className="mt-4 border-t border-line pt-3">
+            <h3 className="text-[10px] font-mono uppercase tracking-wider text-ink-mute mb-2 flex items-center gap-1">
+              <Key size={11} /> GemArc Key
+            </h3>
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setKeyDirty(true); }}
+                placeholder="粘贴 GemArc Token..."
+                data-testid="prototype-gemarc-key-input"
+                className="w-full rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[11px] font-mono text-ink placeholder:text-ink-mute focus:border-accent focus:outline-none pr-16"
+              />
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  title={showKey ? "隐藏 Key" : "显示 Key"}
+                  className="p-1 rounded text-ink-mute hover:text-ink"
+                >
+                  {showKey ? <EyeOff size={11} /> : <Eye size={11} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveKey}
+                  disabled={!keyDirty && !apiKey}
+                  title="保存 Key"
+                  data-testid="prototype-gemarc-key-save"
+                  className={clsx(
+                    "p-1 rounded text-[10px] font-mono font-semibold transition-colors",
+                    keySaved ? "text-ok" : keyDirty ? "text-accent hover:text-accent-soft" : "text-ink-mute",
+                  )}
+                >
+                  {keySaved ? <Check size={11} /> : <RotateCw size={11} />}
+                </button>
+              </div>
+            </div>
+            <p className="mt-1 text-[9px] text-ink-mute">
+              Token 仅保存在浏览器 localStorage，不会上传到服务器。
+            </p>
           </div>
         </aside>
 

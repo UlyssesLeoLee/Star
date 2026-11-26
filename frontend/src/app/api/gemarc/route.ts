@@ -19,7 +19,6 @@ export const dynamic = "force-dynamic";
 // 远端 = https://gem-arc.vercel.app/mcp (用户 2026-11-14 提供)
 const GEMARC_LOCAL = process.env.GEMARC_MCP_URL ?? "http://127.0.0.1:8760/mcp";
 const GEMARC_REMOTE = process.env.GEMARC_REMOTE_URL ?? "https://gem-arc.vercel.app/mcp";
-const GEMARC_REMOTE_TOKEN = process.env.GEMARC_REMOTE_TOKEN ?? "";
 
 /** 只代理 MCP 工具调用 (tools/call), 白名单工具防滥用 */
 const ALLOWED_TOOLS = new Set([
@@ -46,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   // 白名单校验: 只放行 tools/call + 白名单工具
-  const b = body as { method?: string; params?: { name?: string } };
+  const b = body as { method?: string; params?: { name?: string; _meta?: { source?: string; token?: string } } };
   if (b?.method === "tools/call" && b?.params?.name) {
     if (!ALLOWED_TOOLS.has(b.params.name)) {
       return Response.json({ error: `tool not allowed via proxy: ${b.params.name}` }, { status: 403 });
@@ -56,16 +55,21 @@ export async function POST(request: Request) {
   }
 
   // 数据来源: body.params._meta.source === "remote" → 远端 stateless; 默认本地 full
-  const b2 = body as { params?: { _meta?: { source?: string } } };
-  const useRemote = b2?.params?._meta?.source === "remote";
+  const meta = (body as { params?: { _meta?: { source?: string; token?: string } } }).params?._meta ?? {};
+  const useRemote = meta.source === "remote";
   const target = useRemote ? GEMARC_REMOTE : GEMARC_LOCAL;
+
+  // Token 优先级: 请求体传入 > 环境变量 (GEMARC_MCP_PAT) > GEMARC_REMOTE_TOKEN 环境变量
+  const userToken = meta.token;
+  const envToken = process.env.GEMARC_MCP_PAT ?? process.env.GEMARC_REMOTE_TOKEN ?? "";
+  const finalToken = userToken || envToken;
 
   const upstream = await fetch(target, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
-      ...(useRemote && GEMARC_REMOTE_TOKEN ? { Authorization: `Bearer ${GEMARC_REMOTE_TOKEN}` } : {}),
+      ...(useRemote && finalToken ? { Authorization: `Bearer ${finalToken}` } : {}),
     },
     body: JSON.stringify(body),
   });
