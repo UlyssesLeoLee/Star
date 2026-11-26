@@ -21,7 +21,7 @@ MERGE (row)-[:CALLS]->(link)
 "use client";
 
 import { clsx } from "clsx";
-import { Bell, LayoutGrid, MessageSquare, Plus, X } from "lucide-react";
+import { Bell, MessageSquare, LayoutGrid, Plus, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { GuardedLink } from "@/components/navigation/GuardedLink";
@@ -54,6 +54,12 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
     return item && !pinIds.includes(id) ? [item] : [];
   });
 
+  // 从 registry 读取 utility 模块 (替代硬编码)
+  const utilityModules = ["notification", "inbox"].flatMap((id) => {
+    const item = MODULE_MAP.get(id);
+    return item ? [item] : [];
+  });
+
   useEffect(() => {
     if (!open) return;
     function dismissOutside(event: PointerEvent) {
@@ -78,11 +84,6 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
   function close() {
     setOpenMode(null);
   }
-
-  const utilityLinks = [
-    { id: "notifications", icon: Bell, label: t.sidebar.quickEntries.notifications, href: "/notification" },
-    { id: "chat", icon: MessageSquare, label: t.sidebar.quickEntries.chat, href: "/inbox?type=chat" },
-  ];
 
   return (
     <div
@@ -158,10 +159,16 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
               {globalModules.map((item) => (
                 <ShortcutModule key={item.id} item={item} active={moduleHrefMatches(item.href, pathname, searchParams)} onNavigate={close} />
               ))}
-              {utilityLinks.map(({ id, href, label, icon: Icon }) => (
-                <li key={id}>
-                  <GuardedLink href={href} onNavigate={close} className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-ink-dim hover:bg-bg-soft hover:text-ink" data-testid={`sidebar-quick-${id}`}>
-                    <Icon size={14} aria-hidden="true" />{label}
+              {utilityModules.map((item) => (
+                <li key={item.id}>
+                  <GuardedLink
+                    href={item.href}
+                    onNavigate={close}
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-ink-dim hover:bg-bg-soft hover:text-ink"
+                    data-testid={`sidebar-quick-${item.id}`}
+                  >
+                    <item.icon size={14} aria-hidden="true" />
+                    {useModuleTranslation(item).label}
                   </GuardedLink>
                 </li>
               ))}

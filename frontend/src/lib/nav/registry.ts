@@ -45,6 +45,8 @@ import {
   Bell,
   ShieldAlert,
   Palette,
+  SlidersHorizontal,
+  GitMerge,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -257,16 +259,16 @@ export const ALL_MODULES: ModuleDefinition[] = [
     isCore: true,
   },
   {
-    id: "advanced-settings",
-    label: "Advanced Settings",
-    code: "ADV",
-    href: "/settings/advanced/hooks",
-    category: "system",
-    categoryLabel: "System Extensions",
-    description: "Skills、Hooks、MCP 与 Plugins 的统一高级设置入口",
-    icon: Settings,
-    isCore: true,
-  },
+      id: "advanced-settings",
+      label: "Advanced Settings",
+      code: "ADV",
+      href: "/settings/advanced/hooks",
+      category: "system",
+      categoryLabel: "System Extensions",
+      description: "Skills、Hooks、MCP 与 Plugins 的统一高级设置入口",
+      icon: SlidersHorizontal,
+      isCore: true,
+    },
   {
     id: "remote",
     label: "Remote Control",
@@ -363,30 +365,18 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "人机协作反馈回路与异常预警",
     icon: MessageCircleWarning,
   },
+  // Per 2026-11-16: /agent-view 路由删除 (redirect 移入 legacy 表) —
+  //   入口改为 Canvas「Agent 画布」标签 (?tab=agent), 已合并入 development 模块
   {
-    // Per 2026-09-05 11:25 JST 用户发令: 无限画布形式的 agent 视图, 自动选
-    // 当前工作 agent, 关联 worktree + work-items (跟 kanban / worktree 共享 store)
-    // per 2026-11-16: /agent-view 路由删除 (redirect 移入 legacy 表) —
-    //   入口改为 Canvas「Agent 画布」标签 (?tab=agent)
-    id: "agent-view",
-    label: "Agent View",
-    code: "AV",
-    href: "/canvas/canvas-001?tab=agent",
-    category: "agent",
-    categoryLabel: "Worktree / Agent",
-    description: "Canvas「Agent 画布」标签入口 (Agent 拓扑无限画布, per 2026-11-16 /agent-view 路由删除)",
-    icon: Bot,
-  },
-  {
-    id: "agent-relationships",
-    label: "Agent Relationships",
-    code: "AR",
-    href: "/agent-relationships",
-    category: "agent",
-    categoryLabel: "Worktree / Agent",
-    description: "Agent 关系图谱 (成就/编辑/模板/视图, per 2026-11-15 canvas 自审补注册)",
-    icon: Network,
-  },
+      id: "agent-relationships",
+      label: "Agent Relationships",
+      code: "AR",
+      href: "/agent-relationships",
+      category: "agent",
+      categoryLabel: "Worktree / Agent",
+      description: "Agent 关系图谱 (成就/编辑/模板/视图, per 2026-11-15 canvas 自审补注册)",
+      icon: GitMerge,
+    },
 
   // ── Work Management Modules ──────────────────────────────────────
   {
@@ -400,15 +390,15 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Workflow,
   },
   {
-    id: "development",
-    label: "Development Hub",
-    code: "DEV",
-    href: "/canvas/canvas-001?tab=agent",
-    category: "work",
-    categoryLabel: "Work Management",
-    description: "变更集 ChangeSet 与分支代码协同",
-    icon: Hammer,
-  },
+      id: "development",
+      label: "Development Hub",
+      code: "DEV",
+      href: "/canvas/canvas-001?tab=agent",
+      category: "work",
+      categoryLabel: "Work Management",
+      description: "变更集 ChangeSet 与分支代码协同 + Agent Canvas (原 /agent-view 路由已删除, 重定向至此)",
+      icon: Hammer,
+    },
   {
     id: "planning",
     label: "Planning Hub",
@@ -462,37 +452,37 @@ export const ALL_MODULES: ModuleDefinition[] = [
     icon: Code2,
   },
   {
-    id: "webhooks",
-    label: "Webhooks",
-    code: "WHK",
-    href: "/settings/developer?tab=webhooks",
-    category: "integration",
-    categoryLabel: "Integration & Security",
-    description: "出站 Webhook endpoint + 5 域预置通知模板",
-    icon: Webhook,
-  },
-  {
-    id: "cli-profiles",
-    label: "CLI Profiles",
-    code: "CLI",
-    href: "/settings/cli-profiles",
-    category: "integration",
-    categoryLabel: "Integration & Security",
-    description: "命令行环境配置与凭据模板",
-    icon: Terminal,
-  },
-  {
-      id: "search",
-      label: "Universal Search",
-      code: "SRC",
-      href: "/search",
+      id: "webhooks",
+      label: "Webhooks",
+      code: "WHK",
+      href: "/settings/developer?tab=webhooks",
       category: "integration",
       categoryLabel: "Integration & Security",
-      description: "全域跨模块语义检索与索引",
-      icon: Search,
+      description: "出站 Webhook endpoint + 5 域预置通知模板 (Settings → Developer Console 子标签)",
+      icon: Webhook,
     },
+  {
+        id: "cli-profiles",
+        label: "CLI Profiles",
+        code: "CLI",
+        href: "/settings/cli-profiles",
+        category: "integration",
+        categoryLabel: "Integration & Security",
+        description: "命令行环境配置与凭据模板",
+        icon: Terminal,
+      },
+    {
+        id: "search",
+        label: "Universal Search",
+        code: "SRC",
+        href: "/search",
+        category: "integration",
+        categoryLabel: "Integration & Security",
+        description: "全域跨模块语义检索与索引",
+        icon: Search,
+      },
 
-      // ── System & Meta ────────────────────────────────────────────────
+        // ── System & Meta ────────────────────────────────────────────────
       {
         id: "local-runtime",
         label: "Local Runtime",
@@ -700,7 +690,7 @@ export type NavGroupId =
 export const NAV_GROUPS: Record<NavGroupId, string[]> = {
   // per 2026-11-14 artifact 设计: Branch 功能 tabs 在顶栏 (DEFAULT_HEADER_TABS),
   // 侧栏收敛为 项目列表(LANE树) + 全局组(收件箱/Agent中心/分析) + 管理(4子组)
-  "home-core": [],
+  "home-core": ["review"],
   // 全局组 (per artifact: 左栏底部 全局)
   "home-personal": ["inbox", "agents", "analytics"],
   // 项目与工作流类 (worktree/agent/feedback/validation/review 收纳)
@@ -710,7 +700,7 @@ export const NAV_GROUPS: Record<NavGroupId, string[]> = {
   // per §1.2.1 管理 → 组织 (Workspace 无路由 → 缺标; settings = 租户全局配置)
   "admin-org": ["tenant", "identity", "permission", "settings"],
   // per §1.2.1 管理 → 集成 (SCM/Integration/Notification + 新路由)
-  "admin-integration": ["scm", "integration", "notification", "webhooks", "api-keys", "cli-profiles"],
+    "admin-integration": ["scm", "integration", "notification", "api-keys", "cli-profiles"],
   // per §1.2.1 管理 → 运维 (7 运维控制台 首; LocalRuntime/Audit/Automation/Collaboration + remote)
   "admin-ops": ["ops", "local-runtime", "audit", "automation", "collaboration", "remote"],
   // per §1.2.1 管理 → 开发者 (过渡: Development/Workflow/Relation/Context + 内部页)
@@ -730,8 +720,8 @@ export const NAV_GROUPS: Record<NavGroupId, string[]> = {
 };
 
 export const NAV_GROUP_ORDER: NavGroupId[] = [
-  "home-core",
   "home-personal",
+  "home-core",
   "project",
   "view",
   "admin-org",
@@ -798,12 +788,12 @@ export const MODULE_GROUPS: ModuleGroupDef[] = [
     defaultTab: "analytics",
   },
   {
-    id: "agents",
-    name: "Agent 中心",
-    blurb: "会话 · Runtime · 远程 · 搜索 · 收件箱流",
-    tabs: ["agents", "agent-windows", "local-runtime", "remote", "search", "inbox", "review", "notification", "comment"],
-    defaultTab: "agents",
-  },
+      id: "agents",
+      name: "Agent 中心",
+      blurb: "会话 · Runtime · 远程 · 搜索 · 收件箱流",
+      tabs: ["agents", "agent-windows", "local-runtime", "remote", "search", "inbox", "review", "notification"],
+      defaultTab: "agents",
+    },
   {
     id: "plugins",
     name: "插件",
