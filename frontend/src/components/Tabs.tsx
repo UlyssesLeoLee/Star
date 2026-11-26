@@ -56,16 +56,17 @@ export function Tabs({
 
   const containerClass =
     variant === "pills"
-      ? "flex items-center gap-1.5 p-1 rounded-xl bg-bg-soft/70 border border-line mb-5 w-fit shadow-inner"
+      ? "flex items-center gap-1.5 p-1.5 rounded-xl bg-bg-soft/70 border border-line mb-5 w-fit shadow-inner [perspective:900px]"
       : variant === "cards"
-      ? "flex items-center gap-0 border-b border-line mb-5"
-      : "flex items-center gap-0 border-b border-line mb-5";
+      ? "flex items-center gap-1.5 border-b border-line mb-5 [perspective:900px]"
+      : "flex items-center gap-1.5 border-b border-line mb-5 [perspective:900px]";
 
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
       data-testid="planning-tabs"
+      style={{ transformStyle: "preserve-3d" }}
       className={containerClass}
     >
       {items.map((it, idx) => {
@@ -79,10 +80,15 @@ export function Tabs({
             aria-selected={isActive}
             data-testid={`planning-tab-${it.id}`}
             data-tab-idx={idx}
+            data-active={isActive ? "true" : "false"}
             onClick={() => onChange(it.id)}
             onKeyDown={(e) => handleKey(e, idx)}
+            style={{
+              transformStyle: "preserve-3d",
+              transform: isActive ? "translateY(-1px) translateZ(0px)" : "translateZ(0px)",
+            }}
             className={clsx(
-              "relative flex items-center gap-2 font-medium transition-all duration-200 outline-none",
+              "ui-3d-tab relative flex items-center gap-2 font-medium transition-all duration-200 outline-none",
               sizeClass,
               variant === "pills" && [
                 "rounded-lg",
@@ -91,17 +97,21 @@ export function Tabs({
                   : "text-ink-dim hover:text-ink hover:bg-bg-soft",
               ],
               variant !== "pills" && [
-                isActive ? "text-accent font-bold" : "text-ink-dim hover:text-ink",
+                isActive
+                  ? "text-accent font-bold bg-bg-card/80 border-t border-x border-line shadow-[0_4px_0_0_var(--cel-ink)]"
+                  : "text-ink-dim hover:text-ink hover:bg-bg-soft/60",
               ],
             )}
           >
-            {it.icon}
-            <span>{it.label}</span>
-            {it.badge !== undefined && (
-              <span className={clsx("ml-1.5 text-xs font-mono font-bold px-2 py-0.5 min-w-[20px] text-center rounded-full border", badgeToneClass[tone])}>
-                {it.badge}
-              </span>
-            )}
+            <span className="inline-flex items-center gap-2" style={{ transform: "translateZ(1px)" }}>
+              {it.icon}
+              <span>{it.label}</span>
+              {it.badge !== undefined && (
+                <span className={clsx("ml-1.5 text-xs font-mono font-bold px-2 py-0.5 min-w-[20px] text-center rounded-full border", badgeToneClass[tone])}>
+                  {it.badge}
+                </span>
+              )}
+            </span>
             {isActive && variant !== "pills" && (
               <span aria-hidden className="absolute left-0 right-0 -bottom-px h-[3px] bg-accent shadow-[2px_2px_0px_0px_var(--cel-ink)]" />
             )}

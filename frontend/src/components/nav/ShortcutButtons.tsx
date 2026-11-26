@@ -86,13 +86,10 @@ export function ShortcutButtons({ className }: { className?: string }) {
             aria-current={active ? "page" : undefined}
             title={button.label}
             className={clsx(
-              "inline-flex items-center gap-1 rounded border border-line px-2 py-1",
-              "text-[11px] font-mono transition-colors",
-              "hover:border-accent hover:text-accent",
+              "ui-3d-chip cel-btn-3d inline-flex items-center gap-1 px-2 py-1",
+              "text-[11px] font-mono transition-all",
               "focus-visible:outline focus-visible:outline-accent",
-              active
-                ? "border-accent/60 bg-accent/10 text-accent"
-                : "bg-bg-card text-ink-dim",
+              active ? "font-bold text-accent" : "text-ink-dim",
             )}
           >
             <span className="truncate">{button.label}</span>

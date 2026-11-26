@@ -42,9 +42,7 @@ import type { Identity, AgentSession, Tenant } from "@/types/ids";
 import type { AgentSettings } from "@/lib/agent/settings";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { MODEL_OPTIONS } from "@/lib/agent/settings";
-import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 import { CelCard3D } from "@/components/effects/CelCard3D";
-import { CelCrystal3D, CelHoloCube3D, CelOrbitalGauge3D } from "@/components/effects/Cel3DUI";
 
 // =====================================================================
 // 子组件: TeamMemberRow — 人类/agent 身份行 (统一列表, type 徽标区分)
@@ -219,7 +217,7 @@ function AgentProviderRow({
             onClick={handleSave}
             disabled={busy}
             data-testid={`team-agent-save-${agent.id}`}
-            className="inline-flex items-center gap-1 rounded-lg border border-accent bg-accent/10 px-3 py-1.5 text-[10px] text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-ink-dim transition-colors"
+            className="btn-primary-ghost cel-btn-3d inline-flex items-center gap-1 rounded-lg border border-accent bg-accent/10 px-3 py-1.5 text-[10px] text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-ink-dim transition-all"
           >
             {busy ? "保存中…" : "保存供应商"}
           </button>
@@ -262,7 +260,7 @@ function SquadRow({ squad }: { squad: { id: string; name: string; members: Squad
     <div
       key={squad.id}
       data-testid={`team-squad-${squad.id}`}
-      className="rounded-xl border border-line bg-bg-card p-3 space-y-2"
+      className="card card-compact rounded-xl !p-3 space-y-2"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -270,7 +268,7 @@ function SquadRow({ squad }: { squad: { id: string; name: string; members: Squad
           <span className="text-sm font-semibold text-ink">{squad.name}</span>
         </div>
         <span
-          className="rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-mute"
+          className="pill rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-mute"
           data-testid={`team-squad-size-${squad.id}`}
         >
           {squad.members.length} 成员
@@ -281,7 +279,7 @@ function SquadRow({ squad }: { squad: { id: string; name: string; members: Squad
           <span
             key={m.id}
             data-testid={`team-squad-member-${m.id}`}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${
+            className={`pill flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${
               m.kind === "agent"
                 ? "border-emerald-400/50 bg-emerald-500/10 text-emerald"
                 : "border-accent-500/50 bg-accent/10 text-accent"
@@ -367,64 +365,46 @@ export default function TeamPage() {
       <PageHeader
         title="团队"
         subtitle="人类与 Agent 身份统一管理 · 给 Agent 选供应商 · 创建人机小队"
-        icon={<TacticalCore3D size={38} status="nominal" className="shrink-0" />}
+        icon={<Users className="text-accent" size={20} />}
         track="T"
         count={`${identities.length} members`}
       />
 
-      {/* 统计卡 (3渲2 触觉卡片 + 真3D组件) */}
+      {/* 统计卡 (3渲2 触觉卡片) */}
       <SectionTitle>概览</SectionTitle>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CelCard3D className="h-full">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">总成员</div>
-              <div className="text-xl font-black font-mono text-ink mt-1">{identities.length}</div>
-              <div className="text-[10px] text-ink-mute mt-1">
-                {humanMembers.length} 人类 · {agentMembers.length} Agent
-              </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 [perspective:900px]">
+        <CelCard3D className="h-full" depthLayers>
+          <div style={{ transformStyle: "preserve-3d" }}>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] font-mono font-bold uppercase text-ink-mute">总成员</div>
+            <div style={{ transform: "translateZ(2px)" }} className="text-xl font-black font-mono text-ink mt-1">{identities.length}</div>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] text-ink-mute mt-1">
+              {humanMembers.length} 人类 · {agentMembers.length} Agent
             </div>
-            <CelCrystal3D tone="cyan" size={40} title="Team Roster Crystal [真3D]" data-testid="team-3d-members" />
           </div>
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">活跃 Agent 会话</div>
-              <div className="text-xl font-black font-mono text-ink mt-1">
-                {agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length}
-              </div>
-              <div className="text-[10px] text-ink-mute mt-1">
-                {agentSessions.length} 个会话
-              </div>
+        <CelCard3D className="h-full" depthLayers>
+          <div style={{ transformStyle: "preserve-3d" }}>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] font-mono font-bold uppercase text-ink-mute">活跃 Agent 会话</div>
+            <div style={{ transform: "translateZ(2px)" }} className="text-xl font-black font-mono text-ink mt-1">
+              {agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length}
             </div>
-            <CelOrbitalGauge3D
-              progress={agentSessions.length > 0 ? Math.round((agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length / agentSessions.length) * 100) : 0}
-              tone="ok"
-              size={40}
-              title="Active Agent Sessions [真3D]"
-              data-testid="team-3d-sessions"
-            />
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] text-ink-mute mt-1">
+              {agentSessions.length} 个会话
+            </div>
           </div>
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">小队</div>
-              <div className="text-xl font-black font-mono text-ink mt-1">{squads.length}</div>
-              <div className="text-[10px] text-ink-mute mt-1">人机协作小队</div>
-            </div>
-            <CelHoloCube3D status="optimal" size={40} title="Squad Topology HoloCube [真3D]" data-testid="team-3d-squads" />
+        <CelCard3D className="h-full" depthLayers>
+          <div style={{ transformStyle: "preserve-3d" }}>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] font-mono font-bold uppercase text-ink-mute">小队</div>
+            <div style={{ transform: "translateZ(2px)" }} className="text-xl font-black font-mono text-ink mt-1">{squads.length}</div>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] text-ink-mute mt-1">人机协作小队</div>
           </div>
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">租户</div>
-              <div className="text-xl font-black font-mono text-ink mt-1">{tenants.length}</div>
-              <div className="text-[10px] text-ink-mute mt-1">多租户隔离</div>
-            </div>
-            <CelCrystal3D tone="gold" size={40} title="Tenant Isolation Crystal [真3D]" data-testid="team-3d-tenants" />
+        <CelCard3D className="h-full" depthLayers>
+          <div style={{ transformStyle: "preserve-3d" }}>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] font-mono font-bold uppercase text-ink-mute">租户</div>
+            <div style={{ transform: "translateZ(2px)" }} className="text-xl font-black font-mono text-ink mt-1">{tenants.length}</div>
+            <div style={{ transform: "translateZ(1px)" }} className="text-[10px] text-ink-mute mt-1">多租户隔离</div>
           </div>
         </CelCard3D>
       </div>
@@ -545,7 +525,7 @@ export default function TeamPage() {
             type="button"
             onClick={createSquad}
             data-testid="team-create-squad"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-accent bg-accent/10 px-3 py-1.5 text-[11px] text-accent hover:bg-accent/20 transition-colors"
+            className="btn-primary cel-btn-3d inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] transition-all"
           >
             <Plus size={12} /> 新建小队
           </button>
@@ -638,7 +618,7 @@ function TabsComponent({
   items: TabsItem[];
 }) {
   return (
-    <div className="flex gap-1 border-b border-line mb-4">
+    <div className="flex gap-1 border-b border-line mb-4 [perspective:900px]">
       {items.map((item) => {
         const active = activeTab === item.id;
         return (
@@ -647,8 +627,9 @@ function TabsComponent({
             type="button"
             onClick={() => onChange(item.id)}
             data-testid={`team-tab-${item.id}`}
+            data-active={active ? "true" : "false"}
             className={clsx(
-              "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors border-b-2",
+              "ui-3d-tab flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all border-b-2",
               active
                 ? "border-accent bg-accent/10 text-accent font-semibold"
                 : "border-transparent text-ink-dim hover:bg-bg-soft/60 hover:text-ink"

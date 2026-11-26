@@ -43,7 +43,6 @@ import {
   type NoticeState,
 } from "@/components/status/StatusNotice";
 import { useTranslation } from "@/lib/i18n";
-import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 type Category = "all" | "review" | "comment" | "notice";
 const CATEGORY_IDS = ["all", "review", "comment", "notice"] as const;
@@ -173,12 +172,6 @@ export default function InboxPage() {
       {/* 头部: 全局 / 收件箱 */}
       <header className="border-b-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm">
-          <CelBeacon3D
-            status={unread > 0 ? "warning" : "active"}
-            size={30}
-            title={unread > 0 ? `${unread} 条未读` : "收件箱实时信号"}
-            data-testid="inbox-beacon-3d"
-          />
           <span className="text-ink-dim">{t.inbox.global}</span>
           <span className="text-ink-dim">/</span>
           <h1 className="font-black text-ink">{t.pageTitles["/inbox"].title}</h1>
@@ -194,15 +187,16 @@ export default function InboxPage() {
       </header>
 
       {/* 分类 tabs */}
-      <div data-testid="inbox-categories" className="border-b border-line bg-bg-card px-3 flex items-center gap-1">
+      <div data-testid="inbox-categories" className="border-b border-line bg-bg-card px-3 py-1 flex items-center gap-1.5">
         {CATEGORY_IDS.map((cat) => (
           <button
             key={cat}
             type="button"
             onClick={() => setActiveCategory(cat)}
             data-testid={`inbox-category-${cat}`}
+            data-active={activeCategory === cat ? "true" : "false"}
             className={clsx(
-              "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
+              "ui-3d-tab px-3 py-2 text-sm border-b-2 -mb-px transition-all",
               activeCategory === cat
                 ? "border-accent text-accent font-semibold"
                 : "border-transparent text-ink-dim hover:text-ink",
@@ -228,7 +222,7 @@ export default function InboxPage() {
                 type="button"
                 onClick={() => void load()}
                 data-testid="inbox-retry"
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
+                className="btn cel-btn-3d inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
               >
                 <RefreshCw size={12} /> {t.inbox.retry}
               </button>
@@ -239,7 +233,7 @@ export default function InboxPage() {
         /* 列表 + 详情 */
         <div className="flex flex-1 min-h-0">
           {/* 消息列表 */}
-          <ul className="w-96 shrink-0 border-r border-line overflow-y-auto" data-testid="inbox-list">
+          <ul className="w-96 shrink-0 border-r border-line overflow-y-auto [perspective:900px]" data-testid="inbox-list">
             {visible.map((n) => {
               const cat = categoryOf(n);
               return (
@@ -248,8 +242,10 @@ export default function InboxPage() {
                   data-testid={`inbox-item-${n.id}`}
                   onClick={() => setSelectedId(n.id)}
                   className={clsx(
-                    "px-4 py-3 border-b border-line/60 cursor-pointer transition-colors",
-                    selectedId === n.id ? "bg-accent/5 border-l-2 border-l-accent" : "hover:bg-bg-soft/60",
+                    "px-4 py-3 border-b border-line/60 cursor-pointer transition-all duration-150",
+                    selectedId === n.id
+                      ? "bg-accent/5 border-l-2 border-l-accent shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_3px_0_0_var(--cel-ink)]"
+                      : "hover:bg-bg-soft/60 hover:translate-x-0.5",
                     n.read && "opacity-60",
                   )}
                 >
@@ -276,7 +272,7 @@ export default function InboxPage() {
           {/* 详情面板 */}
           <aside className="flex-1 min-w-0 overflow-y-auto p-4">
             {selected ? (
-              <div data-testid="inbox-detail" className="bg-bg-card rounded-xl border border-line p-4">
+              <div data-testid="inbox-detail" className="card rounded-xl p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={clsx(
                     "text-[10px] px-1.5 py-0.5 rounded border",
@@ -296,7 +292,7 @@ export default function InboxPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid="inbox-open-branch"
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent/90"
+                      className="btn-primary cel-btn-3d flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
                     >
                       <GitBranch size={12} /> {t.inbox.openInBranch}
                     </a>
@@ -305,7 +301,7 @@ export default function InboxPage() {
                     type="button"
                     onClick={() => void toggleRead(selected)}
                     data-testid="inbox-mark-read"
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
+                    className="btn cel-btn-3d flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-ink-dim hover:bg-bg-soft"
                   >
                     <CheckCircle2 size={12} /> {selected.read ? t.inbox.markUnread : t.inbox.markRead}
                   </button>

@@ -190,35 +190,56 @@ body.cel {
     background-color: color-mix(in srgb, var(--popover-bg, #ffffff) 92%, var(--color-surface-elevated, #ffffff));
   }
 
-  /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
-  /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
+  /* ── 艺术级三渲二漫画卡片 (真实 3D 挤压底座 + 透视悬浮) ────────────────────────── */
   .card {
     border-radius: 0px;
     border: 2px solid var(--cel-ink, #000000);
     background-image: radial-gradient(var(--cel-screentone-dot) 1px, transparent 1px), var(--cel-card-ramp);
     background-size: 10px 10px, auto;
     padding: 1.25rem 1.5rem; /* 20px vert, 24px horiz optical breathing room */
-    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms ease, border-color 0.15s ease;
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 140ms ease, border-color 0.15s ease;
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 3px 0 0 var(--cel-ink, #000000),
+      3px 0 0 0 var(--cel-ink, #000000),
+      5px 6px 0px 0px var(--cel-shadow-color, #000000);
     position: relative;
   }
   .card:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 6px 6px 0px 0px var(--cel-shadow-color, #000000);
-    border-color: var(--cel-cyan, #00f0ff);
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 4px 0 0 var(--cel-ink, #000000),
+      3px 0 0 0 var(--cel-ink, #000000),
+      6px 7px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: color-mix(in srgb, var(--cel-cyan, #00f0ff) 55%, var(--cel-ink, #05070c));
   }
 
   /* 紧凑型卡片（看板列、小挂件、状态网格） */
   .card-compact {
     padding: 0.875rem 1rem;
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 2px 0 0 var(--cel-ink, #000000),
+      2px 0 0 0 var(--cel-ink, #000000),
+      4px 5px 0px 0px var(--cel-shadow-color, #000000);
   }
   .card-compact:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 3px 0 0 var(--cel-ink, #000000),
+      2px 0 0 0 var(--cel-ink, #000000),
+      5px 6px 0px 0px var(--cel-shadow-color, #000000);
   }
 
-  /* ── 动漫三渲二战术面板 (NPR Stepped Ramp + Breathing Chamfer) ─────────────────────── */
+  /* ── 动漫三渲二战术面板 (NPR Stepped Ramp + 3D Extruded Chamfer) ─────────────────────── */
   .anime-panel {
     position: relative;
     border-radius: 0px;
@@ -226,17 +247,26 @@ body.cel {
     background-image: radial-gradient(var(--cel-screentone-dot) 1px, transparent 1px), var(--cel-card-ramp);
     background-size: 10px 10px, auto;
     padding: 1.25rem 1.5rem; /* 20px / 24px optical gutter */
-    transition: transform 120ms ease, box-shadow 120ms ease;
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    transform-style: preserve-3d;
+    transition: transform 140ms ease, box-shadow 140ms ease;
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 4px 0 0 var(--cel-ink, #000000),
+      6px 7px 0px 0px var(--cel-shadow-color, #000000);
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
   }
   .anime-panel:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 7px 7px 0px 0px var(--cel-shadow-color, #000000);
-    border-color: var(--cel-crimson, #ff184c);
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 5px 0 0 var(--cel-ink, #000000),
+      7px 8px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: color-mix(in srgb, var(--cel-cyan, #00f0ff) 55%, var(--cel-ink, #05070c));
   }
 
-  /* ── 战术 HUD 微标签 (Manga Inked HUD Tag) ─────────────────────── */
+  /* ── 战术 HUD 微标签 (3D 凸起铭牌) ─────────────────────── */
   .anime-hud-tag {
     display: inline-flex;
     align-items: center;
@@ -253,11 +283,19 @@ body.cel {
     border: 1.5px solid var(--cel-ink, #000000);
     color: var(--cel-cyan, #00f0ff);
     background-color: var(--cel-surface-card, #0f1422);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 2px 2px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 2px 0 0 var(--cel-ink, #000000),
+      2px 3px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 90ms ease, box-shadow 90ms ease;
     line-height: 1;
   }
+  .anime-hud-tag:hover {
+    transform: translate3d(0, -1px, 0);
+  }
 
-  /* ── 二次元三渲二发光徽章 ──────────────────────────────────────── */
+  /* ── 二次元三渲二发光徽章 (3D 凸起铭牌) ──────────────────────────── */
   .anime-badge-neon {
     display: inline-flex;
     align-items: center;
@@ -272,12 +310,16 @@ body.cel {
     border: 2px solid var(--cel-ink, #000000);
     background-color: var(--cel-crimson, #ff184c);
     color: #000000;
-    box-shadow: inset 1px 1px 0 0 rgba(255,255,255,0.35), inset -1px -1px 0 0 rgba(0,0,0,0.3), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255,255,255,0.45),
+      inset -1px -1px 0 0 rgba(0,0,0,0.35),
+      0 2px 0 0 var(--cel-ink, #000000),
+      3px 4px 0px 0px var(--cel-shadow-color, #000000);
     font-style: italic;
     line-height: 1;
   }
 
-  /* ── 状态胶囊 (Stepped NPR Pill) ────────────────────────────── */
+  /* ── 状态胶囊 (3D 立体铭牌 Stepped NPR Pill) ────────────────────── */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -291,12 +333,19 @@ body.cel {
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: 0.02em;
     background-color: var(--cel-surface-sub, #151c2c);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 2px 2px 0px 0px var(--cel-shadow-color, #000000);
-    transition: transform 80ms ease;
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 2px 0 0 var(--cel-ink, #000000),
+      2px 3px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 90ms ease, box-shadow 90ms ease;
     line-height: 1;
   }
+  .pill:hover {
+    transform: translate3d(0, -1px, 0);
+  }
 
-  /* ── 3D 触觉战术交互按钮 (Standardized Fitts Target: min-h 40px) ───────────────────── */
+  /* ── 3D 机械实体键帽按钮 (Standardized Fitts Target: min-h 40px) ───────────────────── */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -310,18 +359,30 @@ body.cel {
     font-size: 13px;
     font-weight: 700;
     color: var(--cel-text-primary, #ffffff);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
-    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 4px 0 0 var(--cel-ink, #000000),
+      4px 6px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms ease;
     line-height: 1.2;
   }
-  .btn:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+  .btn:hover:not(:disabled) {
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 5px 0 0 var(--cel-ink, #000000),
+      5px 7px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-cyan, #00f0ff);
   }
-  .btn:active {
-    transform: translate(2px, 2px) !important;
-    box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo) !important;
+  .btn:active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow:
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 1px 0 0 var(--cel-ink, #000000) !important;
   }
 
   .btn-primary {
@@ -340,18 +401,30 @@ body.cel {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-style: italic;
-    box-shadow: inset 1px 1px 0 0 rgba(255,255,255,0.35), inset -1px -1px 0 0 var(--cel-bevel-lo), 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255,255,255,0.38),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 4px 0 0 var(--cel-ink, #000000),
+      4px 6px 0px 0px var(--cel-shadow-color, #000000);
     transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
     line-height: 1.2;
   }
-  .btn-primary:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: inset 1px 1px 0 0 rgba(255,255,255,0.35), inset -1px -1px 0 0 var(--cel-bevel-lo), 6px 6px 0px 0px var(--cel-shadow-color, #000000);
-    filter: brightness(1.08);
+  .btn-primary:hover:not(:disabled) {
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255,255,255,0.45),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 5px 0 0 var(--cel-ink, #000000),
+      5px 7px 0px 0px var(--cel-shadow-color, #000000);
+    filter: brightness(1.06);
   }
-  .btn-primary:active {
-    transform: translate(3px, 3px) !important;
-    box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo) !important;
+  .btn-primary:active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow:
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 1px 0 0 var(--cel-ink, #000000) !important;
   }
 
   .btn-primary-ghost {
@@ -367,24 +440,56 @@ body.cel {
     font-size: 13px;
     font-weight: 700;
     color: var(--cel-cyan, #00f0ff);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 4px 0 0 var(--cel-ink, #000000),
+      4px 6px 0px 0px var(--cel-shadow-color, #000000);
     transition: transform 100ms ease, box-shadow 100ms ease;
     line-height: 1.2;
   }
-  .btn-primary-ghost:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+  .btn-primary-ghost:hover:not(:disabled) {
+    transform: translate3d(-1px, -1px, 0);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 5px 0 0 var(--cel-ink, #000000),
+      5px 7px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-cyan, #00f0ff);
   }
-  .btn-primary-ghost:active {
-    transform: translate(2px, 2px) !important;
-    box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo) !important;
+  .btn-primary-ghost:active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow:
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 1px 0 0 var(--cel-ink, #000000) !important;
   }
-  .btn-primary-ghost:disabled,
-  .btn-primary:disabled {
-    opacity: 0.4;
+  .btn:disabled,
+  .btn-primary-ghost:disabled {
+    opacity: 0.45;
     cursor: not-allowed;
     box-shadow: none !important;
+    transform: none !important;
+  }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+  html.dark .btn-primary:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background-image:
+      radial-gradient(rgba(5, 7, 12, 0.14) 1px, transparent 1px),
+      var(--cel-btn-primary-ramp);
+    border-color: var(--cel-ink, #05070c);
+    color: #05070c;
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255, 255, 255, 0.35),
+      0 2px 0 0 #05070c,
+      2px 2px 0 0 #000000 !important;
     transform: none !important;
   }
 
@@ -419,34 +524,118 @@ body.cel {
     background-color: var(--cel-surface-stage, #1a2438);
   }
 
-  /* 暗夜神格：以硬边色阶和青色焦点统一常用组件。 */
-  html.dark .btn-primary {
-    background: linear-gradient(135deg, #ff6484 0%, #ff6484 32%, #ff184c 32%, #ff184c 72%, #bd123b 72%, #bd123b 100%);
-    color: #080a10;
+  /* 暗夜神格：以美漫三渲二硬边色阶与 80/15/5 色彩心理学统一按钮体系 */
+  html.dark :is(
+    .btn-primary,
+    button[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"]):not([role="switch"]):not(.ui-3d-tab):not(.ui-3d-chip),
+    a[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"])
+  ) {
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #05070c);
+    background-color: var(--cel-gold, #ffc400);
+    background-image:
+      radial-gradient(rgba(5, 7, 12, 0.14) 1px, transparent 1px),
+      var(--cel-btn-primary-ramp);
+    background-size: 6px 6px, 100% 100%;
+    color: #05070c;
+    font-weight: 800;
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms ease;
+    box-shadow:
+      inset 2px 2px 0 0 rgba(255, 255, 255, 0.58),
+      inset -1px -1px 0 0 rgba(0, 0, 0, 0.45),
+      0 3px 0 0 var(--cel-ink, #05070c),
+      3px 4px 0 0 var(--cel-shadow-color, #000000);
+  }
+  html.dark :is(
+    .btn-primary,
+    button[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"]):not([role="switch"]):not(.ui-3d-tab):not(.ui-3d-chip),
+    a[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"])
+  ):hover:not(:disabled) {
+    transform: translate3d(-1px, -1px, 0);
+    border-color: #ffe066;
+    color: #05070c;
+    box-shadow:
+      inset 2px 2px 0 0 rgba(255, 255, 255, 0.68),
+      inset -1px -1px 0 0 rgba(0, 0, 0, 0.5),
+      0 4px 0 0 var(--cel-ink, #05070c),
+      4px 5px 0 0 var(--cel-shadow-color, #000000);
+  }
+  html.dark :is(
+    .btn-primary,
+    button[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"]):not([role="switch"]):not(.ui-3d-tab):not(.ui-3d-chip),
+    a[class*="bg-accent"]:not([class*="bg-accent/"]):not([role="tab"])
+  ):active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow: var(--cel-btn-shadow-press) !important;
   }
   html.dark .btn-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    border-radius: 0px;
-    border: 2px solid var(--cel-ink, #05070c);
-    background: var(--cel-surface-sub, #121929);
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 700;
-    color: var(--cel-cyan, #00f0ff);
-    box-shadow: var(--dark-divinity-bevel), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
-    transition: transform 100ms ease, box-shadow 100ms ease, border-color 120ms ease;
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+    transition: transform 100ms ease, box-shadow 100ms ease, border-color 120ms ease, background-image 120ms ease, color 120ms ease;
   }
-  html.dark .btn-secondary:hover:not(:disabled) {
-    transform: translate(-1px, -1px);
-    border-color: var(--cel-cyan, #00f0ff);
-    box-shadow: var(--dark-divinity-bevel), 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+  html.dark :is(
+    .btn,
+    .btn-secondary,
+    .cel-btn-3d,
+    button[class*="border"]:not([role="tab"]):not([role="treeitem"]):not([role="switch"]):not([role="option"])
+  ):not(.btn-primary):not(.btn-primary-ghost):not([class*="bg-accent"]):not(.ui-3d-tab):not(.ui-3d-chip):not(.ui-3d-nav-tree-row):not(.ui-3d-nav-tree-toggle) {
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-rest-ramp);
+    color: #e2e8f0;
+    box-shadow: var(--cel-btn-shadow-rest);
+    transform-style: preserve-3d;
+    transition: transform 100ms ease, box-shadow 100ms ease, border-color 120ms ease, background-image 120ms ease, color 120ms ease;
   }
-  html.dark .btn-secondary:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo);
+  html.dark :is(
+    .btn,
+    .btn-secondary,
+    .cel-btn-3d,
+    button[class*="border"]:not([role="tab"]):not([role="treeitem"]):not([role="switch"]):not([role="option"])
+  ):not(.btn-primary):not(.btn-primary-ghost):not([class*="bg-accent"]):not(.ui-3d-tab):not(.ui-3d-chip):not(.ui-3d-nav-tree-row):not(.ui-3d-nav-tree-toggle):hover:not(:disabled) {
+    background-image: var(--cel-btn-hover-ramp);
+    color: var(--cel-gold, #ffc400);
+    border-color: var(--cel-gold, #ffc400);
+    box-shadow: var(--cel-btn-shadow-hover);
+    transform: translate3d(-1px, -1px, 0);
+  }
+  html.dark :is(
+    .btn,
+    .btn-secondary,
+    .cel-btn-3d,
+    button[class*="border"]:not([role="tab"]):not([role="treeitem"]):not([role="switch"]):not([role="option"])
+  ):not(.btn-primary):not(.btn-primary-ghost):not([class*="bg-accent"]):not(.ui-3d-tab):not(.ui-3d-chip):not(.ui-3d-nav-tree-row):not(.ui-3d-nav-tree-toggle):active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow: var(--cel-btn-shadow-press) !important;
+  }
+  html.dark .btn-primary-ghost {
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-active-ramp);
+    color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.35),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      2px 3px 0 0 var(--cel-shadow-color, #000000);
+  }
+  html.dark .btn-primary-ghost:hover:not(:disabled) {
+    transform: translate3d(-1px, -1px, 0);
+    border-color: var(--cel-gold, #ffc400);
+    color: #ffe066;
+    box-shadow: var(--cel-btn-shadow-hover);
+  }
+  html.dark .btn-primary-ghost:active:not(:disabled) {
+    transform: translate3d(1px, 2px, 0) !important;
+    box-shadow: var(--cel-btn-shadow-press) !important;
   }
   html.dark :is(.card, .anime-panel, [class*="bg-bg-card"]:not(.popover-solid)) {
     background-color: var(--cel-surface-card);
@@ -454,7 +643,12 @@ body.cel {
     border-color: var(--cel-ink, #05070c);
     background-image: var(--dark-divinity-grid, radial-gradient(var(--cel-screentone-dot) 1px, transparent 1px)), var(--cel-card-ramp);
     background-size: 10px 10px, auto;
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      inset -1px -1px 0 0 var(--cel-bevel-lo),
+      0 3px 0 0 var(--cel-ink, #05070c),
+      3px 0 0 0 var(--cel-ink, #05070c),
+      5px 6px 0px 0px var(--cel-shadow-color, #000000);
   }
   html.dark header:is([class*="bg-bg-card"]),
   html.dark aside:is([class*="bg-bg-card"]) {
@@ -465,15 +659,318 @@ body.cel {
     background-color: #090d16;
     border: 1.5px solid #1e2a42;
     color: var(--cel-text-primary, #ffffff);
-    box-shadow: inset 1px 1px 0 0 rgba(0, 0, 0, 0.55);
+    transform: perspective(500px) translateZ(0px);
+    box-shadow:
+      inset 2px 2px 0 0 rgba(0, 0, 0, 0.78),
+      inset -1px -1px 0 0 rgba(0, 240, 255, 0.12),
+      0 1px 0 0 rgba(0, 240, 255, 0.22);
+    transition: transform 110ms ease, border-color 110ms ease, box-shadow 110ms ease;
   }
   html.dark :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus {
     border-color: var(--cel-cyan, #00f0ff);
-    box-shadow: 2px 2px 0px 0px var(--cel-cyan, #00f0ff);
+    transform: perspective(500px) translateZ(3px) translateY(-1px);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(0, 0, 0, 0.6),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      2px 3px 0px 0px var(--cel-cyan, #00f0ff);
     outline: none;
   }
-  html.dark [data-testid^="tab-"][data-active="true"] {
-    box-shadow: inset 0 -2px 0 0 var(--cel-cyan, #00f0ff), 0 4px 12px rgba(0, 240, 255, 0.14);
+
+  /* ── 通用既有 UI 控件的防溢出美漫三渲二扩展类 (Tabs / Chips / 3D 棱柱进度条) ── */
+  .ui-3d-tab {
+    position: relative;
+    transform-style: preserve-3d;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #05070c);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 2px 0 0 var(--cel-ink, #05070c);
+    transform: translate3d(0, 0, 0);
+    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms ease, border-color 120ms ease, background-image 120ms ease, color 120ms ease;
+  }
+  .ui-3d-tab:not([data-testid^="tab-"]) {
+    background-image: var(--cel-btn-rest-ramp);
+    color: var(--cel-text-secondary, #94a3b8);
+  }
+  .ui-3d-tab:hover:not([data-active="true"]):not([aria-selected="true"]):not([aria-pressed="true"]) {
+    transform: translate3d(0, -1px, 0);
+    border-color: color-mix(in srgb, var(--cel-cyan, #00f0ff) 55%, var(--cel-ink, #05070c));
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 3px 0 0 var(--cel-ink, #05070c);
+  }
+  html.dark .ui-3d-tab:hover:not([data-active="true"]):not([aria-selected="true"]):not([aria-pressed="true"]) {
+    border-color: color-mix(in srgb, var(--cel-gold, #ffc400) 65%, var(--cel-ink, #05070c));
+  }
+  .ui-3d-tab:not([data-testid^="tab-"]):hover:not([data-active="true"]):not([aria-selected="true"]):not([aria-pressed="true"]) {
+    color: var(--cel-text-primary, #f8fafc);
+  }
+  .ui-3d-tab:active {
+    transform: translate3d(0, 1px, 0) !important;
+    box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo), 0 1px 0 0 var(--cel-ink, #05070c) !important;
+  }
+  .ui-3d-tab:not([data-testid^="tab-"]):is([data-active="true"], [aria-selected="true"], [aria-pressed="true"]) {
+    transform: translate3d(0, -1px, 0);
+    border-color: var(--cel-cyan, #00f0ff);
+    background-image: var(--cel-btn-active-ramp);
+    color: var(--cel-cyan, #00f0ff);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(0, 240, 255, 0.35),
+      inset 0 -2px 0 0 var(--cel-cyan, #00f0ff),
+      0 2px 0 0 var(--cel-ink, #05070c);
+  }
+  html.dark .ui-3d-tab:not([data-testid^="tab-"]):is([data-active="true"], [aria-selected="true"], [aria-pressed="true"]) {
+    border-color: var(--cel-gold, #ffc400);
+    background-image: var(--cel-btn-active-ramp);
+    color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.38),
+      inset 0 -2px 0 0 var(--cel-gold, #ffc400),
+      0 2px 0 0 var(--cel-ink, #05070c);
+  }
+
+  .ui-3d-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transform-style: preserve-3d;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-rest-ramp);
+    color: var(--cel-text-secondary, #94a3b8);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      2px 2px 0px 0px var(--cel-shadow-color, #000000);
+    transform: translate3d(0, 0, 0);
+    transition: transform 90ms ease, box-shadow 90ms ease, border-color 120ms ease, color 120ms ease;
+  }
+  .ui-3d-chip:hover {
+    transform: translate3d(0, -1px, 0);
+    color: var(--cel-text-primary, #f8fafc);
+    border-color: color-mix(in srgb, var(--cel-cyan, #00f0ff) 60%, var(--cel-ink, #05070c));
+  }
+  html.dark .ui-3d-chip:hover {
+    border-color: color-mix(in srgb, var(--cel-gold, #ffc400) 70%, var(--cel-ink, #05070c));
+    color: var(--cel-gold, #ffc400);
+  }
+  .ui-3d-chip:active {
+    transform: translate3d(0, 1px, 0) !important;
+    box-shadow: 0 0 0 0 var(--cel-ink, #05070c) !important;
+  }
+  .ui-3d-chip[aria-pressed="true"],
+  .ui-3d-chip[aria-selected="true"],
+  .ui-3d-chip[data-active="true"] {
+    transform: translate3d(0, 0, 0);
+    border-color: var(--cel-cyan, #00f0ff);
+    background-image: var(--cel-btn-active-ramp);
+    color: var(--cel-cyan, #00f0ff);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(0, 240, 255, 0.35),
+      inset 2px 0 0 0 var(--cel-gold, #ffc400),
+      0 1px 0 0 var(--cel-ink, #05070c);
+  }
+  html.dark .ui-3d-chip:is([aria-pressed="true"], [aria-selected="true"], [data-active="true"]) {
+    border-color: var(--cel-gold, #ffc400);
+    background-image: var(--cel-btn-active-ramp);
+    color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.38),
+      inset 2px 0 0 0 var(--cel-gold, #ffc400),
+      0 1px 0 0 var(--cel-ink, #05070c);
+  }
+
+  /* ── 左侧导航 3D 美漫树形节点 / 折叠键帽 / 图标牌 ────────────────────── */
+  .ui-3d-nav-tree-row {
+    position: relative;
+    transform-style: preserve-3d;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-rest-ramp);
+    color: var(--cel-text-primary, #f8fafc);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      2px 2px 0 0 var(--cel-shadow-color, #000000);
+    transform: translate3d(0, 0, 0);
+    transition: transform 90ms ease, box-shadow 90ms ease, border-color 110ms ease, background-image 110ms ease, color 110ms ease;
+  }
+  .ui-3d-nav-tree-row:hover {
+    transform: translate3d(-1px, -1px, 0);
+    border-color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.35),
+      0 3px 0 0 var(--cel-ink, #05070c),
+      3px 3px 0 0 var(--cel-shadow-color, #000000);
+  }
+  .ui-3d-nav-tree-row:is([aria-selected="true"], [data-active="true"], [aria-current="page"]) {
+    background-image: var(--cel-btn-active-ramp);
+    border-color: var(--cel-gold, #ffc400);
+    color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 3px 0 0 0 var(--cel-gold, #ffc400),
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.35),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      2px 3px 0 0 #000000;
+  }
+  .ui-3d-nav-tree-toggle {
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-rest-ramp);
+    color: var(--cel-text-secondary, #94a3b8);
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 2px 0 0 var(--cel-ink, #05070c);
+    transition: transform 90ms ease, border-color 110ms ease, color 110ms ease;
+  }
+  .ui-3d-nav-tree-toggle:hover {
+    transform: translate3d(0, -1px, 0);
+    border-color: var(--cel-gold, #ffc400);
+    color: var(--cel-gold, #ffc400);
+  }
+  .ui-3d-nav-tree-toggle:active {
+    transform: translate3d(0, 1px, 0);
+    box-shadow: none;
+  }
+  .ui-3d-nav-icon-tile {
+    border-radius: 0px;
+    border: 1px solid var(--cel-ink, #05070c);
+    background: rgba(255, 196, 0, 0.12);
+    color: var(--cel-gold, #ffc400);
+    box-shadow: 0 1.5px 0 0 var(--cel-ink, #05070c);
+    transform: translateZ(2px);
+  }
+  .ui-3d-tree-level-project {
+    border-left: 4px solid var(--cel-gold, #ffc400);
+    background-image:
+      radial-gradient(rgba(255, 196, 0, 0.08) 1px, transparent 1px),
+      var(--cel-btn-rest-ramp);
+    background-size: 6px 6px, 100% 100%;
+    box-shadow:
+      inset 1px 1px 0 0 var(--cel-bevel-hi),
+      0 2px 0 0 var(--cel-ink, #05070c),
+      3px 3px 0 0 var(--cel-shadow-color, #000000);
+  }
+  .ui-3d-tree-level-lane {
+    border-left: 3px solid var(--cel-cyan, #00f0ff);
+  }
+  .ui-3d-tree-level-worktree {
+    border-left: 3px solid #10b981;
+  }
+  .ui-3d-tree-level-branch {
+    border-left: 3px solid var(--cel-gold, #ffc400);
+  }
+  .ui-3d-tree-spine {
+    position: relative;
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid #263248;
+  }
+  .ui-3d-tree-branch-tick {
+    position: relative;
+  }
+  .ui-3d-tree-branch-tick::before {
+    content: "";
+    position: absolute;
+    left: -0.75rem;
+    top: 50%;
+    width: 10px;
+    height: 2px;
+    background: #263248;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .ui-3d-tree-branch-tick::after {
+    content: "";
+    position: absolute;
+    left: calc(-0.75rem - 2px);
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    background: var(--cel-cyan, #00f0ff);
+    border: 1px solid var(--cel-ink, #05070c);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .ui-3d-tree-tag {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    padding: 1px 4px;
+    line-height: 1.2;
+    border: 1px solid var(--cel-ink, #05070c);
+    background: rgba(5, 7, 12, 0.55);
+  }
+
+  .ui-3d-progress-track {
+    position: relative;
+    height: 14px;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #05070c);
+    background: #070b14;
+    box-shadow:
+      inset 2px 2px 0 0 rgba(0, 0, 0, 0.8),
+      inset -1px -1px 0 0 rgba(0, 240, 255, 0.15),
+      0 2px 0 0 var(--cel-ink, #05070c);
+    overflow: hidden;
+  }
+  .ui-3d-progress-fill {
+    height: 100%;
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--cel-cyan, #00f0ff) 92%, #ffffff) 0%,
+      color-mix(in srgb, var(--cel-cyan, #00f0ff) 92%, #ffffff) 35%,
+      var(--cel-cyan, #00f0ff) 35%,
+      var(--cel-cyan, #00f0ff) 72%,
+      color-mix(in srgb, var(--cel-cyan, #00f0ff) 52%, #05070c) 72%,
+      color-mix(in srgb, var(--cel-cyan, #00f0ff) 52%, #05070c) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.55),
+      inset -2px 0 0 0 rgba(255, 255, 255, 0.45);
+    transition: width 450ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cel-card-pulse {
+    animation: cel-card-breathe 3s ease-in-out infinite;
+  }
+
+  html.dark [data-testid^="tab-"]:not([data-testid^="tab-icon-tile-"]) {
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #05070c);
+    background-image: var(--cel-btn-rest-ramp);
+    color: #cbd5e1;
+    box-shadow: var(--cel-btn-shadow-rest);
+  }
+  html.dark [data-testid^="tab-"]:not([data-testid^="tab-icon-tile-"]):hover:not([data-active="true"]) {
+    background-image: var(--cel-btn-hover-ramp);
+    border-color: var(--cel-gold, #ffc400);
+    color: var(--cel-gold, #ffc400);
+    box-shadow: var(--cel-btn-shadow-hover);
+    transform: translate3d(-1px, -1px, 0);
+  }
+  html.dark [data-testid^="tab-"]:not([data-testid^="tab-icon-tile-"])[data-active="true"] {
+    background-image: var(--cel-btn-active-ramp);
+    border-color: var(--cel-gold, #ffc400);
+    color: var(--cel-gold, #ffc400);
+    box-shadow:
+      inset 0 -3px 0 0 var(--cel-gold, #ffc400),
+      inset 1px 1px 0 0 rgba(255, 196, 0, 0.42),
+      0 3px 0 0 #05070c,
+      3px 4px 0 0 #000000;
+  }
+  html.dark [data-testid^="tab-icon-tile-"] {
+    border-radius: 0px;
+    border: 1px solid var(--cel-ink, #05070c);
+    background: rgba(255, 196, 0, 0.12);
+    color: var(--cel-gold, #ffc400);
+    box-shadow: 0 1.5px 0 0 var(--cel-ink, #05070c);
+  }
+  html.dark [data-testid^="tab-"]:not([data-testid^="tab-icon-tile-"])[data-active="true"] [data-testid^="tab-icon-tile-"] {
+    background: var(--cel-gold, #ffc400);
+    color: #05070c;
+    border-color: #05070c;
   }
   .divinity-3d-frame {
     position: relative;
@@ -497,11 +994,15 @@ body.cel {
     outline-offset: 3px;
   }
   @media (prefers-reduced-motion: reduce) {
-    html.dark :is(.card, .anime-panel, .btn, .btn-primary, .btn-primary-ghost, .btn-secondary, .lift-on-hover) {
+    html.dark :is(.card, .anime-panel, .btn, .btn-primary, .btn-primary-ghost, .btn-secondary, .ui-3d-tab, .ui-3d-chip, .ui-3d-nav-tree-row, .ui-3d-nav-tree-toggle, .lift-on-hover) {
       transition: none;
     }
-    html.dark :is(.card, .anime-panel, .btn, .btn-primary, .btn-primary-ghost, .btn-secondary, .lift-on-hover):hover {
+    html.dark :is(.card, .anime-panel, .btn, .btn-primary, .btn-primary-ghost, .btn-secondary, .ui-3d-tab, .ui-3d-chip, .ui-3d-nav-tree-row, .ui-3d-nav-tree-toggle, .lift-on-hover):hover {
       transform: none;
+    }
+    .cel-card-pulse {
+      animation: none;
+      opacity: 0.3;
     }
   }
 
@@ -574,6 +1075,10 @@ body.cel {
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.55; transform: scale(0.85); }
+}
+@keyframes cel-card-breathe {
+  0%, 100% { opacity: 0.2; transform: translateZ(-1px) scale(1); }
+  50%      { opacity: 0.45; transform: translateZ(-1px) scale(1.003); }
 }
 
 /* ============================================================================
@@ -840,11 +1345,11 @@ html.physis {
 }
 
 .cel-btn-3d:hover {
-  transform: translate(-1px, -1px);
+  transform: translate3d(-1px, -1px, 0);
 }
 
 .cel-btn-3d:active {
-  transform: translate(3px, 3px) !important;
+  transform: translate3d(1px, 2px, 0) !important;
   box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo) !important;
 }
 

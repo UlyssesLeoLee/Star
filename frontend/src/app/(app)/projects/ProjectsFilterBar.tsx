@@ -212,10 +212,11 @@ export function ProjectsFilterBar({
               type="button"
               role="tab"
               aria-selected={calendarView === v}
+              data-active={calendarView === v ? "true" : "false"}
               data-testid={`calendar-subtab-${v}`}
               onClick={() => onCalendarViewChange?.(v)}
               className={clsx(
-                "px-2.5 py-1 text-[11px] font-mono rounded border transition-colors",
+                "ui-3d-tab px-2.5 py-1 text-[11px] font-mono rounded border transition-all",
                 calendarView === v
                   ? "bg-accent text-white border-accent font-bold"
                   : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
@@ -236,9 +237,10 @@ export function ProjectsFilterBar({
               type="button"
               data-testid={`filter-status-${s}`}
               aria-pressed={filter.statuses.includes(s)}
+              data-active={filter.statuses.includes(s) ? "true" : "false"}
               onClick={() => toggleStatus(s)}
               className={clsx(
-                "px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors",
+                "ui-3d-chip px-2 py-0.5 text-[10px] font-mono rounded-full border transition-all",
                 filter.statuses.includes(s)
                   ? "bg-accent/15 text-accent border-accent font-bold"
                   : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
@@ -259,9 +261,10 @@ export function ProjectsFilterBar({
               type="button"
               data-testid={`filter-priority-${p}`}
               aria-pressed={filter.priorities.includes(p)}
+              data-active={filter.priorities.includes(p) ? "true" : "false"}
               onClick={() => togglePriority(p)}
               className={clsx(
-                "px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors",
+                "ui-3d-chip px-2 py-0.5 text-[10px] font-mono rounded-full border transition-all",
                 filter.priorities.includes(p)
                   ? "bg-accent/15 text-accent border-accent font-bold"
                   : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
@@ -282,9 +285,10 @@ export function ProjectsFilterBar({
               type="button"
               data-testid={`filter-member-${m.id}`}
               aria-pressed={filter.memberIds.includes(m.id)}
+              data-active={filter.memberIds.includes(m.id) ? "true" : "false"}
               onClick={() => toggleMember(m.id)}
               className={clsx(
-                "px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors",
+                "ui-3d-chip px-2 py-0.5 text-[10px] font-mono rounded-full border transition-all",
                 filter.memberIds.includes(m.id)
                   ? "bg-accent/15 text-accent border-accent font-bold"
                   : "border-line text-ink-mute hover:text-ink hover:border-accent/50",
@@ -316,7 +320,7 @@ export function ProjectsFilterBar({
           type="button"
           data-testid="filter-clear-all"
           onClick={clearAll}
-          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded border border-line text-ink-mute hover:text-accent hover:border-accent transition-colors"
+          className="ui-3d-chip flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded border border-line text-ink-mute hover:text-accent hover:border-accent transition-all"
         >
           <X size={11} aria-hidden="true" />
           {t.projectsFilterBar.clearAll}

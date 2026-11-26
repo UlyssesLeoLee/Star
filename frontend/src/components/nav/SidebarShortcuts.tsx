@@ -119,8 +119,8 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
         data-testid="sidebar-shortcuts-trigger"
         onClick={() => setOpenMode((mode) => mode === "click" ? null : "click")}
         className={clsx(
-          "grid h-9 place-items-center border border-line bg-bg-card text-ink-mute hover:text-accent focus-visible:outline focus-visible:outline-accent",
-          inDrawer ? "w-9 rounded-md" : "w-7 rounded-r-md border-l-0",
+          "cel-btn-3d grid h-9 place-items-center border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] text-ink-mute hover:text-accent focus-visible:outline focus-visible:outline-accent",
+          inDrawer ? "w-9" : "w-7 border-l-0",
           open && "text-accent",
         )}
       >
@@ -133,14 +133,14 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
         aria-label={t.sidebar.shortcuts.label}
         data-testid="sidebar-shortcuts-panel"
         className={clsx(
-          "absolute w-52 overflow-y-auto rounded-md border border-line bg-bg-card p-2 shadow-soft",
+          "absolute w-52 overflow-y-auto border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] p-2.5 shadow-[5px_6px_0_0_#000000] [perspective:800px]",
           inDrawer ? "right-0 top-full max-h-[60dvh]" : "left-full top-0 max-h-[calc(100dvh-6rem)]",
         )}
       >
         {open && (
           <>
             {pinnedModules.length > 0 && (
-              <ul className="space-y-0.5 border-b border-line pb-1" data-testid="sidebar-pinned-modules">
+              <ul className="space-y-1.5 border-b border-line pb-2" data-testid="sidebar-pinned-modules">
                 {pinnedModules.map((item) => (
                   <ShortcutModule
                     key={item.id}
@@ -155,7 +155,7 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
                 ))}
               </ul>
             )}
-            <ul className="space-y-0.5" data-testid="sidebar-group-global">
+            <ul className="space-y-1.5" data-testid="sidebar-group-global">
               {globalModules.map((item) => (
                 <ShortcutModule key={item.id} item={item} active={moduleHrefMatches(item.href, pathname, searchParams)} onNavigate={close} />
               ))}
@@ -164,10 +164,12 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
                   <GuardedLink
                     href={item.href}
                     onNavigate={close}
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-ink-dim hover:bg-bg-soft hover:text-ink"
+                    className="ui-3d-nav-tree-row flex items-center gap-2 px-2 py-1.5 text-xs"
                     data-testid={`sidebar-quick-${item.id}`}
                   >
-                    <item.icon size={14} aria-hidden="true" />
+                    <span className="ui-3d-nav-icon-tile grid size-5 shrink-0 place-items-center">
+                      <item.icon size={13} aria-hidden="true" />
+                    </span>
                     {useModuleTranslation(item).label}
                   </GuardedLink>
                 </li>
@@ -176,7 +178,7 @@ export function SidebarShortcuts({ inDrawer = false, onCustomize }: {
             <button
               type="button"
               data-testid="sidebar-add-shortcut"
-              className="mt-1 flex w-full items-center gap-2 border-t border-line px-2 py-2 text-left text-xs text-accent hover:bg-bg-soft focus-visible:outline focus-visible:outline-accent"
+              className="btn-primary cel-btn-3d mt-2 flex w-full !min-h-[32px] items-center justify-center gap-1.5 !px-2.5 !py-1.5 text-xs focus-visible:outline focus-visible:outline-accent"
               onClick={() => {
                 trigger.current?.focus();
                 close();
@@ -204,21 +206,23 @@ function ShortcutModule({ item, active, onNavigate, onRemove }: {
   const Icon = item.icon;
   const removeLabel = `${t.appMatrix.unpinFromSidebar} · ${label}`;
   return (
-    <li className="flex items-center rounded hover:bg-bg-soft">
+    <li className="flex items-center gap-1">
       <GuardedLink
         href={item.href}
         onNavigate={onNavigate}
         aria-current={active ? "page" : undefined}
         data-active={active}
         data-testid={`sidebar-item-${item.id}`}
-        className={clsx("flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1.5 text-xs", active ? "bg-accent/10 font-medium text-accent" : "text-ink-dim hover:text-ink")}
+        className={clsx("ui-3d-nav-tree-row flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs", active && "font-bold")}
       >
-        <Icon size={14} className="shrink-0" aria-hidden="true" />
+        <span className="ui-3d-nav-icon-tile grid size-5 shrink-0 place-items-center">
+          <Icon size={13} aria-hidden="true" />
+        </span>
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {item.count !== undefined && item.count > 0 && <span className="shrink-0 tabular-nums">{item.count}</span>}
       </GuardedLink>
       {onRemove && (
-        <button type="button" onClick={onRemove} aria-label={removeLabel} title={removeLabel} data-testid={`sidebar-remove-${item.id}`} className="shrink-0 rounded p-1.5 text-ink-mute hover:text-err focus-visible:outline focus-visible:outline-accent">
+        <button type="button" onClick={onRemove} aria-label={removeLabel} title={removeLabel} data-testid={`sidebar-remove-${item.id}`} className="ui-3d-nav-tree-toggle shrink-0 p-1.5 text-ink-mute hover:text-err focus-visible:outline focus-visible:outline-accent">
           <X size={12} aria-hidden="true" />
         </button>
       )}

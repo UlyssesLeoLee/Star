@@ -25,7 +25,6 @@ import { useChatStore, CHAT_MODELS, type ChatEffort } from "@/lib/chat/chatStore
 import { ContextPanel, estimateTokens } from "@/components/agent/ContextPanel";
 import { DmCenterPanel } from "@/components/chat/DmCenterPanel";
 import { useTranslation } from "@/lib/i18n";
-import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 export function RightChatRail() {
   const { t } = useTranslation();
@@ -103,7 +102,6 @@ const [open, setOpen] = useState(false);
         {open ? (
           <>
             <span className="text-xs font-black tracking-wide text-[var(--cel-text-primary,var(--color-text))] flex items-center gap-2">
-              <CelBeacon3D status="active" size={24} title="Agent Comms Online" data-testid="chat-rail-beacon-3d" />
               <MessageSquare size={13} className="text-[var(--cel-cyan,var(--color-primary))]" /> 聊天
             </span>
             <button
@@ -112,7 +110,7 @@ const [open, setOpen] = useState(false);
               data-testid="chat-rail-collapse"
               aria-label="折叠聊天栏"
               title="折叠聊天栏"
-              className="p-1 rounded hover:bg-bg-soft text-ink-mute hover:text-accent"
+              className="cel-btn-3d p-1 rounded border border-line/60 bg-bg-soft hover:bg-bg-card text-ink-mute hover:text-accent transition-all"
             >
               <PanelRightClose size={14} />
             </button>
@@ -124,7 +122,7 @@ const [open, setOpen] = useState(false);
             data-testid="chat-rail-expand"
             aria-label="展开聊天栏"
             title="展开聊天栏"
-            className="flex flex-col items-center gap-2 w-full py-2.5 rounded-lg text-ink-mute hover:text-accent hover:bg-accent/10 transition-colors"
+            className="cel-btn-3d flex flex-col items-center gap-2 w-full py-2.5 rounded-lg border border-line/60 bg-bg-soft text-ink-mute hover:text-accent hover:bg-accent/10 transition-all"
           >
             {/* 折叠/展开按钮在上 (用户一眼识别) */}
             <PanelRightOpen size={14} />
@@ -181,8 +179,9 @@ const [open, setOpen] = useState(false);
               type="button"
               onClick={() => setAgentSettings({ thinkingMode: !agentSettings.thinkingMode })}
               aria-pressed={agentSettings.thinkingMode}
+              data-active={agentSettings.thinkingMode ? "true" : "false"}
               data-testid="chat-rail-thinking"
-              className={`flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${agentSettings.thinkingMode ? "border-accent bg-accent/15 text-accent" : "border-line text-ink-mute hover:text-ink"}`}
+              className={`ui-3d-chip flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-all ${agentSettings.thinkingMode ? "border-accent bg-accent/15 text-accent font-bold" : "border-line text-ink-mute hover:text-ink"}`}
             >
               思考模式 {agentSettings.thinkingMode ? "ON" : "OFF"}
             </button>
@@ -190,8 +189,9 @@ const [open, setOpen] = useState(false);
               type="button"
               onClick={() => setAgentSettings({ autoMode: !agentSettings.autoMode })}
               aria-pressed={agentSettings.autoMode}
+              data-active={agentSettings.autoMode ? "true" : "false"}
               data-testid="chat-rail-automode"
-              className={`flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${agentSettings.autoMode ? "border-accent bg-accent/15 text-accent" : "border-line text-ink-mute hover:text-ink"}`}
+              className={`ui-3d-chip flex-1 rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-all ${agentSettings.autoMode ? "border-accent bg-accent/15 text-accent font-bold" : "border-line text-ink-mute hover:text-ink"}`}
             >
               自动模式 {agentSettings.autoMode ? "ON" : "OFF"}
             </button>
@@ -206,7 +206,7 @@ const [open, setOpen] = useState(false);
             type="button"
             data-testid="chat-rail-dm-toggle"
             onClick={() => setDmOpen((v) => !v)}
-            className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[9px] font-semibold text-ink-dim hover:text-accent"
+            className="cel-btn-3d flex w-full items-center gap-1.5 px-2.5 py-1.5 text-[9px] font-semibold text-ink-dim hover:text-accent"
           >
             <MessagesSquare size={11} />
             即时通信
@@ -226,16 +226,17 @@ const [open, setOpen] = useState(false);
           className="shrink-0 border-b border-line bg-bg-card px-2 py-1.5"
           data-testid="chat-rail-scope-bar"
         >
-          <div className="flex items-center gap-0.5 rounded-lg bg-bg-soft p-0.5" role="group" aria-label="聊天范围">
+          <div className="flex items-center gap-1.5 rounded-lg bg-bg-soft p-1" role="group" aria-label="聊天范围">
             <button
               type="button"
               onClick={() => setChatScope("WORKTREE")}
               data-testid="chat-rail-scope-worktree"
               aria-pressed={chatScope === "WORKTREE"}
+              data-active={chatScope === "WORKTREE" ? "true" : "false"}
               className={clsx(
-                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors",
+                "ui-3d-chip flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-all",
                 chatScope === "WORKTREE"
-                  ? "bg-accent text-white shadow-sm"
+                  ? "bg-accent text-white shadow-sm font-bold"
                   : "text-ink-dim hover:text-ink",
               )}
             >
@@ -246,10 +247,11 @@ const [open, setOpen] = useState(false);
               onClick={() => setChatScope("GLOBAL")}
               data-testid="chat-rail-scope-global"
               aria-pressed={chatScope === "GLOBAL"}
+              data-active={chatScope === "GLOBAL" ? "true" : "false"}
               className={clsx(
-                "flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-colors",
+                "ui-3d-chip flex-1 rounded-md px-2 py-1 text-[10px] font-semibold transition-all",
                 chatScope === "GLOBAL"
-                  ? "bg-accent text-white shadow-sm"
+                  ? "bg-accent text-white shadow-sm font-bold"
                   : "text-ink-dim hover:text-ink",
               )}
             >

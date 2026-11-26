@@ -119,13 +119,21 @@ export function StatusPill({ value, size = "sm", translateAs }: StatusPillProps)
   const label = useStatusLabel(translateAs ?? ("workItem" as StatusKind), k);
   // 当 translateAs 未传, useStatusLabel 仍会兜底成 prettify, 与原行为一致
   return (
-    <span className={clsx(
-      "pill font-mono items-center",
-      size === "xs" ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-1 font-bold",
-      cls,
-    )}>
-      {dot && <span className={clsx("size-1.5 rounded-full inline-block mr-1 shrink-0", dot)} />}
-      <span>{label}</span>
+    <span
+      style={{ transformStyle: "preserve-3d" }}
+      className={clsx(
+        "pill font-mono items-center transition-transform duration-150 hover:-translate-y-px",
+        size === "xs" ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-1 font-bold",
+        cls,
+      )}
+    >
+      {dot && (
+        <span
+          style={{ transform: "translateZ(1px)" }}
+          className={clsx("size-1.5 rounded-full inline-block mr-1 shrink-0", dot)}
+        />
+      )}
+      <span style={{ transform: "translateZ(1px)" }}>{label}</span>
     </span>
   );
 }

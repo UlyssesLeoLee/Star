@@ -114,17 +114,41 @@ export function KanbanCard({
       data-testid={`kanban-card-${workItem.id}`}
       data-issue-id={workItem.id}
       draggable
-      onDragStart={handleDragStart}
+      onDragStart={(e) => {
+        e.currentTarget.style.transform = "";
+        handleDragStart(e);
+      }}
       onDragEnd={onDragEnd}
       onClick={handleClick}
+      onMouseMove={(e) => {
+        if (isDragging) return;
+        if (
+          typeof window !== "undefined" &&
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const nx = (e.clientX - rect.left) / rect.width - 0.5;
+        const ny = (e.clientY - rect.top) / rect.height - 0.5;
+        const rx = (-ny * 3).toFixed(2);
+        const ry = (nx * 3.5).toFixed(2);
+        e.currentTarget.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0px)`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "";
+      }}
+      style={{ transformStyle: "preserve-3d" }}
       className={clsx(
-        "card card-compact !p-3 border-l-4 cursor-pointer select-none transition-all duration-100",
+        "card card-compact !px-3.5 !py-3 border-l-4 cursor-pointer select-none transition-all duration-150 will-change-transform",
         pColor,
         isDragging && "opacity-50 ring-2 ring-[var(--cel-cyan)] shadow-[0_0_15px_rgba(0,240,255,0.4)]",
       )}
     >
       {/* Row 1: key + priority + story_points (jira 风格顶行) */}
-      <div className="flex items-center justify-between mb-1.5">
+      <div style={{ transform: "translateZ(2px)" }} className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1">
           <span className="font-mono text-[10px] text-ink-mute font-normal">//</span>
           <span className="font-mono text-xs text-info font-bold tracking-tight">
@@ -150,12 +174,12 @@ export function KanbanCard({
       </div>
 
       {/* Row 2: title */}
-      <div className="text-sm font-semibold text-ink line-clamp-2 mb-1.5 leading-snug">
+      <div style={{ transform: "translateZ(3px)" }} className="text-sm font-semibold text-ink line-clamp-2 mb-1.5 leading-snug">
         {workItem.title}
       </div>
 
       {/* Row 3: kind + status pills */}
-      <div className="flex flex-wrap items-center gap-1 mb-1">
+      <div style={{ transform: "translateZ(2px)" }} className="flex flex-wrap items-center gap-1 mb-1">
         <StatusPill value={workItem.kind} size="xs" translateAs="workItemKind" />
         <StatusPill value={workItem.status} size="xs" translateAs="workItem" />
       </div>

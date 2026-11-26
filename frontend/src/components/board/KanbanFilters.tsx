@@ -107,7 +107,7 @@ export function KanbanFilters({ value, onChange, assignees, total, shown }: Kanb
       {(value.kind !== "all" || value.assignee_id !== "all" || value.priority !== "all") && (
         <button
           onClick={() => onChange({ kind: "all", assignee_id: "all", priority: "all" })}
-          className="text-[10px] text-info hover:underline"
+          className="ui-3d-chip px-2 py-0.5 rounded border border-line text-[10px] text-info hover:underline"
         >
           clear
         </button>

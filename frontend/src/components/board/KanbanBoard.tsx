@@ -362,6 +362,7 @@ export function KanbanBoard({
                   handleDrop(e, col.status);
                 }
               }}
+              style={{ transformStyle: "preserve-3d" }}
               className={clsx(
                 "card card-compact !p-3.5 min-h-[200px] transition-colors relative",
                 overWip && "border-warn/60",
@@ -397,7 +398,10 @@ export function KanbanBoard({
                   ⋮⋮
                 </div>
               )}
-              <div className="flex items-center justify-between mb-3 gap-1 flex-1 min-w-0">
+              <div
+                style={{ transform: "translateZ(4px)" }}
+                className="flex items-center justify-between mb-3 gap-1 flex-1 min-w-0"
+              >
                 {editingCol === col.status && onRenameColumn ? (
                   // Inline edit 模式 (per 2026-08-29 18:52 JST 拍板)
                   <input
@@ -563,7 +567,8 @@ export function KanbanBoard({
                   type="button"
                   data-testid={`kanban-column-add-card-${col.status}`}
                   onClick={() => onRequestNewWorkItem(col.status)}
-                  className="mt-1 w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-dashed border-line/60 hover:border-accent/60 bg-transparent hover:bg-accent/5 text-[11px] text-ink-mute hover:text-accent transition-all duration-150 group"
+                  style={{ transform: "translateZ(2px)" }}
+                  className="btn-primary cel-btn-3d mt-1.5 w-full inline-flex items-center justify-center gap-1.5 !min-h-[34px] !px-2.5 !py-1.5 text-[11px] font-extrabold group"
                   title={t.board.addTaskTitle}
                 >
                   <Plus size={12} className="group-hover:rotate-90 transition-transform duration-200" />

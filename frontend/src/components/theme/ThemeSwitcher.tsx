@@ -72,7 +72,7 @@ export function ThemeSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="size-9 grid place-items-center text-base border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] hover:bg-[var(--cel-surface-sub,var(--color-surface))] text-[var(--cel-text-primary,var(--color-text))] transition-all cel-shadow shrink-0"
+        className="cel-btn-3d size-9 grid place-items-center text-base border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] hover:bg-[var(--cel-surface-sub,var(--color-surface))] text-[var(--cel-text-primary,var(--color-text))] transition-all cel-shadow shrink-0"
         aria-label="theme switcher"
         aria-expanded={open}
         title={`${current.displayName} (${current.id})`}

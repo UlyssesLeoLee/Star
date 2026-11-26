@@ -112,8 +112,6 @@ import type {
 } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
-import { CelCrystal3D, CelHoloCube3D, CelOrbitalGauge3D } from "@/components/effects/Cel3DUI";
-import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 import { CreateProjectDialog } from "@/components/project/CreateProjectDialog";
 import {
   ProjectsFilterBar,
@@ -545,37 +543,19 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         onSelect={setSelectedProjectId}
       />
 
-      {/* ---- Project Telemetry Deck (3渲2 触觉物理卡片 + 真3D组件矩阵) ---- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <CelCard3D className="h-full">
-          <div className="flex items-center gap-3">
-            <CelCrystal3D tone="cyan" size={44} title="Open Tasks Crystal [真3D]" data-testid="projects-3d-open" />
-            <Stat bare label="Open Tasks" value={kpis.open} hint="待处理 / 进行中" tone="info" />
-          </div>
+      {/* ---- Project Telemetry Deck (3渲2 触觉物理卡片) ---- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 [perspective:900px]">
+        <CelCard3D className="h-full" depthLayers>
+          <Stat bare label="Open Tasks" value={kpis.open} hint="待处理 / 进行中" tone="info" />
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center gap-3">
-            <CelOrbitalGauge3D
-              progress={kpis.open + kpis.closed > 0 ? Math.round((kpis.closed / (kpis.open + kpis.closed)) * 100) : 0}
-              tone="ok"
-              size={44}
-              title="Completion Orbital Gauge [真3D]"
-              data-testid="projects-3d-completed"
-            />
-            <Stat bare label="Completed" value={kpis.closed} hint="已闭环事项" tone="ok" />
-          </div>
+        <CelCard3D className="h-full" depthLayers>
+          <Stat bare label="Completed" value={kpis.closed} hint="已闭环事项" tone="ok" />
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center gap-3">
-            <TacticalCore3D size={44} status={kpis.activeAgents > 0 ? "nominal" : "warning"} className="shrink-0" />
-            <Stat bare label="Active Agents" value={kpis.activeAgents} hint="自律代理人" tone="warn" />
-          </div>
+        <CelCard3D className="h-full" depthLayers>
+          <Stat bare label="Active Agents" value={kpis.activeAgents} hint="自律代理人" tone="warn" />
         </CelCard3D>
-        <CelCard3D className="h-full">
-          <div className="flex items-center gap-3">
-            <CelHoloCube3D status={kpis.worktrees > 0 ? "optimal" : "warning"} size={44} title="Worktrees HoloCube [真3D]" data-testid="projects-3d-worktrees" />
-            <Stat bare label="Worktrees" value={kpis.worktrees} hint="隔离工作区分支" tone="default" />
-          </div>
+        <CelCard3D className="h-full" depthLayers>
+          <Stat bare label="Worktrees" value={kpis.worktrees} hint="隔离工作区分支" tone="default" />
         </CelCard3D>
       </div>
 
@@ -837,11 +817,12 @@ function ProjectSwitcher({
             key={p.id}
             type="button"
             data-testid={`project-switcher-${p.id}`}
+            data-active={active ? "true" : "false"}
             onClick={() => onSelect(p.id)}
             className={
-              "group flex items-center gap-2 px-3 py-2 rounded border transition-colors whitespace-nowrap " +
+              "ui-3d-tab group flex items-center gap-2 px-3 py-2 rounded border transition-all whitespace-nowrap " +
               (active
-                ? "border-accent/60 bg-accent/10 text-ink"
+                ? "border-accent/60 bg-accent/10 text-ink font-bold"
                 : "border-line bg-bg-soft/40 text-ink-dim hover:border-accent/40 hover:text-ink")
             }
           >

@@ -67,8 +67,14 @@ export function Stat({
     default: "text-ink",
   }[effectiveTone];
   return (
-    <div className={bare ? "group min-w-0" : "card group hover:border-accent/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all duration-200"}>
-      <div className="text-xs uppercase tracking-wider text-ink-mute flex items-center justify-between font-mono font-bold">
+    <div
+      style={{ transformStyle: "preserve-3d" }}
+      className={bare ? "group min-w-0" : "card group hover:border-accent/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all duration-200"}
+    >
+      <div
+        style={{ transform: "translateZ(1px)" }}
+        className="text-xs uppercase tracking-wider text-ink-mute flex items-center justify-between font-mono font-bold"
+      >
         <span className="flex items-center gap-1.5">
           {Icon && <Icon size={13} className="text-accent" />}
           {label}
@@ -77,8 +83,17 @@ export function Stat({
           {t.pageHeader.telemetryTag}
         </span>
       </div>
-      <div className={clsx("text-2xl font-bold mt-1 font-mono tracking-tight", color)}>{value}</div>
-      {hint && <div className="text-xs text-ink-mute mt-1 leading-snug">{hint}</div>}
+      <div
+        style={{ transform: "translateZ(2px)" }}
+        className={clsx("text-2xl font-bold mt-1 font-mono tracking-tight", color)}
+      >
+        {value}
+      </div>
+      {hint && (
+        <div style={{ transform: "translateZ(1px)" }} className="text-xs text-ink-mute mt-1 leading-snug">
+          {hint}
+        </div>
+      )}
     </div>
   );
 }

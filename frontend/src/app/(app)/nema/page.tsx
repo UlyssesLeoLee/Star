@@ -300,9 +300,10 @@ export default function NemaPage() {
             <button
               key={s}
               type="button"
+              data-active={scope === s ? "true" : "false"}
               onClick={() => setScope(s)}
               className={clsx(
-                "flex-1 text-xs px-2 py-1.5 rounded-lg border transition-colors",
+                "ui-3d-tab flex-1 text-xs px-2 py-1.5 rounded-lg border transition-colors",
                 scope === s ? "border-accent text-accent bg-accent/10 font-semibold" : "border-line text-ink-dim",
               )}
             >
@@ -369,7 +370,7 @@ export default function NemaPage() {
                           const wid = await openNemaAsStarTask(f.task.id);
                           if (wid) router.push(`/work-item/${wid}`);
                         }}
-                        className="text-[10px] text-accent hover:underline"
+                        className="btn-primary cel-btn-3d !min-h-0 !px-2 !py-0.5 text-[10px]"
                       >
                         开卡
                       </button>
@@ -399,7 +400,7 @@ export default function NemaPage() {
             )}
           </div>
 
-          <button type="button" onClick={() => setShowForm((v) => !v)} data-testid="nema-link-file" className="w-full flex items-center justify-center gap-1.5 text-xs py-2 rounded-lg border border-dashed border-line text-ink-dim hover:border-accent/60 hover:text-accent">
+          <button type="button" onClick={() => setShowForm((v) => !v)} data-testid="nema-link-file" className="btn cel-btn-3d w-full flex items-center justify-center gap-1.5 text-xs !py-2">
             <Plus size={12} /> 关联共享文件（自动生成 .nema 侧车）
           </button>
 
@@ -430,7 +431,7 @@ export default function NemaPage() {
               <input value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder="文件路径 (e.g. src/graph/bfs.rs)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs font-mono" />
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="任务标题 (可选)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs" />
               <input value={editorsText} onChange={(e) => setEditorsText(e.target.value)} placeholder="编辑者 (逗号分隔, e.g. 林, Agent A1)" className="w-full rounded-lg border border-line bg-bg-card px-2.5 py-1.5 text-xs" />
-              <button type="button" onClick={handleRegister} disabled={!selectedProfile} className="w-full text-xs py-1.5 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={handleRegister} disabled={!selectedProfile} className="btn-primary cel-btn-3d w-full !min-h-[34px] text-xs !py-1.5 disabled:cursor-not-allowed">
                 注册并生成 .nema
               </button>
             </div>
@@ -585,9 +586,10 @@ export default function NemaPage() {
                     key={task.id}
                     type="button"
                     data-testid={`nema-collab-select-${task.filePath}`}
+                    data-active={task.id === selectedTask.id ? "true" : "false"}
                     onClick={() => setSelectedTaskId(task.id)}
                     className={clsx(
-                      "text-[10px] px-2 py-0.5 rounded-full border",
+                      "ui-3d-chip text-[10px] px-2 py-0.5 rounded-full border",
                       task.id === selectedTask.id
                         ? "border-accent bg-accent/10 text-accent"
                         : "border-line text-ink-dim hover:border-accent/50",
@@ -658,7 +660,7 @@ export default function NemaPage() {
                   data-testid="nema-add-editor"
                   onClick={() => void handleAddEditor()}
                   disabled={!newEditorName.trim()}
-                  className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-primary cel-btn-3d !min-h-[30px] text-[11px] !px-3 !py-1 disabled:cursor-not-allowed"
                 >
                   添加
                 </button>
@@ -694,13 +696,13 @@ export default function NemaPage() {
 
         {/* 操作按钮 */}
         <div className="flex items-center gap-2">
-          <button type="button" data-testid="nema-advance-merge" className="text-xs px-3 py-2 rounded-lg bg-accent text-white hover:bg-accent-soft flex items-center gap-1.5">
+          <button type="button" data-testid="nema-advance-merge" className="btn-primary cel-btn-3d !min-h-[36px] text-xs !px-3.5 !py-2 flex items-center gap-1.5">
             <Send size={12} /> 推进到 ③ 语义合并
           </button>
-          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60 flex items-center gap-1.5">
+          <button type="button" className="btn cel-btn-3d !min-h-[36px] text-xs !px-3.5 !py-2 flex items-center gap-1.5">
             <UserPlus size={12} /> 邀请 Agent 加入
           </button>
-          <button type="button" className="text-xs px-3 py-2 rounded-lg border border-line text-ink-dim hover:border-accent/60 flex items-center gap-1.5">
+          <button type="button" className="btn cel-btn-3d !min-h-[36px] text-xs !px-3.5 !py-2 flex items-center gap-1.5">
             <Terminal size={12} /> 在 CLI 中打开
           </button>
         </div>

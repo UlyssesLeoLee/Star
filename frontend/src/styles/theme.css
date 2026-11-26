@@ -153,9 +153,9 @@
   --color-primary-glow:       rgba(0, 240, 255, 0.38);
   --color-secondary:          #ff2a85;
   --color-secondary-glow:     rgba(255, 42, 133, 0.35);
-  --color-accent:             #00f0ff;
-  --color-accent-soft:        #00c8d4;
-  --color-accent-50:          #00f0ff;
+  --color-accent:             #ffc400;
+  --color-accent-soft:        #e6ac00;
+  --color-accent-50:          #ffe066;
   --color-accent-violet:      #a855f7;
   --color-accent-violet-glow: rgba(168, 85, 247, 0.30);
 
@@ -235,6 +235,15 @@
   --cel-bevel-lo:         rgba(0, 0, 0, 0.55);
   --cel-glint-color:      rgba(255, 255, 255, 0.28);
   --cel-glint-rim:        rgba(0, 240, 255, 0.16);
+
+  /* === 暗夜神格美漫三渲二按钮与色彩心理学令牌 === */
+  --cel-btn-rest-ramp:    linear-gradient(135deg, #1b2436 0%, #1b2436 32%, #131a28 32%, #131a28 74%, #0d121d 74%, #0d121d 100%);
+  --cel-btn-hover-ramp:   linear-gradient(135deg, #223049 0%, #223049 34%, #172235 34%, #172235 74%, #101726 74%, #101726 100%);
+  --cel-btn-active-ramp:  linear-gradient(135deg, #33270a 0%, #33270a 35%, #231a07 35%, #231a07 74%, #151004 74%, #151004 100%);
+  --cel-btn-primary-ramp: linear-gradient(135deg, #ffe066 0%, #ffe066 28%, #ffc400 28%, #ffc400 72%, #d99b00 72%, #d99b00 100%);
+  --cel-btn-shadow-rest:  inset 1px 1px 0 0 rgba(189, 231, 255, 0.16), inset -1px -1px 0 0 rgba(0, 0, 0, 0.65), 0 2px 0 0 #05070c, 2px 3px 0 0 #000000;
+  --cel-btn-shadow-hover: inset 1.5px 1.5px 0 0 rgba(255, 196, 0, 0.55), inset -1px -1px 0 0 rgba(0, 0, 0, 0.7), 0 3px 0 0 #05070c, 3px 4px 0 0 #000000;
+  --cel-btn-shadow-press: inset 1px 1px 0 0 rgba(0, 0, 0, 0.75), 0 0 0 0 #05070c;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

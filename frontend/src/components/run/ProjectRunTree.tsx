@@ -168,8 +168,13 @@ export function ProjectRunTree({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation();
   if (collapsed) return <div className="flex justify-center py-2" title={t.sidebar.openProjectDirectory}><FolderKanban size={20} aria-label={t.sidebar.projectNavigation} /></div>;
   return <section aria-label={t.sidebar.projectDirectory} data-testid="project-run-directory" className="flex min-h-0 flex-1 flex-col">
-    <div className="px-2 py-1 text-xs font-bold">{t.sidebar.projectNavigation}</div>
-    <p className="px-2 pb-2 text-[10px] text-ink-mute">{t.runDirectory.hierarchyHint}</p>
+    <div className="divinity-3d-frame mx-1.5 mt-0.5 mb-2 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-black tracking-wide text-ink">{t.sidebar.projectNavigation}</span>
+        <span aria-hidden="true" className="ui-3d-tree-tag text-[var(--cel-gold,#ffc400)]">P▸L▸W▸B</span>
+      </div>
+      <p className="mt-1 text-[10px] text-ink-mute">{t.runDirectory.hierarchyHint}</p>
+    </div>
     {session.status === "ready" && session.client ? <AuthenticatedProjectRunTree client={session.client} /> :
       <FallbackProjectRunTree />}
   </section>;
@@ -196,6 +201,7 @@ function FallbackProjectRunTree() {
   const setSidebarScope = useNavStore((s) => s.setSidebarScope);
   const selectedLaneId = useNavStore((s) => s.selectedLaneId);
   const selectedWorktreeId = useNavStore((s) => s.selectedWorktreeId);
+  const selectedBranch = useNavStore((s) => s.selectedBranch);
   const setLaneContext = useNavStore((s) => s.setLaneContext);
   const lanes = useStore((s) => s.lanes);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
@@ -224,10 +230,10 @@ function FallbackProjectRunTree() {
   function selectWorktree(laneId: string, worktreeId: string, branch: string) {
     setLaneContext(laneId, worktreeId, branch);
   }
-  const toggleProject = (id: string) =>
-    setExpandedProjects((prev) => ({ ...prev, [id]: !prev[id] }));
-  const toggleWorktree = (id: string) =>
-    setExpandedWorktrees((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleProject = (id: string, defaultExpanded: boolean) =>
+    setExpandedProjects((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }));
+  const toggleWorktree = (id: string, defaultExpanded: boolean) =>
+    setExpandedWorktrees((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }));
 
   return <div data-testid="project-run-directory-fallback">
     <p role="status" className="px-2 pb-1 text-[10px] text-ink-mute">
@@ -240,72 +246,103 @@ function FallbackProjectRunTree() {
         {t.runDirectory.emptyHint}
       </p>
     )}
-    <ul role="tree" aria-label={t.sidebar.projectDirectory} className="min-w-0">
-      {projects.map((project) => {
+    <ul role="tree" aria-label={t.sidebar.projectDirectory} className="min-w-0 space-y-2 px-1 [perspective:800px]">
+      {projects.map((project, projectIdx) => {
         const laneWorktrees = byProject.get(project.id) ?? [];
-        const expanded = Boolean(expandedProjects[project.id]);
         const selected = selectedProjectId === project.id;
+        const expanded = expandedProjects[project.id] ?? (selected || projectIdx === 0);
         return (
           <li key={project.id}>
-            <div className="flex items-center gap-1 px-1">
-              <button type="button" aria-expanded={expanded} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
-                onClick={() => toggleProject(project.id)}>
+            <div className="flex items-center gap-1.5 px-0.5">
+              <button type="button" aria-expanded={expanded} tabIndex={-1} className="ui-3d-nav-tree-toggle flex h-6 w-6 shrink-0 items-center justify-center"
+                onClick={() => toggleProject(project.id, selected || projectIdx === 0)}>
                 {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
               </button>
               <Link role="treeitem" aria-level={1} aria-expanded={expanded} aria-selected={selected}
                 href={`/worktree?project_id=${encodeURIComponent(project.id)}`} prefetch={false}
                 onNavigate={() => selectProject(project.id)}
-                className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selected ? "bg-accent/15 text-accent" : ""}`}>
-                <FolderKanban size={13} className="shrink-0" />
-                <span className="min-w-0">
+                className={`ui-3d-nav-tree-row ui-3d-tree-level-project flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-left ${selected ? "font-bold" : ""}`}>
+                <span className="ui-3d-nav-icon-tile grid size-5 shrink-0 place-items-center"><FolderKanban size={12} /></span>
+                <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs">{project.name}</span>
                   <span className="block truncate text-[9px] text-ink-mute">Project · {project.key}</span>
                 </span>
+                <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-[var(--cel-gold,#ffc400)]">PRJ</span>
               </Link>
             </div>
             {expanded && (
-              <ul className="ml-3 border-l border-line/60 pl-1">
+              <ul className="ui-3d-tree-spine mt-1.5 space-y-1.5">
                 {lanes.filter((l) => l.project_id === project.id).map((lane) => {
                   const laneSel = selectedLaneId === lane.id;
                   const laneWts = laneWorktrees.filter((wt) => wt.lane_id === lane.id);
                   return (
-                    <li key={lane.id} aria-level={2}>
+                    <li key={lane.id} aria-level={2} className="ui-3d-tree-branch-tick space-y-1">
                       <button
                         type="button"
                         role="treeitem"
                         aria-selected={laneSel}
                         onClick={() => selectLane(lane.id)}
                         data-testid={`project-run-lane-${lane.id}`}
-                        className={`flex w-full items-center gap-1 rounded py-0.5 pl-3 pr-1 text-left hover:bg-accent/10 ${laneSel ? "bg-accent/15 text-accent" : "text-ink-mute"}`}
+                        className={`ui-3d-nav-tree-row ui-3d-tree-level-lane flex w-full items-center gap-1.5 py-1 pl-1.5 pr-1.5 text-left ${laneSel ? "font-bold" : ""}`}
                       >
-                        <Layers size={11} className="shrink-0" />
-                        <span className="truncate text-[10px]">{lane.name}</span>
+                        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><Layers size={10} /></span>
+                        <span className="min-w-0 flex-1 truncate text-[10px]">{lane.name}</span>
                         {!lane.git_remote_url && (
-                          <span title="未绑定远端" className="ml-auto shrink-0 rounded border border-warn/40 bg-warn/10 px-1 text-[8px] text-warn">未绑定</span>
+                          <span title="未绑定远端" className="shrink-0 border border-warn/50 bg-warn/15 px-1 text-[8px] text-warn">未绑定</span>
                         )}
+                        <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-[var(--cel-cyan,#00f0ff)]">LANE</span>
                       </button>
-                      {laneWts.map((wt) => (
-                        <li key={wt.id} className="ml-2">
-                          <div className="flex items-center gap-1">
-                            <button type="button" aria-expanded={Boolean(expandedWorktrees[wt.id])} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
-                              onClick={() => toggleWorktree(wt.id)}>
-                              {expandedWorktrees[wt.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                            </button>
-                            <Link role="treeitem" aria-level={3} aria-selected={selectedWorktreeId === wt.id}
-                              href={`/worktree?project_id=${encodeURIComponent(project.id)}&lane_id=${encodeURIComponent(lane.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
-                              prefetch={false}
-                              onNavigate={() => selectWorktree(lane.id, wt.id, wt.branch)}
-                              className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selectedWorktreeId === wt.id ? "bg-accent/15 text-accent" : ""}`}>
-                              <GitBranch size={11} className="shrink-0" />
-                              <span className="min-w-0">
-                                <span className="block truncate text-[11px]">{wt.name}</span>
-                                <span className="block truncate text-[9px] text-ink-mute">Worktree · {wt.branch}</span>
-                                <span className="block truncate text-[9px] text-ink-mute">{copy.demoCheckoutStatus}: {wt.status}</span>
-                              </span>
-                            </Link>
-                          </div>
-                        </li>
-                      ))}
+                      {laneWts.length > 0 && (
+                        <ul className="ui-3d-tree-spine mt-1 space-y-1">
+                          {laneWts.map((wt, wtIdx) => {
+                            const wtDefault = selectedWorktreeId === wt.id || wtIdx === 0;
+                            const wtExpanded = expandedWorktrees[wt.id] ?? wtDefault;
+                            const wtSelected = selectedWorktreeId === wt.id;
+                            const branchSelected = selectedBranch === wt.branch && wtSelected;
+                            return (
+                              <li key={wt.id} className="ui-3d-tree-branch-tick space-y-1">
+                                <div className="flex items-center gap-1">
+                                  <button type="button" aria-expanded={wtExpanded} tabIndex={-1} className="ui-3d-nav-tree-toggle flex h-6 w-6 shrink-0 items-center justify-center"
+                                    onClick={() => toggleWorktree(wt.id, wtDefault)}>
+                                    {wtExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                  </button>
+                                  <Link role="treeitem" aria-level={3} aria-expanded={wtExpanded} aria-selected={wtSelected}
+                                    href={`/worktree?project_id=${encodeURIComponent(project.id)}&lane_id=${encodeURIComponent(lane.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                                    prefetch={false}
+                                    onNavigate={() => selectWorktree(lane.id, wt.id, wt.branch)}
+                                    className={`ui-3d-nav-tree-row ui-3d-tree-level-worktree flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-left ${wtSelected ? "font-bold" : ""}`}>
+                                    <span className="ui-3d-nav-icon-tile grid size-5 shrink-0 place-items-center"><Monitor size={11} /></span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-[11px]">{wt.name}</span>
+                                      <span className="block truncate text-[9px] text-ink-mute">{copy.demoCheckoutStatus}: {wt.status}</span>
+                                    </span>
+                                    <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-emerald-400">WT</span>
+                                  </Link>
+                                </div>
+                                {wtExpanded && wt.branch && (
+                                  <ul className="ui-3d-tree-spine mt-1">
+                                    <li className="ui-3d-tree-branch-tick">
+                                      <Link
+                                        role="treeitem"
+                                        aria-level={4}
+                                        aria-selected={branchSelected}
+                                        href={`/kanban?lane_id=${encodeURIComponent(lane.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                                        prefetch={false}
+                                        onNavigate={() => selectWorktree(lane.id, wt.id, wt.branch)}
+                                        className={`ui-3d-nav-tree-row ui-3d-tree-level-branch flex min-w-0 items-center gap-1.5 px-1.5 py-1 text-left ${branchSelected ? "font-bold" : ""}`}
+                                      >
+                                        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><GitBranch size={10} /></span>
+                                        <span className="min-w-0 flex-1 truncate font-mono text-[10px]">{wt.branch}</span>
+                                        <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-[var(--cel-gold,#ffc400)]">REF</span>
+                                      </Link>
+                                    </li>
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
@@ -313,34 +350,61 @@ function FallbackProjectRunTree() {
                   const uncat = laneWorktrees.filter((wt) => wt.lane_id === undefined);
                   if (uncat.length === 0) return null;
                   return (
-                    <li key="uncat" aria-level={2}>
-                      <span className="flex w-full items-center gap-1 rounded py-0.5 pl-3 pr-1 text-left text-[10px] text-ink-mute">
-                        <Layers size={11} className="shrink-0" />
+                    <li key="uncat" aria-level={2} className="ui-3d-tree-branch-tick space-y-1">
+                      <span className="ui-3d-nav-tree-row ui-3d-tree-level-lane flex w-full items-center gap-1.5 py-1 pl-1.5 pr-1.5 text-left text-[10px] text-ink-mute">
+                        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><Layers size={10} /></span>
                         <span className="truncate">{t.runDirectory.fallbackLane}</span>
                         <span className="ml-auto font-mono">{uncat.length}</span>
                       </span>
-                      {uncat.map((wt) => (
-                        <li key={wt.id} className="ml-2">
-                          <div className="flex items-center gap-1">
-                            <button type="button" aria-expanded={Boolean(expandedWorktrees[wt.id])} tabIndex={-1} className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10"
-                              onClick={() => toggleWorktree(wt.id)}>
-                              {expandedWorktrees[wt.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                            </button>
-                            <Link role="treeitem" aria-level={3} aria-selected={selectedWorktreeId === wt.id}
-                              href={`/worktree?project_id=${encodeURIComponent(project.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
-                              prefetch={false}
-                              onNavigate={() => selectWorktree("", wt.id, wt.branch)}
-                              className={`flex min-w-0 flex-1 items-center gap-1 rounded py-0.5 pr-1 text-left hover:bg-accent/10 ${selectedWorktreeId === wt.id ? "bg-accent/15 text-accent" : ""}`}>
-                              <GitBranch size={11} className="shrink-0" />
-                              <span className="min-w-0">
-                                <span className="block truncate text-[11px]">{wt.name}</span>
-                                <span className="block truncate text-[9px] text-ink-mute">Worktree · {wt.branch}</span>
-                                <span className="block truncate text-[9px] text-ink-mute">{copy.demoCheckoutStatus}: {wt.status}</span>
-                              </span>
-                            </Link>
-                          </div>
-                        </li>
-                      ))}
+                      <ul className="ui-3d-tree-spine mt-1 space-y-1">
+                        {uncat.map((wt, wtIdx) => {
+                          const wtDefault = selectedWorktreeId === wt.id || wtIdx === 0;
+                          const wtExpanded = expandedWorktrees[wt.id] ?? wtDefault;
+                          const wtSelected = selectedWorktreeId === wt.id;
+                          const branchSelected = selectedBranch === wt.branch && wtSelected;
+                          return (
+                            <li key={wt.id} className="ui-3d-tree-branch-tick space-y-1">
+                              <div className="flex items-center gap-1">
+                                <button type="button" aria-expanded={wtExpanded} tabIndex={-1} className="ui-3d-nav-tree-toggle flex h-6 w-6 shrink-0 items-center justify-center"
+                                  onClick={() => toggleWorktree(wt.id, wtDefault)}>
+                                  {wtExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                </button>
+                                <Link role="treeitem" aria-level={3} aria-expanded={wtExpanded} aria-selected={wtSelected}
+                                  href={`/worktree?project_id=${encodeURIComponent(project.id)}&worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                                  prefetch={false}
+                                  onNavigate={() => selectWorktree("", wt.id, wt.branch)}
+                                  className={`ui-3d-nav-tree-row ui-3d-tree-level-worktree flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1 text-left ${wtSelected ? "font-bold" : ""}`}>
+                                  <span className="ui-3d-nav-icon-tile grid size-5 shrink-0 place-items-center"><Monitor size={11} /></span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[11px]">{wt.name}</span>
+                                    <span className="block truncate text-[9px] text-ink-mute">{copy.demoCheckoutStatus}: {wt.status}</span>
+                                  </span>
+                                  <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-emerald-400">WT</span>
+                                </Link>
+                              </div>
+                              {wtExpanded && wt.branch && (
+                                <ul className="ui-3d-tree-spine mt-1">
+                                  <li className="ui-3d-tree-branch-tick">
+                                    <Link
+                                      role="treeitem"
+                                      aria-level={4}
+                                      aria-selected={branchSelected}
+                                      href={`/kanban?worktree_id=${encodeURIComponent(wt.id)}&branch=${encodeURIComponent(wt.branch)}`}
+                                      prefetch={false}
+                                      onNavigate={() => selectWorktree("", wt.id, wt.branch)}
+                                      className={`ui-3d-nav-tree-row ui-3d-tree-level-branch flex min-w-0 items-center gap-1.5 px-1.5 py-1 text-left ${branchSelected ? "font-bold" : ""}`}
+                                    >
+                                      <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><GitBranch size={10} /></span>
+                                      <span className="min-w-0 flex-1 truncate font-mono text-[10px]">{wt.branch}</span>
+                                      <span aria-hidden="true" className="ui-3d-tree-tag shrink-0 text-[var(--cel-gold,#ffc400)]">REF</span>
+                                    </Link>
+                                  </li>
+                                </ul>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </li>
                   );
                 })()}
@@ -488,9 +552,9 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
     }
   }
   return <>
-    <button type="button" onClick={() => { model.refresh(); if (viewport.current) viewport.current.scrollTop = 0; setScrollTop(0); }} className="mb-1 flex items-center gap-1 px-2 text-[10px] text-ink-mute hover:text-ink"><RefreshCw size={11} />{t.runDirectory.refreshDirectory}</button>
+    <button type="button" onClick={() => { model.refresh(); if (viewport.current) viewport.current.scrollTop = 0; setScrollTop(0); }} className="ui-3d-chip cel-btn-3d mx-2 mb-1.5 flex items-center gap-1 px-2 py-1 text-[10px] text-ink-mute hover:text-ink"><RefreshCw size={11} />{t.runDirectory.refreshDirectory}</button>
     <div ref={viewport} role="tree" aria-label={t.sidebar.projectDirectory} onKeyDown={moveTreeFocus}
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden [perspective:800px]">
       <div role="presentation" style={{ height: rows.length * ROW_HEIGHT }}>
         {visible.map((row, offset) => <DirectoryRow key={row.key} row={row} index={start + offset} model={model}
           selectedWorktreeId={focus?.focus?.worktree_id} clearFocus={clearFocus} onCreateLane={openCreateLane}
@@ -510,8 +574,8 @@ function AuthenticatedProjectRunTree({ client }: { client: RunDirectoryApiClient
         </label>
         {createError && <p role="alert" className="mt-3 text-sm text-danger">{createError}</p>}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" disabled={createBusy} onClick={() => setCreateTarget(null)} className="rounded border border-line px-3 py-2 text-sm disabled:opacity-50">{t.runDirectory.cancel}</button>
-          <button type="submit" disabled={createBusy || !createTitle.trim()} className="rounded bg-accent px-3 py-2 text-sm text-white disabled:opacity-50">{createBusy ? copy.creatingLane : copy.createLaneButton}</button>
+          <button type="button" disabled={createBusy} onClick={() => setCreateTarget(null)} className="btn cel-btn-3d !min-h-[34px] px-3 py-1.5 text-sm disabled:opacity-50">{t.runDirectory.cancel}</button>
+          <button type="submit" disabled={createBusy || !createTitle.trim()} className="btn-primary cel-btn-3d !min-h-[34px] px-3 py-1.5 text-sm disabled:opacity-50">{createBusy ? copy.creatingLane : copy.createLaneButton}</button>
         </div>
       </form>
     </div>}
@@ -611,25 +675,50 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
   }
   const { node, expanded } = row;
   const Icon = { project: FolderKanban, branch: GitBranch, lane: Layers, laneWorktree: Monitor, run: Layers, worktree: Monitor }[node.kind];
+  const levelClass = {
+    project: "ui-3d-tree-level-project",
+    lane: "ui-3d-tree-level-lane",
+    run: "ui-3d-tree-level-lane",
+    laneWorktree: "ui-3d-tree-level-worktree",
+    worktree: "ui-3d-tree-level-worktree",
+    branch: "ui-3d-tree-level-branch",
+  }[node.kind];
+  const levelTag = {
+    project: "PRJ",
+    lane: "LANE",
+    run: "LANE",
+    laneWorktree: "WT",
+    worktree: "WT",
+    branch: "REF",
+  }[node.kind];
+  const levelTagTone = {
+    project: "text-[var(--cel-gold,#ffc400)]",
+    lane: "text-[var(--cel-cyan,#00f0ff)]",
+    run: "text-[var(--cel-cyan,#00f0ff)]",
+    laneWorktree: "text-emerald-400",
+    worktree: "text-emerald-400",
+    branch: "text-[var(--cel-gold,#ffc400)]",
+  }[node.kind];
   const scopeLabel = nodeScopeLabel(node, statusLabels, laneCopy);
-  const contents = <><span className="flex shrink-0 items-center"><Icon size={13} /></span>
-    <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span></>;
-  const className = "flex w-full min-w-0 items-center gap-1 rounded pr-1 text-left hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent";
+  const contents = <><span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><Icon size={12} /></span>
+    <span className="min-w-0 flex-1"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
+    <span aria-hidden="true" className={`ui-3d-tree-tag shrink-0 ${levelTagTone}`}>{levelTag}</span></>;
+  const className = `ui-3d-nav-tree-row ${levelClass} flex w-full min-w-0 items-center gap-1.5 px-1.5 py-0.5 text-left focus:outline focus:outline-1 focus:outline-accent`;
   if (node.kind === "project") {
     const selected = selectedProjectId === node.entity.project_id;
     const projectHref = `/worktree?project_id=${encodeURIComponent(node.entity.project_id)}`;
     return <div role="presentation" style={style} className="flex items-center gap-1">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.projectChildren}`}
-        className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
+        className="ui-3d-nav-tree-toggle flex h-6 w-5 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected}
         aria-current={selected && pathname === "/worktree" ? "page" : undefined} data-directory-index={index} href={projectHref} prefetch={false}
-        aria-label={`${statusLabels.selectNode} ${node.label}`} title={node.label} className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        aria-label={`${statusLabels.selectNode} ${node.label}`} title={node.label} className={`${className} min-w-0 flex-1 ${selected ? "font-bold" : ""}`}
         onNavigate={() => { onSelectProject(node.entity.project_id); clearFocus(); }}>{contents}</Link>
       <button type="button" aria-label={`${node.label}: ${newLaneLabel}`} title={newLaneLabel}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-ink-mute hover:bg-accent/10 hover:text-accent focus:outline focus:outline-1 focus:outline-accent"
-        onClick={() => onCreateLane(node, expanded)}><Plus size={14} /></button>
+        className="btn-primary cel-btn-3d !min-h-0 !p-0 flex h-6 w-6 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
+        onClick={() => onCreateLane(node, expanded)}><Plus size={13} /></button>
     </div>;
   }
   // P0-lane: Lane 节点 — 服务端实体, 点选即选中 Lane (Worktree/Branch 随 Lane 清空)
@@ -639,12 +728,12 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     return <div role="presentation" style={style} className="flex items-center gap-1">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${laneCopy.laneChildren}`}
-        className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
+        className="ui-3d-nav-tree-toggle flex h-6 w-5 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected}
         aria-current={selected ? "page" : undefined} data-directory-index={index} href={href} prefetch={false}
         aria-label={`${laneCopy.selectLane} ${node.label}`} title={scopeLabel}
-        className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        className={`${className} min-w-0 flex-1 ${selected ? "font-bold" : ""}`}
         onNavigate={() => { onSelectProject(node.entity.project_id); onSelectLane(node.entity.lane_id); clearFocus(); }}>{contents}</Link>
     </div>;
   }
@@ -653,23 +742,24 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     const selected = selectedWorktreeId === node.entity.worktree_id;
     const status = laneWorktreeStatusLabel(node.entity, statusLabels, laneCopy);
     const statusDescription = `${node.label}. ${status.summary}. ${status.details}`;
-    return <div role="presentation" style={style} className="flex items-center">
+    return <div role="presentation" style={style} className="flex items-center gap-1">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.worktreeBranches}`}
-        className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
+        className="ui-3d-nav-tree-toggle flex h-6 w-5 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected} aria-current={selected ? "page" : undefined}
         aria-label={statusDescription} data-directory-index={index} title={statusDescription}
-        className={`${className} w-auto flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`} prefetch={false}
+        className={`${className} w-auto flex-1 ${selected ? "font-bold" : ""}`} prefetch={false}
         onNavigate={() => {
           if (!selected) clearFocus();
         }}
         href={canonicalLaneWorktreeHref(node.entity.project_id, node.entity.lane_id, node.entity.worktree_id)}>
-        <span className="flex shrink-0 items-center"><Monitor size={13} /></span>
-        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
-        <span aria-hidden="true" title={status.details} className="mr-1 shrink-0 rounded border border-line px-1 text-[9px] leading-4 text-ink-mute">?</span>
+        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><Monitor size={12} /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
+        <span aria-hidden="true" title={status.details} className="shrink-0 border border-line px-1 text-[9px] leading-4 text-ink-mute">?</span>
+        <span aria-hidden="true" className={`ui-3d-tree-tag shrink-0 ${levelTagTone}`}>{levelTag}</span>
       </Link>
     </div>;
   }
@@ -677,23 +767,24 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     const selected = selectedWorktreeId === node.entity.worktree_id;
     const status = worktreeStatusLabel(node.entity, statusLabels);
     const statusDescription = `${node.label}. ${status.summary}. ${status.details}`;
-    return <div role="presentation" style={style} className="flex items-center">
+    return <div role="presentation" style={style} className="flex items-center gap-1">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.worktreeBranches}`}
-        className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
+        className="ui-3d-nav-tree-toggle flex h-6 w-5 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected} aria-current={selected ? "page" : undefined}
         aria-label={statusDescription} data-directory-index={index} title={statusDescription}
-        className={`${className} w-auto flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`} prefetch={false}
+        className={`${className} w-auto flex-1 ${selected ? "font-bold" : ""}`} prefetch={false}
         onNavigate={() => {
           if (!selected) clearFocus();
         }}
         href={canonicalRunWorktreeHref(node.entity.project_id, node.entity.engineering_run_id, node.entity.worktree_id)}>
-        <span className="flex shrink-0 items-center"><Monitor size={13} /></span>
-        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
-        <span aria-hidden="true" title={status.details} className="mr-1 shrink-0 rounded border border-line px-1 text-[9px] leading-4 text-ink-mute">?</span>
+        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><Monitor size={12} /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-xs">{node.label}</span><span className="block truncate text-[9px] text-ink-mute">{scopeLabel}</span></span>
+        <span aria-hidden="true" title={status.details} className="shrink-0 border border-line px-1 text-[9px] leading-4 text-ink-mute">?</span>
+        <span aria-hidden="true" className={`ui-3d-tree-tag shrink-0 ${levelTagTone}`}>{levelTag}</span>
       </Link>
     </div>;
   }
@@ -703,12 +794,12 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
     return <div role="presentation" style={style} className="flex items-center gap-1">
       <button type="button" tabIndex={-1} aria-label={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${node.label}`}
         aria-expanded={expanded} title={`${expanded ? statusLabels.collapseNode : statusLabels.expandNode} ${statusLabels.runChildren}`}
-        className="flex h-full w-5 shrink-0 items-center justify-center rounded hover:bg-accent/10 focus:outline focus:outline-1 focus:outline-accent"
+        className="ui-3d-nav-tree-toggle flex h-6 w-5 shrink-0 items-center justify-center focus:outline focus:outline-1 focus:outline-accent"
         onClick={() => model.toggle(node)}>{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</button>
       <Link role="treeitem" aria-level={depth + 1} aria-expanded={expanded} aria-selected={selected}
         aria-current={selected ? "page" : undefined} data-directory-index={index} href={href} prefetch={false}
         aria-label={`${statusLabels.openRunOverview} ${node.label}`} title={statusLabels.runOverviewFocusHint}
-        className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        className={`${className} min-w-0 flex-1 ${selected ? "font-bold" : ""}`}
         onNavigate={() => { onSelectProject(node.entity.project_id); clearFocus(); }}>{contents}</Link>
     </div>;
   }
@@ -728,11 +819,12 @@ function DirectoryRow({ row, index, model, selectedWorktreeId, clearFocus, selec
         data-directory-index={index} href={href} prefetch={false}
         aria-label={`${statusLabels.selectNode} ${branchName}`}
         title={branchName ? `${statusLabels.branchRecord} · ${node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}: ${branchName}` : statusLabels.branchUnavailable}
-        className={`${className} min-w-0 flex-1 ${selected ? "bg-accent/15 text-accent" : ""}`}
+        className={`${className} min-w-0 flex-1 ${selected ? "font-bold" : ""}`}
         onNavigate={() => { if (branchName) onSelectBranch(laneId, worktreeId, branchName); }}>
-        <span className="flex shrink-0 items-center"><GitBranch size={14} /></span>
-        <span className="min-w-0"><span className="block truncate text-xs">{node.label}</span>
+        <span className="ui-3d-nav-icon-tile grid size-4 shrink-0 place-items-center"><GitBranch size={12} /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-xs">{node.label}</span>
           <span className="block truncate text-[10px] text-ink-mute" title={node.entity.checkoutStatus ?? laneCopy.checkoutStatusUnavailable}>本地 Branch</span></span>
+        <span aria-hidden="true" className={`ui-3d-tree-tag shrink-0 ${levelTagTone}`}>{levelTag}</span>
       </Link>
     </div>;
   }

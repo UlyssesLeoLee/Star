@@ -111,7 +111,6 @@ import {
   type UnifiedWorkItem,
 } from "./unifiedWorkItems";
 import { KANBAN_COLUMNS } from "@/mocks/data";
-import { CelBeacon3D, CelHoloCube3D } from "@/components/effects/Cel3DUI";
 
 // per 2026-11-22 用户发令: 任务看板是第一个标签页; 甘特图(时间线)/燃尽图从分析界面迁入,
 // 所有任务管理内容集中在看板。
@@ -740,7 +739,7 @@ export default function KanbanPage() {
         {/* 视图 tabs (?view= 深链) */}
         <div
           data-testid="kanban-view-tabs"
-          className="flex items-center gap-1 border-b border-line"
+          className="flex items-center gap-1.5 py-1 border-b border-line"
         >
           {VIEW_TABS.map((tab) => (
             <button
@@ -748,8 +747,9 @@ export default function KanbanPage() {
               type="button"
               onClick={() => setActiveView(tab)}
               data-testid={`kanban-view-tab-${tab}`}
+              data-active={activeView === tab ? "true" : "false"}
               className={clsx(
-                "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
+                "ui-3d-tab px-3 py-2 text-sm border-b-2 -mb-px transition-all",
                 activeView === tab
                   ? "border-accent text-accent font-semibold"
                   : "border-transparent text-ink-dim hover:text-ink",
@@ -802,23 +802,9 @@ export default function KanbanPage() {
               {identities.length} 在线
             </span>
           </div>
-          <div className="divinity-hud-strip shrink-0">
-            <CelHoloCube3D
-              status={selectedWorktree ? "optimal" : "warning"}
-              size={28}
-              title={selectedWorktree ? `Worktree ${selectedWorktree.name}` : "Worktree Topology 3D"}
-              data-testid="kanban-3d-holocube"
-            />
-            <CelBeacon3D
-              status={serverMode ? "active" : "warning"}
-              size={28}
-              title={serverMode ? "服务端真源在线" : "本地模式"}
-              data-testid="kanban-3d-beacon"
-            />
-            <span className="font-mono text-[10px] font-bold text-[var(--cel-cyan,var(--accent-DEFAULT))]">
-              {serverMode ? "SYNC: LIVE" : "MODE: LOCAL"}
-            </span>
-          </div>
+          <span className="pill font-mono text-[10px] font-bold text-[var(--cel-cyan,var(--accent-DEFAULT))] border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] shrink-0">
+            {serverMode ? "SYNC: LIVE" : "MODE: LOCAL"}
+          </span>
         </div>
 
         {/* 数据来源标识 (per P1: 服务端真源 / 本地模式 明确区分, 不冒充) */}
@@ -863,7 +849,7 @@ export default function KanbanPage() {
         {/* 新任务卡创建栏 (per 1b · 任务 · IPA 看板 mockup: 标题 + IPA 流程 + 工作流) */}
         <div
           data-testid="kanban-create-bar"
-          className="flex items-center gap-2 flex-wrap rounded-xl border border-line bg-bg-card p-3"
+          className="card card-compact flex items-center gap-2 flex-wrap rounded-xl !p-3"
         >
           <input
             value={draftTitle}
@@ -945,8 +931,7 @@ export default function KanbanPage() {
             onClick={() => void handleCreateTaskCard()}
             disabled={createDisabled || !draftTitle.trim()}
             data-testid="kanban-create-submit"
-            className="h-8 px-4 rounded-lg text-white text-xs font-semibold hover:bg-accent-soft disabled:opacity-50 flex items-center gap-1"
-            style={{ backgroundColor: "var(--accent-DEFAULT, #1D4ED8)" }}
+            className="btn-primary cel-btn-3d h-8 px-4 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1"
           >
             开卡
           </button>
@@ -973,7 +958,7 @@ export default function KanbanPage() {
             <span key={stage.id} className="flex items-center gap-2">
               <span
                 className={clsx(
-                  "px-2 py-0.5 rounded-full border",
+                  "pill px-2 py-0.5 rounded-full border",
                   i === 1
                     ? "bg-accent/10 border-accent/50 text-accent font-semibold"
                     : "border-line bg-bg-card",
@@ -1142,7 +1127,7 @@ export default function KanbanPage() {
                           if (wid)
                             setDrawerMode({ kind: "view", workItemId: wid });
                         }}
-                        className="text-[11px] px-2 py-1 rounded-lg bg-accent text-white hover:bg-accent-soft flex items-center gap-1"
+                        className="btn-primary cel-btn-3d !min-h-[28px] !px-2.5 !py-1 text-[11px] flex items-center gap-1"
                       >
                         <FileText size={11} /> 打开为任务
                       </button>

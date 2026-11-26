@@ -41,13 +41,13 @@ export function ProjectNavigation({
     { value: "directory", label: t.sidebar.tabs.directory, slug: "directory" },
     { value: "aiUpdates", label: t.sidebar.tabs.aiUpdates, slug: "ai-updates" },
   ] as const;
-  const statuses: { value: TaskStatusFilter; label: string }[] = [
-    { value: "all", label: t.sidebar.taskStatus.all },
-    { value: "todo", label: t.sidebar.taskStatus.todo },
-    { value: "in_progress", label: t.sidebar.taskStatus.inProgress },
-    { value: "review", label: t.sidebar.taskStatus.review },
-    { value: "blocked", label: t.sidebar.taskStatus.blocked },
-    { value: "done", label: t.sidebar.taskStatus.done },
+  const statuses: { value: TaskStatusFilter; label: string; dotClass: string }[] = [
+    { value: "all", label: t.sidebar.taskStatus.all, dotClass: "bg-[var(--cel-gold,#ffc400)]" },
+    { value: "todo", label: t.sidebar.taskStatus.todo, dotClass: "bg-slate-400" },
+    { value: "in_progress", label: t.sidebar.taskStatus.inProgress, dotClass: "bg-cyan-400" },
+    { value: "review", label: t.sidebar.taskStatus.review, dotClass: "bg-amber-400" },
+    { value: "blocked", label: t.sidebar.taskStatus.blocked, dotClass: "bg-rose-500" },
+    { value: "done", label: t.sidebar.taskStatus.done, dotClass: "bg-emerald-400" },
   ];
   const visibleTab = collapsed ? "directory" : tab;
 
@@ -69,7 +69,7 @@ export function ProjectNavigation({
     <section className="flex min-h-0 flex-1 flex-col" aria-label={t.sidebar.projectNavigation}>
       {!collapsed && (
         <div
-          className="grid shrink-0 grid-cols-2 gap-1 border-b border-line px-2 py-1.5"
+          className="grid shrink-0 grid-cols-2 gap-1.5 border-b-2 border-[var(--cel-ink,var(--color-border))] bg-bg-soft/60 px-2.5 py-2"
           role="tablist"
           aria-label={t.sidebar.projectNavigation}
           data-testid={`${testIdPrefix}-top-tabs`}
@@ -86,12 +86,16 @@ export function ProjectNavigation({
               tabIndex={tab === value ? 0 : -1}
               data-view={value}
               data-testid={`${testIdPrefix}-tab-${slug}`}
+              data-active={tab === value ? "true" : "false"}
               onClick={() => setTab(value)}
               className={clsx(
-                "rounded-md border px-2 py-1.5 text-xs font-medium focus-visible:outline focus-visible:outline-accent",
-                tab === value ? "border-accent/30 bg-accent/15 text-accent" : "border-transparent text-ink-dim hover:bg-bg-soft hover:text-ink",
+                "ui-3d-tab flex items-center justify-center rounded-md border px-2 py-1.5 text-xs font-medium focus-visible:outline focus-visible:outline-accent",
+                tab === value ? "border-accent/30 bg-accent/15 text-accent font-bold" : "border-transparent text-ink-dim hover:bg-bg-soft hover:text-ink",
               )}
             >
+              <span aria-hidden="true" className="ui-3d-nav-icon-tile mr-1.5 inline-grid size-4 place-items-center font-mono text-[9px] font-black">
+                {slug === "directory" ? "01" : "02"}
+              </span>
               {label}
             </button>
           ))}
@@ -122,23 +126,31 @@ export function ProjectNavigation({
       )}
 
       {!collapsed && (
-        <div className="shrink-0 border-t border-line p-2" data-testid={`${testIdPrefix}-bottom-fixed`}>
-          <div className="mb-1.5 px-1 text-[11px] font-medium text-ink-mute">{t.sidebar.taskStatus.label}</div>
-          <div className="grid grid-cols-3 gap-1" role="group" aria-label={t.sidebar.taskStatus.label} data-testid={`${testIdPrefix}-task-status-filter`}>
-            {statuses.map(({ value, label }) => (
+        <div className="shrink-0 border-t-2 border-[var(--cel-ink,var(--color-border))] bg-bg-soft/40 p-2" data-testid={`${testIdPrefix}-bottom-fixed`}>
+          <div className="mb-1.5 flex items-center justify-between px-1">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-ink-mute">
+              <span aria-hidden="true" className="text-[9px] text-[var(--cel-gold,var(--color-accent))]">◆</span>
+              {t.sidebar.taskStatus.label}
+            </span>
+            <span aria-hidden="true" className="font-mono text-[9px] font-bold text-ink-mute/70">MATRIX</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label={t.sidebar.taskStatus.label} data-testid={`${testIdPrefix}-task-status-filter`}>
+            {statuses.map(({ value, label, dotClass }) => (
               <button
                 key={value}
                 type="button"
                 aria-pressed={filter === value}
                 aria-controls={`${id}-${visibleTab === "directory" ? "directory" : "ai-updates"}-panel`}
                 data-testid={`${testIdPrefix}-status-${value}`}
+                data-active={filter === value ? "true" : "false"}
                 onClick={() => setFilter(value)}
                 className={clsx(
-                  "min-w-0 rounded border px-1 py-1.5 text-[11px] font-medium leading-tight focus-visible:outline focus-visible:outline-accent",
-                  filter === value ? "border-accent/40 bg-accent/10 text-accent" : "border-transparent text-ink-mute hover:bg-bg-soft hover:text-ink",
+                  "ui-3d-chip min-w-0 justify-center rounded border px-1.5 py-1.5 text-[11px] font-medium leading-tight focus-visible:outline focus-visible:outline-accent",
+                  filter === value ? "border-accent/40 bg-accent/10 text-accent font-bold" : "border-transparent text-ink-mute hover:bg-bg-soft hover:text-ink",
                 )}
               >
-                {label}
+                <span aria-hidden="true" className={clsx("size-1.5 shrink-0 border border-black/60", dotClass)} />
+                <span className="truncate">{label}</span>
               </button>
             ))}
           </div>

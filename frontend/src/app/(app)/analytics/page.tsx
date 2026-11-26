@@ -41,8 +41,6 @@ import { Chart15PriorityDist } from "@/components/charts/Chart15PriorityDist";
 // import { GanttView } from "@/components/gantt/GanttView"; // per 2026-11-22: 迁往 /kanban
 import { Suspense } from "react";
 import { CelCard3D } from "@/components/effects/CelCard3D";
-import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
-import { CelBeacon3D, CelCrystal3D, CelHoloCube3D, CelOrbitalGauge3D } from "@/components/effects/Cel3DUI";
 
 // per 2026-11-22 用户发令: 甘特图/燃尽图等任务管理内容全部迁往 /kanban 标签页,
 //   分析页只保留 BI/统计类图表 (任务相关内容集中在任务看板)。
@@ -364,12 +362,6 @@ function AnalyticsPageInner() {
     ];
   }, [workItems, agents]);
 
-  const ipaOverallPct = useMemo(() => {
-    const totalDone = IPA_PHASES.reduce((sum, p) => sum + p.done, 0);
-    const totalAll = IPA_PHASES.reduce((sum, p) => sum + p.total, 0);
-    return totalAll > 0 ? Math.round((totalDone / totalAll) * 100) : 0;
-  }, []);
-
   const preview = (
     <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-warn/40 bg-warn/10 px-3 py-1.5 text-[10px] text-warn">
       <AlertTriangle size={11} />
@@ -401,15 +393,8 @@ function AnalyticsPageInner() {
     <div className="flex h-full flex-col bg-bg">
       <header className="border-b-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <TacticalCore3D size={36} status={biStatus.tone === "ok" ? "nominal" : "warning"} className="shrink-0" />
           <h1 className="text-base font-black tracking-tight text-ink">分析</h1>
           <span className="anime-hud-tag">全局</span>
-          <CelBeacon3D
-            status={biStatus.tone === "ok" ? "active" : biStatus.tone === "err" ? "error" : "warning"}
-            size={30}
-            title={biStatus.text}
-            data-testid="analytics-beacon-3d"
-          />
           <span
             data-testid="analytics-data-source-status"
             className={`text-[10px] px-2 py-0.5 border font-mono font-bold ${
@@ -437,7 +422,7 @@ function AnalyticsPageInner() {
 
       <nav
         data-testid="analytics-tabs"
-        className="flex items-center gap-0.5 overflow-x-auto border-b border-line bg-bg-card px-3 py-1.5"
+        className="flex items-center gap-1.5 overflow-x-auto border-b border-line bg-bg-card px-3 py-2"
         aria-label="分析视图"
       >
         {ANALYTICS_TABS.map((tab) => (
@@ -445,10 +430,11 @@ function AnalyticsPageInner() {
             key={tab}
             type="button"
             data-testid={`analytics-tab-${tab}`}
+            data-active={activeTab === tab ? "true" : "false"}
             onClick={() => setActiveTab(tab)}
             aria-pressed={activeTab === tab}
-            className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors whitespace-nowrap ${
-              activeTab === tab ? "bg-accent text-bg" : "text-ink-mute hover:text-ink hover:bg-bg-soft"
+            className={`ui-3d-tab shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all whitespace-nowrap ${
+              activeTab === tab ? "bg-accent text-bg font-bold" : "text-ink-mute hover:text-ink hover:bg-bg-soft"
             }`}
           >
             {tab}
@@ -469,24 +455,18 @@ function AnalyticsPageInner() {
               以下 KPI / 图表为本地估算 — 基于当前会话数据 (store 聚合), 非服务端 BI, 不可与授权数据核对。
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 [perspective:900px]">
               {kpiData.map((kpi, i) => (
-                <CelCard3D key={i} data-testid={`analytics-kpi-${i}`} className="h-full">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <kpi.icon size={14} className={i === 0 ? "text-ok" : i === 1 ? "text-accent" : i === 2 ? "text-info" : "text-warn"} />
-                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink-dim">{kpi.label}</span>
-                      </div>
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-2xl font-black font-mono text-ink">{kpi.value}</span>
-                        <span className={`text-xs font-mono font-bold ${kpi.trendUp ? "text-ok" : "text-err"}`}>{kpi.trend}</span>
-                      </div>
+                <CelCard3D key={i} data-testid={`analytics-kpi-${i}`} className="h-full" depthLayers>
+                  <div className="min-w-0 flex-1" style={{ transformStyle: "preserve-3d" }}>
+                    <div className="flex items-center gap-1.5" style={{ transform: "translateZ(1px)" }}>
+                      <kpi.icon size={14} className={i === 0 ? "text-ok" : i === 1 ? "text-accent" : i === 2 ? "text-info" : "text-warn"} />
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink-dim">{kpi.label}</span>
                     </div>
-                    {i === 0 && <CelOrbitalGauge3D progress={kpi.progress} tone="ok" size={44} title={kpi.label} />}
-                    {i === 1 && <CelOrbitalGauge3D progress={kpi.progress} tone="cyan" size={44} title={kpi.label} />}
-                    {i === 2 && <CelCrystal3D tone="gold" size={44} title={kpi.label} />}
-                    {i === 3 && <CelHoloCube3D status="optimal" size={44} title={kpi.label} />}
+                    <div className="mt-2 flex items-baseline gap-2" style={{ transform: "translateZ(2px)" }}>
+                      <span className="text-2xl font-black font-mono text-ink">{kpi.value}</span>
+                      <span className={`text-xs font-mono font-bold ${kpi.trendUp ? "text-ok" : "text-err"}`}>{kpi.trend}</span>
+                    </div>
                   </div>
                 </CelCard3D>
               ))}
@@ -494,10 +474,7 @@ function AnalyticsPageInner() {
 
             <section data-testid="analytics-ipa-phases" className="card">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                  <CelOrbitalGauge3D progress={ipaOverallPct} tone="cyan" size={34} title="IPA Overall Progress" />
-                  <h2 className="text-sm font-black uppercase tracking-wider text-ink">IPA 阶段进度</h2>
-                </div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-ink">IPA 阶段进度</h2>
                 <span className="anime-hud-tag">Branch: feat/relation-bfs</span>
               </div>
               <div className="space-y-2">
@@ -507,8 +484,8 @@ function AnalyticsPageInner() {
                     <div key={phase.id} className="flex items-center gap-3">
                       <span className="text-[10px] font-mono text-ink-dim w-10 text-right">{phase.id}</span>
                       <span className="text-xs text-ink-dim w-24">{phase.label}</span>
-                      <div className="flex-1 h-3 bg-bg-soft border border-[var(--cel-ink,var(--color-border))] overflow-hidden">
-                        <div className="h-full bg-[var(--cel-cyan,var(--accent-DEFAULT))] transition-all duration-500" style={{ width: `${pct}%` }} />
+                      <div className="ui-3d-progress-track flex-1 h-3">
+                        <div className="ui-3d-progress-fill h-full" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="text-[10px] font-mono text-ink-dim w-20 text-right">
                         {phase.done} / {phase.total} ({pct}%)

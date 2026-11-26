@@ -34,7 +34,7 @@ export interface CelCard3DProps extends HTMLAttributes<HTMLDivElement> {
 export function CelCard3D({
   children,
   className = "",
-  maxTilt = 7,
+  maxTilt = 4,
   glint = true,
   chamfer = false,
   elevation = "md",
@@ -52,16 +52,18 @@ export function CelCard3D({
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!cardRef.current) return;
       const rect = cardRef.current.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const clientX = e.clientX - rect.left;
       const clientY = e.clientY - rect.top;
 
-      // Normalization from -1 to 1
+      // Normalization from -1 to 1 with size-based damping for compact cards
       const normX = (clientX / rect.width) * 2 - 1;
       const normY = (clientY / rect.height) * 2 - 1;
+      const sizeDamp = Math.min(1, Math.min(rect.width, rect.height) / 140);
 
       // Calculate tilt angles (X tilt from vertical position, Y tilt from horizontal position)
-      const rotX = -normY * maxTilt;
-      const rotY = normX * maxTilt;
+      const rotX = -normY * maxTilt * sizeDamp;
+      const rotY = normX * maxTilt * sizeDamp;
 
       setTilt({ rotateX: rotX, rotateY: rotY });
 
@@ -112,23 +114,23 @@ export function CelCard3D({
         style={{
           transformStyle: "preserve-3d",
           transform: isHovered
-            ? `rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) translateZ(8px)`
+            ? `rotateX(${tilt.rotateX.toFixed(2)}deg) rotateY(${tilt.rotateY.toFixed(2)}deg) translateZ(0px)`
             : "rotateX(0deg) rotateY(0deg) translateZ(0px)",
           transition: isHovered
             ? "transform 80ms ease-out, box-shadow 150ms ease"
             : "transform 350ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 250ms ease",
         }}
       >
-        {/* Holographic edge glow - 3D depth layer */}
+        {/* Cel-shaded inner rim highlight - zero-blur 3D contour */}
         {holographic && (
           <div
             className="absolute inset-0 pointer-events-none z-0"
             style={{
-              transform: "translateZ(-2px)",
+              transform: "translateZ(-1px)",
               boxShadow: isHovered
-                ? "0 0 20px 4px var(--cel-cyan, #00f0ff), inset 0 0 15px 2px var(--cel-cyan, #00f0ff)"
-                : "0 0 8px 1px var(--cel-cyan, #00f0ff), inset 0 0 5px 1px var(--cel-cyan, #00f0ff)",
-              opacity: isHovered ? 0.6 : 0.25,
+                ? "inset 0 0 0 1px rgba(0, 240, 255, 0.42), inset 2px 2px 0 0 rgba(189, 231, 255, 0.22)"
+                : "inset 1px 1px 0 0 rgba(189, 231, 255, 0.12)",
+              opacity: isHovered ? 0.9 : 0.7,
               transition: "opacity 200ms ease, box-shadow 200ms ease",
               borderRadius: "inherit",
             }}
@@ -143,18 +145,18 @@ export function CelCard3D({
               transform: "translateZ(-1px)",
               border: "1px solid var(--cel-cyan, #00f0ff)",
               borderRadius: "inherit",
-              opacity: 0.3,
+              opacity: 0.25,
             }}
           />
         )}
 
-        {/* 3渲2 阶梯式光标动态高光 (Stepped Anime Specular Glint) */}
+        {/* 3渲2 硬切阶梯式光标动态高光 (Zero-blur Stepped Comic Specular Slash) */}
         {glint && (
           <div
-            className="absolute inset-0 pointer-events-none transition-opacity duration-200 z-20 overflow-hidden"
+            className="absolute inset-0 pointer-events-none transition-opacity duration-150 z-20 overflow-hidden"
             style={{
               opacity: glintPos.opacity,
-              background: `radial-gradient(circle 120px at ${glintPos.x}% ${glintPos.y}%, var(--cel-glint-color, rgba(255,255,255,0.28)) 0%, var(--cel-glint-rim, rgba(0,240,255,0.16)) 40%, transparent 70%)`,
+              background: `linear-gradient(125deg, transparent 0%, transparent ${Math.max(0, glintPos.x - 16).toFixed(0)}%, rgba(255, 255, 255, 0.22) ${Math.max(0, glintPos.x - 16).toFixed(0)}%, rgba(255, 255, 255, 0.22) ${Math.max(0, glintPos.x - 6).toFixed(0)}%, rgba(0, 240, 255, 0.14) ${Math.max(0, glintPos.x - 6).toFixed(0)}%, rgba(0, 240, 255, 0.14) ${Math.min(100, glintPos.x + 2).toFixed(0)}%, transparent ${Math.min(100, glintPos.x + 2).toFixed(0)}%, transparent 100%)`,
               transform: "translateZ(1px)",
             }}
           />
@@ -167,49 +169,32 @@ export function CelCard3D({
         {depthLayers && (
           <>
             <div
-              className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
-              style={{ transform: "translateZ(3px)", opacity: isHovered ? 1 : 0.5, transition: "opacity 150ms" }}
+              className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
+              style={{ transform: "translateZ(2px)", opacity: isHovered ? 0.9 : 0.28, transition: "opacity 150ms" }}
             />
             <div
-              className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
-              style={{ transform: "translateZ(3px)", opacity: isHovered ? 1 : 0.5, transition: "opacity 150ms" }}
+              className="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
+              style={{ transform: "translateZ(2px)", opacity: isHovered ? 0.9 : 0.28, transition: "opacity 150ms" }}
             />
             <div
-              className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
-              style={{ transform: "translateZ(3px)", opacity: isHovered ? 1 : 0.5, transition: "opacity 150ms" }}
+              className="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
+              style={{ transform: "translateZ(2px)", opacity: isHovered ? 0.9 : 0.28, transition: "opacity 150ms" }}
             />
             <div
-              className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
-              style={{ transform: "translateZ(3px)", opacity: isHovered ? 1 : 0.5, transition: "opacity 150ms" }}
+              className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-[var(--cel-cyan, #00f0ff)] pointer-events-none z-30"
+              style={{ transform: "translateZ(2px)", opacity: isHovered ? 0.9 : 0.28, transition: "opacity 150ms" }}
             />
           </>
         )}
 
-        {/* 卡片内容区 (可通过 translateZ 自由挂载悬浮层) */}
+        {/* 卡片内容区 (温和视差防溢出) */}
         <div
           className="relative z-10 w-full h-full"
-          style={{ transform: depthLayers ? "translateZ(4px)" : "translateZ(0px)" }}
+          style={{ transform: depthLayers ? "translateZ(2px)" : "translateZ(0px)" }}
         >
           {children}
         </div>
       </div>
-
-      {/* CSS animation for breathing pulse */}
-      <style jsx>{`
-        @keyframes cel-card-breathe {
-          0%, 100% { opacity: 0.2; transform: translateZ(-1px) scale(1); }
-          50% { opacity: 0.5; transform: translateZ(-1px) scale(1.005); }
-        }
-        .cel-card-pulse {
-          animation: cel-card-breathe 3s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .cel-card-pulse {
-            animation: none;
-            opacity: 0.3;
-          }
-        }
-      `}</style>
     </div>
   );
 }
