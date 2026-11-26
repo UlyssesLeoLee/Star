@@ -82,10 +82,7 @@ import {
 } from "@/lib/cookies";
 import { StatusNotice } from "@/components/status/StatusNotice";
 import { useWorktreeGroupApi, useWorktreeGroupSessionState } from "@/lib/group/groupProjection";
-import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { GanttChart } from "@/components/gantt";
-import { IpaSkillWorkflowBoard } from "@/components/ipa-skills/IpaSkillWorkflowBoard";
-import { IPA_SKILL_CATALOG } from "@/lib/ipa-skills/catalog";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { buildEvents } from "@/components/calendar/events";
 import {
@@ -100,6 +97,10 @@ import {
   Clock,
   GitBranch,
   Workflow,
+  Layers,
+  Monitor,
+  ScanEye,
+  GitFork,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -113,6 +114,9 @@ import type {
 import { useTranslation } from "@/lib/i18n";
 import { CelCard3D } from "@/components/effects/CelCard3D";
 import { CreateProjectDialog } from "@/components/project/CreateProjectDialog";
+import { RuntimeSwitcher } from "@/components/run/RuntimeSwitcher";
+import { WorktreeScanner } from "@/components/run/WorktreeScanner";
+import { BranchLinker } from "@/components/run/BranchLinker";
 import {
   ProjectsFilterBar,
   applyKanbanFilter,
@@ -127,14 +131,14 @@ import {
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 // per 2026-11-17 去重: kanban tab 合并进 /kanban 顶层路由 (2026-11-14 拍板延续),
-// 本页 tabs = Timeline / Backlog / Agents / Worktrees / IPA 技能 (kanban 保留为 legacy
-// cookie/URL 值, 由 redirect effect 转发 /kanban)。
+// per 2026-11-27 二次去重: IPA 技能合并进 /kanban (已含 IPA 流程图 tab),
+// 本页 tabs = Timeline / Backlog / Agents / Worktrees / Lane 管理
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
   { id: "timeline",  label: "Timeline",  icon: <SquareChartGantt size={12} /> },
   { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
   { id: "agents",    label: "Agents",    icon: <Users size={12} /> },
   { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
-  { id: "ipa",       label: "IPA 技能",  icon: <Workflow size={12} /> },
+  { id: "lane",      label: "Lane 管理", icon: <Layers size={12} /> },
 ];
 
 // Kanban 列已随 tab 合并进 /kanban (per 2026-11-17 去重), 本页不再内联 KANBAN_COLUMNS 副本。
