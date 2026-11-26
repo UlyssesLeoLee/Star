@@ -102,27 +102,40 @@ class RuleDatabase:
         self._rules: List[Rule] = []
         self._lock = threading.RLock()
         self._observer = None
-        self._load_rules()
+        try:
+            self._load_rules()
+        except RuleLoadError:
+            # 构造完成但处于不健康状态；Guard.evaluate 将据此 BLOCK
+            pass
         if enable_watcher:
             self._try_start_watcher()
 
     def get_rules(self) -> List[Rule]:
-        """線程安全讀取, 返回拷貝避免外部修改."""
+        """線程安全讀取, 返回拷貝避免外部修改.
+        
+        如果规则加载失败(不健康状态), 返回空列表.
+        调用者应检查 is_healthy() 并在不健康时 fail-closed.
+        """
         with self._lock:
             return list(self._rules)
+    
+    def is_healthy(self) -> bool:
+        """规则是否可用."""
+        with self._lock:
+            return len(self._rules) > 0
 
     def _load_rules(self) -> None:
-        """加載規則, 失敗 → 保留舊 rules + WARN log (per FR-6.1)."""
+        """加載規則, 失敗 → 抛出 RuleLoadError (per FR-6.1 fail-closed)."""
         try:
             with self._path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
-            logger.warning("Rule load failed (IO/JSON), keeping old rules: %s", e)
-            return
+            logger.error("Rule load failed (IO/JSON), fail-closed: %s", e)
+            raise RuleLoadError(f"rule load failed: {e}") from e
         errors = _validate_schema(data)
         if errors:
-            logger.warning("Rule schema validation failed, keeping old rules: %s", errors[:3])
-            return
+            logger.error("Rule schema validation failed, fail-closed: %s", errors[:3])
+            raise RuleLoadError(f"schema validation failed: {errors[:3]}")
         new_rules: List[Rule] = []
         for r in data["rules"]:
             try:
@@ -143,6 +156,19 @@ class RuleDatabase:
             self._rules = new_rules
         logger.info("Loaded %d rules from %s", len(new_rules), self._path)
 
+    def reload(self) -> int:
+        """手動 reload, 返回當前 rules 數量 (for testing)."""
+        try:
+            self._load_rules()
+        except RuleLoadError:
+            # reload 失败 → 清空规则并标记不健康，后续 evaluate 将 BLOCK
+            with self._lock:
+                self._rules = []
+            logger.error("Rules reload failed, fail-closed: %s", "see earlier log")
+            return 0
+        return len(self.get_rules())
+
+
     def _try_start_watcher(self) -> None:
         """嘗試啟動 watchdog, 失敗 graceful fallback (no-watcher, 仍可手動 reload)."""
         try:
@@ -160,7 +186,11 @@ class RuleDatabase:
                         try:
                             if Path(event.src_path).resolve() == db._path.resolve():
                                 logger.info("Rules file modified, reloading...")
-                                db._load_rules()
+                                try:
+                                    db._load_rules()
+                                except RuleLoadError as e:
+                                    # 保留 _failure 标记；后续 evaluate 一律 BLOCK
+                                    logger.error("Rules reload failed, fail-closed: %s", e)
                         except OSError:
                             pass
 
@@ -182,8 +212,3 @@ class RuleDatabase:
             except Exception:
                 pass
             self._observer = None
-
-    def reload(self) -> int:
-        """手動 reload, 返回當前 rules 數量 (for testing)."""
-        self._load_rules()
-        return len(self.get_rules())

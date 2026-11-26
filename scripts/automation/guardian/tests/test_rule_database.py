@@ -76,17 +76,18 @@ def test_load_valid_rules(tmp_rules):
 
 
 def test_load_invalid_json_keeps_old(tmp_path):
-    """FR-6.1: 坏 JSON 保留旧 rules (fail-open)."""
+    """FR-6.1: 坏 JSON 触发 RuleLoadError → fail-closed (0 rules)."""
     p = tmp_path / "bad.json"
     p.write_text("{ invalid", encoding="utf-8")
     db = RuleDatabase(p, enable_watcher=False)
     rules = db.get_rules()
+    # fail-closed: 规则加载失败 → 0 rules (无旧规则可保留)
     assert rules == [], f"坏 JSON 应 0 规则, 实际 {len(rules)}"
     db.stop()
 
 
 def test_load_schema_violation_keeps_old(tmp_path):
-    """schema 不通过, 0 规则加载, 不抛."""
+    """schema 不通过, 触发 RuleLoadError, 0 规则加载."""
     p = tmp_path / "bad_schema.json"
     p.write_text(json.dumps({"schema_version": "1.0", "rules": [{"id": "BAD", "name": "x"}]}), encoding="utf-8")
     db = RuleDatabase(p, enable_watcher=False)

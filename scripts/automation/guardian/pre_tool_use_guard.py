@@ -142,7 +142,7 @@ class PreToolUseGuard:
         """PreToolUse hook 入口 (per FR-1.1 + NFR-P-1/NFR-P-2).
 
         延迟 p50 < 5ms, p99 < 10ms.
-        規則加載失敗 → fail-open (PASS + WARN log).
+        規則不可用/加载失败 → fail-closed (BLOCK + 诊断).
         audit 寫失敗 → fail-closed (BLOCK, per FR-6.2).
         """
         t0 = time.perf_counter()
@@ -150,18 +150,26 @@ class PreToolUseGuard:
         rule_id: Optional[str] = None
         reason: Optional[str] = None
 
-        try:
-            rules = self._rules.get_rules()
-            matches = PatternMatcher.match_all(tool_call, rules)
-            decision = DecisionRouter.route(matches)
-            if matches:
-                rule_id = matches[0].rule_id
-                reason = matches[0].reason
-        except Exception as e:
-            # per FR-6.1: fail-open
-            logger.warning("Rule evaluation failed, fail-open: %s", e)
-            decision = Decision.PASS
-            reason = f"fail-open: {type(e).__name__}: {e}"
+        # fail-closed: 规则不可用时阻断所有安全关键调用
+        if not self._rules.is_healthy():
+            logger.error("Security rules unavailable, fail-closed")
+            decision = Decision.BLOCK
+            rule_id = None
+            reason = "fail-closed: security rules unavailable"
+        else:
+            try:
+                rules = self._rules.get_rules()
+                matches = PatternMatcher.match_all(tool_call, rules)
+                decision = DecisionRouter.route(matches)
+                if matches:
+                    rule_id = matches[0].rule_id
+                    reason = matches[0].reason
+            except Exception as e:
+                # 其他异常也 fail-closed
+                logger.error("Rule evaluation failed, fail-closed: %s", e)
+                decision = Decision.BLOCK
+                rule_id = None
+                reason = f"fail-closed: {type(e).__name__}: {e}"
 
         latency_ms = (time.perf_counter() - t0) * 1000.0
 

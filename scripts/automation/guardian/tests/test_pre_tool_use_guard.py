@@ -209,10 +209,10 @@ def test_p99_latency_under_10ms(guard):
     assert p99 < 10, f"p99 = {p99:.3f}ms 违反 NFR-P-2 (< 10ms)"
 
 
-# ============ AC-3: fail-open / fail-closed ============
+# ============ AC-3: fail-closed ============
 
-def test_rule_load_fail_open(tmp_path, audit_log):
-    """AC-3: 规则 JSON 坏掉 → fail-open (PASS + 旧 rules 仍可用)."""
+def test_rule_load_fail_closed(tmp_path, audit_log):
+    """AC-3: 规则 JSON 坏掉 → fail-closed (BLOCK)."""
     bad = tmp_path / "bad.json"
     bad.write_text("{ invalid json", encoding="utf-8")
     db = RuleDatabase(bad, enable_watcher=False)
@@ -220,12 +220,28 @@ def test_rule_load_fail_open(tmp_path, audit_log):
     tc = ToolCall(
         tool_name="bash",
         tool_args={"command": "rm -rf /"},
-        session_id="fail_open_test",
+        session_id="fail_closed_test",
         agent_role="orchestrator",
     )
     decision = guard.evaluate(tc)
-    # fail-open: rules 为空 → 全部 PASS
-    assert decision == Decision.PASS
+    # fail-closed: 规则加载失败 → BLOCK
+    assert decision == Decision.BLOCK
+
+
+def test_rule_schema_fail_closed(tmp_path, audit_log):
+    """AC-3: 规则 schema 校验失败 → fail-closed (BLOCK)."""
+    bad = tmp_path / "bad_schema.json"
+    bad.write_text('{"schema_version": "1.0", "rules": [{"id": "BAD"}]}', encoding="utf-8")
+    db = RuleDatabase(bad, enable_watcher=False)
+    guard = PreToolUseGuard(db, audit_log)
+    tc = ToolCall(
+        tool_name="bash",
+        tool_args={"command": "ls"},
+        session_id="fail_closed_test",
+        agent_role="orchestrator",
+    )
+    decision = guard.evaluate(tc)
+    assert decision == Decision.BLOCK
 
 
 def test_audit_write_fail_closed(rule_db, tmp_path):
