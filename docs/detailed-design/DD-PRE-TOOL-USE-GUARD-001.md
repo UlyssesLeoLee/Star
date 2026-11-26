@@ -1,14 +1,16 @@
 # DD-PRE-TOOL-USE-GUARD-001
 
-> **Mavis PreToolUse 安全拦截层 — 詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
->
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
+> **2026-11-24 对账说明**: 本专题安全关键操作的规则、原生 evaluator 或必需审计不可用时必须阻断; 旧 Python fail-open 仅作为非权威的开发兼容或观测描述, 不得用于产品安全关键操作。统合边界与状态说明见 [要件总索引](../requirements/README.md) 与 [基本设计](../design/BD-PRE-TOOL-USE-GUARD-001.md)。
+
+> **Mavis PreToolUse 安全拦截层 — 詳細設計書 v0.2** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
+
+> - 状态: 🟡 Draft v0.2 (2026-11-24 · fail-open → fail-closed 同步; FR-6/NFR/AC 重定义)
 > - 上游: [`docs/requirements/SRS-PRE-TOOL-USE-GUARD-001.md`](../requirements/SRS-PRE-TOOL-USE-GUARD-001.md) v0.1 (23KB, 7 機能 / 4 業務 / 6 非機能 / 7 验收) + [`docs/design/BD-PRE-TOOL-USE-GUARD-001.md`](../design/BD-PRE-TOOL-USE-GUARD-001.md) v0.1 (36KB, 5 module / 3 表 / 7 集成点)
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Python 3.10+ (per SRS §6.1 制約)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-10 JST
+> - 日期: 2026-11-24 JST
 
 ---
 
@@ -22,7 +24,7 @@
 - **W/T/M 3 表 100% カバー** (守門 #13) — `pre_tool_use_rules` (W/M) + `pre_tool_use_audit` (T) + `pre_tool_use_session_state` (M)
 - **15 条危险模式** (BLOCK 8 + ASK 5 + WARN 2) — 跟 Claude Code `security-guidance` 9 条对照 + 扩展
 - **三级决策** (BLOCK/ASK/WARN) — 跟守门 v28 拍板必带推荐项联动
-- **fail-open / fail-closed** — 規則加載失敗 vs 審計失敗 二分
+- **fail-closed 安全故障处理** — 安全关键规则、原生 evaluator 或必要审计不可用时阻断受影响调用
 - **Framework 選型** (per 既存 mavis 仓 实证): stdlib `re` / `json` / `pathlib` / `logging` + `jsonschema` (1 依赖) + `watchdog` (1 依赖)
 
 **不做什么** (per SRS-001 §1.4):
@@ -56,7 +58,7 @@ scripts/automation/guardian/
 
 tests/automation/guardian/
 ├── __init__.py
-├── test_pre_tool_use_guard.py      # 15 條規則 + fail-open/closed, ~250 LOC
+├── test_pre_tool_use_guard.py      # 15 條規則 + fail-closed 故障注入, ~250 LOC
 ├── test_rule_database.py           # 規則加載/熱更新/schema 校驗, ~150 LOC
 ├── test_audit_logger.py            # 寫入/异步 fsync/fail-closed, ~100 LOC
 └── fixtures/
@@ -248,14 +250,14 @@ class DecisionRouter:
 
 class PreToolUseGuard:
     """主入口, 整合 PM-1 + PM-3 + audit."""
-    
+
     def __init__(self, rule_db: RuleDatabase, audit: AuditLogger):
         self._rules = rule_db
         self._audit = audit
-    
+
     def evaluate(self, tool_call: ToolCall) -> Decision:
         """PreToolUse hook 入口.
-        
+
         Per FR-1.1 + NFR-P-1/NFR-P-2:
         - p50 < 5ms
         - p99 < 10ms
@@ -263,20 +265,22 @@ class PreToolUseGuard:
         """
         t0 = time.perf_counter()
         try:
+            if not self._rules.is_healthy():
+                raise RuleLoadError(self._rules.failure_reason() or "rules unavailable")
             rules = self._rules.get_rules()  # hot-reload safe
             matches = PatternMatcher.match_all(tool_call, rules)
             decision = DecisionRouter.route(matches)
             rule_id = matches[0].rule_id if matches else None
             reason = matches[0].reason if matches else None
         except Exception as e:
-            # per FR-6.1 fail-open: 規則加載失敗 → PASS + WARN log
-            logger.error("Rule evaluation failed, fail-open: %s", e)
-            decision = Decision.PASS
+            # per FR-6.1 fail-closed: 安全关键规则/原生 evaluator/必要审计不可用 → BLOCK, 记录诊断
+            logger.error("Security rule evaluation failed, fail-closed: %s", e)
+            decision = Decision.BLOCK
             rule_id = None
-            reason = f"fail-open: {e}"
-        
+            reason = f"fail-closed: {e}"
+
         latency_ms = (time.perf_counter() - t0) * 1000
-        
+
         # audit log 必写 (per FR-4.1)
         try:
             self._audit.log(AuditEvent(
@@ -293,10 +297,10 @@ class PreToolUseGuard:
                 env_hash=hashlib.sha256(",".join(sorted(os.environ.keys())).encode()).hexdigest(),
             ))
         except Exception as e:
-            # per FR-6.2 fail-closed: 審計失敗 → BLOCK
+            # per FR-6.2 fail-closed: 审计写失败 → BLOCK
             logger.error("Audit log write failed, fail-closed: %s", e)
             return Decision.BLOCK
-        
+
         return decision
     
     def evaluate_for_dispatch(
@@ -320,7 +324,7 @@ class PreToolUseGuard:
 **关键设计点**:
 1. **`PatternMatcher.extract_scan_target` 跨平台**: 統一提取字符串, 後續所有規則只對這個字符串跑 regex
 2. **`DecisionRouter.PRIORITY` 字典**: BLOCK > ASK > WARN > PASS, 簡單明確
-3. **fail-open vs fail-closed 二分**: 規則錯誤 → fail-open (不阻斷主流程), 審計錯誤 → fail-closed (凭据零外泄)
+3. **fail-closed 统一**: 规则加载/校验失败、原生 evaluator 不可用、审计写失败 → 一律阻断受影响调用
 
 ### 2.2 `rule_database.py` Rule Database
 
@@ -387,16 +391,30 @@ class RuleDatabase:
         self._rules: List[Rule] = []
         self._lock = threading.RLock()
         self._observer: Optional[Observer] = None
-        self._load_rules()  # 啟動時一次性加載
+        self._failure: Optional[str] = "rules not loaded"
+        try:
+            self._load_rules()  # 啟動時一次性加載
+        except RuleLoadError:
+            # 構造完成但處于不健康狀態；Guard.evaluate 將據此 BLOCK
+            pass
         self._start_watcher()
     
     def get_rules(self) -> List[Rule]:
         """線程安全讀取 (RLock)."""
         with self._lock:
             return list(self._rules)  # 拷貝避免外部修改
+
+    def is_healthy(self) -> bool:
+        """規則是否可用；False 時所有安全關鍵調用必須 fail-closed。"""
+        with self._lock:
+            return self._failure is None
+
+    def failure_reason(self) -> Optional[str]:
+        with self._lock:
+            return self._failure
     
     def _load_rules(self) -> None:
-        """加載規則, 失敗 → 保留舊 rules + WARN log (per FR-6.1)."""
+        """加載規則, 失敗 → 抛出 RuleLoadError 并标记不健康 (per FR-6.1 fail-closed)."""
         try:
             with self._path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -414,10 +432,13 @@ class RuleDatabase:
             ]
             with self._lock:
                 self._rules = new_rules
+                self._failure = None
             logger.info("Loaded %d rules from %s", len(new_rules), self._path)
         except (json.JSONDecodeError, jsonschema.ValidationError, OSError) as e:
-            logger.warning("Rule load failed, keeping old rules: %s", e)
-            # per FR-6.1: 不抛異常, 保留舊 rules
+            with self._lock:
+                self._failure = str(e)
+            logger.error("Rule load failed, fail-closed: %s", e)
+            raise RuleLoadError(f"rule load failed: {e}") from e
     
     def _start_watcher(self) -> None:
         """監聽規則文件 mtime, 自動 reload (per FR-5.1)."""
@@ -431,7 +452,11 @@ class RuleDatabase:
             def on_modified(self, event):
                 if Path(event.src_path) == self._db._path:
                     logger.info("Rules file modified, reloading...")
-                    self._db._load_rules()
+                    try:
+                        self._db._load_rules()
+                    except RuleLoadError as e:
+                        # 保留 _failure 标记；后续 evaluate 一律 BLOCK
+                        logger.error("Rules reload failed, fail-closed: %s", e)
         
         try:
             self._observer = Observer()
@@ -450,7 +475,7 @@ class RuleDatabase:
 
 **关键设计点**:
 1. **`RLock` 線程安全**: hook 可能在多線程調用, 規則加載和讀取必須互斥
-2. **加載失敗保留舊規則**: per FR-6.1, 不破壞現有 mavis runtime 流程
+2. **加載/校驗失敗 → fail-closed**: 抛出 `RuleLoadError` 并标记不健康，`Guard.evaluate` 統一 BLOCK，不沿用舊規則放行
 3. **`watchdog` 監聽 mtime**: 自動 reload, 0 人工介入
 4. **`jsonschema` 校驗**: 防 JSON 寫錯導致運行時崩潰
 
@@ -538,6 +563,11 @@ class AuditLogger:
 class AuditLogError(Exception):
     """Audit log 寫入失敗, 用於 fail-closed 判斷."""
     pass
+
+
+class RuleLoadError(Exception):
+    """規則加載/校驗失敗；Guard 必須 fail-closed 阻斷受影響調用."""
+    pass
 ```
 
 **关键设计点**:
@@ -592,7 +622,7 @@ def list_user_rules(user_rules_dir: Path) -> List[str]:
                         │                            │
                         │ schema fail                │ 失敗
                         ▼                            ▼
-                   [加載失敗, 保留舊規則]      [重載失敗, 保留舊規則]
+                   [加載失敗, 进入 fail-closed]  [重載失敗, 进入 fail-closed]
 ```
 
 **狀態轉換條件**:
@@ -602,9 +632,11 @@ def list_user_rules(user_rules_dir: Path) -> List[str]:
 | 未加載 | 已加載 | 啟動時 `_load_rules()` 成功 |
 | 已加載 | 排隊 | watchdog 監測到 mtime 變化 |
 | 排隊 | 已重載 | `_load_rules()` 成功 |
-| 排隊 | 失敗 | JSON parse / schema 校驗 / OS error |
+| 排隊 | fail-closed | JSON parse / schema 校驗 / OS error |
 | 已加載 / 已重載 | 排隊 | 文件 mtime 變化 (持續監聽) |
 | 任意 | 任意 | 進程退出 |
+
+> **fail-closed 约束**: `failed` 状态下, 所有安全关键工具调用 → `DecisionRouter.on_security_failure` → BLOCK。
 
 ### 3.2 audit log 狀態機 (per AuditEvent)
 
@@ -762,6 +794,37 @@ LLM            PreToolUseGuard     AuditLogger       OS
  │                  │ return BLOCK   │                │
  │                  │                │                │
  │                  │ (LLM 收到 error, 改 plan, 同時 audit 寫失敗事件)
+```
+
+### 4.6 规则加载/Schema 失败 → fail-closed 场景 (per FR-6.1)
+
+```
+LLM            PreToolUseGuard     RuleDatabase
+ │                  │                │
+ │─evaluate()─────▶│                │
+ │                  │─get_rules()───▶│
+ │                  │                │─_load_rules()
+ │                  │                │  JSON parse / schema 校验失败
+ │                  │                │  进入 fail-closed
+ │                  │◀─BLOCK─────────│
+ │                  │                │
+ │                  │ (LLM 收到 error, 记录诊断)
+```
+
+### 4.7 安全关键规则/evaluator 不可用 → fail-closed 场景 (per FR-6.1)
+
+```
+LLM            PreToolUseGuard     DecisionRouter
+ │                  │                │
+ │─evaluate()─────▶│                │
+ │                  │─match_all()    │
+ │                  │  命中安全关键规则
+ │                  │                │
+ │                  │─on_security_failure()  (SecurityFailure.RULE_LOAD_FAILED)
+ │                  │                │
+ │                  │◀─BLOCK─────────│  (记录诊断, 不放行)
+ │                  │                │
+ │                  │ (LLM 收到 error, 恢复后重新授权校验, 不自动重放)
 ```
 
 ---
@@ -954,7 +1017,7 @@ LLM            PreToolUseGuard     AuditLogger       OS
 
 | 錯誤類型 | 觸發 | 處理 | HTTP status (如適用) |
 |---|---|---|---|
-| `RuleLoadError` | JSON parse fail / schema 校驗 fail | fail-open (PASS + WARN log) | N/A |
+| `RuleLoadError` | JSON parse fail / schema 校驗 fail | **fail-closed (BLOCK + 诊断)** | N/A |
 | `RuleRegexError` | regex catastrophic backtracking / pattern invalid | 跳過該規則, 其他繼續, WARN log | N/A |
 | `AuditLogError` | 磁盤滿 / 權限不足 / 編碼錯誤 | fail-closed (BLOCK) | N/A |
 | `ToolCallFormatError` | tool_call 缺必填字段 | 返回 ERROR decision + 詳細 log | N/A |
@@ -964,21 +1027,20 @@ LLM            PreToolUseGuard     AuditLogger       OS
 ### 6.2 例外處理原則
 
 - **永不靜默吞錯** (per 9/1 P0-1 实证教訓)
-- **fail-open vs fail-closed 明確二分**:
-  - 規則錯誤 (邏輯) → fail-open, 不阻斷主流程
-  - 審計錯誤 (凭据) → fail-closed, 阻斷 tool call
+- **fail-closed 统一**: 规则加载失败、schema 校验失败、原生 evaluator 不可用、审计写失败 → 全部阻断受影响调用
 - **log 必含 trace**: traceback.format_exc() + 時間戳 + session_id
 
 ### 6.3 例外伝播鏈
 
 ```
 RuleDatabase._load_rules() 
-  → except → logger.warning, 保留舊規則 → 不傳播
-  
+  → except → logger.error, 进入 fail-closed → BLOCK
+ 
 PreToolUseGuard.evaluate()
-  → except RuleLoadError → fail-open PASS + WARN
+  → except RuleLoadError → fail-closed BLOCK + 诊断
   → except AuditLogError → return BLOCK (per FR-6.2)
-  → except 其他 → fail-open PASS + ERROR log
+  → except SecurityFailure (evaluator 不可用) → fail-closed BLOCK + 诊断
+  → except 其他 → fail-closed BLOCK + ERROR log
 ```
 
 ---
@@ -1001,8 +1063,10 @@ PreToolUseGuard.evaluate()
 | TC-1.10 | 15 條規則全部跑通 | AC-1 | 15 個 fixture | 100% 命中預期 |
 | TC-2.1 | p50 < 5ms (100 次平均) | AC-2 | benchmark | < 5ms |
 | TC-2.2 | p99 < 10ms (1000 次) | AC-2 | benchmark | < 10ms |
-| TC-3.1 | 規則 JSON 故意壞掉 → fail-open | AC-3 | 壞 JSON | PASS + WARN log |
+| TC-3.1 | 規則 JSON 故意壞掉 → **fail-closed** | AC-3 | 壞 JSON | **BLOCK + ERROR log** |
 | TC-3.2 | audit log 故意 read-only → fail-closed | AC-3 | chmod 0444 | BLOCK + ERROR log |
+| TC-3.3 | 规则 schema 校验失败 → **fail-closed** | AC-3 | 错误 schema | **BLOCK + ERROR log** |
+| TC-3.4 | 原生 evaluator 不可用 → **fail-closed** | AC-3 | 模拟不可用 | **BLOCK + 诊断** |
 | TC-4.1 | audit log append-only | AC-4 | append 100 條 | 100 條全在, 無 truncate |
 | TC-4.2 | audit log OS 權限 | AC-4 | chmod 0444 | 其他進程不可寫 |
 | TC-5.1 | Windows PowerShell 兼容 | AC-5 | Windows CI | 100% pass |
@@ -1095,12 +1159,12 @@ def test_p50_latency(rule_db_with_15_rules, audit_log):
     assert p50 < 5, f"p50 = {p50}ms, 期望 < 5ms"
 
 
-def test_rule_load_fail_open(audit_log):
-    """TC-3.1: 規則壞掉 → fail-open PASS."""
+def test_rule_load_fail_closed(audit_log):
+    """TC-3.1: 規則壞掉 → fail-closed BLOCK."""
     with tempfile.TemporaryDirectory() as tmp:
         bad_path = Path(tmp) / "bad.json"
         bad_path.write_text("{ invalid json", encoding="utf-8")
-        db = RuleDatabase(bad_path)  # 不拋, 保留空 rules
+        db = RuleDatabase(bad_path)  # 不拋, 进入 fail-closed
         guard = PreToolUseGuard(db, audit_log)
         tool_call = ToolCall(
             tool_name="bash",
@@ -1109,8 +1173,25 @@ def test_rule_load_fail_open(audit_log):
             agent_role="orchestrator",
         )
         decision = guard.evaluate(tool_call)
-        # fail-open: 無規則 → PASS
-        assert decision == Decision.PASS
+        # fail-closed: 规则加载失败 → BLOCK
+        assert decision == Decision.BLOCK
+
+
+def test_rule_schema_fail_closed(audit_log):
+    """TC-3.3: 规则 schema 校验失败 → fail-closed BLOCK."""
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_schema.json"
+        bad_path.write_text('{"schema_version": "1.0", "rules": [{"id": "R-BAD"}]}', encoding="utf-8")
+        db = RuleDatabase(bad_path)
+        guard = PreToolUseGuard(db, audit_log)
+        tool_call = ToolCall(
+            tool_name="bash",
+            tool_args={"command": "ls"},
+            session_id="test",
+            agent_role="orchestrator",
+        )
+        decision = guard.evaluate(tool_call)
+        assert decision == Decision.BLOCK
 
 
 def test_audit_log_write_fail_closed(rule_db_with_15_rules):
@@ -1257,3 +1338,4 @@ $ python -c "from scripts.automation.guardian.audit_logger import AuditLogger; \
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 19:18 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 10 段 (目的/模块/类/状态/时序/数据/错误/测试/运用/引用+修订), 5 module 物理実装 (pre_tool_use_guard + rule_database + audit_logger + user_rule_api + 2 hook), 10 文件 (~1.5K 行), 4 依赖 (jsonschema + watchdog + pytest + pytest-benchmark), 3 表 W/T/M 100% 覆盖 (Rule W/M + Audit T + Session M, per 守门 #13), 15 条规则 1:1 落地 (BLOCK 8 + ASK 5 + WARN 2), 20+ 單元測試 + 5 整合測試 + 150 渗透測試, IPA 詳細設計書 模板 + 5 維 (模块/类/状态/时序/测试) 覆盖 | 2026-09-10 19:03 JST Ulysses 拍板"整理出需求文档, 然后基于需求文档写基本设计, 要符合日本 IPA 的水准和规范" + 19:18 JST Ulysses 拍板"**根据详细设计制作spec, 实施计划, 并加入wbs**" |
+| **v0.2** | 2026-11-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **fail-open → fail-closed 全面同步**: FR-6 重定义为"安全关键规则/evaluator/审计不可用时阻断"（对齐上游 SRS NFR-A-1/AC-3）；DecisionRouter 新增 `on_security_failure`；RuleDatabase 新增 `is_healthy` / `failure_reason` 与 `RuleLoadError`，加载/校验/热更新失败不再保留旧规则放行；测试矩阵 TC-3.1/3.3/3.4 改为 BLOCK 预期；错误码、例外处理原则、异常传播链、序列图同步。版本号同步升 v0.2。 | 2026-11-24 SRS/BD 同步更新 (fail-open→fail-closed, FR-6/NFR/AC 重定义) |

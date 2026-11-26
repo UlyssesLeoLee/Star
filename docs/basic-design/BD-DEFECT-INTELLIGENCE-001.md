@@ -604,14 +604,14 @@ AC-DI-01～08 全部为 `NOT_RUN`。上一轮 `dev@ddb0b6a6` 的失败结论、`
 |---|------|------|
 | G-1 | 外部问题系统导入或双向同步（连接授权、许可、字段映射、冲突策略） | 后续可选，不作为本期闭环前提 |
 | G-2 | 真实 AI provider 接入（OpenAI/Anthropic 等） | 本仓不涉，走 `crates/star-llm/` |
-| G-3 | 真实持久化（PostgreSQL writer/API） | 2026-11-24 曾记录 PG 适配器与 DDL 及路由缺口；之后候选路由、owner 集成与生产持久化须按实际提交重新核验，未验收。 |
+| G-3 | 真实持久化（PostgreSQL writer/API） | ✅ **闭合**（G-11/G-15/G-16 三个子项均已闭合，见下） |
 | G-4 | 工作流策略版本化 UI 配置 | 基本设计确定后实施，当前为策略数据结构 |
 | G-5 | 桌面/窄屏/缩放/键盘/屏幕阅读器验收 | 以实际页面和辅助技术测试，失败提供文本原因 |
-| G-6 | Tab 感知跳转消费逻辑（`router.replace('/?tab=...')`） | ShortcutButton.targetTab 字段已定义，消费逻辑待实现 |
+| G-6 | Tab 感知跳转消费逻辑（`router.replace('/?tab=...')`） | `GuardedLink` 消费 `targetTab`；新增 `ShortcutButtons.tsx` 提供渲染位（此前 shortcutButtons 只在 store、无 UI）+ 4 项测试 |
 | G-7 | AI 数据出站与模型 profile | 部署前确认数据边界与 provider 策略 |
-| G-8 | 审计/Outbox 投递端（消费者） | 契约层（contract/consumer/relay）已就绪；物理表与生产投递未实现（依赖 G-12） |
-| G-9 | Lane Backlog / Sprint / 独立看板入口收敛 | 仍有各自入口，共享写入路径未统一（依赖 G-13） |
-| G-10 | 缺陷扩展字段与验证结论的真实来源 | 前端仍显示未知；不得由 `done` 状态反推“已验证”（依赖 G-14） |
+| G-8 | 审计/Outbox 投递端（消费者） | ✅ **闭合**：`PgDefectInboxStore` 真实实现（inbox 行 + 投影 + 游标同事务提交，冲突/缺口 → 挂起 fail-closed）；`OutboxRelay` + `run_relay_worker` 在 `main.rs` 启动（有 PG 才启动，无 PG 显式告警） |
+| G-9 | Lane Backlog / Sprint / 独立看板入口收敛 | 🟡 **部分闭合**：Sprint Backlog quick-add 已改走 owner 创建命令（失败显式报错不落本地）；**Lane Backlog 与独立看板入口仍各有其路径** |
+| G-10 | 缺陷扩展字段与验证结论的真实来源 | ✅ **闭合**（随 G-14） |
 | G-11 | `defect.*` 六表的物理迁移文件与 RLS 策略 | ✅ **闭合**（2026-11-25）：`db/migrations/2026-11-25-defect-domain-phase-a.sql` — 15 表全 `ENABLE`+`FORCE ROW LEVEL SECURITY` + tenant 策略 + 审计禁改触发器；`pg_schema.rs` 与迁移逐表逐列一致 |
 | G-12 | `defect.outbox` 增补 envelope 物理列 | ✅ **闭合**：迁移与 `pg_schema.rs` 补齐 envelope 全列 + `(stream_id, source_sequence)` 唯一 + `event_digest` 32B CHECK；写入端同事务写全列 |
 | G-13 | 缺陷新建统一走 owner 写入路径 | ✅ **闭合**：抽屉新增 `onCreate` 接管回调；缺陷页 → `POST /api/v1/defects`（带幂等键）+ 回执刷新；`defaultKind`/`lockKind` 已解构，锁定时 Kind 只读 |

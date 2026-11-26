@@ -1,15 +1,17 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.5.14** (Hooks 保持 Advanced Settings 内容区并列标签；Phase 9D-5b 定义条件式 Run admission producer 与事务内同 event_id 双写，生产 adapter/完整 BI/目标环境验收仍开放)
+> **2026-11-24 对账说明**：高级设置提供 typed 无代码 HookSet 编辑，Project/Worktree 继承与 Run 快照以版本化契约为准。Rust 原生安全关键 evaluator、策略及必需审计不可用时阻断；Python handler 和浏览器 localStorage 仅能作为非权威兼容/观测，不能证明策略持久化或执行。§8.4 是本专题故障策略入口，旧示例中的 fail-open 不适用产品关键操作。详见 [基本设计总索引](../basic-design/README.md)。
 
-> - 状态: 🟡 Draft v0.5.14 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer contract)
+> **Multica Hook 域詳細設計書 v0.5.15** (Hooks 保持 Advanced Settings 内容区并列标签；Phase 9D-5b 定义条件式 Run admission producer 与事务内同 event_id 双写，生产 adapter/完整 BI/目标环境验收仍开放)
+
+> - 状态: 🟡 Draft v0.5.15 (2026-11-24 · fail-open → fail-closed 同步；§8.4 故障策略重写)
 > - 上游: [docs/requirements/SRS-MULTICA-HOOK-001.md](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.6 + [docs/design/BD-MULTICA-HOOK-001.md](../design/BD-MULTICA-HOOK-001.md) v0.5.8 + docs/requirements.md v5.23 §50.8D
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Rust Hook Engine / typed rule evaluator；Rust-native desktop UI；现有 Web UI 仅作同 DTO 的 presentation adapter。旧 Python handler 不具备安全决策 authority。
-> - 平行参考: `DD-PRE-TOOL-USE-GUARD-001.md` v0.1 仅作为既有 guard 行为输入；v0.5 的 Rust builtin policy 对 critical decision 统一 fail-closed，历史 fail-open 方案不具权威性
+> - 平行参考: `DD-PRE-TOOL-USE-GUARD-001.md` v0.2 仅作为既有 guard 行为输入；v0.5 的 Rust builtin policy 对 critical decision 统一 fail-closed，历史 fail-open 方案不具权威性
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-30 JST
+> - 日期: 2026-11-24 JST
 
 ---
 
@@ -344,14 +346,17 @@ class HookRegistry:
         """從 registry.json 加載所有 hook, 含 builtin hook 合併.
 
         流程:
-        1. 讀 registry.json (per fail-open)
-        2. 校驗 schema (per fail-open)
+        1. 讀 registry.json (per fail-closed)
+        2. 校驗 schema (per fail-closed)
         3. 加載 builtin hook (BL-6)
         4. 合併到 self._hooks
         5. 啟動 watchdog 監聽
 
         Returns:
             List[Hook]: 所有 hook (含 builtin)
+
+        Raises:
+            HookLoadError: registry 加载/校验失败 → fail-closed，阻断关键操作
         """
         with self._lock:
             try:
@@ -360,10 +365,10 @@ class HookRegistry:
                     jsonschema.validate(hook_data, HOOK_SCHEMA)
                     self._hooks[hook_data["name"]] = Hook(hook_data)
             except (json.JSONDecodeError, jsonschema.ValidationError) as e:
-                # fail-open: 跳過 registry, 只用 builtin hook
+                # fail-closed: registry 加载/校验失败 → 抛出异常，阻断关键操作
                 import logging
-                logging.warning(f"registry.json 加載失敗, fail-open: {e}")
-                self._hooks.clear()
+                logging.error(f"registry.json 加载/校验失败, fail-closed: {e}")
+                raise HookLoadError(f"registry.json load/validation failed: {e}") from e
 
             # 合併 builtin hook
             for builtin_hook in self._builtin_loader.load_all():
@@ -658,6 +663,11 @@ from scripts.automation.hooks.audit_logger import AuditLogger
 
 class HookTimeoutError(Exception):
     """Hook 執行超時異常 (per SRS §FR-4.5)."""
+    pass
+
+
+class HookLoadError(Exception):
+    """Hook registry 加載/校驗失敗；關鍵決策必須 fail-closed 阻斷."""
     pass
 
 
@@ -1339,8 +1349,8 @@ stateDiagram-v2
 | T-EM-2 | M-EM-1 | emit 14 类事件全部 | 全部成功 |
 | T-EM-3 | M-EM-2 | payload schema 校驗失敗 | ValueError |
 | T-HR-1 | M-HR-1 | load registry.json 成功 | 返回所有 hook |
-| T-HR-2 | M-HR-1 | load registry.json 損壞 (JSON parse fail) | fail-open + builtin hook 仍可用 |
-| T-HR-3 | M-HR-1 | load registry.json schema 校驗失敗 | fail-open + WARN log |
+| T-HR-2 | M-HR-1 | load registry.json 損壞 (JSON parse fail) | **fail-closed + 抛出 HookLoadError** |
+| T-HR-3 | M-HR-1 | load registry.json schema 校驗失敗 | **fail-closed + 抛出 HookLoadError** |
 | T-HR-4 | M-HR-3 | register 新 hook | 寫入 registry.json |
 | T-HR-5 | M-HR-3 | register 重名 hook | FileExistsError |
 | T-HR-6 | M-HR-4 | update builtin hook | PermissionError |
@@ -1384,7 +1394,7 @@ stateDiagram-v2
 - 6 module 全覆蓋
 - 14 事件全覆蓋
 - 4 action type 全覆蓋
-- fail-open / fail-closed 全覆蓋
+- **fail-closed 全覆蓋** (registry 加载/校验失败、audit 写失败、evaluator 不可用)
 
 ---
 

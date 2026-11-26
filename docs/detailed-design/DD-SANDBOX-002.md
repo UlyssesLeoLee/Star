@@ -1,14 +1,16 @@
 # DD-SANDBOX-002
 
-> **Sandbox-as-a-Service (sandboxd) — 詳細設計書 v0.1.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
->
-> - 状态: 🟢 Draft v0.1.1 (2026-09-10 22:36 JST 集成点补全 per Ulysses opt1, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter / mavis CLI / v37 守门 集成)
+> **2026-11-24 对账说明**：生产 sandbox 不可用时禁止执行，不得降级为未验证 subprocess；允许展示诊断，恢复须重新核验授权、策略和独立 sandbox readiness。VM/K3s 就绪不替代 Runtime sandbox。统合边界与状态说明见 [要件总索引](../requirements/README.md) 与 [基本设计](../basic-design/SANDBOX-BASIC-DESIGN-002.md)。
+
+> **Sandbox-as-a-Service (sandboxd) — 詳細設計書 v0.1.2** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
+
+> - 状态: 🟢 Draft v0.1.2 (2026-11-24 · fail-open → fail-closed 同步；FR-7/NFR/AC 重定义)
 > - 上游: [`docs/requirements/SRS-SANDBOX-002.md`](../requirements/SRS-SANDBOX-002.md) v0.1.2 (37KB, 8 機能 / 5 業務 / 7 非機能 / 4 表 W/T/M / 9 缺口 / 10 决策点全部已拍板) + [`docs/basic-design/SANDBOX-BASIC-DESIGN-002.md`](../basic-design/SANDBOX-BASIC-DESIGN-002.md) v0.1.2 (46.6KB, 6 模块 / 18 子模块 / gRPC proto / 4 维后端 / 10 决策点)
 > - 下游: 实装代码 (`crates/sandboxd/`) + 测试 + 报告 (`docs/reports/PHASE-SANDBOX-002-IMPL-REPORT.md`)
 > - 核心语言: Rust 1.80+ (跟 mavis desktop 同栈, per 守门 #1 cargo check)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-10 JST
+> - 日期: 2026-11-24 JST
 
 ---
 
@@ -170,8 +172,8 @@ testcontainers = "0.20"  # PG 容器 (integration test)
 
 | 集成点 | 現有代碼 | 集成方式 |
 |---|---|---|
-| `dispatcher.py` v0.1 | `scripts/automation/dispatcher.py` `invoke()` | 創建 SandboxdClient, 替換 subprocess.run 為 gRPC CreateSession + RunCommand (per FR-7.1 fail-open 降級保留) |
-| `scripts/automation/guardian/sandbox.py` v0.2 | 资源維包裝器 | sandboxd 不可用時降級路徑 (per FR-7.1) |
+| `dispatcher.py` v0.1 | `scripts/automation/dispatcher.py` `invoke()` | 創建 SandboxdClient, 替換 subprocess.run 為 gRPC CreateSession + RunCommand (per FR-7.1 fail-closed 阻断执行) |
+| `scripts/automation/guardian/sandbox.py` v0.2 | 资源維包裝器 | sandboxd 不可用時阻断执行 (per FR-7.1) |
 | **mavis CLI** (root/branch session 模型) | mavis 入口 → root session → branch session → tool call | sandboxd 在 mavis CLI 入口层接入, 跟 root/branch session 模型对齐 (WBS §14.19 SBX-09) |
 | `crates/star-mcp/` 0.12 | MCP transport | 創建 `crates/star-mcp/src/sandboxd_client.rs` (跟 Python client 對稱) |
 | **mavis Rust workspace (22 domain + 13 supporting crate)** | `crates/agent-domain/` (10 module) + `crates/arg/` + `arg-bridge/` + `arg-effect/` + `crates/canvas-collab/` 等 | 任意 gRPC client 通過 `crates/sandboxd-client/` (新建) 调用 (per WBS §14.19 SBX-10) |
@@ -566,7 +568,9 @@ pub struct ObservabilityConfig {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct FailoverConfig {
+    /// 生产执行不得降级到未验证隔离；false = 阻断执行
     pub enable_v0_2_subprocess_fallback: bool,
+    /// 保留用于诊断展示
     pub fallback_path: PathBuf,
     pub root_session_notify: bool,
 }
@@ -707,7 +711,7 @@ client                sandboxd              backend           PG
   │         hit_violations}                    │                 │
 ```
 
-### 3.3 DestroySession + fail-open 降級時序 (per FR-4.3 + FR-7.1)
+### 3.3 DestroySession + fail-closed 阻断时序 (per FR-4.3 + FR-7.1)
 
 ```
 client                sandboxd              backend           SANDBOX-001 v0.2
@@ -722,19 +726,19 @@ client                sandboxd              backend           SANDBOX-001 v0.2
   │ ◀──── {Destroyed}    │                     │                 │
 ```
 
-**fail-open 降級時序** (sandboxd 不可用時):
+**fail-closed 阻断时序** (sandboxd 不可用或必要审计失败时):
 ```
-client (dispatcher)                                            SANDBOX-001 v0.2
+client (dispatcher)                                            SANDBOX-001 v0.2 (仅用于诊断)
   │                                                                │
   │ 嘗試 gRPC Connect 127.0.0.1:50051                             │
-  │ ─────── 連接失敗 / Unavailable ───▶                            │
+  │ ─────── 連接失敗 / Unavailable / 健康检查失败 ───▶              │
   │                                                                │
-  │ 走 SANDBOX-001 v0.2 subprocess.run 降級路徑                     │
+  │ **阻断执行，显示诊断，不走 subprocess 降级**                   │
   │ ────────────────────────────────────────────────────────────▶  │
   │                                                                │
-  │ ◀───────────────── 結果 (僅 resource 維隔離)                    │
-  │                                                                │
   │ 寫 root session 通知 (per NFR-O-3)                             │
+  │                                                                │
+  │ 恢复: 重新校验当前授权、策略、绑定与独立 sandbox readiness；不自动重放先前变更
 ```
 
 ### 3.4 StreamLogs 時序 (per FR-2.3)
@@ -848,7 +852,7 @@ client                sandboxd              PG
 | 集成路徑 | TC 数量 | 覆盖目標 |
 |---|---|---|
 | gRPC 4 RPC 端到端 | 8 | CreateSession / RunCommand / DestroySession / StreamLogs 全部 RPC |
-| SANDBOX-001 v0.2 降級路徑 | 4 | sandboxd 不可用 / 健康檢查失敗 / 連接拒絕 / Unavailable |
+| sandbox 不可用阻断路径 | 4 | 连接拒绝 / Unavailable / 健康检查失败 / 审计不可用 → 受影响执行 100% 阻断并记录诊断 |
 | PG audit 持久化 | 5 | 創建/查詢/索引/append-only/失敗回滾 |
 | **小計** | **17 TC** | **100% pass on Win + Linux** |
 
@@ -856,7 +860,7 @@ client                sandboxd              PG
 
 | 場景 | TC 数量 | 覆盖目標 |
 |---|---|---|
-| dispatcher.py 集成 | 4 | 創建 session / 跑命令 / 銷毀 session / 降級路徑 |
+| dispatcher.py 集成 | 4 | 創建 session / 跑命令 / 銷毀 session / sandbox 不可用阻断路径 |
 | mavis desktop 集成 (Rust) | 4 | 跟 dispatcher 對稱 |
 | 跨平台驗證 | 3 | Windows / Linux / macOS 各 1 |
 | **小計** | **11 TC** | **100% pass** |
@@ -877,7 +881,7 @@ client                sandboxd              PG
 |---|---|---|---|
 | AC-1 | FR-3.1~FR-3.4 | 單元測試 4 維隔離全部命中 | 100% |
 | AC-2 | FR-1.1 + NFR-P-1 + NFR-P-2 | benchmark p50 + p99 | < 10ms / < 100ms |
-| AC-3 | FR-7.1 + FR-7.2 | 故障注入測試 | 100% fail-open / 100% fail-closed |
+|| AC-3 | FR-7.1 + FR-7.2 | sandbox 和审计故障注入 | 受影响执行全部阻断；恢复重新校验且不自动重放 |
 | AC-4 | FR-4.1 + FR-4.2 + FR-4.3 | session 生命周期測試 | 100% 行為符合 |
 | AC-5 | NFR-T-1 + NFR-T-2 + NFR-T-3 | CI 三平台 | 100% pass |
 | AC-6 | FR-6.1 + NFR-O-1 | Prometheus scrape 驗證 | 100% 指標暴露 |
@@ -1059,14 +1063,14 @@ INSERT INTO sandbox_capability (capability_id, syscall_name, platform, risk_leve
 
 | 守門 | 跟 sandboxd 詳設聯動 |
 |---|---|
-| **#1 fail-open** | §2.1 SandboxdError + §3.3 fail-open 降級時序 (per FR-7.1) |
+| **#1 fail-closed** | sandbox 不可用时阻断受影响执行，恢复须重新验证授权、策略和隔离 (FR-7.1) |
 | **#1 v15 docs 同步飽和** | 本 DD 落档, 守門飽和計數 +1 |
 | **#1 v25 cargo test** | §5 測試矩陣 56 UT + 17 IT + 11 E2E, 走單 crate `cargo test -p sandboxd --lib -j 4` |
 | **#1 v19 -j 4 修正** | §5 全部 cargo test 命令加 `-j 4` |
 | **#5 env 安全** | §2.1 SandboxdError 不序列化 env 內容 + §2.2 gRPC impl 僅 KEY=VALUE 引用 |
 | **#6 PowerShell + 跨平台** | §1.1 三平台文件結構 (Windows + Linux + macOS) |
 | **#9 子代理 dispatch** | §3.2 RunCommand 時序 + §5.3 E2E dispatcher.py 集成 |
-| **#9 v3 調試控制台 subprocess** | §3.3 fail-open 降級路徑 (跟 SANDBOX-001 v0.2 兼容) |
+| **#9 v3 调试控制台 subprocess** | §3.3 fail-closed 阻断路径 (不再兼容 SANDBOX-001 v0.2 降级) |
 | **#11 缺標比錯標** | §5 8 已知缺口 + SRS-002 §9 9 已知缺口 顯式列 |
 | **#13 T/M 橫展** | §6 4 表 W/T/M 100% 覆蓋, 0 W 派生 + 12/12 RLS 13 類必攜 |
 | **#14 v3 Mavis 永久代簽** | 本 DD 落档 author=Ulysses, 5 域 Lead 签字欄 (Mavis 臨時代簽) |
@@ -1087,7 +1091,7 @@ INSERT INTO sandbox_capability (capability_id, syscall_name, platform, risk_leve
 | §4.4 FR-4 session 生命周期 | §3.2 4 RPC 詳設 | §3 時序 + §4 狀態遷移 | ✅ |
 | §4.5 FR-5 跨平台後端 | §5 三平台詳設 | §2.1 BackendFactory + §1.1 三平台文件 | ✅ |
 | §4.6 FR-6 觀測性 | §6.4 + §6.5 部署 | §2.4 SandboxdMetrics + §6 DDL | ✅ |
-| §4.7 FR-7 fail-open | §1.3 兼容 | §3.3 降級時序 + §1.3 集成點 | ✅ |
+| §4.7 FR-7 fail-closed | §1.3 生产执行故障关闭 | §3.3 阻断时序 + §1.3 集成点 | ✅ |
 | §4.8 FR-8 測試 | (BD 派 §1.1) | §5 5 維測試 + TEST-DESIGN-SANDBOX-002 v0.1 | ✅ |
 | §5 NFR-P/A/S/M/T/O/C | §1.4 守門 | §5 測試矩陣 | ✅ |
 | §8 4 表 W/T/M | §4 數據模型 | §6 DDL 100% 對齊 | ✅ |
@@ -1131,3 +1135,4 @@ INSERT INTO sandbox_capability (capability_id, syscall_name, platform, risk_leve
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 22:11 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守門 #14 v3 + 守門 #14 v4 反轉 v0.62) | 初版落档, 5 維設計 (モジュール 24 文件 / クラス 5 struct 5 enum 5 trait / 時序 4 場景 / 状態遷移 2 圖 / 測試 8 類 56 UT + 17 IT + 11 E2E + 5 PT + 8 UAT), 4 表 W/T/M 100% 覆蓋 DDL (Session T + Policy M + Audit T + Capability M, 12/12 RLS 13 類必攜), 9 已知缺口 (跟 SRS-002 §9 對齊, 含 1 P0 阻塞), 跟 SRS-002 + BD-002 100% 對齊自審 (12 項), 跟現有守門 13 項聯動 (#1+#1 v15+#1 v19+#1 v25+#5+#6+#9+#9 v3+#11+#13+#14 v3+#22+#28), IPA 11 段結構 (目的 / 模組 / 類 / 時序 / 狀態 / 測試 / 數據 / 守門 / SRS-BD 對齊 / 缺口 / 簽字 + 修訂) | 2026-09-10 22:11 JST Ulysses 拍板"各級文檔完善好, 更新後續任務到 wbs" + SRS-SANDBOX-002 v0.1.1 + BD-SANDBOX-002 v0.1.1 派生 (6 決策點已拍板 per A 選項) |
 | **v0.1.1** | 2026-09-10 22:36 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守門 #14 v3 + 守門 #14 v4 + 守門 v28 + 9/5 04:03 + 守門 #11 缺標比錯標 + 守門 #1 禁回溯敘事) | 集成点 §1.3 補全 per Ulysses opt1 = 全部按推薦改造: +mavis CLI (root/branch session 模型) + crates/agent-domain/ (ARG 11 子項已收官, per D-7) + crates/arg-bridge/ + arg-effect/ + crates/canvas-collab/ (多人協作, per SBX-18) + 5 域 Lead (player/economy/match/social/admin, per 守門 #3 8/21 JST, per D-10) + crates/star-telemetry/ (per D-9) + crates/star-pg-adapter/ (per D-9) + crates/star-eventbus/ (per D-9) + docs/guardian/v37_sandbox_guard.md (per 4acae3f 22:24 JST 落檔, sandboxd v0.1 hard 約束跟 v37 v0.1 軟約束 串聯); 修訂履歴 v0.1.1 行追加, 顶部狀態 v0.1 → v0.1.1, 標題 v0.1 → v0.1.1, 上游 SRS 引用 v0.1.1 → v0.1.2, 上游 BD 引用 v0.1.1 → v0.1.2; 守門 12/12 通過, 0 改任何 24 文件 / 5 struct / 5 enum / 5 trait / 4 時序 / 2 狀態圖 / 4 表 DDL / 9 已知缺口 / 13 守門聯動, 僅集成点補全 + 修訂履歴 v0.1.1 行 + 顶部狀態/標題/上游引用版本號; 觸發: 2026-09-10 22:36 JST Ulysses reply "opt1" (= 按推薦改造); 估算 token 0.05M 實測 |
+| **v0.1.2** | 2026-11-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **fail-open → fail-closed 全面同步**: FR-7 重定义为"安全故障处理"，sandbox 不可用/必要审计失败 → 阻断执行，不以未验证 subprocess 降级；FailoverConfig 补注；时序 §3.3 改为阻断时序；AC-3 与 §5.2/§5.3 测试矩阵改为阻断语义（对齐上游 SRS NFR-C-1/NFR-M-5）；守门 #1/#9 v3 同步；SRS/BD 对齐表 §4.7 同步。版本号同步升 v0.1.2。 | 2026-11-24 SRS/BD 同步更新 (fail-open→fail-closed) |

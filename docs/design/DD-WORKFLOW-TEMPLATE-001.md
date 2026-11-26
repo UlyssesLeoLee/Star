@@ -1,5 +1,7 @@
 # DD-WORKFLOW-TEMPLATE-001
 
+> **2026-11-24 对账说明**：现行设计见 [工作流模板基本设计](BD-WORKFLOW-TEMPLATE-001.md) 及 [协作总册 §16.78](../basic-design.md#1678-resource-scoped-push-collaboration-drafts-and-conflict-recovery)。本文旧固定轮询、排他锁和强制覆盖流程及其测试仅作历史候选，不得用于实现或放行；需按双方草稿、授权推送、游标恢复、显式解决与 CAS 重写并重新验收。
+
 > **瀑布式开发工作流模板 — 詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート / DD-CANVAS-GAMIFY-001 v0.1 §3 模板)
 >
 > - 状态: 🟡 Draft v0.1 — 待 5 角色签字栏拍板
@@ -1170,22 +1172,28 @@ eventSource.addEventListener('template_changed', (e) => {
 });
 ```
 
-**降级** (per BD §9.3 T-05): SSE 不可用时 polling 5s 轮询 `GET /api/workflow-templates`
+**客户端订阅行为**:
+- 进入 `/workflow-templates` 或 `/workflow-templates/{id}*` 路由时建立 SSE 连接
+- 退出路由时关闭连接
+- 推送断线时显示连接状态；重授权后按持久游标补缺，不以固定轮询替代在线推送。
+
+**服务端推送**: 由 owner 事务与 Outbox 触发，仅向授权订阅者推送。授权或通道不可用时显示断线，不自动重放变更。
 
 ### 7.8 错误处理总则 (per BD §5.5)
 
 | 错误类别 | HTTP | 处理策略 |
 |---|---|---|
-| 客户端校验失败 | 400 | form 内联错误 |
+| 客户端校验失败 | 400 | form 内联错误提示 / toast, 不阻塞 UI |
 | 未登录 | 401 | 跳登录页 |
-| 权限不足 | 403 | toast |
+| 权限不足 | 403 | toast + 显示脱敏诊断 |
 | 资源不存在 | 404 | toast |
-| 名称冲突 | 409 | form 错误提示 |
-| 版本冲突 | 409 | 弹 §4.6 ConflictDialog |
-| 锁被他人持有 | 409 | UI 角标 |
-| 业务规则违反 | 422 | form 内联错误 |
-| 服务端错误 | 500 | toast + Sentry + 触发 polling fallback |
-| SSE 断连 | — | 自动重连 3 次, 失败切 polling 5s |
+| 名称冲突 | 409 | toast + Sentry 上报; 不触发 fallback polling |
+| 版本冲突 | 409 | 弹 SCR-WT-05 冲突弹窗 |
+| 锁被他人持有 | 403 | UI 角标显示 + 编辑按钮置灰 |
+| 业务规则违反 | 422 | form 内联错误提示 |
+| 服务端错误 | 500 | 脱敏错误提示和有界诊断；不自动重放变更 |
+| 网络中断 | — | 展示断线，重授权后重连并按持久游标补缺 |
+| SSE 连接超时 (>30s 无消息) | — | 客户端主动断开, 重连 |
 
 ---
 

@@ -1,8 +1,10 @@
 # BD-PRE-TOOL-USE-GUARD-001
 
-> **Mavis PreToolUse 安全拦截层 — 基本設計書 v0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
->
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
+> **2026-11-24 对账说明**：本专题安全关键操作的规则、原生 evaluator 或必需审计不可用时必须阻断；旧 Python fail-open 仅作为非权威的开发兼容或观测描述，不得用于产品安全关键操作。统合边界与状态说明见 [要件总索引](../requirements/README.md) 与 [详细设计](../detailed-design/DD-PRE-TOOL-USE-GUARD-001.md)。
+
+> **Mavis PreToolUse 安全拦截层 — 基本設計書 v0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+
+> - 状态: 🟡 Draft v0.2 (2026-11-24 · fail-open → fail-closed 同步；FR-6/NFR/AC 重定义)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 上位要件: [`docs/requirements/SRS-PRE-TOOL-USE-GUARD-001.md`](../requirements/SRS-PRE-TOOL-USE-GUARD-001.md) v0.1 (23KB, 7 機能 / 4 業務 / 6 非機能 / 7 验收 / 8 已知缺口, 守门 6/6 通过)
@@ -11,7 +13,7 @@
 > - 守门基线: 守门 #1+#5+#9+#10+#14 v3+#14 v4 6 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses)
-> - 日期: 2026-09-10 JST
+> - 日期: 2026-11-24 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
 > - 拍板来源: 2026-09-10 19:03 JST Ulysses 拍板"**整理出需求文档, 然后基于需求文档写基本设计, 要符合日本 IPA 的水准和规范**" (本 BD 落档)
 > - 跨域 disclaimer: **守门 v3x 候选 ≠ 守门硬约束** (per AGENTS.md §4.1.1, v27/v28/v29 是待激活候选, v3x 落档目录 = `docs/guardian/`, 不跟硬约束守门 #1~#14 混)

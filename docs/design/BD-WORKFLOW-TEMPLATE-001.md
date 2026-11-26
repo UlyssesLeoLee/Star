@@ -1,5 +1,7 @@
 # BD-WORKFLOW-TEMPLATE-001
 
+> **2026-11-24 现行设计**：模板列有稳定身份，多列可映射同一任务状态，owner 持久化任务的模板版本与列归属；在线更新由 owner 事务和 Outbox 驱动授权推送，游标只用于首次读取、断线恢复或补缺。并发完整重叠草稿在冲突事务中固定双方修订，显式解决时按当前 revision CAS。以下旧写锁、固定轮询和强制覆盖方案仅保留历史设计，不作为实现或验收依据；跨域协作契约唯一见 [总册 §16.78](../basic-design.md#1678-resource-scoped-push-collaboration-drafts-and-conflict-recovery)。需求与验收见 [SRS-WORKFLOW-TEMPLATE-001](../requirements/SRS-WORKFLOW-TEMPLATE-001.md)。
+
 > **瀑布式开发工作流模板 — 基本設計書 v0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
 > - 状态: 🟡 Draft v0.1 — 待 5 角色签字栏拍板
@@ -88,23 +90,23 @@
 | FR-WT-5.3 | Dev/PM | 在模板编辑器 | 拖动列边缘改 width_factor (仅 builtin=false + 非作废列) | UI 实时更新列宽 | builtin 作废列调节器置灰 + 后端 422 | 列宽持久化 | P0 |
 | FR-WT-5.4 | Dev/PM | 在模板编辑器 | 拖动列重排 | 实时重排 | 违反 WT-2.3/2.4/2.5 约束 → toast 拒绝并回滚 | 顺序持久化 | P0 |
 | FR-WT-5.5 | Dev/PM | 在模板编辑器 | 双击列名进入编辑 | form 改 name, blur 提交 | 空/重名 → 校验失败 | name 更新 | P0 |
-| (FR-WT-5.6, P1) | Dev/PM | 在模板编辑器 | 改 mapping_status 弹 picker | 4 状态单选 (todo/in_progress/review/done) | 同一状态已被其他列映射 → picker 禁用该选项 | mapping 更新 | P1 |
+| (FR-WT-5.6, P1) | Dev/PM | 已授权模板编辑 | 修改列状态映射 | 多列可选同一状态，列身份独立 | 无效状态或无权限拒绝 | 版本化映射更新 | P1 |
 
 #### 1.1.6 WT-6 同步事件与跨界面联动 (3 项 FR)
 
 | FR ID | Actor | 前置条件 | 输入 | 输出 | 异常处理 | 后置条件 | 优先级 |
 |---|---|---|---|---|---|---|---|
-| FR-WT-6.1 | 系统 (BFF) | 模板 CRUD 成功 | 事件 payload `{template_id, version, event_type}` | SSE 推送 `template_changed` 事件 | SSE 不可用 → fallback polling | 客户端收到事件 | P0 |
-| FR-WT-6.2 | 客户端 | SSE 不可用 | 5s polling `GET /api/workflow-templates` | 拉取最新列表, 对比本地缓存 | 网络失败 → 退避到 10s | 缓存 invalidate | P0 |
+| FR-WT-6.1 | owner / gateway | 授权事务提交 | Outbox 版本事件 | 向获授权订阅者推送有界事件 | 授权或通道不可用时显示断线 | 提交事实与 Outbox 原子写入 | P0 |
+| FR-WT-6.2 | 客户端 | 首次加载、断线或 gap | 持久游标 | 重授权后补齐并去重 | 不使用固定轮询冒充实时 | 订阅恢复 | P0 |
 | FR-WT-6.3 | 客户端 | 收到 `template_changed` 事件 | template_id | 所有打开的 `/workflow-templates/{id}*` 路由 invalidate 缓存 + 重渲染 | — | UI 反映最新状态 | P0 |
 
 #### 1.1.7 WT-7 多人并发编辑与排他锁 (3 项 FR)
 
 | FR ID | Actor | 前置条件 | 输入 | 输出 | 异常处理 | 后置条件 | 优先级 |
 |---|---|---|---|---|---|---|---|
-| FR-WT-7.1 | Dev/PM | 进入模板编辑模式 | template_id | POST `/api/workflow-templates/{id}/lock` 申请写锁 (5min 超时) | 锁被他人持有 → 返回 holder info | 锁写入 `template_locks` 表 (WORM) | P0 |
-| FR-WT-7.2 | 客户端 | 锁申请结果 | 锁状态 (持有/被占) | 若被占 → 编辑按钮置灰 + 显示「{user} 正在编辑 (剩余 {N} 分钟)」 | — | UI 反映锁状态 | P0 |
-| FR-WT-7.3 | Dev/PM | 提交模板更新 | template_id + version (客户端期望) + payload | 后端比对 server.version vs request.version | 不一致 → 409, 弹 conflict dialog 含 3 选项: 强制覆盖 / 放弃 / 回滚到 version N | 用户选其一, 重新提交 | P0 |
+| FR-WT-7.1 | 授权用户 | 打开模板 | resource revision + 草稿 | 并发私有草稿 | 失权拒绝 | 草稿有界保存 | P0 |
+| FR-WT-7.2 | owner | 完整提案 | 两份语义重叠修订 | 同一事务固定双方并生成冲突 | 校验失败不伪造冲突 | 双方获授权通知 | P0 |
+| FR-WT-7.3 | 授权参与者 | 显式解决 | 选择结果 + 当前 revision | owner CAS 写入 | 冲突/取消保留双方草稿，不强制覆盖 | 审计和 Outbox 同事务 | P0 |
 
 #### 1.1.8 WT-8 右侧工作流入口 (2 项 FR)
 
@@ -324,7 +326,7 @@ SSE 推送 template_changed 事件
 | 15 | 审核 | true | 0.6 | bottom | 0 | `review` |
 | 16 | 完成 | true | 0.4 | bottom | 1 | `done` |
 
-**注**: 13 列 (P1-P9 + P6.1-P6.4) 均映射到 `in_progress` — 这与 SRS §10 #7 「同一状态不允许被多列映射」存在冲突, 需 stage 2/3 拍板 (a) 放宽约束 (允许 N 列 → 1 状态) 或 (b) 17 列拆 13 个独立 enum。本 BD 暂按 (a) 假设实现 (允许多列 → 1 状态), 待 §9.2 T-02 拍板。
+**现行映射**：多列允许映射到同一状态；列 identity、模板版本和任务归列由 owner 持久化，不能仅凭状态反推。作废状态的具体兼容映射仍须按 SRS 未决项验证。
 
 ---
 
@@ -414,12 +416,12 @@ SSE 推送 template_changed 事件
 |---|---|
 | 显示条件 | PATCH 返回 409 (乐观锁冲突) |
 | 画面构成 | 弹窗: 「模板在您编辑期间已被他人更新到 v{N}」+ 3 按钮 |
-| 输入项目 | 3 选项: (a) 「强制覆盖」 (你的改动覆盖 server); (b) 「放弃」 (关闭弹窗, 你的改动丢失); (c) 「回滚到 v{N}」 (将 server 回滚到指定版本, 也产生新 version) |
-| 必填/校验 | 选项 (c) 需要 version N (默认显示 server 当前 version) |
-| 按钮行为 | (a) → 重发 PATCH 但 version=server.version (强制覆盖); (b) → 关闭弹窗; (c) → POST 回滚端点 (留 P2+) |
-| 权限控制 | 写锁持有者才能操作 |
-| 关联 API | (a) `PATCH /api/workflow-templates/{id}` 含 server.version; (c) 【TBD】回滚端点 |
-| 异常表现 | 强制覆盖后再次冲突 → 重复弹窗 (最多 3 次, 然后强制只读) |
+| 输入项目 | 双方经授权的有界差异及用户显式选择的解决结果；支持取消并保留草稿。 |
+| 必填/校验 | 当前 actor、资源授权和 expected revision；历史版本仅可作为显式解决候选。 |
+| 按钮行为 | 明确提交解决结果时由 owner 执行 CAS；取消不改 canonical revision。 |
+| 权限控制 | 当前获授权的冲突参与者，读取与解决分别复验。 |
+| 关联 API | 版本化冲突读取/解决 owner API；具体协议在详细设计中确定。 |
+| 异常表现 | CAS 过期或请求失败保留双方草稿和冲突，展示可恢复原因。 |
 
 ### 3.3 画面迁移图
 
@@ -799,7 +801,7 @@ data: {"template_id": "...", "version": 2, "event_type": "updated", "actor_user_
 **客户端订阅**:
 - 进入 `/workflow-templates` 或 `/workflow-templates/{id}*` 路由时建立 SSE 连接
 - 退出路由时关闭连接
-- SSE 不可用时 fallback 到 §5.4 polling 5s
+- 推送断线时显示连接状态；重授权后按持久游标补缺，不以固定轮询替代在线推送。
 
 ### 5.4 与既有 25 module 联动接口
 
@@ -820,10 +822,10 @@ data: {"template_id": "...", "version": 2, "event_type": "updated", "actor_user_
 | 错误类别 | 处理策略 |
 |---|---|
 | 4xx 客户端错误 | form 内联错误提示 / toast, 不阻塞 UI |
-| 5xx 服务端错误 | toast + Sentry 上报 + 触发 fallback polling |
+| 5xx 服务端错误 | 脱敏错误提示和有界诊断；不自动重放变更 |
 | 409 乐观锁冲突 | 弹 SCR-WT-05 冲突弹窗 |
 | 403 锁被他人持有 | UI 角标显示 + 编辑按钮置灰 |
-| 网络中断 | 自动重连 SSE, 失败 3 次后切 polling 5s |
+| 网络中断 | 展示断线，重授权后重连并按持久游标补缺 |
 | SSE 连接超时 (>30s 无消息) | 客户端主动断开, 重连 |
 | WorkItem.status 状态机拒绝 (拖动到非法列) | toast 显示 "WorkItem 状态机不允许此转换" |
 
@@ -840,8 +842,8 @@ data: {"template_id": "...", "version": 2, "event_type": "updated", "actor_user_
 | 模板 CRUD UI | WT-3 (FR-WT-3.1~3.5, 5 项) | 列表 + 创建 + 详情 + 删除 + 复制 |
 | 模板应用到看板 | WT-4 (FR-WT-4.1~4.4, 4 项) | 跳路由 + 模板列渲染 + WorkItem.status 映射 + indicator |
 | 模板列可编辑边界 | WT-5 (FR-WT-5.1~5.6, 5+1 项) | 增/删/改宽/重排/重命名 + mapping 改 (P1) |
-| 同步事件与跨界面联动 | WT-6 (FR-WT-6.1~6.3, 3 项) | SSE + polling 5s 兜底 + 缓存 invalidate |
-| 多人并发编辑与排他锁 | WT-7 (FR-WT-7.1~7.3, 3 项) | 写锁 5min + 乐观锁 + 一键回滚 |
+| 同步事件与跨界面联动 | WT-6 (FR-WT-6.1~6.3, 3 项) | owner Outbox + 授权推送 + 游标恢复 |
+| 多人并发编辑与冲突保护 | WT-7 (FR-WT-7.1~7.3, 3 项) | 双方草稿固定 + 显式解决 + owner CAS |
 | 右侧工作流入口 | WT-8 (FR-WT-8.1~8.2, 1+1 项) | UserMenu 第 5 入口 + 当前激活模板 badge |
 
 33 项 FR 的逐条 Actor/输入/输出/异常映射已在 §1.1.1-§1.1.8 给出, 本节不重复罗列, 仅做功能块级归类以支撑 §10 追溯矩阵按块索引。

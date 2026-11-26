@@ -1,8 +1,10 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.5.8** (沿用既有 Advanced Settings 局部标签导航；Phase 9D-5b 增加条件式 Run admission producer 与同 event_id 双写，生产 adapter/完整 BI/目标 DB/auth 仍未验收)
+> **2026-11-24 现行设计**：高级设置提供 typed 无代码 HookSet 编辑，Project/Worktree 继承与 Run 快照以版本化契约为准。Rust 原生安全关键 evaluator、策略及必需审计不可用时阻断；Python handler 和浏览器 localStorage 仅能作为非权威兼容/观测，不能证明策略持久化或执行。§8.4 是本专题故障策略入口，旧示例中的 fail-open 不适用产品关键操作。详见 [基本设计总索引](../basic-design/README.md)。
 
-> - 状态: 🟡 Draft v0.5.8 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer)
+> **Multica Hook 域基本設計書 v0.5.9** (沿用既有 Advanced Settings 局部标签导航；Phase 9D-5b 增加条件式 Run admission producer 与同 event_id 双写，生产 adapter/完整 BI/目标 DB/auth 仍未验收)
+
+> - 状态: 🟡 Draft v0.5.9 (2026-11-24 · fail-open → fail-closed 同步；§8.4 故障策略重写)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
@@ -12,7 +14,7 @@
 > - 守门基线: 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 8 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses)
-> - 日期: 2026-09-30 JST
+> - 日期: 2026-11-24 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
 > - 拍板来源: ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" (本 BD 落档)
 
@@ -846,17 +848,17 @@ Advanced Settings → Hooks 的 rule builder 根据 policy read response 的 `pr
 ### 8.3 registry 文件只读 (per SRS §NFR-S-3)
 
 - 文件权限: `chmod 644 registry.json` (mavis 进程可写, 其他进程只读)
-- schema 校验: 启动时 + 每次 reload 必校验, 失败 → fail-open (per SRS §NFR-A-1)
+- 安全关键策略在启动及 reload 时校验；缺失、无效或不可验证时阻断受影响操作。
 - builtin hook 不可删除 (UI 无删除按钮, per SRS §NFR-S-4)
 
-### 8.4 fail-open / fail-closed 策略 (per SRS §FR-3.2 + §FR-5.2)
+### 8.4 安全关键 Hook 故障关闭策略
 
 | 场景 | 策略 | 原因 |
 |---|---|---|
-| registry.json 加载失败 | **fail-open** | 不能因为 registry bug 阻断整个 mavis runtime (per SRS §NFR-A-1) |
-| registry.json schema 校验失败 | **fail-open** + WARN log | 同上 |
+| 安全关键策略加载失败 | **fail-closed** | 阻断受影响操作并提供脱敏诊断 |
+| 安全关键策略 schema 校验失败 | **fail-closed** | 不使用无效或过期策略放行 |
 | audit log 写失败 | **fail-closed** (返回 BLOCK) | 凭据外泄零容忍, 审计是最后一道防线 (per SRS §NFR-A-2) |
-| handler 抛异常 | **WARN** | 继续 fan-out, 写 audit log (per SRS §FR-4.5) |
+| 安全关键原生 evaluator 异常 | **BLOCK** | 非权威观测 handler 不得改变安全决定 |
 | handler 超时 | **BLOCK** | 安全优先 (per SRS §FR-4.5) |
 
 ---
@@ -870,7 +872,7 @@ Advanced Settings → Hooks 的 rule builder 根据 policy read response 的 `pr
 | 单 hook 延迟 p50 | < 5ms | handler 调用走 sync 路径, 不走 LLM |
 | 单 hook 延迟 p99 | < 10ms | timeout 默认 1000ms, 超时视为 BLOCK |
 | 14 事件 fan-out 总延迟 p99 | < 50ms (5 hook 平均) | 同 priority 串行, 最多 5 hook |
-| audit log 写延迟 | < 1ms | 异步 fsync (per PreToolUse guard 一致) |
+| 必需审计持久化延迟 | 待目标环境测量 | 关键操作的授权放行和完成以所需 durable audit/owner 事务为前提，不能以排队或异步 fsync 调用成功替代持久确认 |
 | registry 热更新延迟 | < 100ms | watchdog mtime 监听, 内存 cache reload |
 | mavis runtime 主流程额外延迟 | 0% | event_emitter 同步路径, 不影响 |
 
@@ -878,9 +880,9 @@ Advanced Settings → Hooks 的 rule builder 根据 policy read response 的 `pr
 
 | 项 | 阈值 | 设计 |
 |---|---|---|
-| registry 加载失败 → fail-open | 100% | JSON parse 异常时, 跳过 registry, builtin hook 仍可用 |
+| 安全关键策略加载失败 → fail-closed | 100% | 阻断受影响操作，记录可用诊断 |
 | audit log 写失败 → fail-closed | 100% | 磁盘满 / 权限不足时, 返回 BLOCK |
-| hook handler 抛异常 → WARN | 100% | try/except 包住 handler, 异常视为 WARN |
+| 安全关键 evaluator 异常 → BLOCK | 100% | 非权威观测失败不能放行 |
 | registry 热更新不中断 | 0 中断 | 双 buffer 切换 (old + new), 切换时无锁 |
 | 启动时间不显著增加 | < 100ms | 14 事件装载 + builtin hook 装载 < 100ms |
 
@@ -901,11 +903,11 @@ Advanced Settings → Hooks 的 rule builder 根据 policy read response 的 `pr
 
 | 故障 | 检测 | 恢复 | 数据保护 |
 |---|---|---|---|
-| registry.json 损坏 | 启动 / 热更新 时 JSON parse 失败 | fail-open + WARN log | builtin hook 仍可用 |
-| registry.json schema 校验失败 | jsonschema 校验异常 | fail-open + WARN log | builtin hook 仍可用 |
+| 安全关键策略损坏 | 启动 / 热更新校验失败 | fail-closed，恢复后重新校验 | 不执行受影响操作 |
+| 安全关键策略 schema 失败 | schema 校验异常 | fail-closed | 保留诊断，不静默放行 |
 | audit log 写失败 (磁盘满) | write 返回 IOError | fail-closed (返回 BLOCK) | 写磁盘前 sync, 减少丢失 |
 | audit log 写失败 (权限不足) | write 返回 PermissionError | fail-closed (返回 BLOCK) | 启动时 chmod 444 |
-| handler 抛异常 | try/except 捕获 | 视为 WARN + audit log | log level = ERROR |
+| 安全关键 evaluator 异常 | 原生 evaluator 返回失败 | BLOCK + 可用诊断 | 不自动重放变更 |
 | handler 超时 | signal.alarm 或 threading.Timer | 视为 BLOCK + audit log | timeout 默认 1000ms |
 | watchdog 失效 | mtime 监听无事件 | 手动 reload API (`/api/hooks/reload`) | 30 min 定期 reload |
 

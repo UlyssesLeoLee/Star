@@ -1,5 +1,7 @@
 # SANDBOX-BASIC-DESIGN-002
 
+> **2026-11-24 现行设计**：生产 Agent/CLI 必须具备独立、已验证的 Runtime sandbox。sandbox、当前授权、策略或必要审计不可用时，受影响执行保持关闭；仅可展示诊断。不得以旧 Python subprocess、VM 或 K3s 就绪替代隔离，恢复时重新校验且不自动重放变更。§1.3 是本专题故障策略入口；下文旧 fallback 图、示例和配置仅作历史兼容研究，不得用于生产执行。详见 [基本设计总索引](README.md)。
+
 > **Sandbox-as-a-Service (sandboxd) — 基本設計書 v0.1.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
 > - 状态: 🟢 Draft v0.1.2 (2026-09-10 22:36 JST 决策点 D-1~D-10 全部已拍板 per Ulysses opt1 = 全部按推荐, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter 集成, MVP-骨架)
@@ -29,7 +31,7 @@
 (g) 决策点 (D-1~D-6 跟 SRS §10 对齐)
 (h) 守门 (Quality Gate per 守门 #1 v3 + v25)
 
-**MVP 范围** (per SRS-002 §3.1 派生): 6 模块 + 4 RPC + 4 维隔离 + 3 平台后端 + fail-open 降级。
+**目标范围**：6 模块、4 RPC、4 维隔离与平台后端均需独立验证；安全依赖不可用时 fail-closed，诊断不执行任务。
 
 **Framework 选型** (per 守门 #1 cargo 栈):
 
@@ -109,9 +111,9 @@
 | sandboxd-policy (PG) | 4 维策略 + audit log | 5432 (PG) | DB 进程 | 既有 HA | 同上 |
 | client (dispatcher / mavis) | gRPC client library | — | 跟 host 进程同生命周期 | — | 同上 |
 
-### 1.3 跟 SANDBOX-001 v0.2 兼容 (per FR-7.1 / NFR-C-1)
+### 1.3 生产执行故障关闭与旧兼容路径
 
-sandboxd v0.1 跟 SANDBOX-001 v0.2 兼容, 降级路径如下:
+生产执行流程：当前 actor、Task/Worktree 绑定、策略版本与预算复验 → 验证独立 Runtime sandbox readiness → 执行受控命令并记录有界审计与结果。任一条件缺失、不可用或未知时拒绝执行；恢复后重新校验，不自动重放。以下原兼容流程保留为历史示例，不是生产降级方案：
 
 ```
 client (e.g. dispatcher.py v0.2)
@@ -120,15 +122,14 @@ client (e.g. dispatcher.py v0.2)
   │   │
   │   ├─ Success: 走 sandboxd (FR-1~FR-5 完整 4 维隔离)
   │   │
-  │   └─ Failure (Unavailable / Unhealthy): 走 SANDBOX-001 v0.2 subprocess.run 降级
+  │   └─ Failure (Unavailable / Unhealthy): BLOCK 执行，显示诊断
   │       │
-  │       └─ Resource 维隔离 (per SANDBOX-001 v0.2 §3.1)
-  │           (其他 3 维 network / fs / capability 0 隔离, per SANDBOX-001 v0.2 §6 已知缺口)
+  │       └─ 不调用未验证的 subprocess 作为隔离替代
   │
   └─→ RunCommand → SandboxService.RunCommand() → sandboxd 4 维隔离 + audit log
 ```
 
-**降级触发** (per FR-7.1):
+**阻断触发** (per FR-7.1):
 1. gRPC 连接失败 (Connection refused / Unavailable)
 2. sandboxd `/healthz` 返回非 200
 3. sandboxd 返回 Unavailable 错误
@@ -276,7 +277,7 @@ observability:
   audit_log_retention_days: 90
 
 failover:
-  enable_v0_2_subprocess_fallback: true  # per FR-7.1 跟 SANDBOX-001 v0.2 兼容
+  enable_v0_2_subprocess_fallback: false  # 生产执行不得降级到未验证隔离
   fallback_path: "scripts/automation/guardian/sandbox.py"
   root_session_notify: true
 ```
@@ -1025,7 +1026,7 @@ pub fn router(state: AppState) -> Router {
 
 | 守门 | 跟 sandboxd 联动 |
 |---|---|
-| **#1 fail-open** | sandboxd 不可用 → SANDBOX-001 v0.2 降级 (per FR-7.1) |
+| **#1 fail-closed** | sandbox 不可用时阻断受影响执行，恢复须重新验证授权、策略和隔离 (FR-7.1) |
 | **#5 env 安全** | sandboxd 不读 env 内容, 仅 KEY=VALUE 引用 (per 守门 #5 hard ban) |
 | **#6 跨平台** | 三平台 (Win + Linux + macOS) 100% 覆盖 (per FR-5) |
 | **#9 子代理 dispatch** | sandboxd 是 dispatch 的 runtime 隔离层, 跟 brief 必先落档联动 |
