@@ -27,8 +27,6 @@ import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
-import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
-import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 // Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
 // 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (开发服务器注入)
@@ -67,14 +65,14 @@ export function AppHeader() {
         style={{ paddingRight: "var(--chat-rail-w, 56px)" }}
       >
         <div className="h-full px-6 flex items-center gap-4">
-          {/* === Left: 3D Core + Workspace Switcher + Worktree ID sub-label === */}
+          {/* === Left: Workspace Switcher + Worktree ID sub-label === */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <TacticalCore3D size={36} status="nominal" className="shrink-0 hidden sm:block" />
-            <div className="flex flex-col items-start gap-1 shrink-0">
+            <div className="flex flex-col items-start gap-1 shrink-0 [perspective:800px]">
               <button
                 type="button"
                 data-testid="workspace-switcher"
-                className="flex items-center gap-2 px-3 h-9 text-xs font-mono text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-all duration-150"
+                style={{ transformStyle: "preserve-3d" }}
+                className="cel-btn-3d flex items-center gap-2 px-3 h-9 text-xs font-mono text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all duration-150"
                 aria-label={t.appHeader.workspaceSwitcher}
               >
                 <span className="size-2 bg-[var(--cel-cyan,var(--color-primary))] rotate-45 border border-[var(--cel-ink,var(--color-border))]" />
@@ -102,12 +100,12 @@ export function AppHeader() {
             </div>
           </div>
 
-          {/* === Middle: Primary Navigation Tabs (用户自由增删) === */}
-          <nav
-            className="flex items-center gap-1 overflow-x-auto scrollbar-none"
-            data-testid="primary-tabs"
-            aria-label={t.ariaLabels.primaryNav}
-          >
+          {/* === Middle: Primary Navigation Tabs (用户自由增删, per 2026-11-27 flex-wrap 适配窄视口) === */}
+                    <nav
+                      className="flex items-center gap-1 flex-wrap"
+                      data-testid="primary-tabs"
+                      aria-label={t.ariaLabels.primaryNav}
+                    >
             {activeHeaderTabs.map((tab) => (
               <HeaderTab
                 key={tab.id}
@@ -123,7 +121,7 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
+              className="cel-btn-3d h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all shrink-0"
             >
               <Plus size={14} />
             </button>
@@ -133,7 +131,7 @@ export function AppHeader() {
               data-testid="settings-gear"
               aria-label={t.ariaLabels.settings}
               className={clsx(
-                "ml-1 h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0",
+                "cel-btn-3d ml-1 h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all shrink-0",
                 pathname.startsWith("/settings") && "text-[var(--cel-cyan,var(--color-primary))] border-[var(--cel-cyan,var(--color-primary))]"
               )}
             >
@@ -141,8 +139,8 @@ export function AppHeader() {
             </Link>
           </nav>
 
-          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, 3D beacon, dot, avatar === */}
-          <div className="ml-auto flex items-center gap-2">
+          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, status, avatar === */}
+          <div className="ml-auto flex items-center gap-2 [perspective:800px]">
             <ThemeSwitcher />
 
             <button
@@ -150,17 +148,17 @@ export function AppHeader() {
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
               aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-1.5 h-9 px-2.5 border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] text-[var(--cel-text-primary,var(--color-text))] cel-shadow transition-all text-xs shrink-0 whitespace-nowrap"
+              className="cel-btn-3d flex items-center gap-1.5 h-9 px-2.5 border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] text-[var(--cel-text-primary,var(--color-text))] transition-all text-xs shrink-0 whitespace-nowrap"
             >
               <Search size={13} className="text-[var(--cel-cyan,var(--color-primary))] shrink-0" />
-              <kbd className="inline-flex items-center justify-center text-[10px] font-mono px-1.5 border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-gold,var(--color-accent))] font-black">⌘K</kbd>
+              <kbd className="inline-flex items-center justify-center text-[10px] font-mono px-1.5 border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-gold,var(--color-accent))] font-black shadow-[0_2px_0_0_var(--cel-ink)]">⌘K</kbd>
             </button>
 
             <button
               type="button"
               data-testid="notifications-bell"
               aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative size-9 grid place-items-center text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
+              className="cel-btn-3d relative size-9 grid place-items-center text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all shrink-0"
             >
               <Bell size={15} />
               {notifCount > 0 && (
@@ -173,22 +171,15 @@ export function AppHeader() {
               )}
             </button>
 
-            <CelBeacon3D
-              status="active"
-              size={34}
-              title={t.appHeader.realtimeOnline}
-              data-testid="header-beacon-3d"
-              className="hidden md:inline-block border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] cel-shadow"
-            />
-
             {/* Realtime status — dot only, no text label */}
             <div
               data-testid="realtime-status"
-              className="size-9 grid place-items-center border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] cel-shadow shrink-0"
+              style={{ transformStyle: "preserve-3d" }}
+              className="size-9 grid place-items-center border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] shadow-[0_3px_0_0_var(--cel-ink)] shrink-0"
               aria-label={t.appHeader.realtimeOnline}
               title={t.appHeader.realtimeOnline}
             >
-              <span className="size-2.5 bg-ok rounded-full border border-[var(--cel-ink,var(--color-border))]" aria-hidden="true" />
+              <span className="size-2.5 bg-ok rounded-full border border-[var(--cel-ink,var(--color-border))] shadow-[0_0_8px_currentColor]" aria-hidden="true" />
             </div>
 
             <UserMenu />
@@ -231,8 +222,12 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         data-testid={`tab-${testIdSlug}`}
         data-active={active ? "true" : "false"}
         aria-current={active ? "page" : undefined}
+        style={{
+          transformStyle: "preserve-3d",
+          transform: active ? "translateY(-1px) translateZ(0px)" : "translateZ(0px)",
+        }}
         className={clsx(
-          "relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200 shrink-0 whitespace-nowrap",
+          "ui-3d-tab relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200 shrink-0 whitespace-nowrap",
           active
             ? // 域色 active: text 域色 + border 域色 + glow
               clsx(cs.text, cs.borderActive, "font-bold", cs.glow)
@@ -243,11 +238,12 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         <div
           data-testid={`tab-icon-tile-${tab.id}`}
           aria-hidden="true"
+          style={{ transform: active ? "translateZ(2px)" : "translateZ(1px)" }}
           className={clsx(
             "size-7 rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
             active
-              ? // active: 域色 bg + 域色 border + 域色 text + glow
-                clsx(cs.bg, cs.border, cs.text, cs.glow)
+              ? // active: 域色 bg + 域色 border + 域色 text + glow + 3D extrusion
+                clsx(cs.bg, cs.border, cs.text, cs.glow, "shadow-[0_3px_0_0_var(--cel-ink)]")
               : // inactive: 透明 + 灰 text, hover 域色微染
                 "border-transparent text-ink-mute group-hover:text-ink-dim"
           )}
