@@ -121,7 +121,7 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="cel-btn-3d h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] transition-all shrink-0"
+              className="btn-primary cel-btn-3d !min-h-0 h-9 w-9 !p-0 grid place-items-center shrink-0"
             >
               <Plus size={14} />
             </button>
