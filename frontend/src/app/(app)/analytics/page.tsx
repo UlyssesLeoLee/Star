@@ -40,6 +40,9 @@ import { Chart14IssueTypeDist } from "@/components/charts/Chart14IssueTypeDist";
 import { Chart15PriorityDist } from "@/components/charts/Chart15PriorityDist";
 // import { GanttView } from "@/components/gantt/GanttView"; // per 2026-11-22: 迁往 /kanban
 import { Suspense } from "react";
+import { CelCard3D } from "@/components/effects/CelCard3D";
+import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
+import { CelBeacon3D, CelCrystal3D, CelHoloCube3D, CelOrbitalGauge3D } from "@/components/effects/Cel3DUI";
 
 // per 2026-11-22 用户发令: 甘特图/燃尽图等任务管理内容全部迁往 /kanban 标签页,
 //   分析页只保留 BI/统计类图表 (任务相关内容集中在任务看板)。
@@ -354,12 +357,18 @@ function AnalyticsPageInner() {
     const ipaSkills = workItems.filter((w) => w.ipa_skill_ids && w.ipa_skill_ids.length > 0).length;
     const ipaCoverage = workItems.length > 0 ? Math.round((ipaSkills / workItems.length) * 100) : 0;
     return [
-      { label: "完成任务", value: `${completed} / ${total}`, icon: CheckCircle2, trend: "+12%", trendUp: true },
-      { label: "验证通过率", value: `${completionRate}%`, icon: TrendingUp, trend: "+5%", trendUp: true },
-      { label: "Agent 运行时长", value: `${avgTokens}K tokens 平均`, icon: Cpu, trend: "-3%", trendUp: false },
-      { label: "IPA 技能覆盖", value: `${ipaCoverage}%`, icon: FileText, trend: "+8%", trendUp: true },
+      { label: "完成任务", value: `${completed} / ${total}`, icon: CheckCircle2, trend: "+12%", trendUp: true, progress: completionRate },
+      { label: "验证通过率", value: `${completionRate}%`, icon: TrendingUp, trend: "+5%", trendUp: true, progress: completionRate },
+      { label: "Agent 运行时长", value: `${avgTokens}K tokens 平均`, icon: Cpu, trend: "-3%", trendUp: false, progress: Math.min(100, avgTokens) },
+      { label: "IPA 技能覆盖", value: `${ipaCoverage}%`, icon: FileText, trend: "+8%", trendUp: true, progress: ipaCoverage },
     ];
   }, [workItems, agents]);
+
+  const ipaOverallPct = useMemo(() => {
+    const totalDone = IPA_PHASES.reduce((sum, p) => sum + p.done, 0);
+    const totalAll = IPA_PHASES.reduce((sum, p) => sum + p.total, 0);
+    return totalAll > 0 ? Math.round((totalDone / totalAll) * 100) : 0;
+  }, []);
 
   const preview = (
     <p className="mb-2 flex items-center gap-1.5 rounded-lg border border-warn/40 bg-warn/10 px-3 py-1.5 text-[10px] text-warn">
@@ -390,16 +399,23 @@ function AnalyticsPageInner() {
 
   return (
     <div className="flex h-full flex-col bg-bg">
-      <header className="border-b border-line bg-bg-card px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h1 className="text-base font-bold text-ink">分析</h1>
-          <span className="text-[10px] px-1.5 py-0.5 rounded border border-line text-ink-dim">全局</span>
+      <header className="border-b-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <TacticalCore3D size={36} status={biStatus.tone === "ok" ? "nominal" : "warning"} className="shrink-0" />
+          <h1 className="text-base font-black tracking-tight text-ink">分析</h1>
+          <span className="anime-hud-tag">全局</span>
+          <CelBeacon3D
+            status={biStatus.tone === "ok" ? "active" : biStatus.tone === "err" ? "error" : "warning"}
+            size={30}
+            title={biStatus.text}
+            data-testid="analytics-beacon-3d"
+          />
           <span
             data-testid="analytics-data-source-status"
-            className={`text-[10px] px-1.5 py-0.5 rounded border ${
-              biStatus.tone === "ok" ? "border-ok/40 bg-ok/10 text-ok"
-                : biStatus.tone === "warn" ? "border-warn/40 bg-warn/10 text-warn"
-                : "border-err/40 bg-err/10 text-err"
+            className={`text-[10px] px-2 py-0.5 border font-mono font-bold ${
+              biStatus.tone === "ok" ? "border-ok/50 bg-ok/10 text-ok"
+                : biStatus.tone === "warn" ? "border-warn/50 bg-warn/10 text-warn"
+                : "border-err/50 bg-err/10 text-err"
             }`}
           >
             {biStatus.text}
@@ -455,23 +471,34 @@ function AnalyticsPageInner() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {kpiData.map((kpi, i) => (
-                <div key={i} data-testid={`analytics-kpi-${i}`} className="bg-bg-card rounded-xl border border-line p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-ink-dim">{kpi.label}</span>
-                    <kpi.icon size={14} className={i === 0 ? "text-ok" : i === 1 ? "text-accent" : i === 2 ? "text-info" : "text-warn"} />
+                <CelCard3D key={i} data-testid={`analytics-kpi-${i}`} className="h-full">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <kpi.icon size={14} className={i === 0 ? "text-ok" : i === 1 ? "text-accent" : i === 2 ? "text-info" : "text-warn"} />
+                        <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink-dim">{kpi.label}</span>
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl font-black font-mono text-ink">{kpi.value}</span>
+                        <span className={`text-xs font-mono font-bold ${kpi.trendUp ? "text-ok" : "text-err"}`}>{kpi.trend}</span>
+                      </div>
+                    </div>
+                    {i === 0 && <CelOrbitalGauge3D progress={kpi.progress} tone="ok" size={44} title={kpi.label} />}
+                    {i === 1 && <CelOrbitalGauge3D progress={kpi.progress} tone="cyan" size={44} title={kpi.label} />}
+                    {i === 2 && <CelCrystal3D tone="gold" size={44} title={kpi.label} />}
+                    {i === 3 && <CelHoloCube3D status="optimal" size={44} title={kpi.label} />}
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-2xl font-bold text-ink">{kpi.value}</span>
-                    <span className={`text-xs font-semibold ${kpi.trendUp ? "text-ok" : "text-err"}`}>{kpi.trend}</span>
-                  </div>
-                </div>
+                </CelCard3D>
               ))}
             </div>
 
-            <section data-testid="analytics-ipa-phases" className="bg-bg-card rounded-xl border border-line p-4">
+            <section data-testid="analytics-ipa-phases" className="card">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-ink">IPA 阶段进度</h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded border border-line text-ink-dim">Branch: feat/relation-bfs</span>
+                <div className="flex items-center gap-2.5">
+                  <CelOrbitalGauge3D progress={ipaOverallPct} tone="cyan" size={34} title="IPA Overall Progress" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-ink">IPA 阶段进度</h2>
+                </div>
+                <span className="anime-hud-tag">Branch: feat/relation-bfs</span>
               </div>
               <div className="space-y-2">
                 {IPA_PHASES.map((phase) => {
@@ -480,8 +507,8 @@ function AnalyticsPageInner() {
                     <div key={phase.id} className="flex items-center gap-3">
                       <span className="text-[10px] font-mono text-ink-dim w-10 text-right">{phase.id}</span>
                       <span className="text-xs text-ink-dim w-24">{phase.label}</span>
-                      <div className="flex-1 h-3 bg-bg-soft rounded-full overflow-hidden">
-                        <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                      <div className="flex-1 h-3 bg-bg-soft border border-[var(--cel-ink,var(--color-border))] overflow-hidden">
+                        <div className="h-full bg-[var(--cel-cyan,var(--accent-DEFAULT))] transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
                       <span className="text-[10px] font-mono text-ink-dim w-20 text-right">
                         {phase.done} / {phase.total} ({pct}%)

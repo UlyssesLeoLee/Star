@@ -42,6 +42,9 @@ import type { Identity, AgentSession, Tenant } from "@/types/ids";
 import type { AgentSettings } from "@/lib/agent/settings";
 import { agentKindDisplayLabel } from "@/lib/agent/types";
 import { MODEL_OPTIONS } from "@/lib/agent/settings";
+import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
+import { CelCard3D } from "@/components/effects/CelCard3D";
+import { CelCrystal3D, CelHoloCube3D, CelOrbitalGauge3D } from "@/components/effects/Cel3DUI";
 
 // =====================================================================
 // 子组件: TeamMemberRow — 人类/agent 身份行 (统一列表, type 徽标区分)
@@ -364,40 +367,66 @@ export default function TeamPage() {
       <PageHeader
         title="团队"
         subtitle="人类与 Agent 身份统一管理 · 给 Agent 选供应商 · 创建人机小队"
-        icon={<Users className="text-accent size={20}" />}
+        icon={<TacticalCore3D size={38} status="nominal" className="shrink-0" />}
         track="T"
         count={`${identities.length} members`}
       />
 
-      {/* 统计卡 */}
+      {/* 统计卡 (3渲2 触觉卡片 + 真3D组件) */}
+      <SectionTitle>概览</SectionTitle>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <SectionTitle>概览</SectionTitle>
-        <div className="card p-4">
-          <div className="text-[10px] text-ink-mute">总成员</div>
-          <div className="text-xl font-bold text-ink mt-1">{identities.length}</div>
-          <div className="text-[10px] text-ink-mute mt-1">
-            {humanMembers.length} 人类 · {agentMembers.length} Agent
+        <CelCard3D className="h-full">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">总成员</div>
+              <div className="text-xl font-black font-mono text-ink mt-1">{identities.length}</div>
+              <div className="text-[10px] text-ink-mute mt-1">
+                {humanMembers.length} 人类 · {agentMembers.length} Agent
+              </div>
+            </div>
+            <CelCrystal3D tone="cyan" size={40} title="Team Roster Crystal [真3D]" data-testid="team-3d-members" />
           </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-[10px] text-ink-mute">活跃 Agent 会话</div>
-          <div className="text-xl font-bold text-ink mt-1">
-            {agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length}
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">活跃 Agent 会话</div>
+              <div className="text-xl font-black font-mono text-ink mt-1">
+                {agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length}
+              </div>
+              <div className="text-[10px] text-ink-mute mt-1">
+                {agentSessions.length} 个会话
+              </div>
+            </div>
+            <CelOrbitalGauge3D
+              progress={agentSessions.length > 0 ? Math.round((agentSessions.filter((a) => a.status !== "completed" && a.status !== "failed").length / agentSessions.length) * 100) : 0}
+              tone="ok"
+              size={40}
+              title="Active Agent Sessions [真3D]"
+              data-testid="team-3d-sessions"
+            />
           </div>
-          <div className="text-[10px] text-ink-mute mt-1">
-            {agentSessions.length} 个会话
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">小队</div>
+              <div className="text-xl font-black font-mono text-ink mt-1">{squads.length}</div>
+              <div className="text-[10px] text-ink-mute mt-1">人机协作小队</div>
+            </div>
+            <CelHoloCube3D status="optimal" size={40} title="Squad Topology HoloCube [真3D]" data-testid="team-3d-squads" />
           </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-[10px] text-ink-mute">小队</div>
-          <div className="text-xl font-bold text-ink mt-1">{squads.length}</div>
-          <div className="text-[10px] text-ink-mute mt-1">人机协作小队</div>
-        </div>
-        <div className="card p-4">
-          <div className="text-[10px] text-ink-mute">租户</div>
-          <div className="text-xl font-bold text-ink mt-1">{tenants.length}</div>
-          <div className="text-[10px] text-ink-mute mt-1">多租户隔离</div>
-        </div>
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-mono font-bold uppercase text-ink-mute">租户</div>
+              <div className="text-xl font-black font-mono text-ink mt-1">{tenants.length}</div>
+              <div className="text-[10px] text-ink-mute mt-1">多租户隔离</div>
+            </div>
+            <CelCrystal3D tone="gold" size={40} title="Tenant Isolation Crystal [真3D]" data-testid="team-3d-tenants" />
+          </div>
+        </CelCard3D>
       </div>
 
       {/* Tab: 成员身份 | Agent 供应商 | 小队 | Agent 会话 */}

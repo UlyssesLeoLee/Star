@@ -33,6 +33,7 @@ import { GuardedLink } from "@/components/navigation/GuardedLink";
 import { ProjectRunTree } from "@/components/run/ProjectRunTree";
 import { useTranslation } from "@/lib/i18n";
 import { useNavStore } from "@/lib/nav/navStore";
+import { CelCrystal3D } from "@/components/effects/Cel3DUI";
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -65,30 +66,38 @@ export function Sidebar() {
       data-fold={sidebarFold}
       data-nav-model="project-lane"
       className={clsx(
-        "sticky top-0 z-40 hidden h-dvh shrink-0 flex-col border-r border-line bg-bg-card text-ink transition-[width] md:flex",
+        "sticky top-0 z-40 hidden h-dvh shrink-0 flex-col border-r-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] text-[var(--cel-text-primary,var(--color-text))] transition-[width] md:flex",
         collapsed ? "w-16" : "w-64",
       )}
     >
       <div
         data-testid="sidebar-brand-block"
-        className={clsx("flex shrink-0 items-center border-b border-line", collapsed ? "flex-col gap-2 px-2 py-3" : "justify-between px-3 py-3")}
+        className={clsx("flex shrink-0 items-center border-b-2 border-[var(--cel-ink,var(--color-border))]", collapsed ? "flex-col gap-2 px-2 py-3" : "justify-between px-3 py-3")}
       >
         <GuardedLink
           href="/worktree"
           aria-label={t.ariaLabels.starHome}
           data-testid="sidebar-brand"
-          className="flex min-w-0 items-center gap-2.5 rounded focus-visible:outline focus-visible:outline-accent"
+          className="flex min-w-0 items-center gap-2 focus-visible:outline focus-visible:outline-accent"
         >
-          <img src="/sidebar-icon.png" width={36} height={36} alt="" className="size-9 shrink-0 rounded border border-line object-cover" />
-          {!collapsed && <span className="truncate text-base font-bold tracking-wide">STAR</span>}
+          <img src="/sidebar-icon.png" width={36} height={36} alt="" className="size-9 shrink-0 border-2 border-[var(--cel-ink,var(--color-border))] object-cover" />
+          {!collapsed && <span className="truncate text-base font-black tracking-wider">STAR</span>}
         </GuardedLink>
+        {!collapsed && (
+          <CelCrystal3D
+            tone="cyan"
+            size={28}
+            title="STAR Divinity Crystal [真3D]"
+            data-testid="sidebar-crystal-3d"
+          />
+        )}
         <button
           type="button"
           onClick={toggleSidebarFold}
           title={foldLabel}
           aria-label={foldLabel}
           data-testid="sidebar-fold-toggle"
-          className="shrink-0 rounded p-1.5 text-ink-mute hover:bg-bg-soft hover:text-accent focus-visible:outline focus-visible:outline-accent"
+          className="shrink-0 border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] p-1.5 text-ink-mute hover:border-[var(--cel-cyan,var(--color-primary))] hover:text-[var(--cel-cyan,var(--color-primary))] focus-visible:outline focus-visible:outline-accent"
         >
           <FoldIcon size={16} aria-hidden="true" />
         </button>

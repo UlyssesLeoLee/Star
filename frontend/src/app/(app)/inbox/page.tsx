@@ -43,6 +43,7 @@ import {
   type NoticeState,
 } from "@/components/status/StatusNotice";
 import { useTranslation } from "@/lib/i18n";
+import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 type Category = "all" | "review" | "comment" | "notice";
 const CATEGORY_IDS = ["all", "review", "comment", "notice"] as const;
@@ -170,14 +171,20 @@ export default function InboxPage() {
   return (
     <div className="flex h-full flex-col bg-bg" data-testid="inbox-page">
       {/* 头部: 全局 / 收件箱 */}
-      <header className="border-b border-line bg-bg-card px-4 py-3 flex items-center justify-between">
+      <header className="border-b-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm">
+          <CelBeacon3D
+            status={unread > 0 ? "warning" : "active"}
+            size={30}
+            title={unread > 0 ? `${unread} 条未读` : "收件箱实时信号"}
+            data-testid="inbox-beacon-3d"
+          />
           <span className="text-ink-dim">{t.inbox.global}</span>
           <span className="text-ink-dim">/</span>
-          <h1 className="font-bold text-ink">{t.pageTitles["/inbox"].title}</h1>
+          <h1 className="font-black text-ink">{t.pageTitles["/inbox"].title}</h1>
           {loadState === "ready" && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded-full bg-err/10 text-err font-semibold"
+              className="anime-hud-tag"
               data-testid="inbox-unread-count"
             >
               {unread}

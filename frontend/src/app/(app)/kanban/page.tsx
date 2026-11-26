@@ -111,6 +111,7 @@ import {
   type UnifiedWorkItem,
 } from "./unifiedWorkItems";
 import { KANBAN_COLUMNS } from "@/mocks/data";
+import { CelBeacon3D, CelHoloCube3D } from "@/components/effects/Cel3DUI";
 
 // per 2026-11-22 用户发令: 任务看板是第一个标签页; 甘特图(时间线)/燃尽图从分析界面迁入,
 // 所有任务管理内容集中在看板。
@@ -762,43 +763,62 @@ export default function KanbanPage() {
         {/* Branch 上下文条 (per 2026-11-15 用户发令: 不放右侧栏位, 内容进中心区域) */}
         <div
           data-testid="kanban-branch-context"
-          className="flex items-center gap-2 flex-wrap text-[11px]"
+          className="flex items-center justify-between gap-2 flex-wrap text-[11px]"
         >
-          {selectedBranch ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedBranch ? (
+              <a
+                href="/worktree"
+                className="flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 font-semibold text-ok hover:bg-ok/20 transition-colors"
+              >
+                <GitBranch size={11} /> {selectedBranch}
+                {selectedWorktree ? ` · ${selectedWorktree.name}` : ""}
+              </a>
+            ) : (
+              <span className="flex items-center gap-1.5 rounded-full border border-line bg-bg-card px-2.5 py-1 text-ink-dim">
+                <GitBranch size={11} /> 未选择 Branch — 在左侧目录树选择 Worktree
+                → Branch 进入隔离视图
+              </span>
+            )}
             <a
-              href="/worktree"
-              className="flex items-center gap-1.5 rounded-full border border-ok/40 bg-ok/10 px-2.5 py-1 font-semibold text-ok hover:bg-ok/20 transition-colors"
+              href="/canvas/canvas-001"
+              className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent hover:bg-accent/20 transition-colors"
             >
-              <GitBranch size={11} /> {selectedBranch}
-              {selectedWorktree ? ` · ${selectedWorktree.name}` : ""}
+              <PenTool size={11} /> 画布
             </a>
-          ) : (
-            <span className="flex items-center gap-1.5 rounded-full border border-line bg-bg-card px-2.5 py-1 text-ink-dim">
-              <GitBranch size={11} /> 未选择 Branch — 在左侧目录树选择 Worktree
-              → Branch 进入隔离视图
+            <span className="flex items-center gap-1 text-ink-mute">
+              <Users size={11} />
+              <span className="flex -space-x-1">
+                {identities.slice(0, 4).map((who, i) => (
+                  <span
+                    key={who.id ?? i}
+                    title={who.display_name}
+                    className="size-5 rounded-full border border-line bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
+                  >
+                    {who.display_name?.slice(0, 1) ?? "?"}
+                  </span>
+                ))}
+              </span>
+              {identities.length} 在线
             </span>
-          )}
-          <a
-            href="/canvas/canvas-001"
-            className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 font-semibold text-accent hover:bg-accent/20 transition-colors"
-          >
-            <PenTool size={11} /> 画布
-          </a>
-          <span className="flex items-center gap-1 text-ink-mute">
-            <Users size={11} />
-            <span className="flex -space-x-1">
-              {identities.slice(0, 4).map((who, i) => (
-                <span
-                  key={who.id ?? i}
-                  title={who.display_name}
-                  className="size-5 rounded-full border border-line bg-accent/15 text-accent text-[10px] font-bold grid place-items-center"
-                >
-                  {who.display_name?.slice(0, 1) ?? "?"}
-                </span>
-              ))}
+          </div>
+          <div className="divinity-hud-strip shrink-0">
+            <CelHoloCube3D
+              status={selectedWorktree ? "optimal" : "warning"}
+              size={28}
+              title={selectedWorktree ? `Worktree ${selectedWorktree.name}` : "Worktree Topology 3D"}
+              data-testid="kanban-3d-holocube"
+            />
+            <CelBeacon3D
+              status={serverMode ? "active" : "warning"}
+              size={28}
+              title={serverMode ? "服务端真源在线" : "本地模式"}
+              data-testid="kanban-3d-beacon"
+            />
+            <span className="font-mono text-[10px] font-bold text-[var(--cel-cyan,var(--accent-DEFAULT))]">
+              {serverMode ? "SYNC: LIVE" : "MODE: LOCAL"}
             </span>
-            {identities.length} 在线
-          </span>
+          </div>
         </div>
 
         {/* 数据来源标识 (per P1: 服务端真源 / 本地模式 明确区分, 不冒充) */}

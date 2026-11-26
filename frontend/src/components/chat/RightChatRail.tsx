@@ -25,6 +25,7 @@ import { useChatStore, CHAT_MODELS, type ChatEffort } from "@/lib/chat/chatStore
 import { ContextPanel, estimateTokens } from "@/components/agent/ContextPanel";
 import { DmCenterPanel } from "@/components/chat/DmCenterPanel";
 import { useTranslation } from "@/lib/i18n";
+import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 export function RightChatRail() {
   const { t } = useTranslation();
@@ -93,16 +94,17 @@ const [open, setOpen] = useState(false);
       data-testid="right-chat-rail"
       className={clsx(
         // per 2026-11-15 用户发令: 右侧聊天栏顶格 (fixed top-0 顶到视口最顶, 不被 header 挤压)
-        "fixed top-0 right-0 z-40 h-screen border-l-2 border-line bg-bg-card/95 backdrop-blur-xl flex flex-col transition-all duration-200",
+        "fixed top-0 right-0 z-40 h-screen border-l-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-card,var(--color-surface-2))]/95 backdrop-blur-xl flex flex-col transition-all duration-200",
         open ? "w-80" : "w-14",
       )}
     >
       {/* 顶部 header 行: 占满上方空间 (per 2026-11-14 用户发令) */}
-      <div className="shrink-0 border-b border-line flex items-center justify-between px-3 py-2.5 bg-bg-card">
+      <div className="shrink-0 border-b-2 border-[var(--cel-ink,var(--color-border))] flex items-center justify-between px-3 py-2.5 bg-[var(--cel-surface-card,var(--color-surface-2))]">
         {open ? (
           <>
-            <span className="text-xs font-bold text-ink flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-accent" /> 聊天
+            <span className="text-xs font-black tracking-wide text-[var(--cel-text-primary,var(--color-text))] flex items-center gap-2">
+              <CelBeacon3D status="active" size={24} title="Agent Comms Online" data-testid="chat-rail-beacon-3d" />
+              <MessageSquare size={13} className="text-[var(--cel-cyan,var(--color-primary))]" /> 聊天
             </span>
             <button
               type="button"

@@ -105,6 +105,7 @@ import { GitBindingPanel } from "./GitBindingPanel";
 import { MagosLanePanel } from "@/components/magos/MagosLanePanel";
 import { BranchWorkspace } from "@/components/run/BranchWorkspace";
 import { findWorktreeGitBinding, useGitBindings } from "@/lib/group/gitBindingStore";
+import { CelHoloCube3D } from "@/components/effects/Cel3DUI";
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 CREATE
@@ -621,7 +622,7 @@ function WorktreePageInner() {
       <PageHeader
         title="Worktree 汇总与管理入口"
         subtitle="跨 Lane / Worktree / Branch 的汇总与管理入口 — 先选择 Project，再集中查看每个 Agent Worktree 的归属、执行绑定、生命周期与健康信号；Lane 与 Branch 上下文随链接参数就绪时优先展示。"
-        icon={<GitBranch className="text-accent" size={20} />}
+        icon={<CelHoloCube3D status={displayedWorktreeCount > 0 ? "optimal" : "warning"} size={36} title="Worktree 3D Topology" data-testid="worktree-header-3d" />}
         track="B"
         count={displayedWorktreeCount}
       />

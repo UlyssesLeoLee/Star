@@ -27,6 +27,8 @@ import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
+import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
+import { CelBeacon3D } from "@/components/effects/Cel3DUI";
 
 // Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
 // 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (开发服务器注入)
@@ -65,36 +67,39 @@ export function AppHeader() {
         style={{ paddingRight: "var(--chat-rail-w, 56px)" }}
       >
         <div className="h-full px-6 flex items-center gap-4">
-          {/* === Left: Workspace Switcher + Worktree ID sub-label === */}
-          <div className="flex flex-col items-start gap-1 shrink-0">
-            <button
-              type="button"
-              data-testid="workspace-switcher"
-              className="flex items-center gap-2 px-3 h-9 text-xs font-mono text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-all duration-150"
-              aria-label={t.appHeader.workspaceSwitcher}
-            >
-              <span className="size-2 bg-[var(--cel-cyan,var(--color-primary))] rotate-45 border border-[var(--cel-ink,var(--color-border))]" />
-              <span className="truncate max-w-[140px] font-black tracking-tight">ACME Studio</span>
-              <span className="text-[10px] text-black font-mono font-black px-1.5 py-0.5 bg-[var(--cel-gold,var(--color-warning))] border border-[var(--cel-ink,var(--color-border))]">CORE</span>
-              <ChevronDown size={12} className="text-[var(--cel-text-secondary,var(--color-text-dim))] ml-0.5" />
-            </button>
-            {WORKTREE_ID && (
-              <div
-                data-testid="worktree-id-badge"
-                className="flex items-center gap-1.5 pl-1 pr-2 h-5 text-[10px] font-mono font-bold border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-cyan,var(--color-primary))] whitespace-nowrap"
-                title={`Worktree: ${WORKTREE_ID}${WORKTREE_BRANCH ? ` @ ${WORKTREE_BRANCH}` : ""}`}
+          {/* === Left: 3D Core + Workspace Switcher + Worktree ID sub-label === */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <TacticalCore3D size={36} status="nominal" className="shrink-0 hidden sm:block" />
+            <div className="flex flex-col items-start gap-1 shrink-0">
+              <button
+                type="button"
+                data-testid="workspace-switcher"
+                className="flex items-center gap-2 px-3 h-9 text-xs font-mono text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-all duration-150"
+                aria-label={t.appHeader.workspaceSwitcher}
               >
-                <span className="size-1.5 bg-[var(--cel-cyan,var(--color-primary))] animate-pulse" aria-hidden="true" />
-                <span className="text-[var(--cel-text-secondary,var(--color-text-dim))] font-black tracking-wider">WT</span>
-                <span className="text-[var(--cel-text-primary,var(--color-text))] font-black">{WORKTREE_ID}</span>
-                {WORKTREE_BRANCH && (
-                  <>
-                    <span className="text-[var(--cel-text-secondary,var(--color-text-dim))]">·</span>
-                    <span className="text-[var(--cel-gold,var(--color-warning))] font-black tracking-tight">{WORKTREE_BRANCH}</span>
-                  </>
-                )}
-              </div>
-            )}
+                <span className="size-2 bg-[var(--cel-cyan,var(--color-primary))] rotate-45 border border-[var(--cel-ink,var(--color-border))]" />
+                <span className="truncate max-w-[140px] font-black tracking-tight">ACME Studio</span>
+                <span className="text-[10px] text-black font-mono font-black px-1.5 py-0.5 bg-[var(--cel-gold,var(--color-warning))] border border-[var(--cel-ink,var(--color-border))]">CORE</span>
+                <ChevronDown size={12} className="text-[var(--cel-text-secondary,var(--color-text-dim))] ml-0.5" />
+              </button>
+              {WORKTREE_ID && (
+                <div
+                  data-testid="worktree-id-badge"
+                  className="flex items-center gap-1.5 pl-1 pr-2 h-5 text-[10px] font-mono font-bold border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-cyan,var(--color-primary))] whitespace-nowrap"
+                  title={`Worktree: ${WORKTREE_ID}${WORKTREE_BRANCH ? ` @ ${WORKTREE_BRANCH}` : ""}`}
+                >
+                  <span className="size-1.5 bg-[var(--cel-cyan,var(--color-primary))] animate-pulse" aria-hidden="true" />
+                  <span className="text-[var(--cel-text-secondary,var(--color-text-dim))] font-black tracking-wider">WT</span>
+                  <span className="text-[var(--cel-text-primary,var(--color-text))] font-black">{WORKTREE_ID}</span>
+                  {WORKTREE_BRANCH && (
+                    <>
+                      <span className="text-[var(--cel-text-secondary,var(--color-text-dim))]">·</span>
+                      <span className="text-[var(--cel-gold,var(--color-warning))] font-black tracking-tight">{WORKTREE_BRANCH}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* === Middle: Primary Navigation Tabs (用户自由增删) === */}
@@ -118,7 +123,7 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="h-9 w-9 grid place-items-center text-ink-mute hover:text-accent border border-line bg-bg-card hover:bg-accent/10 rounded-lg transition-colors shrink-0"
+              className="h-9 w-9 grid place-items-center text-[var(--cel-text-secondary,var(--color-text-dim))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
             >
               <Plus size={14} />
             </button>
@@ -136,7 +141,7 @@ export function AppHeader() {
             </Link>
           </nav>
 
-          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, dot, avatar === */}
+          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, 3D beacon, dot, avatar === */}
           <div className="ml-auto flex items-center gap-2">
             <ThemeSwitcher />
 
@@ -145,7 +150,7 @@ export function AppHeader() {
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
               aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-1.5 h-9 px-2 border border-line bg-bg-card text-ink hover:bg-accent/10 transition-all text-xs rounded-lg shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1.5 h-9 px-2.5 border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] text-[var(--cel-text-primary,var(--color-text))] cel-shadow transition-all text-xs shrink-0 whitespace-nowrap"
             >
               <Search size={13} className="text-[var(--cel-cyan,var(--color-primary))] shrink-0" />
               <kbd className="inline-flex items-center justify-center text-[10px] font-mono px-1.5 border border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] text-[var(--cel-gold,var(--color-accent))] font-black">⌘K</kbd>
@@ -155,7 +160,7 @@ export function AppHeader() {
               type="button"
               data-testid="notifications-bell"
               aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative size-9 grid place-items-center text-ink hover:text-accent border border-line bg-bg-card hover:bg-accent/10 rounded-lg transition-colors shrink-0"
+              className="relative size-9 grid place-items-center text-[var(--cel-text-primary,var(--color-text))] hover:text-[var(--cel-cyan,var(--color-primary))] border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-sub,var(--color-surface))] hover:bg-[var(--cel-surface-card,var(--color-surface-2))] cel-shadow transition-colors shrink-0"
             >
               <Bell size={15} />
               {notifCount > 0 && (
@@ -167,6 +172,14 @@ export function AppHeader() {
                 </span>
               )}
             </button>
+
+            <CelBeacon3D
+              status="active"
+              size={34}
+              title={t.appHeader.realtimeOnline}
+              data-testid="header-beacon-3d"
+              className="hidden md:inline-block border-2 border-[var(--cel-ink,var(--color-border))] bg-[var(--cel-surface-stage,var(--color-surface))] cel-shadow"
+            />
 
             {/* Realtime status — dot only, no text label */}
             <div
