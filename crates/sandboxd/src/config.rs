@@ -128,15 +128,18 @@ pub struct ObservabilityConfig {
     pub audit_log_retention_days: u32,
 }
 
-/// failover 段 (per FR-7.1 跟 SANDBOX-001 v0.2 兼容)
+/// failover 段 (per FR-7: 保留供 migration 兼容，生产环境 fail-closed 不降级)
+/// 
+/// ⚠️ 生产环境 **fail-closed**: sandboxd 不可用 → BLOCK，不降级到未验证 subprocess。
+/// 此配置仅保留字段以便配置文件反序列化不破坏 migration 兼容性。
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct FailoverConfig {
-    /// 启用 v0.2 subprocess 降级
+    /// 启用 v0.2 subprocess 降级 (仅供 migration 兼容，产品路径已废弃)
     pub enable_v0_2_subprocess_fallback: bool,
-    /// 降级路径 (scripts/automation/guardian/sandbox.py)
+    /// 降级路径 (scripts/automation/guardian/sandbox.py) — 仅供 migration 兼容
     pub fallback_path: PathBuf,
-    /// 降级事件是否推送 root session 通知 (NFR-O-3)
+    /// 降级事件是否推送 root session 通知 (NFR-O-3) — 仅供 migration 兼容
     pub root_session_notify: bool,
 }
 
@@ -240,7 +243,7 @@ impl Default for ObservabilityConfig {
 impl Default for FailoverConfig {
     fn default() -> Self {
         Self {
-            enable_v0_2_subprocess_fallback: true,
+            enable_v0_2_subprocess_fallback: false, // 生产环境 fail-closed：默认禁用降级
             fallback_path: PathBuf::from("scripts/automation/guardian/sandbox.py"),
             root_session_notify: true,
         }
@@ -258,7 +261,7 @@ impl SandboxdConfig {
         Ok(config)
     }
 
-    /// 加载或回退默认 (配置文件不存在 → 默认 + warn, per FR-7.1 fail-open 精神)
+    /// 加载或回退默认 (配置文件不存在 → 默认 + warn)
     pub fn load_or_default(path: &Path) -> SandboxdConfig {
         match Self::from_yaml(path) {
             Ok(c) => c,

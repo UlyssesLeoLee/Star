@@ -3,19 +3,19 @@
 MERGE (self:File {path:"crates/sandboxd/src/client.rs"})
 @endcypher
 */
-//! `sandboxd` client 模块 (per FR-7.1 fail-open + BD-002 §3.3 Rust client)
+//! `sandboxd` client 模块 (per FR-7 fail-closed + BD-002 §3.3 Rust client)
 //!
-//! Rust gRPC client + fail-open 降级:
+//! Rust gRPC client + **fail-closed 安全阻断**:
 //!
 //! ```text
 //! client ── gRPC Connect 127.0.0.1:50051
 //!   ├─ Success: CreateSession → RunCommand → DestroySession (完整 4 维隔离)
-//!   └─ Failure (连接拒绝 / Unavailable / 健康检查失败):
-//!       走 SANDBOX-001 v0.2 subprocess 降级 (仅 resource 维隔离, per FR-7.1)
+//!   └─ Failure (连接拒绝 / Unavailable / 健康检查失败 / 策略不满足 / 审计不可用):
+//!       **BLOCK** (不降级, per DD-SANDBOX-002 v0.1.2 FR-7 fail-closed)
 //! ```
 //!
-//! 注意 (per SRS §9 缺口 #1 P0 阻塞): dispatcher.py 切 gRPC client 是 v0.2 拍摄,
-//! 本模块提供 Rust 侧完整 client + failover 原语, Python 端改造跨 session 续做。
+//! ⚠️ 旧版 fail-open 降级路径 (SANDBOX-001 v0.2 subprocess) 已废弃，
+//! 仅保留 FallbackSpec 配置结构供 migration 兼容，不再作为产品路径。
 
 use std::path::Path;
 use std::time::Duration;
@@ -23,7 +23,7 @@ use std::time::Duration;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
-use crate::backend::{await_child, CommandSpec, RunResult, TIMEOUT_EXIT_CODE};
+use crate::backend::{CommandSpec, RunResult};
 use crate::error::SandboxdError;
 use crate::policy::SessionSpec;
 use crate::proto as pb;
@@ -31,19 +31,21 @@ use crate::proto as pb;
 /// gRPC client 连接超时 (per NFR-P-1: CreateSession p99 < 100ms 降级判断)
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_millis(100);
 
-/// fail-open 降级规格 (per FR-7.1: SANDBOX-001 v0.2 subprocess 降级路径)
+/// 兼容配置结构 (per FR-7: 保留供 migration 兼容，不再作为产品路径)
+/// 
+/// ⚠️ 旧版 fail-open 降级规格 (SANDBOX-001 v0.2 subprocess) 已废弃。
+/// 生产环境 **fail-closed**: sandboxd 不可用 → BLOCK，不降级。
+/// 此结构仅保留字段以便配置文件反序列化不破坏。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FallbackSpec {
-    /// 可执行程序 (e.g. "python")
+    /// 可执行程序 (e.g. "python") — 仅供 migration 兼容
     pub program: String,
-    /// 前缀参数 (e.g. ["scripts/automation/guardian/sandbox.py"])
+    /// 前缀参数 (e.g. ["scripts/automation/guardian/sandbox.py"]) — 仅供 migration 兼容
     pub args_prefix: Vec<String>,
 }
 
 impl FallbackSpec {
-    /// 从降级路径构造 (per config.failover.fallback_path)
-    ///
-    /// `.py` → program="python" + prefix=[path]; 其他 → program=path。
+    /// 从降级路径构造 (per config.failover.fallback_path) — 仅供 migration 兼容
     pub fn from_path(path: &Path) -> Self {
         let s = path.to_string_lossy().to_string();
         if s.ends_with(".py") {
@@ -59,7 +61,7 @@ impl FallbackSpec {
         }
     }
 
-    /// 禁用降级 (program 为空 = disabled, per config 关闭 failover)
+    /// 禁用降级 (program 为空 = disabled, per config 关闭 failover) — 仅供 migration 兼容
     pub fn disabled() -> Self {
         Self {
             program: String::new(),
@@ -73,15 +75,43 @@ impl FallbackSpec {
     }
 }
 
-/// failover 执行结果 (per FR-7.1: 降级路径标注 degraded)
+/// failover 执行结果 (per FR-7: 生产执行阻断，不降级到未验证 subprocess)
+/// 
+/// 生产执行阻断语义 (per DD-SANDBOX-002 v0.1.2 FR-7 fail-closed):
+/// - sandboxd gRPC 连接/健康检查失败 → BLOCK (不降级)
+/// - CreateSession 失败（策略不满足、资源不足、audit 不可用） → BLOCK
+/// - RunCommand 失败 → BLOCK
+/// 
+/// ⚠️ 旧版 fail-open 降级路径 (SANDBOX-001 v0.2 subprocess) 已废弃，
+/// 仅保留配置结构供 migration 兼容，不再作为产品路径。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FailoverRun {
-    /// 命令结果
-    pub result: RunResult,
-    /// 是否走降级路径 (sandboxd 不可用)
+    /// 命令结果 (仅在未 BLOCK 时有效)
+    pub result: Option<RunResult>,
+    /// 是否因降级路径产生 (保留字段，永远为 false)
     pub degraded: bool,
-    /// 详情 (降级原因 / gRPC 错误摘要)
-    pub detail: String,
+    /// 降级/失败原因 (BLOCK 时包含诊断信息)
+    pub reason: String,
+}
+
+impl FailoverRun {
+    /// 成功执行
+    pub fn success(result: RunResult) -> Self {
+        Self {
+            result: Some(result),
+            degraded: false,
+            reason: String::new(),
+        }
+    }
+
+    /// 安全阻断 (fail-closed)
+    pub fn blocked(reason: impl Into<String>) -> Self {
+        Self {
+            result: None,
+            degraded: false,
+            reason: reason.into(),
+        }
+    }
 }
 
 /// sandboxd gRPC client (per BD-002 §3.3 Rust client, 跟 Python client 对称)
@@ -236,178 +266,117 @@ impl SandboxdClient {
         Ok(Box::pin(resp))
     }
 
-    /// 完整生命周期 + fail-open 降级 (per FR-7.1)
-    ///
-    /// gRPC 路径任一步失败 (连接 / CreateSession / RunCommand) → 走 `fallback` 降级
-    /// (SANDBOX-001 v0.2 subprocess, 仅 resource 维隔离), 返回 `degraded=true`。
-    pub async fn run_with_failover(
-        &self,
-        cmd: &CommandSpec,
-        fallback: &FallbackSpec,
-        timeout_sec: u32,
-    ) -> FailoverRun {
-        // FR-7.1 触发条件 1: gRPC 连接失败 → 降级
-        let mut client = match self.connect().await {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::warn!(
-                    "sandboxd unavailable ({e}), falling back to SANDBOX-001 v0.2 subprocess"
-                );
-                return self
-                    .run_fallback(cmd, fallback, timeout_sec, e.to_string())
-                    .await;
-            }
-        };
-        // CreateSession (默认 policy) → 失败降级
-        let session_id = match client
-            .create_session(pb::CreateSessionRequest {
-                client_id: "sandboxd-client".to_string(),
-                task_id: String::new(),
-                parent_session_id: String::new(),
-                policy: Some((&SessionSpec::default()).into()),
-                timeout_sec,
-            })
-            .await
-            .map(|resp| resp.into_inner())
-        {
-            Ok(resp) => {
-                let status = pb::create_session_response::Status::try_from(resp.status)
-                    .unwrap_or(pb::create_session_response::Status::Failed);
-                if status == pb::create_session_response::Status::Ready {
-                    match Uuid::parse_str(&resp.session_id) {
-                        Ok(id) => id,
-                        Err(e) => {
-                            return self
-                                .run_fallback(cmd, fallback, timeout_sec, e.to_string())
-                                .await;
-                        }
-                    }
-                } else {
-                    return self
-                        .run_fallback(cmd, fallback, timeout_sec, resp.error)
-                        .await;
+    /// 完整生命周期 + fail-closed 安全阻断 (per FR-7)
+        ///
+        /// 生产执行阻断语义 (per DD-SANDBOX-002 v0.1.2 FR-7 fail-closed):
+        /// - sandboxd gRPC 连接/健康检查失败 → BLOCK (不降级)
+        /// - CreateSession 失败（策略不满足、资源不足、audit 不可用） → BLOCK
+        /// - RunCommand 失败 → BLOCK
+        /// 
+        /// ⚠️ 旧版 fail-open 降级路径 (SANDBOX-001 v0.2 subprocess) 已废弃，
+        /// 仅保留 FallbackSpec 配置结构供 migration 兼容，不再作为产品路径。
+        pub async fn run_with_failover(
+            &self,
+            cmd: &CommandSpec,
+            _fallback: &FallbackSpec,
+            timeout_sec: u32,
+        ) -> FailoverRun {
+            // FR-7 触发条件 1: gRPC 连接失败 → BLOCK
+            let mut client = match self.connect().await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::error!(
+                        "sandboxd unavailable ({e}), BLOCK (fail-closed: no fallback)"
+                    );
+                    return FailoverRun::blocked(format!("sandboxd connect failed: {e}"));
                 }
-            }
-            Err(e) => {
-                return self
-                    .run_fallback(cmd, fallback, timeout_sec, e.to_string())
-                    .await;
-            }
-        };
-        // RunCommand → 失败降级
-        let result = match client
-            .run_command(pb::RunCommandRequest {
-                session_id: session_id.to_string(),
-                command: Some(pb::CommandSpec {
-                    cmd: cmd.cmd.clone(),
-                    env: cmd.env.clone(),
-                    cwd: cmd.cwd.clone(),
-                    capture_output: cmd.capture_output,
-                }),
-                timeout_sec,
-            })
-            .await
-            .map(|resp| resp.into_inner())
-        {
-            Ok(resp) => RunResult {
-                returncode: resp.returncode,
-                stdout: resp.stdout,
-                stderr: resp.stderr,
-                latency_ms: resp.latency_ms,
-                hit_violations: resp.hit_violations,
-            },
-            Err(e) => {
-                return self
-                    .run_fallback(cmd, fallback, timeout_sec, e.to_string())
-                    .await;
-            }
-        };
-        // DestroySession (best-effort)
-        let _ = client
-            .destroy_session(pb::DestroySessionRequest {
-                session_id: session_id.to_string(),
-                reason: "client lifecycle end".to_string(),
-            })
-            .await;
-        FailoverRun {
-            result,
-            degraded: false,
-            detail: String::new(),
-        }
-    }
-
-    /// 降级路径执行 (per FR-7.1: SANDBOX-001 v0.2 subprocess.run 等价)
-    async fn run_fallback(
-        &self,
-        cmd: &CommandSpec,
-        fallback: &FallbackSpec,
-        timeout_sec: u32,
-        reason: String,
-    ) -> FailoverRun {
-        let degraded = true;
-        if fallback.is_disabled() {
-            return FailoverRun {
-                result: RunResult {
-                    returncode: -1,
-                    stdout: String::new(),
-                    stderr: "sandboxd unavailable and fallback disabled".to_string(),
-                    latency_ms: 0,
-                    hit_violations: vec![format!("failover: {reason}")],
-                },
-                degraded,
-                detail: format!("sandboxd unavailable: {reason} (fallback disabled)"),
             };
+            // CreateSession (默认 policy) → 失败 BLOCK
+            let session_id = match client
+                .create_session(pb::CreateSessionRequest {
+                    client_id: "sandboxd-client".to_string(),
+                    task_id: String::new(),
+                    parent_session_id: String::new(),
+                    policy: Some((&SessionSpec::default()).into()),
+                    timeout_sec,
+                })
+                .await
+                .map(|resp| resp.into_inner())
+            {
+                Ok(resp) => {
+                    let status = pb::create_session_response::Status::try_from(resp.status)
+                        .unwrap_or(pb::create_session_response::Status::Failed);
+                    if status == pb::create_session_response::Status::Ready {
+                        match Uuid::parse_str(&resp.session_id) {
+                            Ok(id) => id,
+                            Err(e) => {
+                                return FailoverRun::blocked(format!("session ID parse failed: {e}"));
+                            }
+                        }
+                    } else {
+                        return FailoverRun::blocked(format!("CreateSession failed: {}", resp.error));
+                    }
+                }
+                Err(e) => {
+                    return FailoverRun::blocked(format!("CreateSession RPC failed: {e}"));
+                }
+            };
+            // RunCommand → 失败 BLOCK
+            let result = match client
+                .run_command(pb::RunCommandRequest {
+                    session_id: session_id.to_string(),
+                    command: Some(pb::CommandSpec {
+                        cmd: cmd.cmd.clone(),
+                        env: cmd.env.clone(),
+                        cwd: cmd.cwd.clone(),
+                        capture_output: cmd.capture_output,
+                    }),
+                    timeout_sec,
+                })
+                .await
+                .map(|resp| resp.into_inner())
+            {
+                Ok(resp) => RunResult {
+                    returncode: resp.returncode,
+                    stdout: resp.stdout,
+                    stderr: resp.stderr,
+                    latency_ms: resp.latency_ms,
+                    hit_violations: resp.hit_violations,
+                },
+                Err(e) => {
+                    return FailoverRun::blocked(format!("RunCommand RPC failed: {e}"));
+                }
+            };
+            // DestroySession (best-effort)
+            let _ = client
+                .destroy_session(pb::DestroySessionRequest {
+                    session_id: session_id.to_string(),
+                    reason: "client lifecycle end".to_string(),
+                })
+                .await;
+            FailoverRun::success(result)
         }
-        let mut command = tokio::process::Command::new(&fallback.program);
-        command.args(&fallback.args_prefix);
-        command.args(&cmd.cmd);
-        for kv in &cmd.env {
-            if let Some((k, v)) = kv.split_once('=') {
-                command.env(k, v);
-            }
-        }
-        if !cmd.cwd.is_empty() {
-            command.current_dir(&cmd.cwd);
-        }
-        command.stdout(std::process::Stdio::piped());
-        command.stderr(std::process::Stdio::piped());
-        command.stdin(std::process::Stdio::null());
-        command.kill_on_drop(true);
-        let child = match command.spawn() {
-            Ok(c) => c,
-            Err(e) => {
-                return FailoverRun {
-                    result: RunResult {
-                        returncode: -1,
-                        stdout: String::new(),
-                        stderr: format!("fallback spawn failed: {e}"),
-                        latency_ms: 0,
-                        hit_violations: vec![format!("failover: {reason}")],
-                    },
-                    degraded,
-                    detail: format!("sandboxd unavailable ({reason}); fallback spawn failed"),
-                };
-            }
-        };
-        let (code, stdout, stderr, timed_out) = await_child(child, timeout_sec).await;
-        let result = RunResult {
-            returncode: if timed_out { TIMEOUT_EXIT_CODE } else { code },
-            stdout,
-            stderr,
-            latency_ms: 0,
-            hit_violations: vec![format!("failover: {reason}")],
-        };
-        FailoverRun {
-            result,
-            degraded,
-            detail: format!(
-                "sandboxd unavailable: {reason}; degraded to SANDBOX-001 v0.2 subprocess"
-            ),
-        }
-    }
-}
 
-/// tonic 生成 client 类型别名
+        /// 兼容旧版降级路径 (per FR-7: 仅供 migration 兼容，产品路径不再使用)
+            /// 
+            /// ⚠️ 生产环境 **fail-closed**: 此方法不应被调用。
+            /// 保留仅为配置结构反序列化兼容。
+            async fn run_fallback(
+                &self,
+                _cmd: &CommandSpec,
+                _fallback: &FallbackSpec,
+                _timeout_sec: u32,
+                reason: String,
+            ) -> FailoverRun {
+                tracing::error!(
+                    "run_fallback called in production (should not happen), reason: {}",
+                    reason
+                );
+                FailoverRun::blocked(format!("fallback disabled (fail-closed): {reason}"))
+            }
+        }
+
+        /// tonic 生成 client 类型别名
 pub type SandboxServiceClient = pb::sandbox_service_client::SandboxServiceClient<Channel>;
 
 #[cfg(test)]
